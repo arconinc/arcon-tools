@@ -1,7 +1,9 @@
 import type { NextConfig } from "next";
 
 const nextConfig: NextConfig = {
-  /* config options here */
+  // All pages are dynamic (require auth / runtime data)
+  // This prevents build-time errors from missing env vars during prerender
+  output: 'standalone',
 };
 
 export default nextConfig;
