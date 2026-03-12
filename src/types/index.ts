@@ -4,10 +4,22 @@ export interface AppUser {
   id: string
   email: string
   display_name: string
-  google_id: string
+  google_id: string | null
   is_admin: boolean
   created_at: string
   last_login_at: string
+  birth_date: string | null
+  start_date: string | null
+}
+
+export interface BirthdayEvent {
+  id: string
+  name: string
+  initials: string
+  type: 'birthday' | 'anniversary'
+  days_until: number
+  date_label: string   // e.g. "Mar 15" or "Today"
+  years?: number       // years of service (anniversaries only)
 }
 
 // ─── Store ───────────────────────────────────────────────────────────────────

@@ -78,6 +78,22 @@ CREATE INDEX IF NOT EXISTS idx_audit_user_id     ON public.audit_log(user_id);
 CREATE INDEX IF NOT EXISTS idx_audit_store_id    ON public.audit_log(store_id);
 CREATE INDEX IF NOT EXISTS idx_audit_created_at  ON public.audit_log(created_at DESC);
 
+-- ── Migration: Add birth_date, start_date; make google_id nullable ────────────
+-- Run this in the Supabase SQL Editor after the initial schema is applied.
+--
+-- ALTER TABLE public.users
+--   ALTER COLUMN google_id DROP NOT NULL,
+--   ADD COLUMN IF NOT EXISTS birth_date date,
+--   ADD COLUMN IF NOT EXISTS start_date date;
+--
+-- -- Replace the table-level UNIQUE constraint with a partial index so that
+-- -- multiple NULL values are allowed (pre-loaded users before first login).
+-- ALTER TABLE public.users DROP CONSTRAINT IF EXISTS users_google_id_key;
+-- CREATE UNIQUE INDEX IF NOT EXISTS idx_users_google_id_unique
+--   ON public.users(google_id)
+--   WHERE google_id IS NOT NULL;
+-- ──────────────────────────────────────────────────────────────────────────────
+
 -- ── Notes ─────────────────────────────────────────────────────
 -- Row Level Security is intentionally disabled.
 -- All access control is enforced at the Next.js middleware/route level

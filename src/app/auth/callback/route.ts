@@ -12,24 +12,52 @@ export async function GET(request: Request) {
 
     if (!error && sessionData.user) {
       const user = sessionData.user
+      const email = user.email ?? ''
       const adminClient = createAdminClient()
 
-      // Upsert user record on every login
-      await adminClient.from('users').upsert(
-        {
+      // Look up by email to support pre-loaded user records
+      const { data: existing } = await adminClient
+        .from('users')
+        .select('id, google_id')
+        .eq('email', email)
+        .single()
+
+      if (existing) {
+        if (!existing.google_id) {
+          // Pre-loaded user logging in for the first time: link their Google account.
+          // Keep the admin-set display_name — do not override it.
+          await adminClient
+            .from('users')
+            .update({ google_id: user.id, last_login_at: new Date().toISOString() })
+            .eq('id', existing.id)
+        } else {
+          // Returning user: just refresh last_login_at
+          await adminClient
+            .from('users')
+            .update({ last_login_at: new Date().toISOString() })
+            .eq('id', existing.id)
+        }
+      } else {
+        // Brand new user: create a record with their Google identity
+        await adminClient.from('users').insert({
           google_id: user.id,
-          email: user.email ?? '',
-          display_name: user.user_metadata?.full_name ?? user.email ?? 'Unknown',
+          email,
+          display_name: user.user_metadata?.full_name ?? email ?? 'Unknown',
           last_login_at: new Date().toISOString(),
-        },
-        { onConflict: 'google_id' }
-      )
+        })
+      }
 
       // Check if credentials are set up
+      const { data: appUser } = await adminClient
+        .from('users')
+        .select('id')
+        .eq('email', email)
+        .single()
+
       const { data: creds } = await adminClient
         .from('app_credentials')
         .select('id')
-        .eq('user_id', (await adminClient.from('users').select('id').eq('google_id', user.id).single()).data?.id)
+        .eq('user_id', appUser?.id)
         .single()
 
       if (!creds) {

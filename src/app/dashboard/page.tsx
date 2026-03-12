@@ -3,7 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useAppUser } from '@/components/layout/AppShell'
-import { BannerSlide } from '@/types'
+import { BannerSlide, BirthdayEvent } from '@/types'
 
 // ── Mock data ─────────────────────────────────────────────────────────────────
 
@@ -20,11 +20,6 @@ const MOCK_TASKS = [
   { priority: 'low', name: 'Update employee handbook link', meta: 'Due Mar 21', pill: 'HR' },
 ]
 
-const MOCK_BIRTHDAYS = [
-  { initials: 'BB', bg: '#6b1e98', name: 'Brooke Bowlin', sub: '🎂 Birthday', badge: 'Today!', badgeClass: 'badge-today' },
-  { initials: 'EW', bg: '#9333ea', name: 'Ella Wheatcraft', sub: '🎂 Birthday · Mar 15', badge: '3 days', badgeClass: 'badge-soon' },
-  { initials: 'CJ', bg: '#374151', name: 'Cami Johnson', sub: '🥂 5yr Anniversary · Mar 18', badge: '6 days', badgeClass: 'badge-ann' },
-]
 
 const QUICK_LINKS = [
   { icon: '📦', bg: '#f3e8ff', label: 'Add Tracking', href: '/tasks/add-tracking' },
@@ -60,6 +55,8 @@ export default function DashboardPage() {
   const [slides, setSlides] = useState<BannerSlide[]>([])
   const [current, setCurrent] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
+  const [bdayEvents, setBdayEvents] = useState<(BirthdayEvent & { color: string })[]>([])
+  const [bdayCount, setBdayCount] = useState(0)
 
   useEffect(() => {
     fetch('/api/admin/banner')
@@ -84,6 +81,18 @@ export default function DashboardPage() {
     }, 4800)
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
   }, [slides.length])
+
+  useEffect(() => {
+    fetch('/api/dashboard/birthdays')
+      .then((r) => r.json())
+      .then((d) => {
+        if (d.events) {
+          setBdayEvents(d.events)
+          setBdayCount(d.birthdays_this_week ?? 0)
+        }
+      })
+      .catch(() => {})
+  }, [])
 
   function goTo(i: number) {
     const next = ((i % slides.length) + slides.length) % slides.length
@@ -312,8 +321,8 @@ export default function DashboardPage() {
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
               <div>
                 <div className="widget-label">Birthdays This Week</div>
-                <div className="widget-value">2</div>
-                <div className="widget-sub">1 today</div>
+                <div className="widget-value">{bdayCount}</div>
+                <div className="widget-sub">{bdayCount === 1 ? '1 birthday' : bdayCount === 0 ? 'None this week' : `${bdayCount} birthdays`}</div>
               </div>
               <div className="widget-icon wi-gray">
                 <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 15.546c-.523 0-1.046.151-1.5.454a2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.701 2.701 0 00-1.5-.454M9 6l3-3 3 3M9 6h6M9 6a3 3 0 01-3 3m12-3a3 3 0 01-3 3" /></svg>
@@ -385,16 +394,28 @@ export default function DashboardPage() {
               <div className="card-action">View all →</div>
             </div>
             <div className="card-body">
-              {MOCK_BIRTHDAYS.map((b, i) => (
-                <div key={i} className="bday-item">
-                  <div className="bday-av" style={{ background: b.bg }}>{b.initials}</div>
-                  <div style={{ flex: 1 }}>
-                    <div className="bday-name">{b.name}</div>
-                    <div className="bday-when">{b.sub}</div>
-                  </div>
-                  <span className={`bday-badge ${b.badgeClass}`}>{b.badge}</span>
-                </div>
-              ))}
+              {bdayEvents.length === 0 ? (
+                <div style={{ fontSize: 12, color: '#bbb', padding: '8px 0' }}>Nothing in the next 14 days</div>
+              ) : (
+                bdayEvents.map((b) => {
+                  const isBday = b.type === 'birthday'
+                  const sub = isBday
+                    ? `🎂 Birthday · ${b.date_label}`
+                    : `🥂 ${b.years}yr Anniversary · ${b.date_label}`
+                  const badge = b.days_until === 0 ? 'Today!' : b.days_until === 1 ? 'Tomorrow' : `${b.days_until} days`
+                  const badgeClass = b.days_until === 0 ? 'badge-today' : isBday ? 'badge-soon' : 'badge-ann'
+                  return (
+                    <div key={b.id} className="bday-item">
+                      <div className="bday-av" style={{ background: b.color }}>{b.initials}</div>
+                      <div style={{ flex: 1 }}>
+                        <div className="bday-name">{b.name}</div>
+                        <div className="bday-when">{sub}</div>
+                      </div>
+                      <span className={`bday-badge ${badgeClass}`}>{badge}</span>
+                    </div>
+                  )
+                })
+              )}
             </div>
           </div>
 
