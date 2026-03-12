@@ -1,8 +1,11 @@
 @import "tailwindcss";
 
 :root {
-  --background: #f8fafc;
-  --foreground: #0f172a;
+  --background: #f5f5f5;
+  --foreground: #111111;
+  --arcon-purple: #6b1e98;
+  --arcon-purple-light: #f3e8ff;
+  --arcon-sidebar: #111111;
 }
 
 body {

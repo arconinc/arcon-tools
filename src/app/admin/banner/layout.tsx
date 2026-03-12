@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect } from 'next/navigation'
 import AppShell from '@/components/layout/AppShell'
 
-export default async function DashboardLayout({ children }: { children: React.ReactNode }) {
+export default async function BannerAdminLayout({ children }: { children: React.ReactNode }) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
 
@@ -17,8 +17,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
     .single()
 
   if (!appUser) redirect('/login')
+  if (!appUser.is_admin) redirect('/dashboard')
 
-  // Check if credentials are configured
   const { data: creds } = await adminClient
     .from('app_credentials')
     .select('id')

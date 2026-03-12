@@ -27,8 +27,10 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   if (!creds) redirect('/setup-credentials')
 
+  const avatarUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture || null
+
   return (
-    <AppShell user={appUser}>
+    <AppShell user={{ ...appUser, avatar_url: avatarUrl }}>
       {children}
     </AppShell>
   )

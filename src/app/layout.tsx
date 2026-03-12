@@ -2,8 +2,8 @@ import type { Metadata } from 'next'
 import './globals.css'
 
 export const metadata: Metadata = {
-  title: 'Arcon Tools',
-  description: 'Internal store management dashboard',
+  title: 'The Arc',
+  description: 'Arcon Solutions Intranet',
 }
 
 export default function RootLayout({

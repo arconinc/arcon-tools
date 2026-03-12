@@ -113,6 +113,26 @@ export interface NotificationEmailPayload {
   }
 }
 
+// ─── Banner ───────────────────────────────────────────────────────────────────
+
+export interface BannerSlide {
+  id: string
+  pre_heading: string
+  headline: string
+  emoji: string
+  subhead: string
+  bg_type: 'gradient' | 'image'
+  bg_gradient: 'hs-1' | 'hs-2' | 'hs-3' | 'hs-4' | 'hs-5'
+  bg_image_url: string | null
+}
+
+export interface BannerConfig {
+  id: string
+  status: 'draft' | 'published'
+  slides_json: BannerSlide[]
+  updated_at: string
+}
+
 // ─── Task Card ────────────────────────────────────────────────────────────────
 
 export interface TaskCard {
