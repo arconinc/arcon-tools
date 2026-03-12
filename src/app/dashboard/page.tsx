@@ -3,15 +3,8 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useAppUser } from '@/components/layout/AppShell'
+import { NewsFeed } from '@/components/news/NewsFeed'
 import { BannerSlide, BirthdayEvent } from '@/types'
-
-// ── Mock data ─────────────────────────────────────────────────────────────────
-
-const MOCK_NEWS = [
-  { tag: 'Company', tagClass: 'tag-company', date: 'Mar 10', title: 'Q1 All-Hands Meeting — March 20th', preview: 'Zoom link and agenda will be sent by end of week.' },
-  { tag: 'HR', tagClass: 'tag-hr', date: 'Mar 8', title: 'Updated PTO Policy — Effective April 1', preview: 'See HR Documents for the updated handbook.' },
-  { tag: 'Sales', tagClass: 'tag-sales', date: 'Mar 5', title: 'New 2026 Pricing Sheet Available', preview: 'Updated pricing deck is live in the Sales Documents folder.' },
-]
 
 const MOCK_TASKS = [
   { priority: 'high', name: 'Update CSR tracking doc', meta: 'Due Mar 13', pill: 'E-Commerce' },
@@ -156,18 +149,7 @@ export default function DashboardPage() {
         .card-action { font-size: 12px; color: #6b1e98; cursor: pointer; font-weight: 600; }
         .card-body { padding: 12px 16px; }
 
-        /* ── News ── */
-        .news-item { padding: 9px 0; border-bottom: 1px solid #f5f5f5; }
-        .news-item:last-child { border-bottom: none; padding-bottom: 0; }
-        .news-tag { font-size: 10px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; padding: 2px 7px; border-radius: 3px; }
-        .tag-company { background: #f3e8ff; color: #6b1e98; }
-        .tag-hr { background: #f0fdf4; color: #15803d; }
-        .tag-sales { background: #fff7ed; color: #c2410c; }
-        .news-date { font-size: 11px; color: #bbb; }
-        .news-title { font-size: 13px; font-weight: 600; color: #111; margin-bottom: 2px; }
-        .news-preview { font-size: 12px; color: #888; line-height: 1.4; }
-
-        /* ── Tasks ── */
+/* ── Tasks ── */
         .task-item { display: flex; align-items: flex-start; gap: 9px; padding: 8px 0; border-bottom: 1px solid #f5f5f5; }
         .task-item:last-child { border-bottom: none; }
         .task-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
@@ -275,8 +257,13 @@ export default function DashboardPage() {
 
       {/* ── Below-fold content ── */}
       <div style={{ padding: '22px 28px 28px' }}>
+          {/* News & Announcements */}
+          <div style={{ marginBottom: 24 }}>
+              <NewsFeed />
+          </div>
 
-        {/* Stat widgets */}
+
+          {/* Stat widgets */}
         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 22 }}>
           <div className="widget">
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
@@ -345,28 +332,8 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        {/* Three-column section */}
-        <div style={{ display: 'grid', gridTemplateColumns: '2fr 1fr 1fr', gap: 16 }}>
-
-          {/* News & Announcements */}
-          <div className="card">
-            <div className="card-header">
-              <div className="card-title">News &amp; Announcements</div>
-              <div className="card-action">Post update →</div>
-            </div>
-            <div className="card-body">
-              {MOCK_NEWS.map((item, i) => (
-                <div key={i} className="news-item">
-                  <div style={{ display: 'flex', alignItems: 'center', gap: 7, marginBottom: 3 }}>
-                    <span className={`news-tag ${item.tagClass}`}>{item.tag}</span>
-                    <span className="news-date">{item.date}</span>
-                  </div>
-                  <div className="news-title">{item.title}</div>
-                  <div className="news-preview">{item.preview}</div>
-                </div>
-              ))}
-            </div>
-          </div>
+        {/* Two-column section */}
+        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
 
           {/* My Tasks */}
           <div className="card">

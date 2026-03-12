@@ -85,7 +85,7 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
     {
       label: 'Company',
       items: [
-        { href: '#', label: 'News & Announcements', icon: MegaphoneIcon, badge: { text: '2', variant: 'green' } },
+        { href: '/news', label: 'News & Announcements', icon: MegaphoneIcon, adminMatch: true },
         { href: '#', label: 'Birthdays & Anniversaries', icon: CakeIcon },
         { href: '#', label: 'Employee Directory', icon: UsersIcon },
       ],
@@ -110,6 +110,7 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
       label: 'Admin',
       items: [
         { href: '/admin/banner', label: 'Banner', icon: BannerIcon, adminMatch: true },
+        { href: '/admin/news', label: 'News', icon: MegaphoneIcon, adminMatch: true },
         { href: '/admin/stores', label: 'Stores', icon: StoreIcon, adminMatch: true },
         { href: '/admin/users', label: 'Users', icon: UserAdminIcon, adminMatch: true },
         { href: '/admin/audit-log', label: 'Audit Log', icon: LogIcon, adminMatch: true },

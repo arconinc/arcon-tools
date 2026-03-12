@@ -145,6 +145,59 @@ export interface BannerConfig {
   updated_at: string
 }
 
+// ─── News & Announcements ─────────────────────────────────────────────────────
+
+export type ArticleType = 'COMPANY' | 'HR' | 'SALES' | 'IT' | 'FINANCE' | 'OPERATIONS' | 'GENERAL'
+export type ArticleStatus = 'draft' | 'published' | 'archived'
+
+export interface NewsArticle {
+  id: string
+  title: string
+  type: ArticleType
+  status: ArticleStatus
+  content_json: Record<string, unknown>
+  content_html: string | null
+  excerpt: string | null
+  cover_image_url: string | null
+  pinned: boolean
+  reading_time_minutes: number | null
+  publish_date: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface NewsArticleWithAuthor extends NewsArticle {
+  author: {
+    id: string
+    display_name: string
+    email: string
+  }
+}
+
+export interface NewsArticleSummary {
+  id: string
+  title: string
+  type: ArticleType
+  excerpt: string | null
+  cover_image_url: string | null
+  pinned: boolean
+  reading_time_minutes: number | null
+  publish_date: string | null
+  author_name: string
+}
+
+export interface NewsArticlePayload {
+  title: string
+  type: ArticleType
+  status: ArticleStatus
+  content_json: Record<string, unknown>
+  content_html: string
+  cover_image_url?: string | null
+  pinned?: boolean
+  publish_date?: string | null
+}
+
 // ─── Task Card ────────────────────────────────────────────────────────────────
 
 export interface TaskCard {
