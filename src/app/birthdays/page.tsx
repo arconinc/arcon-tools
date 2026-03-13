@@ -9,6 +9,7 @@ type BirthdayEventWithColor = BirthdayEvent & { color: string }
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
 function sectionLabel(daysUntil: number): string {
+  if (daysUntil < 0) return 'Recent'
   if (daysUntil === 0) return 'Today'
   if (daysUntil <= 6) return 'This Week'
   if (daysUntil <= 13) return 'Next Week'
@@ -17,6 +18,7 @@ function sectionLabel(daysUntil: number): string {
 }
 
 function sectionOrder(daysUntil: number): number {
+  if (daysUntil < 0) return -1
   if (daysUntil === 0) return 0
   if (daysUntil <= 6) return 1
   if (daysUntil <= 13) return 2
@@ -31,7 +33,7 @@ export default function BirthdaysPage() {
   useEffect(() => {
     const localDate = new Date()
     const dateParam = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`
-    fetch(`/api/dashboard/birthdays?date=${dateParam}&window=365`)
+    fetch(`/api/dashboard/birthdays?date=${dateParam}&window=60&lookback=7`)
       .then((r) => r.json())
       .then((d) => {
         if (d.events) setEvents(d.events)
@@ -40,10 +42,16 @@ export default function BirthdaysPage() {
       .finally(() => setLoading(false))
   }, [])
 
+  // Sort: past events most-recent-first (-1 before -7), then today, then future ascending
+  const sorted = [...events].sort((a, b) => {
+    if (a.days_until < 0 && b.days_until < 0) return b.days_until - a.days_until
+    return a.days_until - b.days_until
+  })
+
   // Group events into sections
   const sections: { label: string; order: number; events: BirthdayEventWithColor[] }[] = []
   const seen = new Map<string, number>()
-  for (const e of events) {
+  for (const e of sorted) {
     const label = sectionLabel(e.days_until)
     const order = sectionOrder(e.days_until)
     if (!seen.has(label)) {
@@ -74,6 +82,7 @@ export default function BirthdaysPage() {
         .badge-soon   { background: #f0fdf4; color: #15803d; }
         .badge-ann    { background: #fff7ed; color: #c2410c; }
         .badge-future { background: #f5f5f5; color: #555; }
+        .badge-past   { background: #f5f5f5; color: #999; }
         .bday-empty { font-size: 13px; color: #bbb; padding: 32px; text-align: center; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; }
       `}</style>
 
@@ -87,9 +96,9 @@ export default function BirthdaysPage() {
         {loading ? (
           <div className="bday-empty">Loading…</div>
         ) : events.length === 0 ? (
-          <div className="bday-empty">No upcoming birthdays or anniversaries in the next year.</div>
+          <div className="bday-empty">No birthdays or anniversaries in the next 2 months.</div>
         ) : (
-          sections.map((section) => (
+          [...sections].sort((a, b) => a.order - b.order).map((section) => (
             <div key={section.label}>
               <div className="bday-section-label">{section.label}</div>
               <div className="bday-card">
@@ -98,8 +107,9 @@ export default function BirthdaysPage() {
                   const sub = isBday
                     ? `🎂 Birthday · ${b.date_label}`
                     : `🥂 ${b.years}yr Anniversary · ${b.date_label}`
-                  const badgeText = b.days_until === 0 ? 'Today!' : b.days_until === 1 ? 'Tomorrow' : `${b.days_until} days`
-                  const badgeClass = b.days_until === 0 ? 'badge-today' : b.days_until <= 13 ? (isBday ? 'badge-soon' : 'badge-ann') : 'badge-future'
+                  const absDays = Math.abs(b.days_until)
+                  const badgeText = b.days_until === 0 ? 'Today!' : b.days_until === 1 ? 'Tomorrow' : b.days_until < 0 ? `${absDays} day${absDays === 1 ? '' : 's'} ago` : `${b.days_until} days`
+                  const badgeClass = b.days_until === 0 ? 'badge-today' : b.days_until < 0 ? 'badge-past' : b.days_until <= 13 ? (isBday ? 'badge-soon' : 'badge-ann') : 'badge-future'
                   return (
                     <div key={b.id} className="bday-row">
                       <div className="bday-av">{isBday ? '🎂' : '🥂'}</div>

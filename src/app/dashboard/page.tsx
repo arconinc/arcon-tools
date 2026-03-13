@@ -77,7 +77,7 @@ export default function DashboardPage() {
   useEffect(() => {
     const localDate = new Date()
     const dateParam = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`
-    fetch(`/api/dashboard/birthdays?date=${dateParam}`)
+    fetch(`/api/dashboard/birthdays?date=${dateParam}&window=60&lookback=7`)
       .then((r) => r.json())
       .then((d) => {
         if (d.events) {
@@ -171,6 +171,7 @@ export default function DashboardPage() {
         .badge-today { background: #f3e8ff; color: #6b1e98; }
         .badge-soon  { background: #f0fdf4; color: #15803d; }
         .badge-ann   { background: #fff7ed; color: #c2410c; }
+        .badge-past  { background: #f5f5f5; color: #999; }
 
         /* ── Quick Links ── */
         .quick-link { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 8px 12px; text-align: center; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; text-decoration: none; display: block; }
@@ -369,15 +370,16 @@ export default function DashboardPage() {
             </div>
             <div className="card-body">
               {bdayEvents.length === 0 ? (
-                <div style={{ fontSize: 12, color: '#bbb', padding: '8px 0' }}>Nothing in the next 14 days</div>
+                <div style={{ fontSize: 12, color: '#bbb', padding: '8px 0' }}>No upcoming events</div>
               ) : (
                 bdayEvents.map((b) => {
                   const isBday = b.type === 'birthday'
                   const sub = isBday
                     ? `🎂 Birthday · ${b.date_label}`
                     : `🥂 ${b.years}yr Anniversary · ${b.date_label}`
-                  const badge = b.days_until === 0 ? 'Today!' : b.days_until === 1 ? 'Tomorrow' : `${b.days_until} days`
-                  const badgeClass = b.days_until === 0 ? 'badge-today' : isBday ? 'badge-soon' : 'badge-ann'
+                  const absDays = Math.abs(b.days_until)
+                  const badge = b.days_until === 0 ? 'Today!' : b.days_until === 1 ? 'Tomorrow' : b.days_until < 0 ? `${absDays} day${absDays === 1 ? '' : 's'} ago` : `${b.days_until} days`
+                  const badgeClass = b.days_until === 0 ? 'badge-today' : b.days_until < 0 ? 'badge-past' : isBday ? 'badge-soon' : 'badge-ann'
                   return (
                     <div key={b.id} className="bday-item">
                       <div className="bday-av">{isBday ? '🎂' : '🥂'}</div>
