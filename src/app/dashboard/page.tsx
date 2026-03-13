@@ -365,7 +365,7 @@ export default function DashboardPage() {
           <div className="card">
             <div className="card-header">
               <div className="card-title">Birthdays &amp; Anniversaries</div>
-              <div className="card-action">View all →</div>
+              <Link href="/birthdays" className="card-action" style={{ textDecoration: 'none' }}>View all →</Link>
             </div>
             <div className="card-body">
               {bdayEvents.length === 0 ? (

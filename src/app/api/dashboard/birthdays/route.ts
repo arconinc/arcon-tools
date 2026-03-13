@@ -66,6 +66,8 @@ export async function GET(request: Request) {
     today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
   }
 
+  const windowDays = Math.min(365, Math.max(1, parseInt(searchParams.get('window') ?? '14', 10) || 14))
+
   const events: BirthdayEvent[] = []
 
   for (const u of users ?? []) {
@@ -78,7 +80,7 @@ export async function GET(request: Request) {
       const [month, day] = parts.length === 2 ? parts : [parts[1], parts[2]]
       if (month && day) {
         const daysUntil = daysUntilNextOccurrence(month, day, today)
-        if (daysUntil <= 14) {
+        if (daysUntil <= windowDays) {
           events.push({
             id: `${u.id}-bday`,
             name,
@@ -95,7 +97,7 @@ export async function GET(request: Request) {
       const [startYear, month, day] = u.start_date.split('-').map(Number)
       if (month && day && startYear) {
         const daysUntil = daysUntilNextOccurrence(month, day, today)
-        if (daysUntil <= 14) {
+        if (daysUntil <= windowDays) {
           // If the anniversary date this year hasn't passed yet, years = currentYear - startYear
           // If it already passed and we're using next year's occurrence, years = (currentYear + 1) - startYear
           const anniversaryYearOffset = daysUntil < 365 ? 0 : 1
