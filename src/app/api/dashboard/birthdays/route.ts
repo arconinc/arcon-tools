@@ -41,7 +41,7 @@ function avatarColor(name: string): string {
   return AVATAR_COLORS[Math.abs(hash) % AVATAR_COLORS.length]
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -54,9 +54,17 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Use start of today in UTC to ensure consistent behavior regardless of server timezone
-  const now = new Date()
-  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  // Use client-supplied local date if available, otherwise fall back to UTC
+  const { searchParams } = new URL(request.url)
+  const dateParam = searchParams.get('date')
+  let today: Date
+  if (dateParam && /^\d{4}-\d{2}-\d{2}$/.test(dateParam)) {
+    const [y, m, d] = dateParam.split('-').map(Number)
+    today = new Date(Date.UTC(y, m - 1, d))
+  } else {
+    const now = new Date()
+    today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+  }
 
   const events: BirthdayEvent[] = []
 

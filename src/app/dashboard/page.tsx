@@ -75,7 +75,9 @@ export default function DashboardPage() {
   }, [slides.length])
 
   useEffect(() => {
-    fetch('/api/dashboard/birthdays')
+    const localDate = new Date()
+    const dateParam = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`
+    fetch(`/api/dashboard/birthdays?date=${dateParam}`)
       .then((r) => r.json())
       .then((d) => {
         if (d.events) {
