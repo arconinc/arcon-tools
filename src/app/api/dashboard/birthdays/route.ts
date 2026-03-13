@@ -15,12 +15,12 @@ function getInitials(name: string): string {
 // Returns how many days until the next occurrence of the given month/day.
 // Returns 0 if it's today, negative values are treated as next year.
 function daysUntilNextOccurrence(month: number, day: number, today: Date): number {
-  const thisYear = today.getFullYear()
-  const thisOccurrence = new Date(thisYear, month - 1, day)
+  const thisYear = today.getUTCFullYear()
+  const thisOccurrence = new Date(Date.UTC(thisYear, month - 1, day))
   const diff = Math.floor((thisOccurrence.getTime() - today.getTime()) / 86400000)
   if (diff >= 0) return diff
   // Already passed this year — use next year
-  const nextOccurrence = new Date(thisYear + 1, month - 1, day)
+  const nextOccurrence = new Date(Date.UTC(thisYear + 1, month - 1, day))
   return Math.floor((nextOccurrence.getTime() - today.getTime()) / 86400000)
 }
 
@@ -54,9 +54,9 @@ export async function GET() {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Use start of today (midnight) to avoid partial-day drift
+  // Use start of today in UTC to ensure consistent behavior regardless of server timezone
   const now = new Date()
-  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate())
+  const today = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
 
   const events: BirthdayEvent[] = []
 

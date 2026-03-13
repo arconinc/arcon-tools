@@ -2,14 +2,23 @@
 
 import { createClient } from '@/lib/supabase/client'
 import { useState } from 'react'
+import { useSearchParams } from 'next/navigation'
 
 // Prevent static prerendering — this page requires runtime env vars
 export const dynamic = 'force-dynamic'
+
+const ERROR_MESSAGES: Record<string, string> = {
+  unauthorized_domain: 'Access is restricted to @arconinc.com accounts. Please sign in with your Arcon Google Workspace account.',
+  auth_failed: 'Authentication failed. Please try again.',
+}
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const supabase = createClient()
+  const searchParams = useSearchParams()
+  const urlError = searchParams.get('error')
+  const displayError = error ?? (urlError ? (ERROR_MESSAGES[urlError] ?? 'An error occurred. Please try again.') : null)
 
   async function handleGoogleLogin() {
     setLoading(true)
@@ -48,9 +57,9 @@ export default function LoginPage() {
             Use your Arcon Google Workspace account to continue.
           </p>
 
-          {error && (
+          {displayError && (
             <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">
-              {error}
+              {displayError}
             </div>
           )}
 

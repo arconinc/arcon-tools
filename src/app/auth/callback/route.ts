@@ -13,6 +13,12 @@ export async function GET(request: Request) {
     if (!error && sessionData.user) {
       const user = sessionData.user
       const email = user.email ?? ''
+
+      if (!email.endsWith('@arconinc.com')) {
+        await supabase.auth.signOut()
+        return NextResponse.redirect(`${origin}/login?error=unauthorized_domain`)
+      }
+
       const adminClient = createAdminClient()
 
       // Look up by email to support pre-loaded user records
