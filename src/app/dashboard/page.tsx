@@ -167,11 +167,21 @@ export default function DashboardPage() {
         .bday-av { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
         .bday-name { font-size: 13px; font-weight: 600; color: #111; }
         .bday-when { font-size: 11px; color: #aaa; }
+        .bday-date { font-size: 13px; font-weight: 700; color: #555; text-align: center; min-width: 50px; flex-shrink: 0; }
         .bday-badge { font-size: 10px; padding: 2px 7px; border-radius: 3px; font-weight: 700; white-space: nowrap; }
-        .badge-today { background: #f3e8ff; color: #6b1e98; }
-        .badge-soon  { background: #f0fdf4; color: #15803d; }
-        .badge-ann   { background: #fff7ed; color: #c2410c; }
-        .badge-past  { background: #f5f5f5; color: #999; }
+        .badge-today     { background: #f3e8ff; color: #6b1e98; }
+        .badge-soon      { background: #f0fdf4; color: #15803d; }
+        .badge-ann       { background: #fff7ed; color: #c2410c; }
+        .badge-past      { background: #f5f5f5; color: #999; }
+        .badge-milestone { background: #fef3c7; color: #92400e; }
+        .badge-legend    { background: #fde68a; color: #78350f; }
+        .badge-hof       { background: #ede9fe; color: #5b21b6; }
+        .bday-item.milestone-5  { background: #fffbeb; border-left: 3px solid #f59e0b; padding-left: 6px; border-radius: 4px; }
+        .bday-item.milestone-10 { background: #fef3c7; border-left: 3px solid #d97706; padding-left: 6px; border-radius: 4px; }
+        .bday-item.milestone-15 { background: #faf5ff; border-left: 3px solid #7c3aed; padding-left: 6px; border-radius: 4px; }
+        .bday-item.milestone-5  .bday-date { color: #92400e; }
+        .bday-item.milestone-10 .bday-date { color: #78350f; }
+        .bday-item.milestone-15 .bday-date { color: #6b21a8; }
 
         /* ── Quick Links ── */
         .quick-link { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 8px 12px; text-align: center; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; text-decoration: none; display: block; }
@@ -374,19 +384,21 @@ export default function DashboardPage() {
               ) : (
                 bdayEvents.map((b) => {
                   const isBday = b.type === 'birthday'
-                  const sub = isBday
-                    ? `🎂 Birthday · ${b.date_label}`
-                    : `🥂 ${b.years}yr Anniversary · ${b.date_label}`
+                  const sub = isBday ? 'Birthday' : `${b.years}yr Anniversary`
                   const absDays = Math.abs(b.days_until)
                   const badge = b.days_until === 0 ? 'Today!' : b.days_until === 1 ? 'Tomorrow' : b.days_until < 0 ? `${absDays} day${absDays === 1 ? '' : 's'} ago` : `${b.days_until} days`
-                  const badgeClass = b.days_until === 0 ? 'badge-today' : b.days_until < 0 ? 'badge-past' : isBday ? 'badge-soon' : 'badge-ann'
+                  const tier = !isBday && b.years ? (b.years >= 15 ? 'hof' : b.years >= 10 ? 'legend' : b.years >= 5 ? 'milestone' : 'standard') : 'standard'
+                  const milestoneClass = tier === 'hof' ? 'milestone-15' : tier === 'legend' ? 'milestone-10' : tier === 'milestone' ? 'milestone-5' : ''
+                  const badgeClass = b.days_until === 0 ? 'badge-today' : b.days_until < 0 ? 'badge-past' : isBday ? 'badge-soon' : tier === 'hof' ? 'badge-hof' : tier === 'legend' ? 'badge-legend' : tier === 'milestone' ? 'badge-milestone' : 'badge-ann'
+                  const annIcon = tier === 'hof' ? '👑' : tier === 'legend' ? '🏆' : tier === 'milestone' ? '⭐' : '🥂'
                   return (
-                    <div key={b.id} className="bday-item">
-                      <div className="bday-av">{isBday ? '🎂' : '🥂'}</div>
+                    <div key={b.id} className={`bday-item${milestoneClass ? ` ${milestoneClass}` : ''}`}>
+                      <div className="bday-av">{isBday ? '🎂' : annIcon}</div>
                       <div style={{ flex: 1 }}>
                         <div className="bday-name">{b.name}</div>
                         <div className="bday-when">{sub}</div>
                       </div>
+                      <div className="bday-date">{b.date_label}</div>
                       <span className={`bday-badge ${badgeClass}`}>{badge}</span>
                     </div>
                   )
