@@ -4,14 +4,28 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useAppUser } from '@/components/layout/AppShell'
 import { NewsFeed } from '@/components/news/NewsFeed'
-import { BannerSlide, BannerStripItem, BirthdayEvent } from '@/types'
+import { BannerSlide, BannerStripItem, BirthdayEvent, ClickUpTask } from '@/types'
 
-const MOCK_TASKS = [
-  { priority: 'high', name: 'Update CSR tracking doc', meta: 'Due Mar 13', pill: 'E-Commerce' },
-  { priority: 'high', name: 'Review new store API creds', meta: 'Due Mar 14', pill: 'Admin' },
-  { priority: 'med', name: 'Send Q1 vendor pricing', meta: 'Due Mar 17', pill: 'Sales' },
-  { priority: 'low', name: 'Update employee handbook link', meta: 'Due Mar 21', pill: 'HR' },
-]
+function formatDueDate(dueDateMs: string | null): string {
+  if (!dueDateMs) return ''
+  const due = new Date(Number(dueDateMs))
+  const today = new Date()
+  today.setHours(0, 0, 0, 0)
+  const tomorrow = new Date(today)
+  tomorrow.setDate(today.getDate() + 1)
+  const dueDay = new Date(due)
+  dueDay.setHours(0, 0, 0, 0)
+  if (dueDay < today) return 'Overdue'
+  if (dueDay.getTime() === today.getTime()) return 'Due today'
+  if (dueDay.getTime() === tomorrow.getTime()) return 'Due tomorrow'
+  return `Due ${due.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}`
+}
+
+function taskDotClass(priority: ClickUpTask['priority']): string {
+  if (priority === 'urgent' || priority === 'high') return 'dot-high'
+  if (priority === 'low') return 'dot-low'
+  return 'dot-med'
+}
 
 
 const QUICK_LINKS = [
@@ -42,12 +56,24 @@ export default function DashboardPage() {
   const [bdayEvents, setBdayEvents] = useState<(BirthdayEvent & { color: string })[]>([])
   const [bdayCount, setBdayCount] = useState(0)
   const [bannerItems, setBannerItems] = useState<BannerStripItem[]>([])
+  const [tasks, setTasks] = useState<ClickUpTask[]>([])
+  const [tasksConfigured, setTasksConfigured] = useState<boolean | null>(null)
 
   useEffect(() => {
     fetch('/api/banner-strip')
       .then((r) => r.json())
       .then((data: { items: BannerStripItem[] }) => setBannerItems(data.items ?? []))
       .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/tasks')
+      .then((r) => r.json())
+      .then((data: { tasks: ClickUpTask[]; configured: boolean }) => {
+        setTasks(data.tasks ?? [])
+        setTasksConfigured(data.configured ?? false)
+      })
+      .catch(() => setTasksConfigured(false))
   }, [])
 
   useEffect(() => {
@@ -287,8 +313,8 @@ export default function DashboardPage() {
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
               <div>
                 <div className="widget-label">My Open Tasks</div>
-                <div className="widget-value">4</div>
-                <div className="widget-sub">2 due this week</div>
+                <div className="widget-value">{tasksConfigured === null ? '—' : tasks.length}</div>
+                <div className="widget-sub">{tasksConfigured === false ? 'ClickUp not configured' : tasks.length === 0 ? 'All clear' : `${tasks.filter((t) => t.due_date && Number(t.due_date) < Date.now() + 7 * 86400000).length} due this week`}</div>
               </div>
               <div className="widget-icon wi-purple">
                 <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
@@ -357,18 +383,44 @@ export default function DashboardPage() {
           <div className="card">
             <div className="card-header">
               <div className="card-title">My Tasks</div>
-              <div className="card-action">Open board →</div>
+              {tasks.length > 0 && (
+                <a href="https://app.clickup.com" target="_blank" rel="noopener noreferrer" className="card-action" style={{ textDecoration: 'none' }}>
+                  Open ClickUp →
+                </a>
+              )}
             </div>
             <div className="card-body">
-              {MOCK_TASKS.map((task, i) => (
-                <div key={i} className="task-item">
-                  <div className={`task-dot dot-${task.priority}`} />
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    <div className="task-name">{task.name}</div>
-                    <div className="task-meta">{task.meta} · <span className="task-pill">{task.pill}</span></div>
-                  </div>
+              {tasksConfigured === null && (
+                <div style={{ fontSize: 12, color: '#bbb', padding: '8px 0' }}>Loading tasks…</div>
+              )}
+              {tasksConfigured === false && (
+                <div style={{ fontSize: 12, color: '#bbb', padding: '8px 0' }}>
+                  ClickUp not configured.{user?.is_admin && (
+                    <> <a href="/admin/banner-strip" style={{ color: '#6b1e98', textDecoration: 'underline' }}>Set up in admin settings.</a></>
+                  )}
                 </div>
-              ))}
+              )}
+              {tasksConfigured === true && tasks.length === 0 && (
+                <div style={{ fontSize: 12, color: '#bbb', padding: '8px 0' }}>No open tasks — you&apos;re all caught up!</div>
+              )}
+              {tasks.map((task) => {
+                const meta = formatDueDate(task.due_date)
+                const isOverdue = meta === 'Overdue'
+                return (
+                  <div key={task.id} className="task-item">
+                    <div className={`task-dot ${taskDotClass(task.priority)}`} />
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <a href={task.url} target="_blank" rel="noopener noreferrer" className="task-name" style={{ textDecoration: 'none', color: 'inherit' }}>
+                        {task.name}
+                      </a>
+                      <div className="task-meta" style={isOverdue ? { color: '#dc2626' } : undefined}>
+                        {meta && <>{meta} · </>}
+                        <span className="task-pill">{task.list_name || 'ClickUp'}</span>
+                      </div>
+                    </div>
+                  </div>
+                )
+              })}
             </div>
           </div>
 

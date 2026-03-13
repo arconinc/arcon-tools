@@ -16,6 +16,7 @@ export interface AppUser {
   state: string | null
   zip: string | null
   phone: string | null
+  clickup_user_id: string | null
 }
 
 export interface BirthdayEvent {
@@ -236,10 +237,23 @@ export interface TickerConfig {
   holiday_lookahead_days: number
   show_clickup: boolean
   clickup_api_key: string | null
+  clickup_team_id: string | null   // Workspace/team ID for member email→ID lookup
   clickup_list_id: string | null
   clickup_due_within_days: number
   manual_items: TickerManualItem[]
   updated_at: string
+}
+
+// ─── ClickUp Tasks ────────────────────────────────────────────────────────────
+
+export interface ClickUpTask {
+  id: string
+  name: string
+  status: string
+  priority: 'urgent' | 'high' | 'normal' | 'low' | null
+  due_date: string | null   // Unix timestamp in ms as string
+  url: string
+  list_name: string
 }
 
 // ─── Task Card ────────────────────────────────────────────────────────────────

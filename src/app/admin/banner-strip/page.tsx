@@ -16,6 +16,7 @@ const DEFAULT_CONFIG: Omit<TickerConfig, 'id' | 'updated_at'> = {
   holiday_lookahead_days: 7,
   show_clickup: false,
   clickup_api_key: null,
+  clickup_team_id: null,
   clickup_list_id: null,
   clickup_due_within_days: 7,
   manual_items: [],
@@ -111,6 +112,7 @@ export default function BannerStripAdminPage() {
           holiday_lookahead_days: data.holiday_lookahead_days,
           show_clickup: data.show_clickup,
           clickup_api_key: data.clickup_api_key,
+          clickup_team_id: data.clickup_team_id ?? null,
           clickup_list_id: data.clickup_list_id,
           clickup_due_within_days: data.clickup_due_within_days,
           manual_items: data.manual_items ?? [],
@@ -358,6 +360,19 @@ export default function BannerStripAdminPage() {
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
+                  Team ID <span className="normal-case font-normal text-purple-600">(required for My Tasks widget)</span>
+                </label>
+                <input
+                  type="text"
+                  value={config.clickup_team_id ?? ''}
+                  onChange={(e) => update({ clickup_team_id: e.target.value || null })}
+                  placeholder="e.g. 90131331624"
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
+                />
+                <p className="text-xs text-slate-400 mt-1">Found in the ClickUp URL: app.clickup.com/<strong>90131331624</strong>/…</p>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
                   List ID
                 </label>
                 <input
@@ -367,7 +382,7 @@ export default function BannerStripAdminPage() {
                   placeholder="e.g. 901234567"
                   className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
                 />
-                <p className="text-xs text-slate-400 mt-1">Find the List ID in the ClickUp URL when viewing a list.</p>
+                <p className="text-xs text-slate-400 mt-1">Find the List ID in the ClickUp URL when viewing a list. Used for both the ticker and the My Tasks widget.</p>
               </div>
               <NumInput
                 label="Show tasks due within"
