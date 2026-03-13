@@ -132,7 +132,9 @@ export default function AppShell({ children, user }: AppShellProps) {
   const [stores, setStores] = useState<Store[]>([])
   const [selectedStore, setSelectedStore] = useState<Store | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [storeError, setStoreError] = useState<string | null>(null)
+  const [tooltip, setTooltip] = useState<{ label: string; y: number } | null>(null)
 
   useEffect(() => {
     fetch('/api/stores')
@@ -164,6 +166,15 @@ export default function AppShell({ children, user }: AppShellProps) {
     }
   }
 
+  function handleHamburger() {
+    if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
+      setSidebarCollapsed(c => !c)
+      setTooltip(null)
+    } else {
+      setSidebarOpen(o => !o)
+    }
+  }
+
   async function handleSignOut() {
     await supabase.auth.signOut()
     sessionStorage.clear()
@@ -178,6 +189,7 @@ export default function AppShell({ children, user }: AppShellProps) {
     .slice(0, 2)
 
   const navSections = buildNavSections(user.is_admin)
+  const sidebarWidth = sidebarCollapsed ? 52 : 228
 
   return (
     <UserContext.Provider value={{ user }}>
@@ -198,19 +210,35 @@ export default function AppShell({ children, user }: AppShellProps) {
             className={`fixed lg:static inset-y-0 left-0 z-30 flex flex-col transform transition-transform duration-200 ${
               sidebarOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
             }`}
-            style={{ width: 228, minWidth: 228, background: '#111111', height: '100vh', overflowY: 'auto' }}
+            style={{
+              width: sidebarWidth,
+              minWidth: sidebarWidth,
+              background: '#111111',
+              height: '100vh',
+              overflowY: 'auto',
+              overflowX: 'hidden',
+              transition: 'width 0.2s ease, min-width 0.2s ease',
+            }}
           >
             {/* Logo */}
-            <div style={{ padding: '18px 16px 16px', borderBottom: '1px solid #222', flexShrink: 0 }}>
-              <div style={{ display: 'inline-flex', alignItems: 'center', border: '2px solid #fff', padding: '6px 10px' }}>
-                <span style={{ color: '#fff', fontSize: 13, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
-                  The Arc
-                </span>
-                <span style={{ color: '#6b1e98', fontSize: 18, fontWeight: 900, lineHeight: 1, marginLeft: 1 }}>.</span>
-              </div>
-              <div style={{ color: '#666', fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', marginTop: 8 }}>
-                Intranet
-              </div>
+            <div style={{ padding: '18px 0 16px', borderBottom: '1px solid #222', flexShrink: 0, overflow: 'hidden' }}>
+              {sidebarCollapsed ? (
+                <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: 36 }}>
+                  <span style={{ color: '#6b1e98', fontSize: 22, fontWeight: 900, lineHeight: 1 }}>.</span>
+                </div>
+              ) : (
+                <div style={{ padding: '0 16px' }}>
+                  <div style={{ display: 'inline-flex', alignItems: 'center', border: '2px solid #fff', padding: '6px 10px' }}>
+                    <span style={{ color: '#fff', fontSize: 13, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                      The Arc
+                    </span>
+                    <span style={{ color: '#6b1e98', fontSize: 18, fontWeight: 900, lineHeight: 1, marginLeft: 1 }}>.</span>
+                  </div>
+                  <div style={{ color: '#666', fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', marginTop: 8 }}>
+                    Intranet
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Nav */}
@@ -218,10 +246,12 @@ export default function AppShell({ children, user }: AppShellProps) {
               {navSections.map((section, si) => (
                 <div key={si}>
                   {si > 0 && <div style={{ height: 1, background: '#1e1e1e', margin: '4px 0' }} />}
-                  <div style={{ paddingTop: 14, paddingBottom: 2 }}>
-                    <div style={{ color: '#444', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', padding: '0 16px 6px' }}>
-                      {section.label}
-                    </div>
+                  <div style={{ paddingTop: sidebarCollapsed ? 4 : 14, paddingBottom: 2 }}>
+                    {!sidebarCollapsed && (
+                      <div style={{ color: '#444', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', padding: '0 16px 6px' }}>
+                        {section.label}
+                      </div>
+                    )}
                     {section.items.map((item) => {
                       const active = item.href !== '#' && (
                         item.adminMatch
@@ -234,6 +264,9 @@ export default function AppShell({ children, user }: AppShellProps) {
                           item={item}
                           active={active}
                           onClick={() => setSidebarOpen(false)}
+                          collapsed={sidebarCollapsed}
+                          onHover={sidebarCollapsed ? (y) => setTooltip({ label: item.label, y }) : undefined}
+                          onHoverEnd={sidebarCollapsed ? () => setTooltip(null) : undefined}
                         />
                       )
                     })}
@@ -243,7 +276,15 @@ export default function AppShell({ children, user }: AppShellProps) {
             </nav>
 
             {/* User footer */}
-            <div style={{ padding: '12px 16px', borderTop: '1px solid #222', display: 'flex', alignItems: 'center', gap: 10, flexShrink: 0 }}>
+            <div style={{
+              padding: sidebarCollapsed ? '12px 0' : '12px 16px',
+              borderTop: '1px solid #222',
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: sidebarCollapsed ? 'center' : 'flex-start',
+              gap: 10,
+              flexShrink: 0,
+            }}>
               {user.avatar_url ? (
                 <img src={user.avatar_url} alt={user.display_name} referrerPolicy="no-referrer" style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
               ) : (
@@ -251,41 +292,44 @@ export default function AppShell({ children, user }: AppShellProps) {
                   {initials}
                 </div>
               )}
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ color: '#ddd', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                  {user.display_name}
-                </div>
-                <div style={{ color: '#555', fontSize: 10 }}>
-                  {user.is_admin ? 'Admin' : 'Team Member'}
-                </div>
-              </div>
-              <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
-                <Link href="/settings" style={{ color: '#555', fontSize: 10, textDecoration: 'none' }}>
-                  Settings
-                </Link>
-                <button
-                  onClick={handleSignOut}
-                  style={{ color: '#555', fontSize: 10, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
-                >
-                  Sign out
-                </button>
-              </div>
+              {!sidebarCollapsed && (
+                <>
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ color: '#ddd', fontSize: 12, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {user.display_name}
+                    </div>
+                    <div style={{ color: '#555', fontSize: 10 }}>
+                      {user.is_admin ? 'Admin' : 'Team Member'}
+                    </div>
+                  </div>
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 4, alignItems: 'flex-end' }}>
+                    <Link href="/settings" style={{ color: '#555', fontSize: 10, textDecoration: 'none' }}>
+                      Settings
+                    </Link>
+                    <button
+                      onClick={handleSignOut}
+                      style={{ color: '#555', fontSize: 10, background: 'none', border: 'none', cursor: 'pointer', padding: 0 }}
+                    >
+                      Sign out
+                    </button>
+                  </div>
+                </>
+              )}
             </div>
           </aside>
 
           {/* ── Main ─────────────────────────────────────────────────── */}
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
+          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden', minWidth: 0 }}>
 
             {/* Purple stripe */}
             <div style={{ height: 3, background: 'linear-gradient(90deg, #6b1e98, #9333ea)', flexShrink: 0 }} />
 
             {/* Topbar */}
             <header style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '0 24px', height: 52, display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
-              {/* Mobile menu button */}
+              {/* Hamburger — always visible */}
               <button
-                className="lg:hidden"
-                onClick={() => setSidebarOpen(true)}
-                style={{ width: 34, height: 34, borderRadius: 6, background: '#f5f5f5', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#777' }}
+                onClick={handleHamburger}
+                style={{ width: 34, height: 34, borderRadius: 6, background: '#f5f5f5', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#777', flexShrink: 0 }}
               >
                 <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
@@ -337,6 +381,31 @@ export default function AppShell({ children, user }: AppShellProps) {
             </main>
           </div>
 
+          {/* Tooltip for collapsed sidebar */}
+          {sidebarCollapsed && tooltip && (
+            <div
+              style={{
+                position: 'fixed',
+                left: 60,
+                top: tooltip.y,
+                transform: 'translateY(-50%)',
+                background: '#1e1e1e',
+                color: '#e0e0e0',
+                fontSize: 12,
+                fontWeight: 500,
+                padding: '5px 10px',
+                borderRadius: 5,
+                pointerEvents: 'none',
+                whiteSpace: 'nowrap',
+                zIndex: 200,
+                border: '1px solid #333',
+                boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+              }}
+            >
+              {tooltip.label}
+            </div>
+          )}
+
         </div>
       </StoreContext.Provider>
     </UserContext.Provider>
@@ -345,7 +414,75 @@ export default function AppShell({ children, user }: AppShellProps) {
 
 // ── SidebarNavItem ────────────────────────────────────────────────────────────
 
-function SidebarNavItem({ item, active, onClick }: { item: NavItemDef; active: boolean; onClick: () => void }) {
+function SidebarNavItem({
+  item,
+  active,
+  onClick,
+  collapsed,
+  onHover,
+  onHoverEnd,
+}: {
+  item: NavItemDef
+  active: boolean
+  onClick: () => void
+  collapsed?: boolean
+  onHover?: (y: number) => void
+  onHoverEnd?: () => void
+}) {
+  const Icon = item.icon
+
+  if (collapsed) {
+    const collapsedStyle: React.CSSProperties = {
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      width: 36,
+      height: 32,
+      color: active ? '#fff' : '#888',
+      borderRadius: 4,
+      margin: '1px auto',
+      textDecoration: 'none',
+      background: active ? '#6b1e98' : 'transparent',
+      cursor: item.soon ? 'default' : 'pointer',
+      transition: 'background 0.1s, color 0.1s',
+    }
+
+    const handleMouseEnter = (e: React.MouseEvent<HTMLElement>) => {
+      if (!active) {
+        e.currentTarget.style.background = '#1e1e1e'
+        e.currentTarget.style.color = '#ddd'
+      }
+      if (onHover) {
+        const rect = e.currentTarget.getBoundingClientRect()
+        onHover(rect.top + rect.height / 2)
+      }
+    }
+
+    const handleMouseLeave = (e: React.MouseEvent<HTMLElement>) => {
+      if (!active) {
+        e.currentTarget.style.background = 'transparent'
+        e.currentTarget.style.color = '#888'
+      }
+      if (onHoverEnd) onHoverEnd()
+    }
+
+    if (item.soon || item.href === '#') {
+      return (
+        <div style={collapsedStyle} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+          <Icon className="w-[15px] h-[15px] flex-shrink-0" />
+        </div>
+      )
+    }
+
+    return (
+      <Link href={item.href} onClick={onClick} style={collapsedStyle} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+        <Icon className="w-[15px] h-[15px] flex-shrink-0" />
+      </Link>
+    )
+  }
+
+  // ── Expanded mode ──────────────────────────────────────────────────────────
+
   const baseStyle: React.CSSProperties = {
     display: 'flex',
     alignItems: 'center',
@@ -360,8 +497,6 @@ function SidebarNavItem({ item, active, onClick }: { item: NavItemDef; active: b
     cursor: item.soon ? 'default' : 'pointer',
     transition: 'background 0.1s, color 0.1s',
   }
-
-  const Icon = item.icon
 
   const content = (
     <>
