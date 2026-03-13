@@ -110,6 +110,7 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
       label: 'Admin',
       items: [
         { href: '/admin/banner', label: 'Banner', icon: BannerIcon, adminMatch: true },
+        { href: '/admin/banner-strip', label: 'Banner Strip', icon: TickerIcon, adminMatch: true },
         { href: '/admin/news', label: 'News', icon: MegaphoneIcon, adminMatch: true },
         { href: '/admin/stores', label: 'Stores', icon: StoreIcon, adminMatch: true },
         { href: '/admin/users', label: 'Users', icon: UserAdminIcon, adminMatch: true },
@@ -475,4 +476,8 @@ function LogIcon({ className }: { className?: string }) {
 
 function BannerIcon({ className }: { className?: string }) {
   return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="5" width="18" height="14" rx="2" strokeWidth={2} /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 10h18" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 15h4m-4-2h8" /></svg>
+}
+
+function TickerIcon({ className }: { className?: string }) {
+  return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 8h14M5 16h6" /></svg>
 }

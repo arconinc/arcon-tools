@@ -8,8 +8,14 @@ export interface AppUser {
   is_admin: boolean
   created_at: string
   last_login_at: string
-  birth_date: string | null
-  start_date: string | null
+  birth_date: string | null   // MM-DD (no year, PII)
+  start_date: string | null   // YYYY-MM-DD hire date
+  address1: string | null
+  address2: string | null
+  city: string | null
+  state: string | null
+  zip: string | null
+  phone: string | null
 }
 
 export interface BirthdayEvent {
@@ -196,6 +202,44 @@ export interface NewsArticlePayload {
   cover_image_url?: string | null
   pinned?: boolean
   publish_date?: string | null
+}
+
+// ─── Banner Strip (Ticker) ────────────────────────────────────────────────────
+
+export interface BannerStripItem {
+  id: string
+  label: string
+  text: string
+  href?: string | null
+  source: 'birthday' | 'anniversary' | 'news' | 'holiday' | 'clickup' | 'manual'
+}
+
+export interface TickerManualItem {
+  id: string
+  label: string
+  text: string
+  href: string | null
+  active_from: string | null   // ISO date YYYY-MM-DD
+  active_until: string | null  // ISO date YYYY-MM-DD
+  enabled: boolean
+}
+
+export interface TickerConfig {
+  id: string
+  show_birthdays: boolean
+  birthday_window_days: number
+  show_anniversaries: boolean
+  anniversary_window_days: number
+  show_news: boolean
+  news_recency_days: number
+  show_holidays: boolean
+  holiday_lookahead_days: number
+  show_clickup: boolean
+  clickup_api_key: string | null
+  clickup_list_id: string | null
+  clickup_due_within_days: number
+  manual_items: TickerManualItem[]
+  updated_at: string
 }
 
 // ─── Task Card ────────────────────────────────────────────────────────────────

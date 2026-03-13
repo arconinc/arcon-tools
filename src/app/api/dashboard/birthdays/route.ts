@@ -65,12 +65,12 @@ export async function GET() {
     const initials = getInitials(name)
 
     if (u.birth_date) {
-      const [year, month, day] = u.birth_date.split('-').map(Number)
+      // birth_date stored as MM-DD (no year); fall back to YYYY-MM-DD for old data
+      const parts = u.birth_date.split('-').map(Number)
+      const [month, day] = parts.length === 2 ? parts : [parts[1], parts[2]]
       if (month && day) {
         const daysUntil = daysUntilNextOccurrence(month, day, today)
         if (daysUntil <= 14) {
-          // Suppress year — just use month+day for the label
-          void year
           events.push({
             id: `${u.id}-bday`,
             name,

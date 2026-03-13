@@ -47,23 +47,6 @@ export async function GET(request: Request) {
         })
       }
 
-      // Check if credentials are set up
-      const { data: appUser } = await adminClient
-        .from('users')
-        .select('id')
-        .eq('email', email)
-        .single()
-
-      const { data: creds } = await adminClient
-        .from('app_credentials')
-        .select('id')
-        .eq('user_id', appUser?.id)
-        .single()
-
-      if (!creds) {
-        return NextResponse.redirect(`${origin}/setup-credentials`)
-      }
-
       return NextResponse.redirect(`${origin}/dashboard`)
     }
   }

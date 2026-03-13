@@ -4,7 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useAppUser } from '@/components/layout/AppShell'
 import { NewsFeed } from '@/components/news/NewsFeed'
-import { BannerSlide, BirthdayEvent } from '@/types'
+import { BannerSlide, BannerStripItem, BirthdayEvent } from '@/types'
 
 const MOCK_TASKS = [
   { priority: 'high', name: 'Update CSR tracking doc', meta: 'Due Mar 13', pill: 'E-Commerce' },
@@ -21,15 +21,6 @@ const QUICK_LINKS = [
   { icon: '🏢', bg: '#f5f5f5', label: 'Vendors', href: '#' },
   { icon: '📝', bg: '#fff7ed', label: 'PTO Request', href: '#' },
   { icon: '➕', bg: '#f3e8ff', label: 'Add Customer', href: '#' },
-]
-
-const BANNER_ITEMS = [
-  { label: 'Announce', text: 'Q1 All-Hands is March 20th — Zoom link coming soon' },
-  { label: 'Birthday', text: '🎂 Happy Birthday Brooke Bowlin!' },
-  { label: 'HR', text: 'Updated PTO Policy effective April 1 — see HR Docs' },
-  { label: 'Sales', text: '2026 Pricing Sheet is live in Sales Documents' },
-  { label: 'Anniversary', text: '🥂 Congrats Cami Johnson — 5 years at Arcon!' },
-  { label: 'Reminder', text: 'Set The Arc as your browser homepage' },
 ]
 
 // Fallback slides shown when the DB has no published slides yet
@@ -50,6 +41,14 @@ export default function DashboardPage() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [bdayEvents, setBdayEvents] = useState<(BirthdayEvent & { color: string })[]>([])
   const [bdayCount, setBdayCount] = useState(0)
+  const [bannerItems, setBannerItems] = useState<BannerStripItem[]>([])
+
+  useEffect(() => {
+    fetch('/api/banner-strip')
+      .then((r) => r.json())
+      .then((data: { items: BannerStripItem[] }) => setBannerItems(data.items ?? []))
+      .catch(() => {})
+  }, [])
 
   useEffect(() => {
     fetch('/api/admin/banner')
@@ -163,7 +162,7 @@ export default function DashboardPage() {
         /* ── Birthdays ── */
         .bday-item { display: flex; align-items: center; gap: 9px; padding: 8px 0; border-bottom: 1px solid #f5f5f5; }
         .bday-item:last-child { border-bottom: none; }
-        .bday-av { width: 30px; height: 30px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 11px; font-weight: 700; color: #fff; flex-shrink: 0; }
+        .bday-av { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
         .bday-name { font-size: 13px; font-weight: 600; color: #111; }
         .bday-when { font-size: 11px; color: #aaa; }
         .bday-badge { font-size: 10px; padding: 2px 7px; border-radius: 3px; font-weight: 700; white-space: nowrap; }
@@ -235,25 +234,31 @@ export default function DashboardPage() {
       </div>
 
       {/* ── Banner Strip ── */}
-      <div className="banner-strip">
-        <div className="banner-inner">
-          {/* Render twice for seamless loop */}
-          {[...BANNER_ITEMS, ...BANNER_ITEMS].map((item, i) => (
-            <span key={i} style={{ display: 'inline-flex', alignItems: 'center' }}>
-              <span className="banner-item">
-                <span className="banner-label">{item.label}</span>
-                {item.text}
+      {bannerItems.length > 0 && (
+        <div className="banner-strip">
+          <div className="banner-inner">
+            {/* Render twice for seamless loop */}
+            {[...bannerItems, ...bannerItems].map((item, i) => (
+              <span key={i} style={{ display: 'inline-flex', alignItems: 'center' }}>
+                <span className="banner-item">
+                  <span className="banner-label">{item.label}</span>
+                  {item.href ? (
+                    <Link href={item.href} style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+                      {item.text}
+                    </Link>
+                  ) : item.text}
+                </span>
+                <span className="banner-dot-sep">·</span>
               </span>
-              <span className="banner-dot-sep">·</span>
-            </span>
-          ))}
+            ))}
+          </div>
+          {user?.is_admin && (
+            <Link href="/admin/banner-strip" className="banner-edit">
+              ✏ Edit Strip
+            </Link>
+          )}
         </div>
-        {user?.is_admin && (
-          <Link href="/admin/banner" className="banner-edit">
-            ✏ Edit Banner
-          </Link>
-        )}
-      </div>
+      )}
 
       {/* ── Below-fold content ── */}
       <div style={{ padding: '22px 28px 28px' }}>
@@ -373,7 +378,7 @@ export default function DashboardPage() {
                   const badgeClass = b.days_until === 0 ? 'badge-today' : isBday ? 'badge-soon' : 'badge-ann'
                   return (
                     <div key={b.id} className="bday-item">
-                      <div className="bday-av" style={{ background: b.color }}>{b.initials}</div>
+                      <div className="bday-av">{isBday ? '🎂' : '🥂'}</div>
                       <div style={{ flex: 1 }}>
                         <div className="bday-name">{b.name}</div>
                         <div className="bday-when">{sub}</div>
