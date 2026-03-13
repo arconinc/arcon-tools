@@ -3,11 +3,17 @@
 import { useState, useEffect, useCallback } from 'react'
 import { AppUser } from '@/types'
 
-function formatDate(iso: string | null): string {
-  if (!iso) return '—'
-  const [, month, day] = iso.split('-')
-  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
-  return `${months[parseInt(month, 10) - 1]} ${parseInt(day, 10)}`
+const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
+
+// Handles both MM-DD (birth_date) and YYYY-MM-DD (start_date)
+function formatDate(val: string | null): string {
+  if (!val) return '—'
+  const parts = val.split('-')
+  const [month, day] = parts.length === 2 ? parts : [parts[1], parts[2]]
+  const m = parseInt(month, 10)
+  const d = parseInt(day, 10)
+  if (!m || !d) return '—'
+  return `${MONTHS[m - 1]} ${d}`
 }
 
 const EMPTY_FORM = { display_name: '', email: '', birth_date: '', start_date: '', is_admin: false }
@@ -151,10 +157,12 @@ export default function AdminUsersPage() {
             <div>
               <label className="block text-xs text-slate-500 mb-1">Birth date</label>
               <input
-                type="date"
+                type="text"
                 value={addForm.birth_date}
                 onChange={(e) => setAddForm((f) => ({ ...f, birth_date: e.target.value }))}
                 className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-purple-400"
+                placeholder="MM-DD"
+                pattern="\d{2}-\d{2}"
               />
             </div>
             <div>
@@ -227,10 +235,12 @@ export default function AdminUsersPage() {
                     <div>
                       <label className="block text-xs text-slate-500 mb-1">Birth date</label>
                       <input
-                        type="date"
+                        type="text"
                         value={editForm.birth_date}
                         onChange={(e) => setEditForm((f) => ({ ...f, birth_date: e.target.value }))}
                         className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-purple-400"
+                        placeholder="MM-DD"
+                        pattern="\d{2}-\d{2}"
                       />
                     </div>
                     <div>
