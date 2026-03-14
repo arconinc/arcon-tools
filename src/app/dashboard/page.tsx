@@ -214,6 +214,32 @@ export default function DashboardPage() {
         .quick-link:hover { border-color: #6b1e98; box-shadow: 0 0 0 3px #f3e8ff; }
         .ql-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin: 0 auto 7px; font-size: 17px; }
         .ql-label { font-size: 11px; font-weight: 600; color: #555; }
+
+        /* ── Responsive layout ── */
+        .dash-content { padding: 22px 28px 28px; }
+        .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px; }
+        .quick-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 24px; }
+        .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+
+        @media (max-width: 1023px) {
+          .hero { height: 320px; }
+          .stat-grid { grid-template-columns: repeat(2, 1fr); }
+          .quick-grid { grid-template-columns: repeat(3, 1fr); }
+          .two-col { grid-template-columns: 1fr; }
+          .dash-content { padding: 18px 20px 24px; }
+        }
+
+        @media (max-width: 639px) {
+          .hero { height: 220px; }
+          .hero-title { font-size: 18px; }
+          .hero-sub { font-size: 12px; }
+          .hero-caption { padding: 0 16px 14px; }
+          .dash-content { padding: 14px 14px 20px; }
+          .stat-grid { gap: 10px; margin-bottom: 16px; }
+          .quick-grid { gap: 8px; margin-bottom: 18px; }
+          .two-col { gap: 12px; }
+          .widget { padding: 12px 14px; }
+        }
       `}</style>
 
       {/* ── Hero Carousel ── */}
@@ -300,7 +326,7 @@ export default function DashboardPage() {
       )}
 
       {/* ── Below-fold content ── */}
-      <div style={{ padding: '22px 28px 28px' }}>
+      <div className="dash-content">
           {/* News & Announcements */}
           <div style={{ marginBottom: 24 }}>
               <NewsFeed />
@@ -308,7 +334,7 @@ export default function DashboardPage() {
 
 
           {/* Stat widgets */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: 14, marginBottom: 22 }}>
+        <div className="stat-grid">
           <div className="widget">
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
               <div>
@@ -367,7 +393,7 @@ export default function DashboardPage() {
           <div style={{ fontSize: 14, fontWeight: 700, color: '#111' }}>Quick Links</div>
           <div style={{ fontSize: 11, color: '#aaa' }}>Most used tools</div>
         </div>
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(6, 1fr)', gap: 10, marginBottom: 24 }}>
+        <div className="quick-grid">
           {QUICK_LINKS.map((ql) => (
             <Link key={ql.label} href={ql.href} className="quick-link">
               <div className="ql-icon" style={{ background: ql.bg }}>{ql.icon}</div>
@@ -377,7 +403,7 @@ export default function DashboardPage() {
         </div>
 
         {/* Two-column section */}
-        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 16 }}>
+        <div className="two-col">
 
           {/* My Tasks */}
           <div className="card">

@@ -325,7 +325,7 @@ export default function AppShell({ children, user }: AppShellProps) {
             <div style={{ height: 3, background: 'linear-gradient(90deg, #6b1e98, #9333ea)', flexShrink: 0 }} />
 
             {/* Topbar */}
-            <header style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '0 24px', height: 52, display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
+            <header className="app-topbar" style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '0 24px', height: 52, display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
               {/* Hamburger — always visible */}
               <button
                 onClick={handleHamburger}
