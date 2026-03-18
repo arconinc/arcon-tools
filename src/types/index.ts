@@ -256,6 +256,16 @@ export interface ClickUpTask {
   list_name: string
 }
 
+// ─── Countdown ────────────────────────────────────────────────────────────────
+
+export interface CountdownConfig {
+  id: string
+  enabled: boolean
+  label: string
+  target_date: string   // ISO timestamp (TIMESTAMPTZ)
+  updated_at: string
+}
+
 // ─── Task Card ────────────────────────────────────────────────────────────────
 
 export interface TaskCard {

@@ -1,10 +1,10 @@
 'use client'
 
-import { useState, useEffect, createContext, useContext } from 'react'
+import { useState, useEffect, useRef, createContext, useContext } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Store } from '@/types'
+import { Store, CountdownConfig } from '@/types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -111,6 +111,7 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
       items: [
         { href: '/admin/banner', label: 'Banner', icon: BannerIcon, adminMatch: true },
         { href: '/admin/banner-strip', label: 'Banner Strip', icon: TickerIcon, adminMatch: true },
+        { href: '/admin/countdown', label: 'Countdown', icon: CountdownIcon, adminMatch: true },
         { href: '/admin/news', label: 'News', icon: MegaphoneIcon, adminMatch: true },
         { href: '/admin/stores', label: 'Stores', icon: StoreIcon, adminMatch: true },
         { href: '/admin/users', label: 'Users', icon: UserAdminIcon, adminMatch: true },
@@ -135,6 +136,10 @@ export default function AppShell({ children, user }: AppShellProps) {
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [storeError, setStoreError] = useState<string | null>(null)
   const [tooltip, setTooltip] = useState<{ label: string; y: number } | null>(null)
+  const [countdown, setCountdown] = useState<CountdownConfig | null>(null)
+  const [countdownDisplay, setCountdownDisplay] = useState('')
+  const [searchQuery, setSearchQuery] = useState('')
+  const countdownRef = useRef<CountdownConfig | null>(null)
 
   useEffect(() => {
     fetch('/api/stores')
@@ -155,6 +160,46 @@ export default function AppShell({ children, user }: AppShellProps) {
       })
       .catch(() => setStoreError('Could not reach store API'))
   }, [])
+
+  useEffect(() => {
+    fetch('/api/countdown')
+      .then(r => r.ok ? r.json() : null)
+      .then((data: CountdownConfig | null) => {
+        if (data?.enabled) {
+          setCountdown(data)
+          countdownRef.current = data
+        }
+      })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    const tick = () => {
+      const cfg = countdownRef.current
+      if (!cfg?.enabled) return
+      const diff = new Date(cfg.target_date).getTime() - Date.now()
+      if (diff <= 0) { setCountdownDisplay('Now!'); return }
+      const d = Math.floor(diff / 86400000)
+      const h = Math.floor((diff % 86400000) / 3600000)
+      const m = Math.floor((diff % 3600000) / 60000)
+      const s = Math.floor((diff % 60000) / 1000)
+      setCountdownDisplay(d > 0 ? `${d}d ${h}h ${m}m ${s}s` : `${h}h ${m}m ${s}s`)
+    }
+    tick()
+    const id = setInterval(tick, 1000)
+    return () => clearInterval(id)
+  }, [])
+
+  useEffect(() => {
+    countdownRef.current = countdown
+  }, [countdown])
+
+  function handleSearchSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!searchQuery.trim()) return
+    window.open(`https://www.google.com/search?q=${encodeURIComponent(searchQuery.trim())}`, '_blank', 'noopener,noreferrer')
+    setSearchQuery('')
+  }
 
   function handleStoreChange(e: React.ChangeEvent<HTMLSelectElement>) {
     const store = stores.find((s) => s.id === e.target.value) ?? null
@@ -325,7 +370,7 @@ export default function AppShell({ children, user }: AppShellProps) {
             <div style={{ height: 3, background: 'linear-gradient(90deg, #6b1e98, #9333ea)', flexShrink: 0 }} />
 
             {/* Topbar */}
-            <header className="app-topbar" style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '0 24px', height: 52, display: 'flex', alignItems: 'center', gap: 14, flexShrink: 0 }}>
+            <header className="app-topbar" style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '0 24px', height: 52, display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>
               {/* Hamburger — always visible */}
               <button
                 onClick={handleHamburger}
@@ -357,14 +402,94 @@ export default function AppShell({ children, user }: AppShellProps) {
                 </div>
               )}
 
+              {/* Countdown pill */}
+              {countdown?.enabled && countdownDisplay && (
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 7,
+                  background: '#6b1e98',
+                  color: '#fff',
+                  borderRadius: 7,
+                  padding: '5px 11px',
+                  fontSize: 12,
+                  fontWeight: 600,
+                  flexShrink: 0,
+                  whiteSpace: 'nowrap',
+                }}>
+                  <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ opacity: 0.75, flexShrink: 0 }}>
+                    <circle cx="12" cy="12" r="10" strokeWidth={2} />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" />
+                  </svg>
+                  <span style={{ opacity: 0.8, fontSize: 10, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
+                    {countdown.label}
+                  </span>
+                  <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: 13 }}>{countdownDisplay}</span>
+                </div>
+              )}
+
+              {/* Google Search */}
+              <form
+                onSubmit={handleSearchSubmit}
+                style={{ flex: 1, display: 'flex', alignItems: 'center' }}
+              >
+                <div style={{ position: 'relative', width: '100%' }}>
+                  <svg
+                    width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                    style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#999', pointerEvents: 'none' }}
+                  >
+                    <circle cx="11" cy="11" r="8" strokeWidth={2} />
+                    <path strokeLinecap="round" strokeWidth={2} d="M21 21l-4.35-4.35" />
+                  </svg>
+                  <input
+                    type="search"
+                    value={searchQuery}
+                    onChange={e => setSearchQuery(e.target.value)}
+                    placeholder="Search Google…"
+                    style={{
+                      width: '100%',
+                      padding: '7px 12px 7px 32px',
+                      border: '1px solid #e5e7eb',
+                      borderRadius: 7,
+                      fontSize: 13,
+                      color: '#333',
+                      background: '#f9f9f9',
+                      outline: 'none',
+                      boxSizing: 'border-box',
+                      transition: 'border-color 0.15s, background 0.15s',
+                    }}
+                    onFocus={e => { e.currentTarget.style.borderColor = '#9333ea'; e.currentTarget.style.background = '#fff' }}
+                    onBlur={e => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.background = '#f9f9f9' }}
+                  />
+                </div>
+              </form>
+
               {/* Right side */}
-              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 10 }}>
-                <div style={{ width: 34, height: 34, borderRadius: 6, background: '#f5f5f5', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#777', position: 'relative' }}>
+              <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+                {/* Gmail */}
+                <a
+                  href="https://mail.google.com"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Gmail"
+                  style={{ width: 34, height: 34, borderRadius: 6, background: '#f5f5f5', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#777', textDecoration: 'none', flexShrink: 0 }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#fef2f2'; e.currentTarget.style.color = '#dc2626' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#f5f5f5'; e.currentTarget.style.color = '#777' }}
+                >
+                  <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
+                    <path d="M20 4H4C2.9 4 2 4.9 2 6v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm0 4l-8 5-8-5V6l8 5 8-5v2z"/>
+                  </svg>
+                </a>
+
+                {/* Notifications */}
+                <div style={{ width: 34, height: 34, borderRadius: 6, background: '#f5f5f5', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#777', position: 'relative', flexShrink: 0 }}>
                   <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
                   </svg>
                   <div style={{ position: 'absolute', top: 6, right: 6, width: 7, height: 7, background: '#6b1e98', borderRadius: '50%', border: '1.5px solid #fff' }} />
                 </div>
+
+                {/* Avatar */}
                 {user.avatar_url ? (
                   <img src={user.avatar_url} alt={user.display_name} referrerPolicy="no-referrer" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
                 ) : (
@@ -615,4 +740,8 @@ function BannerIcon({ className }: { className?: string }) {
 
 function TickerIcon({ className }: { className?: string }) {
   return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 8h14M5 16h6" /></svg>
+}
+
+function CountdownIcon({ className }: { className?: string }) {
+  return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2} /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" /></svg>
 }
