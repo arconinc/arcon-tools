@@ -16,7 +16,6 @@ export interface AppUser {
   state: string | null
   zip: string | null
   phone: string | null
-  clickup_user_id: string | null
 }
 
 export interface BirthdayEvent {
@@ -212,7 +211,7 @@ export interface BannerStripItem {
   label: string
   text: string
   href?: string | null
-  source: 'birthday' | 'anniversary' | 'news' | 'holiday' | 'clickup' | 'manual'
+  source: 'birthday' | 'anniversary' | 'news' | 'holiday' | 'manual'
 }
 
 export interface TickerManualItem {
@@ -235,25 +234,8 @@ export interface TickerConfig {
   news_recency_days: number
   show_holidays: boolean
   holiday_lookahead_days: number
-  show_clickup: boolean
-  clickup_api_key: string | null
-  clickup_team_id: string | null   // Workspace/team ID for member email→ID lookup
-  clickup_list_id: string | null
-  clickup_due_within_days: number
   manual_items: TickerManualItem[]
   updated_at: string
-}
-
-// ─── ClickUp Tasks ────────────────────────────────────────────────────────────
-
-export interface ClickUpTask {
-  id: string
-  name: string
-  status: string
-  priority: 'urgent' | 'high' | 'normal' | 'low' | null
-  due_date: string | null   // Unix timestamp in ms as string
-  url: string
-  list_name: string
 }
 
 // ─── Countdown ────────────────────────────────────────────────────────────────
@@ -293,3 +275,266 @@ export const CARRIERS: Carrier[] = [
   { id: 'CanadaPost', name: 'Canada Post', trackingUrlTemplate: 'https://www.canadapost-postescanada.ca/track-reperage/en#/search?searchFor={tracking}' },
   { id: 'Other', name: 'Other', trackingUrlTemplate: '' },
 ]
+
+// ─── CRM ─────────────────────────────────────────────────────────────────────
+
+export type CrmClientStatus = 'Prospective' | 'Active' | 'Former'
+export type CrmContactType = 'Customer' | 'Vendor' | 'Prospect' | 'Partner' | 'Other'
+export type CrmOpportunityStatus = 'open' | 'won' | 'lost' | 'stalled'
+export type CrmPipelineStage = 'Send Quote' | 'Follow Up on Quote' | 'Quote Accepted' | 'Send Thank You Email'
+export type CrmOpportunityCategory = 'Apparel' | 'Packaging Product' | 'Print Product' | 'Promotional Product' | 'Signage' | 'Store/Ecommerce Build'
+export type CrmTaskStatus = 'not_started' | 'in_progress' | 'completed' | 'waiting_on_approval' | 'waiting_on_client_approval' | 'need_changes'
+export type CrmTaskPriority = 'low' | 'medium' | 'high'
+export type CrmTaskCategory =
+  | 'Art Order' | 'Art Proactive Prospecting' | 'Art Rush - Drop Everything'
+  | 'Art Rush - EOD' | 'Art Store Mocks' | 'Art Waiting on Approval'
+  | 'CSR Order' | 'CSR Rush' | 'CSR To Do' | 'In Progress' | 'Need Changes'
+  | 'Need Content' | 'Store/Ecommerce Adds' | 'Store/Ecommerce Refresh'
+  | 'Store/Ecommerce QDesign' | 'Store/Ecommerce Update' | 'To Do General'
+  | 'Waiting On Approval' | 'Waiting On Client Approval'
+  | 'Warehouse Fulfillment' | 'Warehouse Knitting' | 'Warehouse Ship' | 'Warehouse To Do'
+
+export interface CrmCustomer {
+  id: string
+  name: string
+  client_status: CrmClientStatus | null
+  phone: string | null
+  website: string | null
+  linkedin: string | null
+  email_domains: string | null
+  billing_address1: string | null
+  billing_address2: string | null
+  billing_city: string | null
+  billing_state: string | null
+  billing_zip: string | null
+  billing_country: string | null
+  shipping_address1: string | null
+  shipping_address2: string | null
+  shipping_city: string | null
+  shipping_state: string | null
+  shipping_zip: string | null
+  shipping_country: string | null
+  description: string | null
+  tags: string[]
+  artwork_notes: string | null
+  general_logo_color: string | null
+  formal_pms_colors: string | null
+  assigned_to: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CrmVendor {
+  id: string
+  name: string
+  phone: string | null
+  website: string | null
+  linkedin: string | null
+  description: string | null
+  tags: string[]
+  premier_group_member: boolean
+  product_line: string | null
+  specialty: string | null
+  arcon_account_number: string | null
+  online_store: string | null
+  arcon_username: string | null
+  arcon_password: string | null
+  customer_service_email: string | null
+  orders_email: string | null
+  orders_cutoff: string | null
+  rush_order_email: string | null
+  rush_order_cutoff: string | null
+  rush_art_email: string | null
+  artwork_email: string | null
+  samples_email: string | null
+  virtuals_email: string | null
+  spec_sample_email: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CrmContact {
+  id: string
+  first_name: string
+  last_name: string
+  title: string | null
+  email: string | null
+  phone: string | null
+  home_phone: string | null
+  mobile_phone: string | null
+  other_phone: string | null
+  linkedin: string | null
+  mailing_address1: string | null
+  mailing_address2: string | null
+  mailing_city: string | null
+  mailing_state: string | null
+  mailing_zip: string | null
+  mailing_country: string | null
+  other_address1: string | null
+  other_address2: string | null
+  other_city: string | null
+  other_state: string | null
+  other_zip: string | null
+  other_country: string | null
+  description: string | null
+  industry: string | null
+  type_of_contact: CrmContactType
+  products_purchased: string | null
+  organization_website: string | null
+  arcon_salesperson: string | null
+  contact_owner: string | null
+  tags: string[]
+  customer_id: string | null
+  vendor_id: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CrmOpportunity {
+  id: string
+  name: string
+  customer_id: string
+  assigned_to: string | null
+  pipeline_stage: CrmPipelineStage | null
+  value: number | null
+  probability: number | null
+  status: CrmOpportunityStatus
+  status_reason: string | null
+  category: CrmOpportunityCategory | null
+  forecast_close_date: string | null
+  description: string | null
+  closed_at: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CrmOpportunityStageHistory {
+  id: string
+  opportunity_id: string
+  pipeline_stage: CrmPipelineStage | null
+  status: CrmOpportunityStatus | null
+  value: number | null
+  probability: number | null
+  forecast_close_date: string | null
+  changed_by: string
+  changed_at: string
+}
+
+export interface CrmTask {
+  id: string
+  title: string
+  assigned_to: string | null
+  task_owner: string | null
+  category: CrmTaskCategory | null
+  priority: CrmTaskPriority
+  due_date: string | null
+  status: CrmTaskStatus
+  progress: number
+  description: string | null
+  opportunity_id: string | null
+  customer_id: string | null
+  vendor_id: string | null
+  contact_id: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CrmTaskComment {
+  id: string
+  task_id: string
+  user_id: string
+  comment: string
+  created_at: string
+  updated_at: string
+}
+
+export interface CrmCommentAttachment {
+  id: string
+  comment_id: string
+  label: string
+  url: string
+  file_name: string | null
+  file_size: number | null
+  mime_type: string | null
+  is_drive_link: boolean
+  uploaded_by: string
+  created_at: string
+}
+
+export interface CrmTaskHistory {
+  id: string
+  task_id: string
+  user_id: string
+  field_changed: string
+  old_value: string | null
+  new_value: string | null
+  changed_at: string
+}
+
+export interface CrmFile {
+  id: string
+  label: string
+  url: string
+  customer_id: string | null
+  vendor_id: string | null
+  contact_id: string | null
+  opportunity_id: string | null
+  added_by: string
+  created_at: string
+}
+
+export interface CrmSalesGoal {
+  id: string
+  user_id: string
+  year: number
+  month: number
+  goal_amount: number
+  created_at: string
+  updated_at: string
+}
+
+// WithRelations detail variants
+
+export interface CrmCustomerDetail extends CrmCustomer {
+  contacts: CrmContact[]
+  opportunities: CrmOpportunity[]
+  files: CrmFile[]
+  assigned_user: { id: string; display_name: string; email: string } | null
+  created_by_user: { id: string; display_name: string; email: string } | null
+}
+
+export interface CrmVendorDetail extends CrmVendor {
+  contacts: CrmContact[]
+  files: CrmFile[]
+}
+
+export interface CrmContactDetail extends CrmContact {
+  customer: CrmCustomer | null
+  vendor: CrmVendor | null
+}
+
+export interface CrmOpportunityDetail extends CrmOpportunity {
+  customer: { id: string; name: string } | null
+  assigned_user: { id: string; display_name: string; email: string } | null
+  tasks: CrmTask[]
+  stage_history: CrmOpportunityStageHistory[]
+  files: CrmFile[]
+}
+
+export interface CrmTaskDetail extends CrmTask {
+  comments: (CrmTaskComment & {
+    attachments: CrmCommentAttachment[]
+    user: { id: string; display_name: string; avatar_url?: string | null }
+  })[]
+  history: (CrmTaskHistory & { user: { id: string; display_name: string } })[]
+  opportunity: { id: string; name: string } | null
+  customer: { id: string; name: string } | null
+  vendor: { id: string; name: string } | null
+  contact: { id: string; first_name: string; last_name: string } | null
+  assigned_user: { id: string; display_name: string; email: string } | null
+}

@@ -66,12 +66,14 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
       ],
     },
     {
-      label: 'E-Commerce',
+      label: 'CRM',
       items: [
-        { href: '/tasks/add-tracking', label: 'Add Tracking', icon: PackageIcon },
-        { href: '#', label: 'Customer Lookup', icon: SearchIcon, soon: true },
-        { href: '#', label: 'Order History', icon: ClipboardListIcon, soon: true },
-        { href: '#', label: 'Reporting', icon: ChartBarIcon, soon: true },
+        { href: '/crm', label: 'Dashboard', icon: CrmDashIcon, adminMatch: true },
+        { href: '/crm/customers', label: 'Customers', icon: CrmCustomersIcon, adminMatch: true },
+        { href: '/crm/vendors', label: 'Vendors', icon: BuildingIcon, adminMatch: true },
+        { href: '/crm/contacts', label: 'Contacts', icon: CrmContactsIcon, adminMatch: true },
+        { href: '/crm/opportunities', label: 'Opportunities', icon: CrmOppsIcon, adminMatch: true },
+        { href: '/crm/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
       ],
     },
     {
@@ -91,16 +93,19 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
       ],
     },
     {
+      label: 'E-Commerce',
+      items: [
+        { href: '/tasks/add-tracking', label: 'Add Tracking', icon: PackageIcon },
+        { href: '#', label: 'Customer Lookup', icon: SearchIcon, soon: true },
+        { href: '#', label: 'Order History', icon: ClipboardListIcon, soon: true },
+        { href: '#', label: 'Reporting', icon: ChartBarIcon, soon: true },
+      ],
+    },
+    {
       label: 'HR',
       items: [
         { href: '#', label: 'Documents', icon: DocumentIcon },
         { href: '#', label: 'PTO Request', icon: CalendarIcon },
-      ],
-    },
-    {
-      label: 'Vendors',
-      items: [
-        { href: '#', label: 'Vendor Directory', icon: BuildingIcon },
       ],
     },
   ]
@@ -744,4 +749,20 @@ function TickerIcon({ className }: { className?: string }) {
 
 function CountdownIcon({ className }: { className?: string }) {
   return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2} /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" /></svg>
+}
+
+function CrmDashIcon({ className }: { className?: string }) {
+  return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h10M4 18h6" /></svg>
+}
+
+function CrmCustomersIcon({ className }: { className?: string }) {
+  return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0H5m14 0h2M5 21H3m4-10h2m-2 4h2m6-4h2m-2 4h2" /></svg>
+}
+
+function CrmContactsIcon({ className }: { className?: string }) {
+  return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+}
+
+function CrmOppsIcon({ className }: { className?: string }) {
+  return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
 }

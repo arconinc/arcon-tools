@@ -1,0 +1,137 @@
+'use client'
+
+import { useState, useEffect, useCallback } from 'react'
+import { useRouter } from 'next/navigation'
+
+type VendorListItem = {
+  id: string
+  name: string
+  phone: string | null
+  website: string | null
+  product_line: string | null
+  specialty: string | null
+  premier_group_member: boolean
+  tags: string[]
+  updated_at: string
+}
+
+export default function VendorsPage() {
+  const router = useRouter()
+  const [vendors, setVendors] = useState<VendorListItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [search, setSearch] = useState('')
+
+  const fetchVendors = useCallback(async () => {
+    setLoading(true)
+    const params = new URLSearchParams()
+    if (search) params.set('search', search)
+    try {
+      const res = await fetch(`/api/crm/vendors?${params}`)
+      const data = await res.json()
+      setVendors(Array.isArray(data) ? data : [])
+    } finally {
+      setLoading(false)
+    }
+  }, [search])
+
+  useEffect(() => {
+    const t = setTimeout(fetchVendors, 300)
+    return () => clearTimeout(t)
+  }, [fetchVendors])
+
+  return (
+    <div className="max-w-6xl mx-auto px-6 py-8">
+      <div className="flex items-center justify-between mb-6">
+        <div>
+          <h1 className="text-2xl font-bold text-slate-900">Vendors</h1>
+          <p className="text-sm text-slate-500 mt-0.5">Supplier organizations and partners</p>
+        </div>
+        <button
+          onClick={() => router.push('/crm/vendors/new')}
+          className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl transition-colors"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+          </svg>
+          New Vendor
+        </button>
+      </div>
+
+      <div className="flex gap-3 mb-5">
+        <div className="relative flex-1 max-w-sm">
+          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <circle cx="11" cy="11" r="8" strokeWidth={2} />
+            <path strokeLinecap="round" strokeWidth={2} d="M21 21l-4.35-4.35" />
+          </svg>
+          <input
+            type="search"
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            placeholder="Search vendors…"
+            className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
+          />
+        </div>
+      </div>
+
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+        <table className="w-full text-sm">
+          <thead className="bg-slate-50 border-b border-slate-200">
+            <tr>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Product Line</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Phone</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Website</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Premier</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {loading && Array.from({ length: 5 }).map((_, i) => (
+              <tr key={i}>
+                {[...Array(5)].map((_, j) => (
+                  <td key={j} className="px-5 py-3.5">
+                    <div className="h-4 bg-slate-100 rounded animate-pulse" style={{ width: j === 0 ? '55%' : '35%' }} />
+                  </td>
+                ))}
+              </tr>
+            ))}
+            {!loading && vendors.length === 0 && (
+              <tr>
+                <td colSpan={5} className="px-5 py-12 text-center text-sm text-slate-400">
+                  {search ? 'No vendors match your search.' : 'No vendors yet. Create one to get started.'}
+                </td>
+              </tr>
+            )}
+            {!loading && vendors.map((v) => (
+              <tr
+                key={v.id}
+                onClick={() => router.push(`/crm/vendors/${v.id}`)}
+                className="hover:bg-slate-50 cursor-pointer transition-colors"
+              >
+                <td className="px-5 py-3.5 font-medium text-slate-900">{v.name}</td>
+                <td className="px-5 py-3.5 text-slate-600 hidden md:table-cell">{v.product_line ?? '—'}</td>
+                <td className="px-5 py-3.5 text-slate-600 hidden md:table-cell">{v.phone ?? '—'}</td>
+                <td className="px-5 py-3.5 hidden lg:table-cell">
+                  {v.website
+                    ? <a href={v.website} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-purple-700 hover:underline">{v.website.replace(/^https?:\/\//, '')}</a>
+                    : <span className="text-slate-400">—</span>
+                  }
+                </td>
+                <td className="px-5 py-3.5 hidden lg:table-cell">
+                  {v.premier_group_member
+                    ? <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-800">Premier</span>
+                    : <span className="text-slate-400">—</span>
+                  }
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+        {!loading && vendors.length > 0 && (
+          <div className="px-5 py-3 border-t border-slate-100 text-xs text-slate-400">
+            {vendors.length} vendor{vendors.length !== 1 ? 's' : ''}
+          </div>
+        )}
+      </div>
+    </div>
+  )
+}

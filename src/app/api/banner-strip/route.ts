@@ -6,7 +6,6 @@ import {
   getBirthdayItems,
   getAnniversaryItems,
   getHolidayItems,
-  getClickUpItems,
   getActiveManualItems,
   articleTypeLabel,
 } from '@/lib/ticker-sources'
@@ -85,17 +84,6 @@ export async function GET() {
   // ── 5. US Holidays ─────────────────────────────────────────────────────────
   if (config.show_holidays) {
     items.push(...getHolidayItems(today, config.holiday_lookahead_days))
-  }
-
-  // ── 6. ClickUp tasks ───────────────────────────────────────────────────────
-  if (config.show_clickup && config.clickup_api_key && config.clickup_list_id) {
-    const clickupItems = await getClickUpItems(
-      config.clickup_api_key,
-      config.clickup_list_id,
-      config.clickup_due_within_days,
-      today,
-    )
-    items.push(...clickupItems)
   }
 
   return NextResponse.json({ items })

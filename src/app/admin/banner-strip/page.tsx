@@ -14,11 +14,6 @@ const DEFAULT_CONFIG: Omit<TickerConfig, 'id' | 'updated_at'> = {
   news_recency_days: 7,
   show_holidays: true,
   holiday_lookahead_days: 7,
-  show_clickup: false,
-  clickup_api_key: null,
-  clickup_team_id: null,
-  clickup_list_id: null,
-  clickup_due_within_days: 7,
   manual_items: [],
 }
 
@@ -110,11 +105,6 @@ export default function BannerStripAdminPage() {
           news_recency_days: data.news_recency_days,
           show_holidays: data.show_holidays,
           holiday_lookahead_days: data.holiday_lookahead_days,
-          show_clickup: data.show_clickup,
-          clickup_api_key: data.clickup_api_key,
-          clickup_team_id: data.clickup_team_id ?? null,
-          clickup_list_id: data.clickup_list_id,
-          clickup_due_within_days: data.clickup_due_within_days,
           manual_items: data.manual_items ?? [],
         })
         setLoading(false)
@@ -335,62 +325,6 @@ export default function BannerStripAdminPage() {
               min={0} max={30} unit="days before"
               onChange={(v) => update({ holiday_lookahead_days: v })}
             />
-          </SourceRow>
-
-          {/* ClickUp */}
-          <SourceRow
-            icon="✅"
-            title="ClickUp Tasks"
-            description="Upcoming tasks from a ClickUp list. Requires API credentials."
-            enabled={config.show_clickup}
-            onToggle={(v) => update({ show_clickup: v })}
-          >
-            <div className="space-y-3">
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                  API Key
-                </label>
-                <input
-                  type="password"
-                  value={config.clickup_api_key ?? ''}
-                  onChange={(e) => update({ clickup_api_key: e.target.value || null })}
-                  placeholder="pk_..."
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 font-mono"
-                />
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                  Team ID <span className="normal-case font-normal text-purple-600">(required for My Tasks widget)</span>
-                </label>
-                <input
-                  type="text"
-                  value={config.clickup_team_id ?? ''}
-                  onChange={(e) => update({ clickup_team_id: e.target.value || null })}
-                  placeholder="e.g. 90131331624"
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
-                />
-                <p className="text-xs text-slate-400 mt-1">Found in the ClickUp URL: app.clickup.com/<strong>90131331624</strong>/…</p>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                  List ID
-                </label>
-                <input
-                  type="text"
-                  value={config.clickup_list_id ?? ''}
-                  onChange={(e) => update({ clickup_list_id: e.target.value || null })}
-                  placeholder="e.g. 901234567"
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
-                />
-                <p className="text-xs text-slate-400 mt-1">Find the List ID in the ClickUp URL when viewing a list. Used for both the ticker and the My Tasks widget.</p>
-              </div>
-              <NumInput
-                label="Show tasks due within"
-                value={config.clickup_due_within_days}
-                min={1} max={30} unit="days"
-                onChange={(v) => update({ clickup_due_within_days: v })}
-              />
-            </div>
           </SourceRow>
 
         </div>

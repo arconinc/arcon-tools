@@ -146,40 +146,6 @@ export function getActiveManualItems(items: TickerManualItem[], today: Date): Ba
     }))
 }
 
-// ── ClickUp ────────────────────────────────────────────────────────────────────
-
-export async function getClickUpItems(
-  apiKey: string,
-  listId: string,
-  dueWithinDays: number,
-  today: Date,
-): Promise<BannerStripItem[]> {
-  try {
-    const now = today.getTime()
-    const dueAfter = now - 86400000 // include tasks due today
-    const dueBefore = now + dueWithinDays * 86400000
-
-    const res = await fetch(
-      `https://api.clickup.com/api/v2/list/${listId}/task?due_date_gt=${dueAfter}&due_date_lt=${dueBefore}&order_by=due_date&reverse=false`,
-      { headers: { Authorization: apiKey }, next: { revalidate: 300 } },
-    )
-    if (!res.ok) return []
-
-    const data = await res.json()
-    const tasks: Array<{ id: string; name: string; url?: string; due_date?: string }> = data.tasks ?? []
-
-    return tasks.slice(0, 5).map((task) => ({
-      id: `clickup-${task.id}`,
-      label: 'Task',
-      text: task.name,
-      href: task.url ?? null,
-      source: 'clickup' as const,
-    }))
-  } catch {
-    return []
-  }
-}
-
 // ── Article label mapper ───────────────────────────────────────────────────────
 
 export function articleTypeLabel(type: string): string {
