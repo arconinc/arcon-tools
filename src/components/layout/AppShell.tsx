@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Store, CountdownConfig } from '@/types'
+import { setGAUser, trackPageView } from '@/lib/analytics'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -199,6 +200,15 @@ export default function AppShell({ children, user }: AppShellProps) {
   useEffect(() => {
     countdownRef.current = countdown
   }, [countdown])
+
+  // ── Analytics ──────────────────────────────────────────────────────────────
+  useEffect(() => {
+    setGAUser(user.email)
+  }, [user.email])
+
+  useEffect(() => {
+    trackPageView(window.location.href, user.email)
+  }, [pathname, user.email])
 
   function handleSearchSubmit(e: React.FormEvent) {
     e.preventDefault()
