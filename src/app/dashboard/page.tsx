@@ -25,6 +25,29 @@ const FALLBACK_SLIDES: BannerSlide[] = [
   { id: 'f5', pre_heading: '5-Year Anniversary', headline: 'Congrats Cami Johnson — 5 Years!', emoji: '🥂', subhead: 'Thank you for five incredible years with Arcon', bg_type: 'gradient', bg_gradient: 'hs-5', bg_image_url: null },
 ]
 
+// ── CRM Task types ────────────────────────────────────────────────────────────
+
+type CrmTask = {
+  id: string; title: string; status: string; priority: string
+  due_date: string | null; category: string | null
+  linked_to_name: string | null; linked_to_type: string | null
+}
+
+const CRM_STATUS_LABEL: Record<string, string> = {
+  not_started: 'Not Started', in_progress: 'In Progress', completed: 'Completed',
+  waiting_on_approval: 'Waiting Approval', waiting_on_client_approval: 'Waiting Client',
+  need_changes: 'Need Changes',
+}
+const CRM_STATUS_CLS: Record<string, string> = {
+  not_started: 'bg-slate-100 text-slate-500', in_progress: 'bg-blue-100 text-blue-700',
+  waiting_on_approval: 'bg-yellow-100 text-yellow-700',
+  waiting_on_client_approval: 'bg-orange-100 text-orange-700',
+  need_changes: 'bg-red-100 text-red-600',
+}
+const CRM_PRIORITY_DOT: Record<string, string> = {
+  high: 'dot-high', medium: 'dot-med', low: 'dot-low',
+}
+
 // ── Page ──────────────────────────────────────────────────────────────────────
 
 export default function DashboardPage() {
@@ -35,6 +58,8 @@ export default function DashboardPage() {
   const [bdayEvents, setBdayEvents] = useState<(BirthdayEvent & { color: string })[]>([])
   const [bdayCount, setBdayCount] = useState(0)
   const [bannerItems, setBannerItems] = useState<BannerStripItem[]>([])
+  const [myTasks, setMyTasks] = useState<CrmTask[]>([])
+  const [tasksLoading, setTasksLoading] = useState(true)
 
   useEffect(() => {
     fetch('/api/banner-strip')
@@ -80,6 +105,16 @@ export default function DashboardPage() {
         }
       })
       .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/crm/tasks?assigned_to=me&status=not_started,in_progress,waiting_on_approval,waiting_on_client_approval,need_changes')
+      .then((r) => r.json())
+      .then((data) => {
+        if (Array.isArray(data)) setMyTasks(data.slice(0, 8))
+      })
+      .catch(() => {})
+      .finally(() => setTasksLoading(false))
   }, [])
 
   function goTo(i: number) {
@@ -378,13 +413,46 @@ export default function DashboardPage() {
             <div className="card-header">
               <div className="card-title">My Tasks</div>
               <Link href="/crm/tasks" className="card-action" style={{ textDecoration: 'none' }}>
-                Go to CRM →
+                View all →
               </Link>
             </div>
-            <div className="card-body">
-              <div style={{ fontSize: 12, color: '#bbb', padding: '8px 0' }}>
-                Task tracking has moved to the CRM. <Link href="/crm/tasks" style={{ color: '#6b1e98', textDecoration: 'underline' }}>View your tasks →</Link>
-              </div>
+            <div className="card-body" style={{ padding: '4px 0' }}>
+              {tasksLoading ? (
+                <div style={{ padding: '12px 16px' }}>
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} style={{ height: 12, background: '#f5f5f5', borderRadius: 4, marginBottom: 10, width: i === 0 ? '70%' : i === 1 ? '55%' : '60%' }} />
+                  ))}
+                </div>
+              ) : myTasks.length === 0 ? (
+                <div style={{ fontSize: 12, color: '#bbb', padding: '12px 16px' }}>
+                  No open tasks. <Link href="/crm/tasks/new" style={{ color: '#6b1e98', textDecoration: 'underline' }}>Create one →</Link>
+                </div>
+              ) : (
+                myTasks.map((t) => (
+                  <Link key={t.id} href={`/crm/tasks/${t.id}`} style={{ textDecoration: 'none' }}>
+                    <div className="task-item" style={{ padding: '8px 16px', cursor: 'pointer' }}
+                      onMouseEnter={(e) => (e.currentTarget.style.background = '#faf5ff')}
+                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
+                      <div className={`task-dot ${CRM_PRIORITY_DOT[t.priority] ?? 'dot-med'}`} />
+                      <div style={{ flex: 1, minWidth: 0 }}>
+                        <div className="task-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</div>
+                        <div className="task-meta">
+                          {t.due_date && (
+                            <span style={{ color: new Date(t.due_date) < new Date() ? '#dc2626' : '#aaa', fontWeight: new Date(t.due_date) < new Date() ? 600 : 400 }}>
+                              Due {new Date(t.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                              {new Date(t.due_date) < new Date() ? ' ⚠️' : ''}
+                              {t.linked_to_name ? ` · ${t.linked_to_name}` : ''}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                      <span className={`task-pill ${CRM_STATUS_CLS[t.status] ?? ''}`} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 3, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
+                        {CRM_STATUS_LABEL[t.status] ?? t.status}
+                      </span>
+                    </div>
+                  </Link>
+                ))
+              )}
             </div>
           </div>
 

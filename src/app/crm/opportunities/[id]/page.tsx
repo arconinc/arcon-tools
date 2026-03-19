@@ -6,6 +6,9 @@ import Link from 'next/link'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
+type DropdownUser = { id: string; display_name: string; email: string }
+type DropdownCustomer = { id: string; name: string }
+
 type OppStatus = 'open' | 'won' | 'lost' | 'stalled'
 type PipelineStage = 'Send Quote' | 'Follow Up on Quote' | 'Quote Accepted' | 'Send Thank You Email'
 type OppCategory = 'Apparel' | 'Packaging Product' | 'Print Product' | 'Promotional Product' | 'Signage' | 'Store/Ecommerce Build'
@@ -51,6 +54,7 @@ type CreateForm = {
   name: string
   customer_id: string
   customer_name: string
+  assigned_to: string
   pipeline_stage: string
   value: string
   probability: string
@@ -248,6 +252,20 @@ export default function OpportunityDetailPage() {
   const [opp, setOpp] = useState<OppDetail | null>(null)
   const [loading, setLoading] = useState(!isNew)
   const [error, setError] = useState<string | null>(null)
+
+  // Dropdown data
+  const [crmUsers, setCrmUsers] = useState<DropdownUser[]>([])
+  const [customers, setCustomers] = useState<DropdownCustomer[]>([])
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/crm/users').then((r) => r.json()),
+      fetch('/api/crm/customers').then((r) => r.json()),
+    ]).then(([users, custs]) => {
+      if (Array.isArray(users)) setCrmUsers(users)
+      if (Array.isArray(custs)) setCustomers(custs)
+    })
+  }, [])
   const [activeTab, setActiveTab] = useState<'details' | 'related' | 'activity'>('details')
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState<Partial<OppDetail>>({})
@@ -261,6 +279,7 @@ export default function OpportunityDetailPage() {
     name: '',
     customer_id: prefillCustomerId,
     customer_name: prefillCustomerName,
+    assigned_to: '',
     pipeline_stage: '',
     value: '',
     probability: '',
@@ -362,7 +381,7 @@ export default function OpportunityDetailPage() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
     if (!createForm.name.trim()) { setCreateError('Name is required'); return }
-    if (!createForm.customer_id.trim()) { setCreateError('Customer ID is required'); return }
+    if (!createForm.customer_id.trim()) { setCreateError('Customer is required'); return }
     setCreating(true)
     setCreateError(null)
     try {
@@ -372,6 +391,7 @@ export default function OpportunityDetailPage() {
         body: JSON.stringify({
           name: createForm.name.trim(),
           customer_id: createForm.customer_id.trim(),
+          assigned_to: createForm.assigned_to || null,
           pipeline_stage: createForm.pipeline_stage || null,
           value: createForm.value ? Number(createForm.value) : null,
           probability: createForm.probability ? Number(createForm.probability) : null,
@@ -416,15 +436,16 @@ export default function OpportunityDetailPage() {
 
           <div>
             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
-              Customer ID <span className="text-red-500">*</span>
+              Customer <span className="text-red-500">*</span>
             </label>
-            <input type="text" value={createForm.customer_id} required
-              placeholder={prefillCustomerName || 'Paste customer UUID'}
+            <select value={createForm.customer_id} required
               onChange={(e) => setCreateForm((p) => ({ ...p, customer_id: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 font-mono text-xs" />
-            {prefillCustomerName && (
-              <p className="text-xs text-slate-400 mt-1">Linking to: <strong>{prefillCustomerName}</strong></p>
-            )}
+              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+              <option value="">— Select Customer —</option>
+              {customers.map((c) => (
+                <option key={c.id} value={c.id}>{c.name}</option>
+              ))}
+            </select>
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -468,6 +489,18 @@ export default function OpportunityDetailPage() {
             <input type="date" value={createForm.forecast_close_date}
               onChange={(e) => setCreateForm((p) => ({ ...p, forecast_close_date: e.target.value }))}
               className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
+          </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Assigned To</label>
+            <select value={createForm.assigned_to ?? ''}
+              onChange={(e) => setCreateForm((p) => ({ ...p, assigned_to: e.target.value }))}
+              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+              <option value="">— Unassigned —</option>
+              {crmUsers.map((u) => (
+                <option key={u.id} value={u.id}>{u.display_name}</option>
+              ))}
+            </select>
           </div>
 
           <div>
@@ -624,7 +657,17 @@ export default function OpportunityDetailPage() {
             {editing ? (
               <>
                 <FieldInput label="Name" name="name" value={(ef.name as string) ?? ''} onChange={handleEditChange} />
-                <FieldInput label="Customer ID" name="customer_id" value={(ef.customer_id as string) ?? ''} onChange={handleEditChange} />
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Customer</label>
+                  <select value={(ef.customer_id as string) ?? ''}
+                    onChange={(e) => handleEditChange('customer_id', e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                    <option value="">— Select Customer —</option>
+                    {customers.map((c) => (
+                      <option key={c.id} value={c.id}>{c.name}</option>
+                    ))}
+                  </select>
+                </div>
                 <div>
                   <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Pipeline Stage</label>
                   <select value={(ef.pipeline_stage as string) ?? ''}
@@ -662,6 +705,17 @@ export default function OpportunityDetailPage() {
                 </div>
                 <div className="col-span-2">
                   <FieldInput label="Description" name="description" value={(ef.description as string) ?? ''} onChange={handleEditChange} textarea />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Assigned To</label>
+                  <select value={(ef.assigned_to as string) ?? ''}
+                    onChange={(e) => handleEditChange('assigned_to', e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                    <option value="">— Unassigned —</option>
+                    {crmUsers.map((u) => (
+                      <option key={u.id} value={u.id}>{u.display_name}</option>
+                    ))}
+                  </select>
                 </div>
               </>
             ) : (

@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 
+type DropdownUser = { id: string; display_name: string; email: string }
+
 type CustomerDetail = {
   id: string; name: string; client_status: 'Prospective' | 'Active' | 'Former' | null
   phone: string | null; website: string | null; linkedin: string | null; email_domains: string | null
@@ -22,7 +24,7 @@ type CustomerDetail = {
 }
 
 type CreateForm = {
-  name: string; client_status: string; phone: string; website: string
+  name: string; client_status: string; assigned_to: string; phone: string; website: string
   linkedin: string; email_domains: string; description: string
 }
 
@@ -73,6 +75,15 @@ export default function CustomerDetailPage() {
   const [customer, setCustomer] = useState<CustomerDetail | null>(null)
   const [loading, setLoading] = useState(!isNew)
   const [error, setError] = useState<string | null>(null)
+
+  // Dropdown data
+  const [crmUsers, setCrmUsers] = useState<DropdownUser[]>([])
+
+  useEffect(() => {
+    fetch('/api/crm/users').then((r) => r.json()).then((users) => {
+      if (Array.isArray(users)) setCrmUsers(users)
+    })
+  }, [])
   const [activeTab, setActiveTab] = useState<'details' | 'related' | 'activity'>('details')
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState<Partial<CustomerDetail>>({})
@@ -80,7 +91,7 @@ export default function CustomerDetailPage() {
 
   // Create form state
   const [createForm, setCreateForm] = useState<CreateForm>({
-    name: '', client_status: '', phone: '', website: '', linkedin: '', email_domains: '', description: '',
+    name: '', client_status: '', assigned_to: '', phone: '', website: '', linkedin: '', email_domains: '', description: '',
   })
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
@@ -142,6 +153,7 @@ export default function CustomerDetailPage() {
         body: JSON.stringify({
           name: createForm.name.trim(),
           client_status: createForm.client_status || null,
+          assigned_to: createForm.assigned_to || null,
           phone: createForm.phone || null,
           website: createForm.website || null,
           linkedin: createForm.linkedin || null,
@@ -183,6 +195,16 @@ export default function CustomerDetailPage() {
               <option>Prospective</option>
               <option>Active</option>
               <option>Former</option>
+            </select>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Assigned To</label>
+            <select value={createForm.assigned_to} onChange={(e) => setCreateForm((p) => ({ ...p, assigned_to: e.target.value }))}
+              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+              <option value="">— Unassigned —</option>
+              {crmUsers.map((u) => (
+                <option key={u.id} value={u.id}>{u.display_name}</option>
+              ))}
             </select>
           </div>
           <div className="grid grid-cols-2 gap-4">
@@ -336,6 +358,16 @@ export default function CustomerDetailPage() {
                     <option>Prospective</option>
                     <option>Active</option>
                     <option>Former</option>
+                  </select>
+                </div>
+                <div className="col-span-2">
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Assigned To</label>
+                  <select value={(ef.assigned_to as string) ?? ''} onChange={(e) => handleEditChange('assigned_to', e.target.value)}
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                    <option value="">— Unassigned —</option>
+                    {crmUsers.map((u) => (
+                      <option key={u.id} value={u.id}>{u.display_name}</option>
+                    ))}
                   </select>
                 </div>
                 <FieldInput label="Phone" name="phone" value={(ef.phone as string) ?? ''} onChange={handleEditChange} type="tel" />

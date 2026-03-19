@@ -10,6 +10,12 @@ import { useAppUser } from '@/components/layout/AppShell'
 type TaskStatus = 'not_started' | 'in_progress' | 'completed' | 'waiting_on_approval' | 'waiting_on_client_approval' | 'need_changes'
 type TaskPriority = 'low' | 'medium' | 'high'
 
+type DropdownUser = { id: string; display_name: string; email: string }
+type DropdownCustomer = { id: string; name: string }
+type DropdownVendor = { id: string; name: string }
+type DropdownOpportunity = { id: string; name: string }
+type DropdownContact = { id: string; first_name: string; last_name: string }
+
 type Attachment = {
   id: string; comment_id: string; label: string; url: string
   file_name: string | null; file_size: number | null; mime_type: string | null
@@ -423,6 +429,30 @@ export default function TaskDetailPage() {
   const [editForm, setEditForm] = useState<Partial<TaskDetail>>({})
   const [saving, setSaving] = useState(false)
 
+  // Dropdown data
+  const [crmUsers, setCrmUsers] = useState<DropdownUser[]>([])
+  const [customers, setCustomers] = useState<DropdownCustomer[]>([])
+  const [vendors, setVendors] = useState<DropdownVendor[]>([])
+  const [opportunities, setOpportunities] = useState<DropdownOpportunity[]>([])
+  const [contacts, setContacts] = useState<DropdownContact[]>([])
+
+  useEffect(() => {
+    Promise.all([
+      fetch('/api/crm/users').then((r) => r.json()),
+      fetch('/api/crm/customers').then((r) => r.json()),
+      fetch('/api/crm/vendors').then((r) => r.json()),
+      fetch('/api/crm/opportunities').then((r) => r.json()),
+      fetch('/api/crm/contacts').then((r) => r.json()),
+    ]).then(([users, custs, vends, opps, conts]) => {
+      if (Array.isArray(users)) setCrmUsers(users)
+      if (Array.isArray(custs)) setCustomers(custs)
+      if (Array.isArray(vends)) setVendors(vends)
+      // opportunities API returns { items: [...], pipeline_total: ... }
+      if (opps?.items && Array.isArray(opps.items)) setOpportunities(opps.items)
+      if (Array.isArray(conts)) setContacts(conts)
+    })
+  }, [])
+
   // Create form
   const [createForm, setCreateForm] = useState<CreateForm>({
     title: '',
@@ -588,10 +618,15 @@ export default function TaskDetailPage() {
           </div>
 
           <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Assigned To (User ID)</label>
-            <input type="text" value={cf.assigned_to} placeholder="User UUID"
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Assigned To</label>
+            <select value={cf.assigned_to}
               onChange={(e) => setCreateForm((p) => ({ ...p, assigned_to: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 font-mono text-xs" />
+              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+              <option value="">— Unassigned —</option>
+              {crmUsers.map((u) => (
+                <option key={u.id} value={u.id}>{u.display_name}</option>
+              ))}
+            </select>
           </div>
 
           <div>
@@ -602,31 +637,51 @@ export default function TaskDetailPage() {
           </div>
 
           <div className="border-t border-slate-100 pt-4">
-            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Link To (optional — paste one ID)</div>
+            <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Link To (optional — select one)</div>
             <div className="grid grid-cols-2 gap-4">
               <div>
-                <label className="block text-xs text-slate-500 mb-1">Opportunity ID</label>
-                <input type="text" value={cf.opportunity_id} placeholder="UUID"
+                <label className="block text-xs text-slate-500 mb-1">Opportunity</label>
+                <select value={cf.opportunity_id}
                   onChange={(e) => setCreateForm((p) => ({ ...p, opportunity_id: e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 font-mono text-xs" />
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                  <option value="">— None —</option>
+                  {opportunities.map((o) => (
+                    <option key={o.id} value={o.id}>{o.name}</option>
+                  ))}
+                </select>
               </div>
               <div>
-                <label className="block text-xs text-slate-500 mb-1">Customer ID</label>
-                <input type="text" value={cf.customer_id} placeholder="UUID"
+                <label className="block text-xs text-slate-500 mb-1">Customer</label>
+                <select value={cf.customer_id}
                   onChange={(e) => setCreateForm((p) => ({ ...p, customer_id: e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 font-mono text-xs" />
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                  <option value="">— None —</option>
+                  {customers.map((c) => (
+                    <option key={c.id} value={c.id}>{c.name}</option>
+                  ))}
+                </select>
               </div>
               <div>
-                <label className="block text-xs text-slate-500 mb-1">Vendor ID</label>
-                <input type="text" value={cf.vendor_id} placeholder="UUID"
+                <label className="block text-xs text-slate-500 mb-1">Vendor</label>
+                <select value={cf.vendor_id}
                   onChange={(e) => setCreateForm((p) => ({ ...p, vendor_id: e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 font-mono text-xs" />
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                  <option value="">— None —</option>
+                  {vendors.map((v) => (
+                    <option key={v.id} value={v.id}>{v.name}</option>
+                  ))}
+                </select>
               </div>
               <div>
-                <label className="block text-xs text-slate-500 mb-1">Contact ID</label>
-                <input type="text" value={cf.contact_id} placeholder="UUID"
+                <label className="block text-xs text-slate-500 mb-1">Contact</label>
+                <select value={cf.contact_id}
                   onChange={(e) => setCreateForm((p) => ({ ...p, contact_id: e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 font-mono text-xs" />
+                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                  <option value="">— None —</option>
+                  {contacts.map((c) => (
+                    <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>
+                  ))}
+                </select>
               </div>
             </div>
           </div>
@@ -819,9 +874,68 @@ export default function TaskDetailPage() {
                       className="w-full accent-purple-700"
                     />
                   </div>
-                  <FieldInput label="Assigned To (User ID)" name="assigned_to" value={(ef.assigned_to as string) ?? ''} onChange={handleEditChange} />
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Assigned To</label>
+                    <select value={(ef.assigned_to as string) ?? ''}
+                      onChange={(e) => handleEditChange('assigned_to', e.target.value)}
+                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                      <option value="">— Unassigned —</option>
+                      {crmUsers.map((u) => (
+                        <option key={u.id} value={u.id}>{u.display_name}</option>
+                      ))}
+                    </select>
+                  </div>
                   <div className="col-span-2">
                     <FieldInput label="Description" name="description" value={(ef.description as string) ?? ''} onChange={handleEditChange} textarea />
+                  </div>
+                  <div className="col-span-2 border-t border-slate-100 pt-4">
+                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Linked Record</div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-1">Opportunity</label>
+                        <select value={(ef.opportunity_id as string) ?? ''}
+                          onChange={(e) => handleEditChange('opportunity_id', e.target.value)}
+                          className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                          <option value="">— None —</option>
+                          {opportunities.map((o) => (
+                            <option key={o.id} value={o.id}>{o.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-1">Customer</label>
+                        <select value={(ef.customer_id as string) ?? ''}
+                          onChange={(e) => handleEditChange('customer_id', e.target.value)}
+                          className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                          <option value="">— None —</option>
+                          {customers.map((c) => (
+                            <option key={c.id} value={c.id}>{c.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-1">Vendor</label>
+                        <select value={(ef.vendor_id as string) ?? ''}
+                          onChange={(e) => handleEditChange('vendor_id', e.target.value)}
+                          className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                          <option value="">— None —</option>
+                          {vendors.map((v) => (
+                            <option key={v.id} value={v.id}>{v.name}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs text-slate-500 mb-1">Contact</label>
+                        <select value={(ef.contact_id as string) ?? ''}
+                          onChange={(e) => handleEditChange('contact_id', e.target.value)}
+                          className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                          <option value="">— None —</option>
+                          {contacts.map((c) => (
+                            <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>
+                          ))}
+                        </select>
+                      </div>
+                    </div>
                   </div>
                 </>
               ) : (
