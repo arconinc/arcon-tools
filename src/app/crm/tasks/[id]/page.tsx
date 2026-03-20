@@ -68,6 +68,20 @@ const STATUSES: { value: TaskStatus; label: string; cls: string }[] = [
   { value: 'need_changes', label: 'Need Changes', cls: 'bg-red-100 text-red-600' },
 ]
 
+const STATUS_ORDER_VALUES = [
+  'not_started', 'in_progress', 'waiting_on_approval',
+  'waiting_on_client_approval', 'need_changes', 'completed',
+] as const
+
+const STATUS_COLORS: Record<string, string> = {
+  not_started: '#94a3b8',
+  in_progress: '#60a5fa',
+  waiting_on_approval: '#fbbf24',
+  waiting_on_client_approval: '#fb923c',
+  need_changes: '#f87171',
+  completed: '#4ade80',
+}
+
 const PRIORITY_BADGE: Record<TaskPriority, string> = {
   low: 'bg-slate-100 text-slate-500',
   medium: 'bg-amber-100 text-amber-700',
@@ -444,7 +458,14 @@ export default function TaskDetailPage() {
       fetch('/api/crm/opportunities').then((r) => r.json()),
       fetch('/api/crm/contacts').then((r) => r.json()),
     ]).then(([users, custs, vends, opps, conts]) => {
-      if (Array.isArray(users)) setCrmUsers(users)
+      if (Array.isArray(users)) {
+        setCrmUsers(users)
+        // Pre-select the current user in the assigned_to field for new tasks
+        if (appUser?.email) {
+          const me = users.find((u: DropdownUser) => u.email === appUser.email)
+          if (me) setCreateForm((prev) => ({ ...prev, assigned_to: me.id }))
+        }
+      }
       if (Array.isArray(custs)) setCustomers(custs)
       if (Array.isArray(vends)) setVendors(vends)
       // opportunities API returns { items: [...], pipeline_total: ... }
@@ -517,6 +538,23 @@ export default function TaskDetailPage() {
       setEditing(false)
     } finally {
       setSaving(false)
+    }
+  }
+
+  async function quickUpdateStatus(newStatus: string) {
+    if (!task) return
+    const prev = task.status
+    setTask((t) => t ? { ...t, status: newStatus as TaskStatus } : t)
+    try {
+      const res = await fetch(`/api/crm/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      if (!res.ok) setTask((t) => t ? { ...t, status: prev } : t)
+      else await loadTask()
+    } catch {
+      setTask((t) => t ? { ...t, status: prev } : t)
     }
   }
 
@@ -774,14 +812,32 @@ export default function TaskDetailPage() {
                 </span>
               )}
             </div>
-            {task.progress > 0 && (
-              <div className="mt-3 flex items-center gap-2">
-                <div className="flex-1 max-w-xs h-2 bg-slate-100 rounded-full overflow-hidden">
-                  <div className="h-full bg-purple-500 rounded-full transition-all" style={{ width: `${task.progress}%` }} />
-                </div>
-                <span className="text-xs text-slate-400">{task.progress}%</span>
-              </div>
-            )}
+            <div style={{ display: 'flex', height: 8, marginTop: 12, gap: 0 }}>
+              {STATUS_ORDER_VALUES.map((s, i) => {
+                const activeIdx = STATUS_ORDER_VALUES.indexOf(task.status as typeof STATUS_ORDER_VALUES[number])
+                const pos = i < activeIdx ? 'past' : i === activeIdx ? 'active' : 'future'
+                const isFirst = i === 0
+                const isLast = i === STATUS_ORDER_VALUES.length - 1
+                const clipPath = isFirst
+                  ? 'polygon(0 0, calc(100% - 5px) 0, 100% 50%, calc(100% - 5px) 100%, 0 100%)'
+                  : isLast
+                  ? 'polygon(5px 0, 100% 0, 100% 100%, 0 100%, 5px 50%)'
+                  : 'polygon(5px 0, calc(100% - 5px) 0, 100% 50%, calc(100% - 5px) 100%, 0 100%, 5px 50%)'
+                const bg = pos === 'past' ? '#ddd6fe' : pos === 'active' ? STATUS_COLORS[s] : '#f1f5f9'
+                const statusLabel = STATUSES.find((st) => st.value === s)?.label ?? s
+                return (
+                  <button
+                    key={s}
+                    title={statusLabel}
+                    onClick={() => quickUpdateStatus(s)}
+                    disabled={s === task.status}
+                    style={{ flex: 1, height: '100%', border: 'none', cursor: s === task.status ? 'default' : 'pointer', clipPath, background: bg, transition: 'filter 0.15s', padding: 0 }}
+                    onMouseEnter={(e) => { if (s !== task.status) (e.currentTarget as HTMLButtonElement).style.filter = 'brightness(0.88)' }}
+                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.filter = '' }}
+                  />
+                )
+              })}
+            </div>
           </div>
         </div>
       </div>
@@ -835,8 +891,36 @@ export default function TaskDetailPage() {
                   <div className="col-span-2">
                     <FieldInput label="Title" name="title" value={(ef.title as string) ?? ''} onChange={handleEditChange} />
                   </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Status</label>
+                  <div className="col-span-2">
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Status</label>
+                    <div style={{ display: 'flex', height: 8, marginBottom: 10, gap: 0 }}>
+                      {STATUS_ORDER_VALUES.map((s, i) => {
+                        const cur = (ef.status as string) ?? 'not_started'
+                        const activeIdx = STATUS_ORDER_VALUES.indexOf(cur as typeof STATUS_ORDER_VALUES[number])
+                        const pos = i < activeIdx ? 'past' : i === activeIdx ? 'active' : 'future'
+                        const isFirst = i === 0
+                        const isLast = i === STATUS_ORDER_VALUES.length - 1
+                        const clipPath = isFirst
+                          ? 'polygon(0 0, calc(100% - 5px) 0, 100% 50%, calc(100% - 5px) 100%, 0 100%)'
+                          : isLast
+                          ? 'polygon(5px 0, 100% 0, 100% 100%, 0 100%, 5px 50%)'
+                          : 'polygon(5px 0, calc(100% - 5px) 0, 100% 50%, calc(100% - 5px) 100%, 0 100%, 5px 50%)'
+                        const bg = pos === 'past' ? '#ddd6fe' : pos === 'active' ? STATUS_COLORS[s] : '#f1f5f9'
+                        const statusLabel = STATUSES.find((st) => st.value === s)?.label ?? s
+                        return (
+                          <button
+                            key={s}
+                            type="button"
+                            title={statusLabel}
+                            onClick={() => handleEditChange('status', s)}
+                            disabled={s === cur}
+                            style={{ flex: 1, height: '100%', border: 'none', cursor: s === cur ? 'default' : 'pointer', clipPath, background: bg, transition: 'filter 0.15s', padding: 0 }}
+                            onMouseEnter={(e) => { if (s !== cur) (e.currentTarget as HTMLButtonElement).style.filter = 'brightness(0.88)' }}
+                            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.filter = '' }}
+                          />
+                        )
+                      })}
+                    </div>
                     <select value={(ef.status as string) ?? 'not_started'}
                       onChange={(e) => handleEditChange('status', e.target.value)}
                       className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
@@ -863,17 +947,6 @@ export default function TaskDetailPage() {
                     </select>
                   </div>
                   <FieldInput label="Due Date" name="due_date" value={(ef.due_date as string)?.slice(0, 10) ?? ''} onChange={handleEditChange} type="date" />
-                  <div className="col-span-2">
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
-                      Progress: {ef.progress ?? 0}%
-                    </label>
-                    <input
-                      type="range" min="0" max="100" step="5"
-                      value={Number(ef.progress ?? 0)}
-                      onChange={(e) => setEditForm((prev) => ({ ...prev, progress: Number(e.target.value) as any }))}
-                      className="w-full accent-purple-700"
-                    />
-                  </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Assigned To</label>
                     <select value={(ef.assigned_to as string) ?? ''}
@@ -944,7 +1017,6 @@ export default function TaskDetailPage() {
                   <Field label="Priority" value={task.priority} />
                   <Field label="Category" value={task.category} />
                   <Field label="Due Date" value={fmtDate(task.due_date)} />
-                  <Field label="Progress" value={`${task.progress}%`} />
                   <Field label="Assigned To" value={task.assigned_user?.display_name ?? null} />
                   {task.description && (
                     <div className="col-span-2">

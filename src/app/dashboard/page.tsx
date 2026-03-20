@@ -30,22 +30,29 @@ const FALLBACK_SLIDES: BannerSlide[] = [
 type CrmTask = {
   id: string; title: string; status: string; priority: string
   due_date: string | null; category: string | null
+  progress: number
   linked_to_name: string | null; linked_to_type: string | null
 }
 
-const CRM_STATUS_LABEL: Record<string, string> = {
-  not_started: 'Not Started', in_progress: 'In Progress', completed: 'Completed',
-  waiting_on_approval: 'Waiting Approval', waiting_on_client_approval: 'Waiting Client',
-  need_changes: 'Need Changes',
-}
-const CRM_STATUS_CLS: Record<string, string> = {
-  not_started: 'bg-slate-100 text-slate-500', in_progress: 'bg-blue-100 text-blue-700',
-  waiting_on_approval: 'bg-yellow-100 text-yellow-700',
-  waiting_on_client_approval: 'bg-orange-100 text-orange-700',
-  need_changes: 'bg-red-100 text-red-600',
-}
 const CRM_PRIORITY_DOT: Record<string, string> = {
   high: 'dot-high', medium: 'dot-med', low: 'dot-low',
+}
+
+const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
+  not_started:                { label: 'Not Started',    color: '#94a3b8' },
+  in_progress:                { label: 'In Progress',    color: '#60a5fa' },
+  waiting_on_approval:        { label: 'Waiting Approval', color: '#fbbf24' },
+  waiting_on_client_approval: { label: 'Waiting Client', color: '#fb923c' },
+  need_changes:               { label: 'Need Changes',   color: '#f87171' },
+  completed:                  { label: 'Completed',      color: '#4ade80' },
+}
+const STATUS_ORDER = Object.keys(STATUS_CONFIG)
+const STATUS_NEXT: Record<string, string> = {
+  not_started: 'in_progress',
+  in_progress: 'waiting_on_approval',
+  waiting_on_approval: 'waiting_on_client_approval',
+  waiting_on_client_approval: 'completed',
+  need_changes: 'in_progress',
 }
 
 // ── Page ──────────────────────────────────────────────────────────────────────
@@ -60,6 +67,7 @@ export default function DashboardPage() {
   const [bannerItems, setBannerItems] = useState<BannerStripItem[]>([])
   const [myTasks, setMyTasks] = useState<CrmTask[]>([])
   const [tasksLoading, setTasksLoading] = useState(true)
+  const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/banner-strip')
@@ -116,6 +124,24 @@ export default function DashboardPage() {
       .catch(() => {})
       .finally(() => setTasksLoading(false))
   }, [])
+
+  async function updateTaskStatus(taskId: string, newStatus: string) {
+    setUpdatingTaskId(taskId)
+    try {
+      await fetch(`/api/crm/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: newStatus }),
+      })
+      setMyTasks((prev) =>
+        newStatus === 'completed'
+          ? prev.filter((t) => t.id !== taskId)
+          : prev.map((t) => t.id === taskId ? { ...t, status: newStatus } : t)
+      )
+    } finally {
+      setUpdatingTaskId(null)
+    }
+  }
 
   function goTo(i: number) {
     const next = ((i % slides.length) + slides.length) % slides.length
@@ -180,15 +206,28 @@ export default function DashboardPage() {
         .card-body { padding: 12px 16px; }
 
 /* ── Tasks ── */
-        .task-item { display: flex; align-items: flex-start; gap: 9px; padding: 8px 0; border-bottom: 1px solid #f5f5f5; }
+        .task-item { padding: 9px 16px 10px; border-bottom: 1px solid #f5f5f5; }
         .task-item:last-child { border-bottom: none; }
-        .task-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; margin-top: 4px; }
+        .task-item:hover { background: #faf5ff; }
+        .task-row { display: flex; align-items: center; gap: 8px; }
+        .task-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
         .dot-high { background: #dc2626; }
         .dot-med  { background: #f59e0b; }
         .dot-low  { background: #22c55e; }
-        .task-name { font-size: 13px; color: #111; font-weight: 500; }
-        .task-meta { font-size: 11px; color: #aaa; margin-top: 1px; }
-        .task-pill { font-size: 10px; background: #f3e8ff; color: #6b1e98; border-radius: 3px; padding: 1px 6px; white-space: nowrap; font-weight: 600; }
+        .task-name { font-size: 13px; color: #111; font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
+        .task-name:hover { color: #6b1e98; }
+        .task-meta { font-size: 11px; color: #aaa; margin-top: 2px; }
+        .prog-bar { display: flex; height: 7px; margin-top: 7px; border-radius: 3px; overflow: hidden; background: #fff; }
+        .prog-step { flex: 1; height: 100%; border: none; cursor: pointer; padding: 0; transition: filter 0.15s; clip-path: polygon(5px 0, calc(100% - 5px) 0, 100% 50%, calc(100% - 5px) 100%, 0 100%, 5px 50%); background: #f1f5f9; }
+        .prog-step:first-child { clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 50%, calc(100% - 5px) 100%, 0 100%); }
+        .prog-step:last-child  { clip-path: polygon(5px 0, 100% 0, 100% 100%, 0 100%, 5px 50%); }
+        .prog-step.prog-past   { background: #ddd6fe; }
+        .prog-step.prog-future { background: #f1f5f9; }
+        .prog-step:hover:not(:disabled) { filter: brightness(0.88); }
+        .prog-step:disabled { cursor: default; }
+        .next-stage-btn { font-size: 10px; font-weight: 700; color: #6b1e98; background: #f3e8ff; border: none; border-radius: 4px; padding: 3px 8px; cursor: pointer; white-space: nowrap; flex-shrink: 0; line-height: 1.5; transition: background 0.12s; }
+        .next-stage-btn:hover { background: #e9d5ff; }
+        .next-stage-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
         /* ── Birthdays ── */
         .bday-item { display: flex; align-items: center; gap: 9px; padding: 8px 0; border-bottom: 1px solid #f5f5f5; }
@@ -342,8 +381,8 @@ export default function DashboardPage() {
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
               <div>
                 <div className="widget-label">My Open Tasks</div>
-                <div className="widget-value">—</div>
-                <div className="widget-sub">CRM tasks coming soon</div>
+                <div className="widget-value">{tasksLoading ? '—' : myTasks.length}</div>
+                <div className="widget-sub">{tasksLoading ? 'Loading…' : myTasks.length === 0 ? 'All caught up!' : `${myTasks.filter((t) => t.priority === 'high').length} high priority`}</div>
               </div>
               <div className="widget-icon wi-purple">
                 <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
@@ -428,30 +467,51 @@ export default function DashboardPage() {
                   No open tasks. <Link href="/crm/tasks/new" style={{ color: '#6b1e98', textDecoration: 'underline' }}>Create one →</Link>
                 </div>
               ) : (
-                myTasks.map((t) => (
-                  <Link key={t.id} href={`/crm/tasks/${t.id}`} style={{ textDecoration: 'none' }}>
-                    <div className="task-item" style={{ padding: '8px 16px', cursor: 'pointer' }}
-                      onMouseEnter={(e) => (e.currentTarget.style.background = '#faf5ff')}
-                      onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}>
-                      <div className={`task-dot ${CRM_PRIORITY_DOT[t.priority] ?? 'dot-med'}`} />
-                      <div style={{ flex: 1, minWidth: 0 }}>
-                        <div className="task-name" style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{t.title}</div>
-                        <div className="task-meta">
-                          {t.due_date && (
-                            <span style={{ color: new Date(t.due_date) < new Date() ? '#dc2626' : '#aaa', fontWeight: new Date(t.due_date) < new Date() ? 600 : 400 }}>
-                              Due {new Date(t.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                              {new Date(t.due_date) < new Date() ? ' ⚠️' : ''}
-                              {t.linked_to_name ? ` · ${t.linked_to_name}` : ''}
-                            </span>
-                          )}
-                        </div>
+                myTasks.map((t) => {
+                  const activeIdx = STATUS_ORDER.indexOf(t.status)
+                  const isUpdating = updatingTaskId === t.id
+                  return (
+                    <div key={t.id} className="task-item">
+                      <div className="task-row">
+                        <div className={`task-dot ${CRM_PRIORITY_DOT[t.priority] ?? 'dot-med'}`} />
+                        <Link href={`/crm/tasks/${t.id}`} className="task-name">{t.title}</Link>
+                        {STATUS_NEXT[t.status] && (
+                          <button
+                            className="next-stage-btn"
+                            disabled={isUpdating}
+                            onClick={() => updateTaskStatus(t.id, STATUS_NEXT[t.status])}
+                          >
+                            {isUpdating ? '…' : `→ ${STATUS_CONFIG[STATUS_NEXT[t.status]].label}`}
+                          </button>
+                        )}
                       </div>
-                      <span className={`task-pill ${CRM_STATUS_CLS[t.status] ?? ''}`} style={{ fontSize: 10, padding: '2px 6px', borderRadius: 3, fontWeight: 600, whiteSpace: 'nowrap', flexShrink: 0 }}>
-                        {CRM_STATUS_LABEL[t.status] ?? t.status}
-                      </span>
+                      {t.due_date && (
+                        <div className="task-meta">
+                          <span style={{ color: new Date(t.due_date) < new Date() ? '#dc2626' : '#aaa', fontWeight: new Date(t.due_date) < new Date() ? 600 : 400 }}>
+                            Due {new Date(t.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
+                            {new Date(t.due_date) < new Date() ? ' ⚠️' : ''}
+                            {t.linked_to_name ? ` · ${t.linked_to_name}` : ''}
+                          </span>
+                        </div>
+                      )}
+                      <div className="prog-bar" style={{ opacity: isUpdating ? 0.5 : 1 }}>
+                        {STATUS_ORDER.map((s, i) => {
+                          const pos = i < activeIdx ? 'past' : i === activeIdx ? 'active' : 'future'
+                          return (
+                            <button
+                              key={s}
+                              className={`prog-step prog-${pos}`}
+                              title={STATUS_CONFIG[s].label}
+                              disabled={isUpdating || s === t.status}
+                              onClick={() => updateTaskStatus(t.id, s)}
+                              style={pos === 'active' ? { background: STATUS_CONFIG[s].color } : undefined}
+                            />
+                          )
+                        })}
+                      </div>
                     </div>
-                  </Link>
-                ))
+                  )
+                })
               )}
             </div>
           </div>

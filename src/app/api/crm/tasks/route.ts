@@ -18,7 +18,8 @@ export async function GET(req: NextRequest) {
   const vendorId = searchParams.get('vendor_id')
 
   // Resolve "me" to current user id
-  const resolvedAssignedTo = assignedTo === 'me' ? appUser.id : assignedTo
+  const isMine = assignedTo === 'me'
+  const resolvedAssignedTo = isMine ? appUser.id : assignedTo
 
   const adminClient = createAdminClient()
   let query = adminClient
@@ -26,7 +27,14 @@ export async function GET(req: NextRequest) {
     .select('id, title, assigned_to, task_owner, category, priority, due_date, status, progress, opportunity_id, customer_id, vendor_id, contact_id, created_at, updated_at')
     .order('due_date', { ascending: true, nullsFirst: false })
 
-  if (resolvedAssignedTo) query = query.eq('assigned_to', resolvedAssignedTo)
+  if (resolvedAssignedTo) {
+    if (isMine) {
+      // Show tasks where the user is either assigned or is the task owner
+      query = query.or(`assigned_to.eq.${resolvedAssignedTo},task_owner.eq.${resolvedAssignedTo}`)
+    } else {
+      query = query.eq('assigned_to', resolvedAssignedTo)
+    }
+  }
   if (status) {
     // Support comma-separated statuses
     const statuses = status.split(',').map((s) => s.trim()).filter(Boolean)
@@ -128,6 +136,7 @@ export async function POST(req: NextRequest) {
       ...safeRest,
       created_by: appUser.id,
       task_owner: safeRest.task_owner ?? appUser.id,
+      assigned_to: safeRest.assigned_to ?? appUser.id,
       status: safeRest.status ?? 'not_started',
       priority: safeRest.priority ?? 'medium',
       progress: safeRest.progress ?? 0,
