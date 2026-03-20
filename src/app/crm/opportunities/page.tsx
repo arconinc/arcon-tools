@@ -45,12 +45,12 @@ function isOverdue(iso: string | null) {
 
 export default function OpportunitiesPage() {
   const router = useRouter()
-  const [opps, setOpps] = useState<OppListItem[]>([])
-  const [pipelineTotal, setPipelineTotal] = useState<number>(0)
+  const [rawOpps, setRawOpps] = useState<OppListItem[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [stageFilter, setStageFilter] = useState('')
+  const [ownerFilter, setOwnerFilter] = useState('')
 
   const fetchOpps = useCallback(async () => {
     setLoading(true)
@@ -60,26 +60,41 @@ export default function OpportunitiesPage() {
     try {
       const res = await fetch(`/api/crm/opportunities?${params}`)
       const data = await res.json()
-      let items: OppListItem[] = Array.isArray(data.items) ? data.items : []
-      // Client-side name search (API supports customer_id filter; search is name-based)
-      if (search) {
-        const q = search.toLowerCase()
-        items = items.filter(
-          (o) =>
-            o.name.toLowerCase().includes(q) ||
-            (o.customer_name ?? '').toLowerCase().includes(q)
-        )
-      }
-      setOpps(items)
-      setPipelineTotal(data.pipeline_total ?? 0)
+      const items: OppListItem[] = Array.isArray(data.items) ? data.items : []
+      setRawOpps(items)
     } finally {
       setLoading(false)
     }
-  }, [search, statusFilter, stageFilter])
+  }, [statusFilter, stageFilter])
+
+  const opps = (() => {
+    let items = rawOpps
+    if (search) {
+      const q = search.toLowerCase()
+      items = items.filter(
+        (o) =>
+          o.name.toLowerCase().includes(q) ||
+          (o.customer_name ?? '').toLowerCase().includes(q)
+      )
+    }
+    if (ownerFilter) {
+      items = items.filter((o) => o.assigned_to === ownerFilter)
+    }
+    return items
+  })()
+
+  const ownerOptions = (() => {
+    const seen = new Map<string, string>()
+    for (const o of rawOpps) {
+      if (o.assigned_to && !seen.has(o.assigned_to)) {
+        seen.set(o.assigned_to, o.assigned_user_name ?? o.assigned_to)
+      }
+    }
+    return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]))
+  })()
 
   useEffect(() => {
-    const t = setTimeout(fetchOpps, 300)
-    return () => clearTimeout(t)
+    fetchOpps()
   }, [fetchOpps])
 
   const openCount = opps.filter((o) => o.status === 'open').length
@@ -107,16 +122,11 @@ export default function OpportunitiesPage() {
       </div>
 
       {/* Pipeline summary */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
+      <div className="grid grid-cols-2 gap-4 mb-6">
         <div className="bg-white border border-slate-200 rounded-2xl px-5 py-4">
           <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Open Pipeline</div>
-          <div className="text-2xl font-bold text-slate-900">{fmt$(pipelineTotal)}</div>
-          <div className="text-xs text-slate-400 mt-0.5">total open value</div>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-2xl px-5 py-4">
-          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Showing (Open)</div>
-          <div className="text-2xl font-bold text-slate-900">{openCount}</div>
-          <div className="text-xs text-slate-400 mt-0.5">{fmt$(openValue)} in filtered view</div>
+          <div className="text-2xl font-bold text-slate-900">{fmt$(openValue)}</div>
+          <div className="text-xs text-slate-400 mt-0.5">{openCount} open opportunit{openCount !== 1 ? 'ies' : 'y'}</div>
         </div>
         <div className="bg-white border border-slate-200 rounded-2xl px-5 py-4">
           <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Won (This View)</div>
@@ -161,6 +171,14 @@ export default function OpportunitiesPage() {
           <option value="">All Stages</option>
           {STAGES.map((s) => <option key={s}>{s}</option>)}
         </select>
+        <select
+          value={ownerFilter}
+          onChange={(e) => setOwnerFilter(e.target.value)}
+          className="px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
+        >
+          <option value="">All Owners</option>
+          {ownerOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
+        </select>
       </div>
 
       {/* Table */}
@@ -190,7 +208,7 @@ export default function OpportunitiesPage() {
             {!loading && opps.length === 0 && (
               <tr>
                 <td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-400">
-                  {search || statusFilter || stageFilter
+                  {search || statusFilter || stageFilter || ownerFilter
                     ? 'No opportunities match your filters.'
                     : 'No opportunities yet. Create one to get started.'}
                 </td>

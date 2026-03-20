@@ -80,7 +80,7 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
     {
       label: 'Tasks',
       items: [
-        { href: '#', label: 'My Tasks', icon: TaskCheckIcon, badge: { text: '4', variant: 'purple' } },
+        { href: '/my-tasks', label: 'My Tasks', icon: TaskCheckIcon, adminMatch: true },
         { href: '#', label: 'Team Board', icon: BoardIcon },
         { href: '#', label: 'Backlog', icon: ArchiveIcon },
       ],
