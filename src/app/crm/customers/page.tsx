@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 
+type TagOption = { id: string; name: string; color: string }
+
 type CustomerListItem = {
   id: string
   name: string
@@ -11,7 +13,7 @@ type CustomerListItem = {
   website: string | null
   assigned_to: string | null
   assigned_user_name: string | null
-  tags: string[]
+  tags: TagOption[]
   updated_at: string
 }
 
@@ -33,14 +35,21 @@ export default function CustomersPage() {
   const router = useRouter()
   const [customers, setCustomers] = useState<CustomerListItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [allTags, setAllTags] = useState<TagOption[]>([])
   const [search, setSearch] = useState('')
   const [status, setStatus] = useState('')
+  const [tagFilter, setTagFilter] = useState('')
+
+  useEffect(() => {
+    fetch('/api/crm/tags').then((r) => r.json()).then((d) => { if (Array.isArray(d)) setAllTags(d) })
+  }, [])
 
   const fetchCustomers = useCallback(async () => {
     setLoading(true)
     const params = new URLSearchParams()
     if (search) params.set('search', search)
     if (status) params.set('status', status)
+    if (tagFilter) params.set('tag_id', tagFilter)
     try {
       const res = await fetch(`/api/crm/customers?${params}`)
       const data = await res.json()
@@ -48,7 +57,7 @@ export default function CustomersPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, status])
+  }, [search, status, tagFilter])
 
   useEffect(() => {
     const t = setTimeout(fetchCustomers, 300)
@@ -75,7 +84,7 @@ export default function CustomersPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3 mb-5">
+      <div className="flex gap-3 mb-5 flex-wrap">
         <div className="relative flex-1 max-w-sm">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <circle cx="11" cy="11" r="8" strokeWidth={2} />
@@ -99,6 +108,16 @@ export default function CustomersPage() {
           <option value="Active">Active</option>
           <option value="Former">Former</option>
         </select>
+        {allTags.length > 0 && (
+          <select
+            value={tagFilter}
+            onChange={(e) => setTagFilter(e.target.value)}
+            className="px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
+          >
+            <option value="">All Tags</option>
+            {allTags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        )}
       </div>
 
       {/* Table */}
@@ -109,6 +128,7 @@ export default function CustomersPage() {
               <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Phone</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Tags</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Owner</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Updated</th>
             </tr>
@@ -117,7 +137,7 @@ export default function CustomersPage() {
             {loading && (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i}>
-                  {[...Array(5)].map((_, j) => (
+                  {[...Array(6)].map((_, j) => (
                     <td key={j} className="px-5 py-3.5">
                       <div className="h-4 bg-slate-100 rounded animate-pulse" style={{ width: j === 0 ? '60%' : '40%' }} />
                     </td>
@@ -127,8 +147,8 @@ export default function CustomersPage() {
             )}
             {!loading && customers.length === 0 && (
               <tr>
-                <td colSpan={5} className="px-5 py-12 text-center text-sm text-slate-400">
-                  {search || status ? 'No customers match your filters.' : 'No customers yet. Create one to get started.'}
+                <td colSpan={6} className="px-5 py-12 text-center text-sm text-slate-400">
+                  {search || status || tagFilter ? 'No customers match your filters.' : 'No customers yet. Create one to get started.'}
                 </td>
               </tr>
             )}
@@ -141,6 +161,18 @@ export default function CustomersPage() {
                 <td className="px-5 py-3.5 font-medium text-slate-900">{c.name}</td>
                 <td className="px-5 py-3.5">{statusBadge(c.client_status)}</td>
                 <td className="px-5 py-3.5 text-slate-600 hidden md:table-cell">{c.phone ?? '—'}</td>
+                <td className="px-5 py-3.5 hidden lg:table-cell">
+                  <div className="flex flex-wrap gap-1">
+                    {c.tags.length > 0
+                      ? c.tags.map((t) => (
+                          <span key={t.id} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold text-white" style={{ backgroundColor: t.color }}>
+                            {t.name}
+                          </span>
+                        ))
+                      : <span className="text-slate-300">—</span>
+                    }
+                  </div>
+                </td>
                 <td className="px-5 py-3.5 text-slate-600 hidden lg:table-cell">{c.assigned_user_name ?? '—'}</td>
                 <td className="px-5 py-3.5 text-slate-400 hidden lg:table-cell">
                   {new Date(c.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}

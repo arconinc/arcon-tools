@@ -278,6 +278,13 @@ export const CARRIERS: Carrier[] = [
 
 // ─── CRM ─────────────────────────────────────────────────────────────────────
 
+export interface CrmTag {
+  id: string
+  name: string
+  color: string
+  created_at: string
+}
+
 export type CrmClientStatus = 'Prospective' | 'Active' | 'Former'
 export type CrmContactType = 'Customer' | 'Vendor' | 'Prospect' | 'Partner' | 'Other'
 export type CrmOpportunityStatus = 'open' | 'won' | 'lost' | 'stalled'

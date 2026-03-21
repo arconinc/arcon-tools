@@ -120,6 +120,7 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
         { href: '/admin/countdown', label: 'Countdown', icon: CountdownIcon, adminMatch: true },
         { href: '/admin/news', label: 'News', icon: MegaphoneIcon, adminMatch: true },
         { href: '/admin/crm-goals', label: 'Sales Goals', icon: GoalIcon, adminMatch: true },
+        { href: '/admin/crm-tags', label: 'CRM Tags', icon: TagIcon, adminMatch: true },
         { href: '/admin/stores', label: 'Stores', icon: StoreIcon, adminMatch: true },
         { href: '/admin/users', label: 'Users', icon: UserAdminIcon, adminMatch: true },
         { href: '/admin/audit-log', label: 'Audit Log', icon: LogIcon, adminMatch: true },
@@ -780,4 +781,8 @@ function CrmOppsIcon({ className }: { className?: string }) {
 
 function GoalIcon({ className }: { className?: string }) {
   return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z" /></svg>
+}
+
+function TagIcon({ className }: { className?: string }) {
+  return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
 }

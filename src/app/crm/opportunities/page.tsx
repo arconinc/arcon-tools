@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 
+type TagOption = { id: string; name: string; color: string }
+
 type OppListItem = {
   id: string
   name: string
@@ -17,6 +19,7 @@ type OppListItem = {
   forecast_close_date: string | null
   created_at: string
   updated_at: string
+  tags: TagOption[]
 }
 
 const STAGES = ['Send Quote', 'Follow Up on Quote', 'Quote Accepted', 'Send Thank You Email']
@@ -47,16 +50,23 @@ export default function OpportunitiesPage() {
   const router = useRouter()
   const [rawOpps, setRawOpps] = useState<OppListItem[]>([])
   const [loading, setLoading] = useState(true)
+  const [allTags, setAllTags] = useState<TagOption[]>([])
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [stageFilter, setStageFilter] = useState('')
   const [ownerFilter, setOwnerFilter] = useState('')
+  const [tagFilter, setTagFilter] = useState('')
+
+  useEffect(() => {
+    fetch('/api/crm/tags').then((r) => r.json()).then((d) => { if (Array.isArray(d)) setAllTags(d) })
+  }, [])
 
   const fetchOpps = useCallback(async () => {
     setLoading(true)
     const params = new URLSearchParams()
     if (statusFilter) params.set('status', statusFilter)
     if (stageFilter) params.set('stage', stageFilter)
+    if (tagFilter) params.set('tag_id', tagFilter)
     try {
       const res = await fetch(`/api/crm/opportunities?${params}`)
       const data = await res.json()
@@ -65,7 +75,7 @@ export default function OpportunitiesPage() {
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, stageFilter])
+  }, [statusFilter, stageFilter, tagFilter])
 
   const opps = (() => {
     let items = rawOpps
@@ -101,6 +111,8 @@ export default function OpportunitiesPage() {
   const openValue = opps
     .filter((o) => o.status === 'open' && o.value != null)
     .reduce((s, o) => s + (o.value ?? 0), 0)
+
+  const activeFilters = !!(search || statusFilter || stageFilter || ownerFilter || tagFilter)
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8">
@@ -179,6 +191,16 @@ export default function OpportunitiesPage() {
           <option value="">All Owners</option>
           {ownerOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
         </select>
+        {allTags.length > 0 && (
+          <select
+            value={tagFilter}
+            onChange={(e) => setTagFilter(e.target.value)}
+            className="px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
+          >
+            <option value="">All Tags</option>
+            {allTags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+          </select>
+        )}
       </div>
 
       {/* Table */}
@@ -191,6 +213,7 @@ export default function OpportunitiesPage() {
               <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Value</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Stage</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden xl:table-cell">Tags</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden xl:table-cell">Forecast Close</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden xl:table-cell">Owner</th>
             </tr>
@@ -198,7 +221,7 @@ export default function OpportunitiesPage() {
           <tbody className="divide-y divide-slate-100">
             {loading && Array.from({ length: 5 }).map((_, i) => (
               <tr key={i}>
-                {[...Array(7)].map((_, j) => (
+                {[...Array(8)].map((_, j) => (
                   <td key={j} className="px-5 py-3.5">
                     <div className="h-4 bg-slate-100 rounded animate-pulse" style={{ width: j === 0 ? '60%' : '40%' }} />
                   </td>
@@ -207,8 +230,8 @@ export default function OpportunitiesPage() {
             ))}
             {!loading && opps.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-400">
-                  {search || statusFilter || stageFilter || ownerFilter
+                <td colSpan={8} className="px-5 py-12 text-center text-sm text-slate-400">
+                  {activeFilters
                     ? 'No opportunities match your filters.'
                     : 'No opportunities yet. Create one to get started.'}
                 </td>
@@ -232,6 +255,18 @@ export default function OpportunitiesPage() {
                   <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold capitalize ${STATUS_BADGE[o.status] ?? 'bg-slate-100 text-slate-600'}`}>
                     {o.status}
                   </span>
+                </td>
+                <td className="px-5 py-3.5 hidden xl:table-cell">
+                  <div className="flex flex-wrap gap-1">
+                    {o.tags.length > 0
+                      ? o.tags.map((t) => (
+                          <span key={t.id} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold text-white" style={{ backgroundColor: t.color }}>
+                            {t.name}
+                          </span>
+                        ))
+                      : <span className="text-slate-300">—</span>
+                    }
+                  </div>
                 </td>
                 <td className="px-5 py-3.5 hidden xl:table-cell">
                   <span className={o.forecast_close_date && isOverdue(o.forecast_close_date) && o.status === 'open' ? 'text-red-600 font-medium' : 'text-slate-500'}>

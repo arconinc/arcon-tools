@@ -22,8 +22,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (error || !opp) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   // Fetch related data in parallel
-  const today = new Date().toISOString()
-  const [customerRes, assignedUserRes, tasksRes, historyRes, filesRes] = await Promise.all([
+  const [customerRes, assignedUserRes, tasksRes, historyRes, filesRes, entityTagsRes] = await Promise.all([
     adminClient.from('crm_customers').select('id, name').eq('id', opp.customer_id).single(),
     opp.assigned_to
       ? adminClient.from('users').select('id, display_name, email').eq('id', opp.assigned_to).single()
@@ -45,6 +44,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       .select('id, label, url, created_at')
       .eq('opportunity_id', id)
       .order('created_at', { ascending: false }),
+    adminClient
+      .from('crm_entity_tags')
+      .select('crm_tags(id, name, color)')
+      .eq('entity_type', 'opportunity')
+      .eq('entity_id', id),
   ])
 
   // Enrich history with changed_by user names
@@ -64,6 +68,8 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     changed_by_name: historyUsersMap[h.changed_by] ?? null,
   }))
 
+  const tags = (entityTagsRes.data ?? []).map((r: any) => r.crm_tags).filter(Boolean)
+
   return NextResponse.json({
     ...opp,
     customer: customerRes.data ?? null,
@@ -71,6 +77,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     tasks: tasksRes.data ?? [],
     stage_history: enrichedHistory,
     files: filesRes.data ?? [],
+    tags,
   })
 }
 
@@ -82,10 +89,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params
   const body = await req.json()
 
-  // Strip read-only fields
-  const { id: _id, created_at: _ca, created_by: _cb, ...updates } = body
+  // Strip read-only fields and extract tag_ids
+  const { id: _id, created_at: _ca, created_by: _cb, tag_ids, tags: _tags, ...updates } = body
 
   const adminClient = createAdminClient()
+
+  // Handle tag updates if tag_ids provided
+  if (Array.isArray(tag_ids)) {
+    await adminClient
+      .from('crm_entity_tags')
+      .delete()
+      .eq('entity_type', 'opportunity')
+      .eq('entity_id', id)
+    if (tag_ids.length > 0) {
+      await adminClient.from('crm_entity_tags').insert(
+        tag_ids.map((tid: string) => ({ tag_id: tid, entity_type: 'opportunity', entity_id: id }))
+      )
+    }
+    // If only updating tags, return early
+    if (Object.keys(updates).length === 0) {
+      return NextResponse.json({ ok: true })
+    }
+  }
 
   // Fetch current record for stage history comparison
   const { data: current, error: fetchErr } = await adminClient
@@ -101,7 +126,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     (field) => field in updates && updates[field] !== current[field]
   )
 
-  // Insert stage history row if any tracked field changed
   if (changedFields.length > 0) {
     await adminClient.from('crm_opportunity_stage_history').insert({
       opportunity_id: id,
@@ -115,7 +139,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     })
   }
 
-  // Auto-set closed_at when status moves to won or lost
   const newStatus = updates.status
   const finalUpdates: Record<string, unknown> = {
     ...updates,
@@ -127,7 +150,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       finalUpdates.closed_at = new Date().toISOString()
     }
   } else if (newStatus === 'open' || newStatus === 'stalled') {
-    // Re-opening: clear closed_at
     finalUpdates.closed_at = null
   }
 

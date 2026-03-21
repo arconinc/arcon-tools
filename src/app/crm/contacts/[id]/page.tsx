@@ -3,10 +3,12 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
+import TagPicker from '@/components/crm/TagPicker'
 
 type DropdownUser = { id: string; display_name: string; email: string }
 type DropdownCustomer = { id: string; name: string }
 type DropdownVendor = { id: string; name: string }
+type TagOption = { id: string; name: string; color: string }
 
 type ContactDetail = {
   id: string; first_name: string; last_name: string; title: string | null; email: string | null
@@ -19,7 +21,7 @@ type ContactDetail = {
   description: string | null; industry: string | null
   type_of_contact: 'Customer' | 'Vendor' | 'Prospect' | 'Partner' | 'Other'
   products_purchased: string | null; organization_website: string | null
-  arcon_salesperson: string | null; contact_owner: string | null; tags: string[]
+  arcon_salesperson: string | null; contact_owner: string | null; tags: TagOption[]
   customer_id: string | null; vendor_id: string | null
   created_by: string; created_at: string; updated_at: string
   customer: { id: string; name: string; website: string | null } | null
@@ -85,6 +87,27 @@ export default function ContactDetailPage() {
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState<Partial<ContactDetail>>({})
   const [saving, setSaving] = useState(false)
+
+  // Tags — always-editable, saves immediately
+  const [tagIds, setTagIds] = useState<string[]>([])
+  const [tagSaving, setTagSaving] = useState(false)
+
+  useEffect(() => {
+    if (contact) setTagIds((contact.tags ?? []).map((t) => t.id))
+  }, [contact])
+
+  async function handleTagsChange(newIds: string[]) {
+    setTagIds(newIds)
+    if (!contact?.id) return
+    setTagSaving(true)
+    try {
+      await fetch(`/api/crm/contacts/${contact.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag_ids: newIds }),
+      })
+    } finally { setTagSaving(false) }
+  }
 
   const [createForm, setCreateForm] = useState({
     first_name: '', last_name: '', title: '', email: '', phone: '',
@@ -357,6 +380,22 @@ export default function ContactDetailPage() {
                   <Field label="LinkedIn" value={contact.linkedin} />
                 </>
               )}
+            </div>
+          </div>
+
+          {/* Tags card */}
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
+              <div className="flex items-center gap-2">
+                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                </svg>
+                <h2 className="text-sm font-semibold text-slate-700">Tags</h2>
+              </div>
+              {tagSaving && <span className="text-xs text-slate-400">Saving…</span>}
+            </div>
+            <div className="p-4">
+              <TagPicker value={tagIds} onChange={handleTagsChange} placeholder="Add tags to this contact…" />
             </div>
           </div>
 

@@ -18,17 +18,25 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   if (error || !vendor) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const [contactsRes, filesRes, createdByUserRes] = await Promise.all([
+  const [contactsRes, filesRes, createdByUserRes, entityTagsRes] = await Promise.all([
     adminClient.from('crm_contacts').select('id, first_name, last_name, title, email, phone, type_of_contact').eq('vendor_id', id).order('last_name'),
     adminClient.from('crm_files').select('id, label, url, created_at').eq('vendor_id', id).order('created_at', { ascending: false }),
     adminClient.from('users').select('id, display_name, email').eq('id', vendor.created_by).single(),
+    adminClient
+      .from('crm_entity_tags')
+      .select('crm_tags(id, name, color)')
+      .eq('entity_type', 'vendor')
+      .eq('entity_id', id),
   ])
+
+  const tags = (entityTagsRes.data ?? []).map((r: any) => r.crm_tags).filter(Boolean)
 
   return NextResponse.json({
     ...vendor,
     contacts: contactsRes.data ?? [],
     files: filesRes.data ?? [],
     created_by_user: createdByUserRes.data ?? null,
+    tags,
   })
 }
 
@@ -39,9 +47,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { id } = await params
   const body = await req.json()
-  const { id: _id, created_at: _ca, created_by: _cb, ...updates } = body
+  const { id: _id, created_at: _ca, created_by: _cb, tag_ids, tags: _tags, ...updates } = body
 
   const adminClient = createAdminClient()
+
+  if (Array.isArray(tag_ids)) {
+    await adminClient.from('crm_entity_tags').delete().eq('entity_type', 'vendor').eq('entity_id', id)
+    if (tag_ids.length > 0) {
+      await adminClient.from('crm_entity_tags').insert(
+        tag_ids.map((tid: string) => ({ tag_id: tid, entity_type: 'vendor', entity_id: id }))
+      )
+    }
+    if (Object.keys(updates).length === 0) return NextResponse.json({ ok: true })
+  }
+
   const { data, error } = await adminClient
     .from('crm_vendors')
     .update({ ...updates, updated_at: new Date().toISOString() })

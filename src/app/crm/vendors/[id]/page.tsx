@@ -3,10 +3,13 @@
 import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
+import TagPicker from '@/components/crm/TagPicker'
+
+type TagOption = { id: string; name: string; color: string }
 
 type VendorDetail = {
   id: string; name: string; phone: string | null; website: string | null; linkedin: string | null
-  description: string | null; tags: string[]
+  description: string | null; tags: TagOption[]
   premier_group_member: boolean; product_line: string | null; specialty: string | null
   arcon_account_number: string | null; online_store: string | null
   arcon_username: string | null; arcon_password: string | null
@@ -59,6 +62,27 @@ export default function VendorDetailPage() {
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState<Partial<VendorDetail>>({})
   const [saving, setSaving] = useState(false)
+
+  // Tags — always-editable, saves immediately
+  const [tagIds, setTagIds] = useState<string[]>([])
+  const [tagSaving, setTagSaving] = useState(false)
+
+  useEffect(() => {
+    if (vendor) setTagIds((vendor.tags ?? []).map((t) => t.id))
+  }, [vendor])
+
+  async function handleTagsChange(newIds: string[]) {
+    setTagIds(newIds)
+    if (!vendor?.id) return
+    setTagSaving(true)
+    try {
+      await fetch(`/api/crm/vendors/${vendor.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tag_ids: newIds }),
+      })
+    } finally { setTagSaving(false) }
+  }
 
   const [createForm, setCreateForm] = useState({ name: '', phone: '', website: '', linkedin: '', description: '', product_line: '', specialty: '' })
   const [creating, setCreating] = useState(false)
@@ -238,6 +262,7 @@ export default function VendorDetailPage() {
 
       {/* Details Tab */}
       {activeTab === 'details' && (
+        <>
         <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
           {/* Org Info */}
           <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
@@ -338,6 +363,23 @@ export default function VendorDetailPage() {
             <span>Updated {new Date(vendor.updated_at).toLocaleDateString()}</span>
           </div>
         </div>
+
+        {/* Tags card — always editable */}
+        <div className="mt-5 bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
+            <div className="flex items-center gap-2">
+              <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+              </svg>
+              <h2 className="text-sm font-semibold text-slate-700">Tags</h2>
+            </div>
+            {tagSaving && <span className="text-xs text-slate-400">Saving…</span>}
+          </div>
+          <div className="p-4">
+            <TagPicker value={tagIds} onChange={handleTagsChange} placeholder="Add tags to this vendor…" />
+          </div>
+        </div>
+        </>
       )}
 
       {/* Related Tab */}

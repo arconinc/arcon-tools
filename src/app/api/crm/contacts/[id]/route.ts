@@ -18,7 +18,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   if (error || !contact) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const [customerRes, vendorRes, filesRes] = await Promise.all([
+  const [customerRes, vendorRes, filesRes, entityTagsRes] = await Promise.all([
     contact.customer_id
       ? adminClient.from('crm_customers').select('id, name, website').eq('id', contact.customer_id).single()
       : Promise.resolve({ data: null }),
@@ -26,13 +26,21 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       ? adminClient.from('crm_vendors').select('id, name, website').eq('id', contact.vendor_id).single()
       : Promise.resolve({ data: null }),
     adminClient.from('crm_files').select('id, label, url, created_at').eq('contact_id', id).order('created_at', { ascending: false }),
+    adminClient
+      .from('crm_entity_tags')
+      .select('crm_tags(id, name, color)')
+      .eq('entity_type', 'contact')
+      .eq('entity_id', id),
   ])
+
+  const tags = (entityTagsRes.data ?? []).map((r: any) => r.crm_tags).filter(Boolean)
 
   return NextResponse.json({
     ...contact,
     customer: customerRes.data ?? null,
     vendor: vendorRes.data ?? null,
     files: filesRes.data ?? [],
+    tags,
   })
 }
 
@@ -43,9 +51,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { id } = await params
   const body = await req.json()
-  const { id: _id, created_at: _ca, created_by: _cb, ...updates } = body
+  const { id: _id, created_at: _ca, created_by: _cb, tag_ids, tags: _tags, ...updates } = body
 
   const adminClient = createAdminClient()
+
+  if (Array.isArray(tag_ids)) {
+    await adminClient.from('crm_entity_tags').delete().eq('entity_type', 'contact').eq('entity_id', id)
+    if (tag_ids.length > 0) {
+      await adminClient.from('crm_entity_tags').insert(
+        tag_ids.map((tid: string) => ({ tag_id: tid, entity_type: 'contact', entity_id: id }))
+      )
+    }
+    if (Object.keys(updates).length === 0) return NextResponse.json({ ok: true })
+  }
+
   const { data, error } = await adminClient
     .from('crm_contacts')
     .update({ ...updates, updated_at: new Date().toISOString() })

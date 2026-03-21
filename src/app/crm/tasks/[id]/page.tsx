@@ -112,6 +112,74 @@ function fmtDateTime(iso: string) {
   })
 }
 
+function StatusBar({
+  currentStatus,
+  onStatusClick,
+  disabled,
+}: {
+  currentStatus: string
+  onStatusClick: (status: string) => void
+  disabled: boolean
+}) {
+  const currentIdx = STATUS_ORDER_VALUES.indexOf(currentStatus as typeof STATUS_ORDER_VALUES[number])
+  return (
+    <div style={{ display: 'flex', alignItems: 'stretch', height: 36 }}>
+      {STATUS_ORDER_VALUES.map((s, idx) => {
+        const isActive = s === currentStatus
+        const isPast = currentIdx > idx
+        const isFirst = idx === 0
+        const isLast = idx === STATUS_ORDER_VALUES.length - 1
+        const statusLabel = STATUSES.find((st) => st.value === s)?.label ?? s
+        const isClickable = !disabled && !isActive
+        const bg = isActive ? STATUS_COLORS[s] : isPast ? '#ede9fe' : '#f8fafc'
+        const textColor = isActive ? '#fff' : isPast ? '#6d28d9' : '#94a3b8'
+        const triangleColor = isActive ? STATUS_COLORS[s] : isPast ? '#ddd6fe' : '#e2e8f0'
+        return (
+          <div key={s} style={{ display: 'flex', alignItems: 'stretch', flex: 1, minWidth: 0 }}>
+            <button
+              type="button"
+              onClick={() => isClickable && onStatusClick(s)}
+              disabled={!isClickable}
+              title={statusLabel}
+              style={{
+                flex: 1,
+                minWidth: 0,
+                background: bg,
+                color: textColor,
+                border: 'none',
+                cursor: isClickable ? 'pointer' : 'default',
+                fontSize: 11,
+                fontWeight: isActive ? 700 : 600,
+                padding: '0 6px',
+                transition: 'filter 0.12s',
+                overflow: 'hidden',
+                whiteSpace: 'nowrap',
+                textAlign: 'center',
+                borderRadius: isFirst ? '8px 0 0 8px' : isLast ? '0 8px 8px 0' : 0,
+              }}
+              onMouseEnter={(e) => { if (isClickable) (e.currentTarget as HTMLButtonElement).style.filter = 'brightness(0.88)' }}
+              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.filter = '' }}
+            >
+              <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                {statusLabel}
+              </span>
+            </button>
+            {!isLast && (
+              <div style={{
+                width: 0, height: 0, flexShrink: 0,
+                borderTop: '18px solid transparent',
+                borderBottom: '18px solid transparent',
+                borderLeft: `10px solid ${triangleColor}`,
+                zIndex: 2,
+              }} />
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 function statusBadge(status: string) {
   const s = STATUSES.find((x) => x.value === status)
   return (
@@ -812,34 +880,16 @@ export default function TaskDetailPage() {
                 </span>
               )}
             </div>
-            <div style={{ display: 'flex', height: 8, marginTop: 12, gap: 0 }}>
-              {STATUS_ORDER_VALUES.map((s, i) => {
-                const activeIdx = STATUS_ORDER_VALUES.indexOf(task.status as typeof STATUS_ORDER_VALUES[number])
-                const pos = i < activeIdx ? 'past' : i === activeIdx ? 'active' : 'future'
-                const isFirst = i === 0
-                const isLast = i === STATUS_ORDER_VALUES.length - 1
-                const clipPath = isFirst
-                  ? 'polygon(0 0, calc(100% - 5px) 0, 100% 50%, calc(100% - 5px) 100%, 0 100%)'
-                  : isLast
-                  ? 'polygon(5px 0, 100% 0, 100% 100%, 0 100%, 5px 50%)'
-                  : 'polygon(5px 0, calc(100% - 5px) 0, 100% 50%, calc(100% - 5px) 100%, 0 100%, 5px 50%)'
-                const bg = pos === 'past' ? '#ddd6fe' : pos === 'active' ? STATUS_COLORS[s] : '#f1f5f9'
-                const statusLabel = STATUSES.find((st) => st.value === s)?.label ?? s
-                return (
-                  <button
-                    key={s}
-                    title={statusLabel}
-                    onClick={() => quickUpdateStatus(s)}
-                    disabled={s === task.status}
-                    style={{ flex: 1, height: '100%', border: 'none', cursor: s === task.status ? 'default' : 'pointer', clipPath, background: bg, transition: 'filter 0.15s', padding: 0 }}
-                    onMouseEnter={(e) => { if (s !== task.status) (e.currentTarget as HTMLButtonElement).style.filter = 'brightness(0.88)' }}
-                    onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.filter = '' }}
-                  />
-                )
-              })}
-            </div>
           </div>
         </div>
+      </div>
+
+      {/* Status bar */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 mb-5">
+        <div className="flex items-center gap-2 mb-3">
+          <span className="text-sm font-semibold text-slate-700">Status</span>
+        </div>
+        <StatusBar currentStatus={task.status} onStatusClick={quickUpdateStatus} disabled={false} />
       </div>
 
       {/* Tabs */}
@@ -893,39 +943,11 @@ export default function TaskDetailPage() {
                   </div>
                   <div className="col-span-2">
                     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Status</label>
-                    <div style={{ display: 'flex', height: 8, marginBottom: 10, gap: 0 }}>
-                      {STATUS_ORDER_VALUES.map((s, i) => {
-                        const cur = (ef.status as string) ?? 'not_started'
-                        const activeIdx = STATUS_ORDER_VALUES.indexOf(cur as typeof STATUS_ORDER_VALUES[number])
-                        const pos = i < activeIdx ? 'past' : i === activeIdx ? 'active' : 'future'
-                        const isFirst = i === 0
-                        const isLast = i === STATUS_ORDER_VALUES.length - 1
-                        const clipPath = isFirst
-                          ? 'polygon(0 0, calc(100% - 5px) 0, 100% 50%, calc(100% - 5px) 100%, 0 100%)'
-                          : isLast
-                          ? 'polygon(5px 0, 100% 0, 100% 100%, 0 100%, 5px 50%)'
-                          : 'polygon(5px 0, calc(100% - 5px) 0, 100% 50%, calc(100% - 5px) 100%, 0 100%, 5px 50%)'
-                        const bg = pos === 'past' ? '#ddd6fe' : pos === 'active' ? STATUS_COLORS[s] : '#f1f5f9'
-                        const statusLabel = STATUSES.find((st) => st.value === s)?.label ?? s
-                        return (
-                          <button
-                            key={s}
-                            type="button"
-                            title={statusLabel}
-                            onClick={() => handleEditChange('status', s)}
-                            disabled={s === cur}
-                            style={{ flex: 1, height: '100%', border: 'none', cursor: s === cur ? 'default' : 'pointer', clipPath, background: bg, transition: 'filter 0.15s', padding: 0 }}
-                            onMouseEnter={(e) => { if (s !== cur) (e.currentTarget as HTMLButtonElement).style.filter = 'brightness(0.88)' }}
-                            onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.filter = '' }}
-                          />
-                        )
-                      })}
-                    </div>
-                    <select value={(ef.status as string) ?? 'not_started'}
-                      onChange={(e) => handleEditChange('status', e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                      {STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-                    </select>
+                    <StatusBar
+                      currentStatus={(ef.status as string) ?? 'not_started'}
+                      onStatusClick={(s) => handleEditChange('status', s)}
+                      disabled={false}
+                    />
                   </div>
                   <div>
                     <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Priority</label>
