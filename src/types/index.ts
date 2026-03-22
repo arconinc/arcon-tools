@@ -306,6 +306,7 @@ export interface CrmCustomer {
   name: string
   client_status: CrmClientStatus | null
   phone: string | null
+  fax: string | null
   website: string | null
   linkedin: string | null
   email_domains: string | null
@@ -326,6 +327,12 @@ export interface CrmCustomer {
   artwork_notes: string | null
   general_logo_color: string | null
   formal_pms_colors: string | null
+  industry: string | null
+  notes: string | null
+  power_units: string | null
+  mta: boolean | null
+  mta_trucking: string | null
+  insightly_id: string | null
   assigned_to: string | null
   created_by: string
   created_at: string
@@ -336,6 +343,7 @@ export interface CrmVendor {
   id: string
   name: string
   phone: string | null
+  fax: string | null
   website: string | null
   linkedin: string | null
   description: string | null
@@ -357,6 +365,10 @@ export interface CrmVendor {
   samples_email: string | null
   virtuals_email: string | null
   spec_sample_email: string | null
+  industry: string | null
+  notes: string | null
+  insightly_id: string | null
+  assigned_to: string | null
   created_by: string
   created_at: string
   updated_at: string
