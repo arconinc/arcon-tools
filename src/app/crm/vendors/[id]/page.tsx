@@ -7,6 +7,18 @@ import TagPicker from '@/components/crm/TagPicker'
 
 type TagOption = { id: string; name: string; color: string }
 
+const PRODUCT_LINE_OPTIONS = [
+  'Apparel - Decorator', 'Apparel - Blank Warehouse', 'Hard Goods', 'Hats', 'USB', 'Awards',
+  'Pins & Jewelry', 'Namebadge', 'Checks, Stationary, Forms & Envelopes', 'Commercial & Long Run',
+  'Signs', 'Large Format', 'Folders', 'Ribbon & Thermal', 'Toner', 'Mailing', 'Labels & Tags',
+  'Safety Apparel/PPE',
+]
+
+const SPECIALTY_OPTIONS = [
+  'Print', 'Promo', 'Office Supply & Stock & Toner', 'Signs', 'Packaging',
+  'Warehouse & Carrier & Courier', 'Artwork', 'Other',
+]
+
 type VendorDetail = {
   id: string; name: string; phone: string | null; website: string | null; linkedin: string | null
   description: string | null; tags: TagOption[]
@@ -15,8 +27,14 @@ type VendorDetail = {
   arcon_username: string | null; arcon_password: string | null
   customer_service_email: string | null; orders_email: string | null; orders_cutoff: string | null
   rush_order_email: string | null; rush_order_cutoff: string | null; rush_art_email: string | null
+  rush_art_cutoff: string | null
   artwork_email: string | null; samples_email: string | null; virtuals_email: string | null
   spec_sample_email: string | null
+  billing_address1: string | null; billing_address2: string | null; billing_city: string | null
+  billing_state: string | null; billing_zip: string | null; billing_country: string | null
+  shipping_address1: string | null; shipping_address2: string | null; shipping_city: string | null
+  shipping_state: string | null; shipping_zip: string | null; shipping_country: string | null
+  notes: string | null
   created_by: string; created_at: string; updated_at: string
   contacts: { id: string; first_name: string; last_name: string; title: string | null; email: string | null; phone: string | null }[]
   files: { id: string; label: string; url: string; created_at: string }[]
@@ -45,6 +63,21 @@ function FI({ label, name, value, onChange, type = 'text', textarea = false }: {
         ? <textarea rows={3} value={value} onChange={(e) => onChange(name, e.target.value)} className={cls + ' resize-none'} />
         : <input type={type} value={value} onChange={(e) => onChange(name, e.target.value)} className={cls} />
       }
+    </div>
+  )
+}
+
+function FS({ label, name, value, onChange, options }: {
+  label: string; name: string; value: string; onChange: (n: string, v: string) => void; options: string[]
+}) {
+  const cls = "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
+  return (
+    <div>
+      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">{label}</label>
+      <select value={value} onChange={(e) => onChange(name, e.target.value)} className={cls}>
+        <option value="">—</option>
+        {options.map((o) => <option key={o} value={o}>{o}</option>)}
+      </select>
     </div>
   )
 }
@@ -84,7 +117,13 @@ export default function VendorDetailPage() {
     } finally { setTagSaving(false) }
   }
 
-  const [createForm, setCreateForm] = useState({ name: '', phone: '', website: '', linkedin: '', description: '', product_line: '', specialty: '' })
+  const [createForm, setCreateForm] = useState({
+    name: '', phone: '', website: '', linkedin: '', description: '', product_line: '', specialty: '',
+    rush_art_cutoff: '',
+    billing_address1: '', billing_address2: '', billing_city: '', billing_state: '', billing_zip: '', billing_country: '',
+    shipping_address1: '', shipping_address2: '', shipping_city: '', shipping_state: '', shipping_zip: '', shipping_country: '',
+    notes: '',
+  })
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 
@@ -168,13 +207,19 @@ export default function VendorDetailPage() {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Product Line</label>
-              <input type="text" value={createForm.product_line} onChange={(e) => setCreateForm((p) => ({ ...p, product_line: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
+              <select value={createForm.product_line} onChange={(e) => setCreateForm((p) => ({ ...p, product_line: e.target.value }))}
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                <option value="">—</option>
+                {PRODUCT_LINE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Specialty</label>
-              <input type="text" value={createForm.specialty} onChange={(e) => setCreateForm((p) => ({ ...p, specialty: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
+              <select value={createForm.specialty} onChange={(e) => setCreateForm((p) => ({ ...p, specialty: e.target.value }))}
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                <option value="">—</option>
+                {SPECIALTY_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+              </select>
             </div>
           </div>
           <div>
@@ -308,8 +353,8 @@ export default function VendorDetailPage() {
                       className="w-4 h-4 rounded border-slate-300 text-purple-600 focus:ring-purple-400" />
                     <label htmlFor="premier" className="text-sm text-slate-700 font-medium">Premier Group Member</label>
                   </div>
-                  <FI label="Product Line" name="product_line" value={(ef.product_line as string) ?? ''} onChange={handleEditChange} />
-                  <FI label="Specialty" name="specialty" value={(ef.specialty as string) ?? ''} onChange={handleEditChange} />
+                  <FS label="Product Line" name="product_line" value={(ef.product_line as string) ?? ''} onChange={handleEditChange} options={PRODUCT_LINE_OPTIONS} />
+                  <FS label="Specialty" name="specialty" value={(ef.specialty as string) ?? ''} onChange={handleEditChange} options={SPECIALTY_OPTIONS} />
                   <FI label="Arcon Account #" name="arcon_account_number" value={(ef.arcon_account_number as string) ?? ''} onChange={handleEditChange} />
                   <FI label="Online Store" name="online_store" value={(ef.online_store as string) ?? ''} onChange={handleEditChange} type="url" />
                   <FI label="Arcon Username" name="arcon_username" value={(ef.arcon_username as string) ?? ''} onChange={handleEditChange} />
@@ -323,11 +368,37 @@ export default function VendorDetailPage() {
                       <FI label="Rush Order Email" name="rush_order_email" value={(ef.rush_order_email as string) ?? ''} onChange={handleEditChange} type="email" />
                       <FI label="Rush Order Cutoff" name="rush_order_cutoff" value={(ef.rush_order_cutoff as string) ?? ''} onChange={handleEditChange} />
                       <FI label="Rush Art Email" name="rush_art_email" value={(ef.rush_art_email as string) ?? ''} onChange={handleEditChange} type="email" />
+                      <FI label="Rush Art Cutoff" name="rush_art_cutoff" value={(ef.rush_art_cutoff as string) ?? ''} onChange={handleEditChange} />
                       <FI label="Artwork Email" name="artwork_email" value={(ef.artwork_email as string) ?? ''} onChange={handleEditChange} type="email" />
                       <FI label="Samples Email" name="samples_email" value={(ef.samples_email as string) ?? ''} onChange={handleEditChange} type="email" />
                       <FI label="Virtuals Email" name="virtuals_email" value={(ef.virtuals_email as string) ?? ''} onChange={handleEditChange} type="email" />
                       <FI label="Spec Sample Email" name="spec_sample_email" value={(ef.spec_sample_email as string) ?? ''} onChange={handleEditChange} type="email" />
                     </div>
+                  </div>
+                  <div className="col-span-2 border-t border-slate-100 pt-4">
+                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Billing Address</div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <FI label="Address 1" name="billing_address1" value={(ef.billing_address1 as string) ?? ''} onChange={handleEditChange} />
+                      <FI label="Address 2" name="billing_address2" value={(ef.billing_address2 as string) ?? ''} onChange={handleEditChange} />
+                      <FI label="City" name="billing_city" value={(ef.billing_city as string) ?? ''} onChange={handleEditChange} />
+                      <FI label="State" name="billing_state" value={(ef.billing_state as string) ?? ''} onChange={handleEditChange} />
+                      <FI label="ZIP" name="billing_zip" value={(ef.billing_zip as string) ?? ''} onChange={handleEditChange} />
+                      <FI label="Country" name="billing_country" value={(ef.billing_country as string) ?? ''} onChange={handleEditChange} />
+                    </div>
+                  </div>
+                  <div className="col-span-2 border-t border-slate-100 pt-4">
+                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Shipping Address</div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <FI label="Address 1" name="shipping_address1" value={(ef.shipping_address1 as string) ?? ''} onChange={handleEditChange} />
+                      <FI label="Address 2" name="shipping_address2" value={(ef.shipping_address2 as string) ?? ''} onChange={handleEditChange} />
+                      <FI label="City" name="shipping_city" value={(ef.shipping_city as string) ?? ''} onChange={handleEditChange} />
+                      <FI label="State" name="shipping_state" value={(ef.shipping_state as string) ?? ''} onChange={handleEditChange} />
+                      <FI label="ZIP" name="shipping_zip" value={(ef.shipping_zip as string) ?? ''} onChange={handleEditChange} />
+                      <FI label="Country" name="shipping_country" value={(ef.shipping_country as string) ?? ''} onChange={handleEditChange} />
+                    </div>
+                  </div>
+                  <div className="col-span-2 border-t border-slate-100 pt-4">
+                    <FI label="Additional Information" name="notes" value={(ef.notes as string) ?? ''} onChange={handleEditChange} textarea />
                   </div>
                 </>
               ) : (
@@ -347,12 +418,44 @@ export default function VendorDetailPage() {
                       <Field label="Rush Order Email" value={vendor.rush_order_email} />
                       <Field label="Rush Order Cutoff" value={vendor.rush_order_cutoff} />
                       <Field label="Rush Art Email" value={vendor.rush_art_email} />
+                      <Field label="Rush Art Cutoff" value={vendor.rush_art_cutoff} />
                       <Field label="Artwork Email" value={vendor.artwork_email} />
                       <Field label="Samples Email" value={vendor.samples_email} />
                       <Field label="Virtuals Email" value={vendor.virtuals_email} />
                       <Field label="Spec Sample Email" value={vendor.spec_sample_email} />
                     </div>
                   </div>
+                  {(vendor.billing_address1 || vendor.billing_city) && (
+                    <div className="col-span-2 border-t border-slate-100 pt-4">
+                      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Billing Address</div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <Field label="Address 1" value={vendor.billing_address1} />
+                        <Field label="Address 2" value={vendor.billing_address2} />
+                        <Field label="City" value={vendor.billing_city} />
+                        <Field label="State" value={vendor.billing_state} />
+                        <Field label="ZIP" value={vendor.billing_zip} />
+                        <Field label="Country" value={vendor.billing_country} />
+                      </div>
+                    </div>
+                  )}
+                  {(vendor.shipping_address1 || vendor.shipping_city) && (
+                    <div className="col-span-2 border-t border-slate-100 pt-4">
+                      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-3">Shipping Address</div>
+                      <div className="grid grid-cols-2 gap-4">
+                        <Field label="Address 1" value={vendor.shipping_address1} />
+                        <Field label="Address 2" value={vendor.shipping_address2} />
+                        <Field label="City" value={vendor.shipping_city} />
+                        <Field label="State" value={vendor.shipping_state} />
+                        <Field label="ZIP" value={vendor.shipping_zip} />
+                        <Field label="Country" value={vendor.shipping_country} />
+                      </div>
+                    </div>
+                  )}
+                  {vendor.notes && (
+                    <div className="col-span-2 border-t border-slate-100 pt-4">
+                      <Field label="Additional Information" value={vendor.notes} />
+                    </div>
+                  )}
                 </>
               )}
             </div>

@@ -27,13 +27,6 @@ function extractOwnerEmail(owner: unknown): string | null {
   return parts[1]?.trim() || null
 }
 
-// Map Insightly Company Type to destination table(s)
-function classifyRecord(companyType: unknown): { isCustomer: boolean; isVendor: boolean } {
-  const t = str(companyType)?.toLowerCase() ?? ''
-  if (t === 'vendor') return { isCustomer: false, isVendor: true }
-  return { isCustomer: true, isVendor: true }
-}
-
 // Map Insightly Client Status to CrmClientStatus
 function mapClientStatus(row: Record<string, unknown>): string {
   const cs = str(row['Client Status'])
@@ -60,10 +53,17 @@ export async function POST(req: NextRequest) {
 
   // ── Parse XLSX from multipart form ────────────────────────────────────────
   let rows: Record<string, unknown>[]
+  let importType: 'vendors' | 'customers'
   try {
     const formData = await req.formData()
     const file = formData.get('file') as File | null
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+
+    const rawImportType = formData.get('importType') as string | null
+    if (!rawImportType || (rawImportType !== 'vendors' && rawImportType !== 'customers')) {
+      return NextResponse.json({ error: 'importType must be "vendors" or "customers"' }, { status: 400 })
+    }
+    importType = rawImportType
 
     const arrayBuffer = await file.arrayBuffer()
     const workbook = XLSX.read(arrayBuffer, { type: 'array' })
@@ -117,8 +117,9 @@ export async function POST(req: NextRequest) {
       if (t) allTagNamesNeeded.add(t)
     }
     const ct = str(row['Company Type'])?.toLowerCase()
-    if (ct === 'competitor') allTagNamesNeeded.add('Competitor')
-    if (ct === 'association') allTagNamesNeeded.add('Association')
+    if (ct && ct !== 'vendor' && ct !== 'customer') {
+      allTagNamesNeeded.add(str(row['Company Type'])!)
+    }
   }
 
   const { data: existingTags } = await adminClient.from('crm_tags').select('id, name')
@@ -169,7 +170,8 @@ export async function POST(req: NextRequest) {
       if (!assignedTo) unmatchedOwners.add(ownerEmail)
     }
 
-    const { isCustomer, isVendor } = classifyRecord(row['Company Type'])
+    const isCustomer = importType === 'customers'
+    const isVendor   = importType === 'vendors'
 
     const rowTagNames: string[] = []
     for (const col of ['Tag1', 'Tag2', 'Tag3', 'Tag4', 'Tag5', 'Tag6', 'Tag7', 'Tag8', 'Tag9']) {
@@ -177,8 +179,9 @@ export async function POST(req: NextRequest) {
       if (t) rowTagNames.push(t)
     }
     const ct = str(row['Company Type'])?.toLowerCase()
-    if (ct === 'competitor') rowTagNames.push('Competitor')
-    if (ct === 'association') rowTagNames.push('Association')
+    if (ct && ct !== 'vendor' && ct !== 'customer') {
+      rowTagNames.push(str(row['Company Type'])!)
+    }
 
     if (isCustomer) {
       const ex = existingCustomerMap.get(insightlyId)
@@ -236,10 +239,23 @@ export async function POST(req: NextRequest) {
         orders_email:           merge(str(row['Orders Email (and cutoff)']), (ex as any)?.orders_email),
         rush_order_email:       merge(str(row['Rush Order Email (and cutoff)']), (ex as any)?.rush_order_email),
         rush_art_email:         merge(str(row['Rush Art Email (and cutoff)']), (ex as any)?.rush_art_email),
+        rush_art_cutoff:        merge(str(row['Rush Art Cutoff']), (ex as any)?.rush_art_cutoff),
         artwork_email:          merge(str(row['Artwork Email']), (ex as any)?.artwork_email),
         samples_email:          merge(str(row['Samples Email']), (ex as any)?.samples_email),
         virtuals_email:         merge(str(row['Virtuals Email']), (ex as any)?.virtuals_email),
         spec_sample_email:      merge(str(row['Spec Sample Email']), (ex as any)?.spec_sample_email),
+        billing_address1:       merge(str(row['BillingAddressStreet']),      (ex as any)?.billing_address1),
+        billing_address2:       merge(str(row['BillingAddressStreet2']),     (ex as any)?.billing_address2),
+        billing_city:           merge(str(row['BillingAddressCity']),        (ex as any)?.billing_city),
+        billing_state:          merge(str(row['BillingAddressState']),       (ex as any)?.billing_state),
+        billing_zip:            merge(str(row['BillingAddressPostalCode']),  (ex as any)?.billing_zip),
+        billing_country:        merge(str(row['BillingAddressCountry']),     (ex as any)?.billing_country),
+        shipping_address1:      merge(str(row['ShippingAddressStreet']),     (ex as any)?.shipping_address1),
+        shipping_address2:      merge(str(row['ShippingAddressStreet2']),    (ex as any)?.shipping_address2),
+        shipping_city:          merge(str(row['ShippingAddressCity']),       (ex as any)?.shipping_city),
+        shipping_state:         merge(str(row['ShippingAddressState']),      (ex as any)?.shipping_state),
+        shipping_zip:           merge(str(row['ShippingAddressPostalCode']), (ex as any)?.shipping_zip),
+        shipping_country:       merge(str(row['ShippingAddressCountry']),    (ex as any)?.shipping_country),
         industry:               merge(str(row['Industry']), (ex as any)?.industry),
         notes:                  merge(str(row['Additional Information']), (ex as any)?.notes),
         assigned_to:            assignedTo ?? (ex as any)?.assigned_to ?? null,

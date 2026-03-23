@@ -364,10 +364,23 @@ export interface CrmVendor {
   rush_order_email: string | null
   rush_order_cutoff: string | null
   rush_art_email: string | null
+  rush_art_cutoff: string | null
   artwork_email: string | null
   samples_email: string | null
   virtuals_email: string | null
   spec_sample_email: string | null
+  billing_address1: string | null
+  billing_address2: string | null
+  billing_city: string | null
+  billing_state: string | null
+  billing_zip: string | null
+  billing_country: string | null
+  shipping_address1: string | null
+  shipping_address2: string | null
+  shipping_city: string | null
+  shipping_state: string | null
+  shipping_zip: string | null
+  shipping_country: string | null
   industry: string | null
   notes: string | null
   insightly_id: string | null

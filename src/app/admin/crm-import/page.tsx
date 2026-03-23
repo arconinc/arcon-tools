@@ -7,9 +7,6 @@ import * as XLSX from 'xlsx'
 
 interface Preview {
   total: number
-  customers: number
-  vendors: number
-  dual: number
   tagsFound: string[]
   ownerEmails: string[]
 }
@@ -30,26 +27,19 @@ async function parseXlsxPreview(file: File): Promise<Preview> {
   const sheet = workbook.Sheets[workbook.SheetNames[0]]
   const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '', raw: false })
 
-  let customers = 0, vendors = 0, dual = 0
   const tagSet = new Set<string>()
   const ownerEmailSet = new Set<string>()
 
   for (const row of rows) {
     const ct = String(row['Company Type'] ?? '').trim().toLowerCase()
-    if (ct === 'vendor') {
-      vendors++
-    } else if (ct === 'customer and vendor') {
-      dual++
-    } else {
-      customers++
-    }
 
-    for (const col of ['Tag1', 'Tag2', 'Tag3']) {
+    for (const col of ['Tag1', 'Tag2', 'Tag3', 'Tag4', 'Tag5', 'Tag6', 'Tag7', 'Tag8', 'Tag9']) {
       const t = String(row[col] ?? '').trim()
       if (t) tagSet.add(t)
     }
-    if (ct === 'competitor') tagSet.add('Competitor')
-    if (ct === 'association') tagSet.add('Association')
+    if (ct && ct !== 'vendor' && ct !== 'customer') {
+      tagSet.add(String(row['Company Type']).trim())
+    }
 
     const ownerRaw = String(row['OrganisationOwner'] ?? '').trim()
     if (ownerRaw) {
@@ -60,9 +50,6 @@ async function parseXlsxPreview(file: File): Promise<Preview> {
 
   return {
     total: rows.length,
-    customers: customers + dual,
-    vendors: vendors + dual,
-    dual,
     tagsFound: [...tagSet].sort(),
     ownerEmails: [...ownerEmailSet].sort(),
   }
@@ -72,6 +59,7 @@ async function parseXlsxPreview(file: File): Promise<Preview> {
 
 export default function CrmImportPage() {
   const fileRef = useRef<HTMLInputElement>(null)
+  const [importType, setImportType] = useState<'vendors' | 'customers' | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<Preview | null>(null)
   const [previewing, setPreviewing] = useState(false)
@@ -98,7 +86,7 @@ export default function CrmImportPage() {
   }
 
   async function handleImport() {
-    if (!file) return
+    if (!file || !importType) return
     setImporting(true)
     setError(null)
     setResult(null)
@@ -106,6 +94,7 @@ export default function CrmImportPage() {
     try {
       const formData = new FormData()
       formData.append('file', file)
+      formData.append('importType', importType)
 
       const res = await fetch('/api/admin/crm/import', { method: 'POST', body: formData })
       const data = await res.json()
@@ -127,6 +116,7 @@ export default function CrmImportPage() {
     setPreview(null)
     setResult(null)
     setError(null)
+    setImportType(null)
     if (fileRef.current) fileRef.current.value = ''
   }
 
@@ -142,6 +132,24 @@ export default function CrmImportPage() {
 
       {/* Upload card */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5 mb-5">
+        <h2 className="text-sm font-semibold text-slate-700 mb-4">Import Type</h2>
+
+        <div className="flex gap-2 mb-5">
+          {(['vendors', 'customers'] as const).map(type => (
+            <button
+              key={type}
+              onClick={() => setImportType(type)}
+              className={`px-5 py-2 rounded-lg text-sm font-semibold border transition-colors capitalize ${
+                importType === type
+                  ? 'bg-purple-700 text-white border-purple-700'
+                  : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
+              }`}
+            >
+              {type === 'vendors' ? 'Vendors' : 'Customers'}
+            </button>
+          ))}
+        </div>
+
         <h2 className="text-sm font-semibold text-slate-700 mb-4">Select Excel File</h2>
 
         <div className="flex items-center gap-3 flex-wrap">
@@ -173,11 +181,13 @@ export default function CrmImportPage() {
         <div className="bg-white border border-slate-200 rounded-2xl p-5 mb-5">
           <h2 className="text-sm font-semibold text-slate-700 mb-4">Import Preview</h2>
 
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 mb-5">
+          <div className="grid grid-cols-2 gap-3 mb-5">
             <StatBox label="Total Records" value={preview.total} />
-            <StatBox label="→ Customers" value={preview.customers} color="blue" />
-            <StatBox label="→ Vendors" value={preview.vendors} color="green" />
-            <StatBox label="Dual (both)" value={preview.dual} color="purple" />
+            <StatBox
+              label={`→ ${importType === 'vendors' ? 'Vendors' : 'Customers'}`}
+              value={preview.total}
+              color={importType === 'vendors' ? 'green' : 'blue'}
+            />
           </div>
 
           {preview.tagsFound.length > 0 && (
@@ -205,12 +215,17 @@ export default function CrmImportPage() {
           )}
 
           <div className="flex items-center gap-3 pt-2 border-t border-slate-100 mt-4">
+            {!importType && (
+              <p className="text-xs text-amber-600 font-medium">Select an import type above before importing.</p>
+            )}
             <button
               onClick={handleImport}
-              disabled={importing}
+              disabled={importing || !importType}
               className="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-lg disabled:opacity-60 transition-colors"
             >
-              {importing ? 'Importing…' : `Import ${preview.total.toLocaleString()} Records`}
+              {importing
+                ? 'Importing…'
+                : `Import ${preview.total.toLocaleString()} as ${importType === 'vendors' ? 'Vendors' : importType === 'customers' ? 'Customers' : '…'}`}
             </button>
             <button
               onClick={reset}
@@ -246,19 +261,18 @@ export default function CrmImportPage() {
             <h2 className="text-sm font-semibold text-slate-700">Import Complete</h2>
           </div>
 
-          <div className="grid grid-cols-2 gap-3 mb-5">
+          <div className="grid grid-cols-1 gap-3 mb-5">
             <div className="bg-slate-50 rounded-xl p-4">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Customers</p>
-              <p className="text-sm text-slate-700">
-                <span className="font-semibold text-green-700">{result.customers.inserted}</span> inserted &nbsp;·&nbsp;
-                <span className="font-semibold text-blue-700">{result.customers.updated}</span> updated
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
+                {importType === 'vendors' ? 'Vendors' : 'Customers'}
               </p>
-            </div>
-            <div className="bg-slate-50 rounded-xl p-4">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Vendors</p>
               <p className="text-sm text-slate-700">
-                <span className="font-semibold text-green-700">{result.vendors.inserted}</span> inserted &nbsp;·&nbsp;
-                <span className="font-semibold text-blue-700">{result.vendors.updated}</span> updated
+                <span className="font-semibold text-green-700">
+                  {importType === 'vendors' ? result.vendors.inserted : result.customers.inserted}
+                </span> inserted &nbsp;·&nbsp;
+                <span className="font-semibold text-blue-700">
+                  {importType === 'vendors' ? result.vendors.updated : result.customers.updated}
+                </span> updated
               </p>
             </div>
           </div>
@@ -293,16 +307,10 @@ export default function CrmImportPage() {
 
           <div className="pt-3 border-t border-slate-100 flex gap-3">
             <a
-              href="/crm/customers"
+              href={importType === 'vendors' ? '/crm/vendors' : '/crm/customers'}
               className="px-4 py-2 text-sm font-semibold bg-purple-700 hover:bg-purple-800 text-white rounded-lg transition-colors"
             >
-              View Customers
-            </a>
-            <a
-              href="/crm/vendors"
-              className="px-4 py-2 text-sm font-semibold border border-slate-300 text-slate-700 hover:bg-slate-50 rounded-lg transition-colors"
-            >
-              View Vendors
+              {importType === 'vendors' ? 'View Vendors' : 'View Customers'}
             </a>
             <button
               onClick={reset}
@@ -330,7 +338,7 @@ export default function CrmImportPage() {
           {[
             ['RecordId', 'insightly_id (deduplication key)'],
             ['OrganizationName', 'name'],
-            ['Company Type', 'table: Customer / Vendor / Both'],
+            ['Company Type', 'tag (if not "Vendor" or "Customer")'],
             ['Client Status', 'client_status'],
             ['OrganisationOwner', 'assigned_to (matched by email)'],
             ['Background', 'description'],
@@ -348,7 +356,7 @@ export default function CrmImportPage() {
             ['Power Units / Trucks & Trailers', 'power_units'],
             ['MTA?', 'mta'],
             ['MTA/Trucking', 'mta_trucking'],
-            ['Tag1/Tag2/Tag3', 'crm_entity_tags (created if new)'],
+            ['Tag1–Tag9 + Company Type', 'crm_entity_tags (created if new)'],
             ['Premier Group Member', 'premier_group_member (Vendors)'],
             ['Product Line', 'product_line (Vendors)'],
             ['Speciality', 'specialty (Vendors)'],
