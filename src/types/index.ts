@@ -6,6 +6,7 @@ export interface AppUser {
   display_name: string
   google_id: string | null
   is_admin: boolean
+  avatar_url: string | null
   created_at: string
   last_login_at: string
   birth_date: string | null   // MM-DD (no year, PII)
@@ -26,6 +27,7 @@ export interface BirthdayEvent {
   days_until: number
   date_label: string   // e.g. "Mar 15" or "Today"
   years?: number       // years of service (anniversaries only)
+  avatar_url?: string | null
 }
 
 // ─── Store ───────────────────────────────────────────────────────────────────
@@ -212,6 +214,7 @@ export interface BannerStripItem {
   text: string
   href?: string | null
   source: 'birthday' | 'anniversary' | 'news' | 'holiday' | 'manual'
+  avatar_url?: string | null
 }
 
 export interface TickerManualItem {

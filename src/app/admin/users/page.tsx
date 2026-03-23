@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
+import { useRouter } from 'next/navigation'
+import { createClient } from '@/lib/supabase/client'
 import { AppUser } from '@/types'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -36,6 +38,50 @@ export default function AdminUsersPage() {
 
   // Admin toggle
   const [togglingId, setTogglingId] = useState<string | null>(null)
+
+  // Sync Google photos
+  const [syncing, setSyncing] = useState(false)
+  const [syncResult, setSyncResult] = useState<string | null>(null)
+  const syncRan = useRef(false)
+  const router = useRouter()
+  const supabase = createClient()
+
+  // After returning from Google OAuth re-auth, auto-trigger the Directory sync
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search)
+    if (params.get('google_sync') !== '1') return
+    if (syncRan.current) return
+    syncRan.current = true
+    // Remove the query param from the URL without re-render
+    router.replace('/admin/users', { scroll: false })
+    syncFromGoogle()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
+  async function syncFromGoogle() {
+    setSyncing(true)
+    setSyncResult(null)
+    const res = await fetch('/api/admin/sync-google-photos', { method: 'POST' })
+    const data = await res.json()
+    setSyncing(false)
+    if (res.ok) {
+      setSyncResult(data.message ?? 'Done')
+      loadUsers()
+    } else if (res.status === 400 || res.status === 401) {
+      // No valid directory token — trigger Google re-auth with the required scope
+      setSyncResult(null)
+      await supabase.auth.signInWithOAuth({
+        provider: 'google',
+        options: {
+          scopes: 'openid email profile https://www.googleapis.com/auth/directory.readonly',
+          redirectTo: `${window.location.origin}/admin/users?google_sync=1`,
+          queryParams: { access_type: 'offline', prompt: 'consent' },
+        },
+      })
+    } else {
+      setSyncResult(`Error: ${data.error ?? 'Unknown error'}`)
+    }
+  }
 
   const loadUsers = useCallback(async () => {
     setLoading(true)
@@ -120,13 +166,32 @@ export default function AdminUsersPage() {
             Manage user roles and profile data. Pre-load users before they log in, or edit existing users.
           </p>
         </div>
-        <button
-          onClick={() => { setShowAdd((v) => !v); setAddError(null) }}
-          className="px-3 py-1.5 text-xs font-medium rounded-lg border border-purple-200 text-purple-600 hover:bg-purple-50 transition-colors"
-        >
-          {showAdd ? 'Cancel' : '+ Add User'}
-        </button>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={syncFromGoogle}
+            disabled={syncing}
+            title="Pull current profile photos from Google Workspace for all users"
+            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+          >
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+            </svg>
+            {syncing ? 'Syncing…' : 'Sync from Google'}
+          </button>
+          <button
+            onClick={() => { setShowAdd((v) => !v); setAddError(null) }}
+            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-purple-200 text-purple-600 hover:bg-purple-50 transition-colors"
+          >
+            {showAdd ? 'Cancel' : '+ Add User'}
+          </button>
+        </div>
       </div>
+
+      {syncResult && (
+        <div className={`mb-4 px-4 py-2.5 rounded-xl text-xs font-medium border ${syncResult.startsWith('Error') ? 'bg-red-50 border-red-200 text-red-700' : 'bg-green-50 border-green-200 text-green-700'}`}>
+          {syncResult}
+        </div>
+      )}
 
       {/* Add user form */}
       {showAdd && (
@@ -272,32 +337,42 @@ export default function AdminUsersPage() {
               ) : (
                 /* ── Read mode ── */
                 <div className="flex items-start justify-between gap-4">
-                  <div className="min-w-0">
-                    <div className="flex items-center gap-2 flex-wrap">
-                      <p className="font-medium text-slate-800">{user.display_name}</p>
-                      {user.is_admin && (
-                        <span className="text-xs font-medium bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Admin</span>
-                      )}
-                      {user.google_id ? (
-                        <span className="text-xs font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Linked</span>
-                      ) : (
-                        <span className="text-xs font-medium bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">Pending</span>
-                      )}
-                    </div>
-                    <p className="text-xs text-slate-400 mt-0.5">{user.email}</p>
-                    <div className="flex gap-4 mt-1">
-                      <p className="text-xs text-slate-300">
-                        🎂 {formatDate(user.birth_date)}
-                      </p>
-                      <p className="text-xs text-slate-300">
-                        🏢 Started {formatDate(user.start_date)}
-                      </p>
-                    </div>
-                    {user.last_login_at && (
-                      <p className="text-xs text-slate-300 mt-0.5">
-                        Last login: {new Date(user.last_login_at).toLocaleString()}
-                      </p>
+                  <div className="flex items-start gap-3 min-w-0">
+                    {user.avatar_url ? (
+                      <img
+                        src={user.avatar_url}
+                        alt={user.display_name}
+                        referrerPolicy="no-referrer"
+                        style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, marginTop: 2 }}
+                      />
+                    ) : (
+                      <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#6b1e98', flexShrink: 0, marginTop: 2 }}>
+                        {user.display_name.split(' ').filter(Boolean).slice(0, 2).map((w: string) => w[0]).join('').toUpperCase()}
+                      </div>
                     )}
+                    <div className="min-w-0">
+                      <div className="flex items-center gap-2 flex-wrap">
+                        <p className="font-medium text-slate-800">{user.display_name}</p>
+                        {user.is_admin && (
+                          <span className="text-xs font-medium bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Admin</span>
+                        )}
+                        {user.google_id ? (
+                          <span className="text-xs font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Linked</span>
+                        ) : (
+                          <span className="text-xs font-medium bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">Pending</span>
+                        )}
+                      </div>
+                      <p className="text-xs text-slate-400 mt-0.5">{user.email}</p>
+                      <div className="flex gap-4 mt-1">
+                        <p className="text-xs text-slate-300">🎂 {formatDate(user.birth_date)}</p>
+                        <p className="text-xs text-slate-300">🏢 Started {formatDate(user.start_date)}</p>
+                      </div>
+                      {user.last_login_at && (
+                        <p className="text-xs text-slate-300 mt-0.5">
+                          Last login: {new Date(user.last_login_at).toLocaleString()}
+                        </p>
+                      )}
+                    </div>
                   </div>
                   <div className="flex gap-2 flex-shrink-0">
                     <button

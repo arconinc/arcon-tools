@@ -31,8 +31,7 @@ function extractOwnerEmail(owner: unknown): string | null {
 function classifyRecord(companyType: unknown): { isCustomer: boolean; isVendor: boolean } {
   const t = str(companyType)?.toLowerCase() ?? ''
   if (t === 'vendor') return { isCustomer: false, isVendor: true }
-  if (t === 'customer and vendor') return { isCustomer: true, isVendor: true }
-  return { isCustomer: true, isVendor: false }
+  return { isCustomer: true, isVendor: true }
 }
 
 // Map Insightly Client Status to CrmClientStatus

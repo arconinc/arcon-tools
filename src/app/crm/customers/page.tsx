@@ -40,7 +40,7 @@ export default function CustomersPage() {
   const [loading, setLoading] = useState(true)
   const [allTags, setAllTags] = useState<TagOption[]>([])
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('')
+  const [status, setStatus] = useState('Active')
   const [tagFilter, setTagFilter] = useState('')
   const [page, setPage] = useState(1)
 

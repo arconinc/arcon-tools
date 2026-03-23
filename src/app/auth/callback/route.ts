@@ -28,19 +28,21 @@ export async function GET(request: Request) {
         .eq('email', email)
         .single()
 
+      const avatarUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture || null
+
       if (existing) {
         if (!existing.google_id) {
           // Pre-loaded user logging in for the first time: link their Google account.
           // Keep the admin-set display_name — do not override it.
           await adminClient
             .from('users')
-            .update({ google_id: user.id, last_login_at: new Date().toISOString() })
+            .update({ google_id: user.id, avatar_url: avatarUrl, last_login_at: new Date().toISOString() })
             .eq('id', existing.id)
         } else {
-          // Returning user: just refresh last_login_at
+          // Returning user: refresh last_login_at and sync avatar (Google photo can change)
           await adminClient
             .from('users')
-            .update({ last_login_at: new Date().toISOString() })
+            .update({ avatar_url: avatarUrl, last_login_at: new Date().toISOString() })
             .eq('id', existing.id)
         }
       } else {
@@ -49,6 +51,7 @@ export async function GET(request: Request) {
           google_id: user.id,
           email,
           display_name: user.user_metadata?.full_name ?? email ?? 'Unknown',
+          avatar_url: avatarUrl,
           last_login_at: new Date().toISOString(),
         })
       }

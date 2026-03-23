@@ -43,7 +43,7 @@ export async function GET() {
   if (config.show_birthdays || config.show_anniversaries) {
     const { data: users } = await adminClient
       .from('users')
-      .select('id, display_name, birth_date, start_date')
+      .select('id, display_name, birth_date, start_date, avatar_url')
       .or('birth_date.not.is.null,start_date.not.is.null')
 
     const userRows = users ?? []

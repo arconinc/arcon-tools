@@ -348,6 +348,14 @@ export default function DashboardPage() {
             {[...bannerItems, ...bannerItems].map((item, i) => (
               <span key={i} style={{ display: 'inline-flex', alignItems: 'center' }}>
                 <span className="banner-item">
+                  {item.avatar_url && (item.source === 'birthday' || item.source === 'anniversary') && (
+                    <img
+                      src={item.avatar_url}
+                      alt=""
+                      referrerPolicy="no-referrer"
+                      style={{ width: 20, height: 20, borderRadius: '50%', objectFit: 'cover', marginRight: 6, flexShrink: 0, border: '1.5px solid rgba(255,255,255,0.5)' }}
+                    />
+                  )}
                   <span className="banner-label">{item.label}</span>
                   {item.href ? (
                     <Link href={item.href} style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2 }}>
@@ -537,7 +545,11 @@ export default function DashboardPage() {
                   const annIcon = tier === 'hof' ? '👑' : tier === 'legend' ? '🏆' : tier === 'milestone' ? '⭐' : '🥂'
                   return (
                     <div key={b.id} className={`bday-item${milestoneClass ? ` ${milestoneClass}` : ''}`}>
-                      <div className="bday-av">{isBday ? '🎂' : annIcon}</div>
+                      <div className="bday-av" style={b.avatar_url ? { background: 'transparent' } : { background: b.color }}>
+                        {b.avatar_url ? (
+                          <img src={b.avatar_url} alt={b.name} referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
+                        ) : (isBday ? '🎂' : annIcon)}
+                      </div>
                       <div style={{ flex: 1 }}>
                         <div className="bday-name">{b.name}</div>
                         <div className="bday-when">{sub}</div>

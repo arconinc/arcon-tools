@@ -77,6 +77,7 @@ interface UserRow {
   display_name: string | null
   birth_date: string | null
   start_date: string | null
+  avatar_url?: string | null
 }
 
 function getInitials(name: string): string {
@@ -97,7 +98,7 @@ export function getBirthdayItems(users: UserRow[], today: Date, windowDays: numb
     const text = daysUntil === 0
       ? `🎂 Happy Birthday ${name}!`
       : `🎂 ${name}'s birthday is ${daysUntil === 1 ? 'tomorrow' : `in ${daysUntil} days`}`
-    items.push({ id: `${u.id}-bday`, label: 'Birthday', text, href: null, source: 'birthday' })
+    items.push({ id: `${u.id}-bday`, label: 'Birthday', text, href: null, source: 'birthday', avatar_url: u.avatar_url ?? null })
   }
   return items.sort((a, b) => {
     // stable sort by days_until is baked into text; sort by name as tiebreaker
@@ -121,7 +122,7 @@ export function getAnniversaryItems(users: UserRow[], today: Date, windowDays: n
       ? `🥂 Congrats ${name} — ${years} Year${years !== 1 ? 's' : ''}!`
       : `🥂 ${name}'s ${years}-year anniversary is ${daysUntil === 1 ? 'tomorrow' : `in ${daysUntil} days`}`
     void getInitials(name) // keep import used
-    items.push({ id: `${u.id}-ann`, label: 'Anniversary', text, href: null, source: 'anniversary' })
+    items.push({ id: `${u.id}-ann`, label: 'Anniversary', text, href: null, source: 'anniversary', avatar_url: u.avatar_url ?? null })
   }
   return items
 }

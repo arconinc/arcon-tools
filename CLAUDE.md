@@ -7,6 +7,10 @@
 - **Google OAuth** via Supabase Auth
 - **Tiptap v3** for WYSIWYG editing (`@tiptap/react`)
 
+## URLs
+- **Production:** https://thearc.arconinc.com
+- **Local dev:** http://localhost:3000
+
 ## Common Commands
 ```bash
 npm run dev      # start dev server (port 3000)
@@ -54,7 +58,7 @@ const supabase = await createClient()
 const { data: { user } } = await supabase.auth.getUser()
 if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 // for admin routes:
-const { data: dbUser } = await adminClient.from('users').select('is_admin').eq('id', user.id).single()
+const { data: dbUser } = await adminClient.from('users').select('is_admin').eq('google_id', user.id).single()
 if (!dbUser?.is_admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 ```
 

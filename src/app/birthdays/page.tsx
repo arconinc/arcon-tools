@@ -123,7 +123,11 @@ export default function BirthdaysPage() {
                   const annIcon = tier === 'hof' ? '👑' : tier === 'legend' ? '🏆' : tier === 'milestone' ? '⭐' : '🥂'
                   return (
                     <div key={b.id} className={`bday-row${milestoneClass ? ` ${milestoneClass}` : ''}`}>
-                      <div className="bday-av">{isBday ? '🎂' : annIcon}</div>
+                      <div className="bday-av" style={b.avatar_url ? { background: 'transparent', overflow: 'hidden' } : {}}>
+                        {b.avatar_url ? (
+                          <img src={b.avatar_url} alt={b.name} referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', objectFit: 'cover', borderRadius: '50%' }} />
+                        ) : (isBday ? '🎂' : annIcon)}
+                      </div>
                       <div style={{ flex: 1, minWidth: 0 }}>
                         <div className="bday-name">{b.name}</div>
                         <div className="bday-sub">{sub}</div>

@@ -49,7 +49,7 @@ export async function GET(request: Request) {
   const adminClient = createAdminClient()
   const { data: users, error } = await adminClient
     .from('users')
-    .select('id, display_name, birth_date, start_date')
+    .select('id, display_name, birth_date, start_date, avatar_url')
     .or('birth_date.not.is.null,start_date.not.is.null')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -89,6 +89,7 @@ export async function GET(request: Request) {
             type: 'birthday',
             days_until: daysUntil,
             date_label: formatDateLabel(month, day, daysUntil),
+            avatar_url: u.avatar_url ?? null,
           })
         }
       }
@@ -112,6 +113,7 @@ export async function GET(request: Request) {
               days_until: daysUntil,
               date_label: formatDateLabel(month, day, daysUntil),
               years,
+              avatar_url: u.avatar_url ?? null,
             })
           }
         }
