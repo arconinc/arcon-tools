@@ -1,6 +1,7 @@
 'use client'
 
 import { useRef, useState } from 'react'
+import * as XLSX from 'xlsx'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -21,59 +22,44 @@ interface ImportResult {
   errors: string[]
 }
 
-// ─── Client-side CSV preview parser ──────────────────────────────────────────
+// ─── Client-side XLSX preview parser ─────────────────────────────────────────
 
-function parseCsvPreview(text: string): Preview {
-  const lines = text.split(/\r?\n/)
-  if (lines.length < 2) return { total: 0, customers: 0, vendors: 0, dual: 0, tagsFound: [], ownerEmails: [] }
-
-  // Simple header split (no quoted-field handling needed — header row is clean)
-  const headers = lines[0].split(',').map(h => h.trim())
-  const idx = (name: string) => headers.indexOf(name)
-
-  const companyTypeIdx = idx('Company Type')
-  const tag1Idx = idx('Tag1')
-  const tag2Idx = idx('Tag2')
-  const tag3Idx = idx('Tag3')
-  const ownerIdx = idx('OrganisationOwner')
+async function parseXlsxPreview(file: File): Promise<Preview> {
+  const arrayBuffer = await file.arrayBuffer()
+  const workbook = XLSX.read(arrayBuffer, { type: 'array' })
+  const sheet = workbook.Sheets[workbook.SheetNames[0]]
+  const rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, { defval: '', raw: false })
 
   let customers = 0, vendors = 0, dual = 0
   const tagSet = new Set<string>()
   const ownerEmailSet = new Set<string>()
 
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim()
-    if (!line) continue
+  for (const row of rows) {
+    const ct = String(row['Company Type'] ?? '').trim().toLowerCase()
+    if (ct === 'vendor') {
+      vendors++
+    } else if (ct === 'customer and vendor') {
+      dual++
+    } else {
+      customers++
+    }
 
-    // Very lightweight field split for preview only (sufficient for non-quoted columns)
-    const cols = line.split(',')
-
-    const ct = (cols[companyTypeIdx] ?? '').trim().toLowerCase()
-    const isVendor = ct === 'vendor'
-    const isBoth = ct === 'customer and vendor'
-    const isCustomer = !isVendor
-
-    if (isBoth) dual++
-    else if (isVendor) vendors++
-    else customers++
-
-    for (const tagIdx of [tag1Idx, tag2Idx, tag3Idx]) {
-      const t = (cols[tagIdx] ?? '').trim()
+    for (const col of ['Tag1', 'Tag2', 'Tag3']) {
+      const t = String(row[col] ?? '').trim()
       if (t) tagSet.add(t)
     }
     if (ct === 'competitor') tagSet.add('Competitor')
     if (ct === 'association') tagSet.add('Association')
 
-    if (ownerIdx >= 0) {
-      const ownerRaw = (cols[ownerIdx] ?? '').trim()
-      const parts = ownerRaw.split(';')
-      const email = parts[1]?.trim()
+    const ownerRaw = String(row['OrganisationOwner'] ?? '').trim()
+    if (ownerRaw) {
+      const email = ownerRaw.split(';')[1]?.trim()
       if (email) ownerEmailSet.add(email)
     }
   }
 
   return {
-    total: customers + vendors + dual,
+    total: rows.length,
     customers: customers + dual,
     vendors: vendors + dual,
     dual,
@@ -103,10 +89,9 @@ export default function CrmImportPage() {
 
     setPreviewing(true)
     try {
-      const text = await f.text()
-      setPreview(parseCsvPreview(text))
+      setPreview(await parseXlsxPreview(f))
     } catch {
-      setError('Failed to read file. Make sure it is a valid CSV.')
+      setError('Failed to read file. Make sure it is a valid .xlsx file.')
     } finally {
       setPreviewing(false)
     }
@@ -145,38 +130,35 @@ export default function CrmImportPage() {
     if (fileRef.current) fileRef.current.value = ''
   }
 
-  const totalImported = result
-    ? result.customers.inserted + result.customers.updated + result.vendors.inserted + result.vendors.updated
-    : 0
-
   return (
     <div className="max-w-3xl mx-auto px-6 py-8">
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">CRM Import</h1>
         <p className="text-sm text-slate-500 mt-0.5">
-          Import organizations from an Insightly CSV export into Customers and Vendors.
+          Import organizations from an Insightly Excel export (.xlsx) into Customers and Vendors.
           Re-importing is safe — existing records update in place, nothing is deleted.
         </p>
       </div>
 
       {/* Upload card */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5 mb-5">
-        <h2 className="text-sm font-semibold text-slate-700 mb-4">Select CSV File</h2>
+        <h2 className="text-sm font-semibold text-slate-700 mb-4">Select Excel File</h2>
 
         <div className="flex items-center gap-3 flex-wrap">
           <label className="cursor-pointer px-4 py-2 border border-slate-300 rounded-lg text-sm font-medium text-slate-700 hover:bg-slate-50 transition-colors">
-            {file ? 'Change file' : 'Choose file…'}
+            {file ? 'Change file' : 'Choose .xlsx file…'}
             <input
               ref={fileRef}
               type="file"
-              accept=".csv,text/csv"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               className="sr-only"
               onChange={handleFileChange}
             />
           </label>
           {file && (
             <span className="text-sm text-slate-600 font-medium">
-              {file.name} <span className="text-slate-400 font-normal">({(file.size / 1024).toFixed(0)} KB)</span>
+              {file.name}{' '}
+              <span className="text-slate-400 font-normal">({(file.size / 1024).toFixed(0)} KB)</span>
             </span>
           )}
         </div>
@@ -200,7 +182,7 @@ export default function CrmImportPage() {
 
           {preview.tagsFound.length > 0 && (
             <div className="mb-4">
-              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Tags found in CSV</p>
+              <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Tags found in file</p>
               <div className="flex flex-wrap gap-1.5">
                 {preview.tagsFound.map(t => (
                   <span key={t} className="px-2 py-0.5 rounded text-xs font-semibold bg-slate-100 text-slate-700">{t}</span>
@@ -373,9 +355,9 @@ export default function CrmImportPage() {
             ['Arcon Account Number', 'arcon_account_number (Vendors)'],
             ['Arcon Username/Password', 'arcon_username / arcon_password (Vendors)'],
             ['*Email fields', 'vendor email columns (Vendors)'],
-          ].map(([csv, db]) => (
-            <div key={csv} className="flex gap-2 py-1 text-xs border-b border-slate-50 last:border-0">
-              <span className="font-mono text-slate-500 shrink-0 w-40 truncate">{csv}</span>
+          ].map(([xlsx, db]) => (
+            <div key={xlsx} className="flex gap-2 py-1 text-xs border-b border-slate-50 last:border-0">
+              <span className="font-mono text-slate-500 shrink-0 w-40 truncate">{xlsx}</span>
               <span className="text-slate-700">{db}</span>
             </div>
           ))}

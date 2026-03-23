@@ -56,7 +56,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const body = await req.json()
 
   // Strip read-only fields and extract tag_ids
-  const { id: _id, created_at: _ca, created_by: _cb, tag_ids, tags: _tags, ...updates } = body
+  const { id: _id, created_at: _ca, updated_at: _ua, created_by: _cb, tag_ids, tags: _tags,
+          assigned_user: _au, created_by_user: _cbu, contacts: _c, opportunities: _o, files: _f,
+          ...updates } = body
 
   const adminClient = createAdminClient()
 

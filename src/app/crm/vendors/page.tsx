@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 
+const PAGE_SIZE = 50
+
 type TagOption = { id: string; name: string; color: string }
 
 type VendorListItem = {
@@ -20,36 +22,47 @@ type VendorListItem = {
 export default function VendorsPage() {
   const router = useRouter()
   const [vendors, setVendors] = useState<VendorListItem[]>([])
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [allTags, setAllTags] = useState<TagOption[]>([])
   const [search, setSearch] = useState('')
   const [tagFilter, setTagFilter] = useState('')
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     fetch('/api/crm/tags').then((r) => r.json()).then((d) => { if (Array.isArray(d)) setAllTags(d) })
   }, [])
 
-  const fetchVendors = useCallback(async () => {
+  const fetchVendors = useCallback(async (currentPage: number) => {
     setLoading(true)
     const params = new URLSearchParams()
     if (search) params.set('search', search)
     if (tagFilter) params.set('tag_id', tagFilter)
+    params.set('page', String(currentPage))
+    params.set('limit', String(PAGE_SIZE))
     try {
       const res = await fetch(`/api/crm/vendors?${params}`)
       const data = await res.json()
-      setVendors(Array.isArray(data) ? data : [])
+      setVendors(Array.isArray(data.vendors) ? data.vendors : [])
+      setTotal(typeof data.total === 'number' ? data.total : 0)
     } finally {
       setLoading(false)
     }
   }, [search, tagFilter])
 
+  useEffect(() => { setPage(1) }, [search, tagFilter])
+
   useEffect(() => {
-    const t = setTimeout(fetchVendors, 300)
+    const t = setTimeout(() => fetchVendors(page), 300)
     return () => clearTimeout(t)
-  }, [fetchVendors])
+  }, [fetchVendors, page])
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const rangeFrom = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+  const rangeTo = Math.min(page * PAGE_SIZE, total)
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-8">
+    <div className="w-full px-6 py-8">
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Vendors</h1>
@@ -158,9 +171,30 @@ export default function VendorsPage() {
             ))}
           </tbody>
         </table>
-        {!loading && vendors.length > 0 && (
-          <div className="px-5 py-3 border-t border-slate-100 text-xs text-slate-400">
-            {vendors.length} vendor{vendors.length !== 1 ? 's' : ''}
+        {!loading && total > 0 && (
+          <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between gap-4 flex-wrap">
+            <span className="text-xs text-slate-400">
+              Showing {rangeFrom}–{rangeTo} of {total} vendor{total !== 1 ? 's' : ''}
+            </span>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="px-3 py-1.5 text-xs font-semibold border border-slate-200 rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Previous
+                </button>
+                <span className="text-xs text-slate-500 px-1">Page {page} of {totalPages}</span>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="px-3 py-1.5 text-xs font-semibold border border-slate-200 rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

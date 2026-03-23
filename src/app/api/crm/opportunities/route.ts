@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 
-// GET /api/crm/opportunities?assigned_to=&status=&stage=&customer_id=&tag_id=
+// GET /api/crm/opportunities?assigned_to=&status=&stage=&customer_id=&tag_id=&page=1&limit=50
 export async function GET(req: NextRequest) {
   const appUser = await requireUser()
   if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -13,6 +13,10 @@ export async function GET(req: NextRequest) {
   const stage = searchParams.get('stage')
   const customerId = searchParams.get('customer_id')
   const tagId = searchParams.get('tag_id')
+  const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
+  const limit = Math.min(200, Math.max(1, parseInt(searchParams.get('limit') ?? '50', 10)))
+  const from = (page - 1) * limit
+  const to = from + limit - 1
 
   const adminClient = createAdminClient()
 
@@ -26,25 +30,33 @@ export async function GET(req: NextRequest) {
       .eq('entity_type', 'opportunity')
     tagFilterIds = (tagRows ?? []).map((r: any) => r.entity_id)
     if (tagFilterIds.length === 0) {
-      return NextResponse.json({ items: [], pipeline_total: 0 })
+      return NextResponse.json({ items: [], total: 0, page, limit, pipeline_total: 0 })
     }
   }
 
-  let query = adminClient
-    .from('crm_opportunities')
-    .select('id, name, customer_id, assigned_to, pipeline_stage, value, probability, status, category, forecast_close_date, closed_at, created_at, updated_at')
-    .order('created_at', { ascending: false })
+  const applyFilters = (q: any) => {
+    if (assignedTo) q = q.eq('assigned_to', assignedTo)
+    if (status) q = q.eq('status', status)
+    if (stage) q = q.eq('pipeline_stage', stage)
+    if (customerId) q = q.eq('customer_id', customerId)
+    if (tagFilterIds) q = q.in('id', tagFilterIds)
+    return q
+  }
 
-  if (assignedTo) query = query.eq('assigned_to', assignedTo)
-  if (status) query = query.eq('status', status)
-  if (stage) query = query.eq('pipeline_stage', stage)
-  if (customerId) query = query.eq('customer_id', customerId)
-  if (tagFilterIds) query = query.in('id', tagFilterIds)
+  const [countRes, dataRes] = await Promise.all([
+    applyFilters(adminClient.from('crm_opportunities').select('*', { count: 'exact', head: true })),
+    applyFilters(
+      adminClient
+        .from('crm_opportunities')
+        .select('id, name, customer_id, assigned_to, pipeline_stage, value, probability, status, category, forecast_close_date, closed_at, created_at, updated_at')
+        .order('created_at', { ascending: false })
+    ).range(from, to),
+  ])
 
-  const { data, error } = await query
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (dataRes.error) return NextResponse.json({ error: dataRes.error.message }, { status: 500 })
 
-  const rows = data ?? []
+  const total = countRes.count ?? 0
+  const rows = (dataRes.data as any[]) ?? []
 
   // Collect unique user IDs and customer IDs for enrichment
   const userIds = [...new Set(rows.map((o: any) => o.assigned_to).filter(Boolean))]
@@ -93,7 +105,7 @@ export async function GET(req: NextRequest) {
     .filter((o: any) => o.status === 'open' && o.value != null)
     .reduce((sum: number, o: any) => sum + (o.value ?? 0), 0)
 
-  return NextResponse.json({ items: enriched, pipeline_total: pipelineTotal })
+  return NextResponse.json({ items: enriched, total, page, limit, pipeline_total: pipelineTotal })
 }
 
 // POST /api/crm/opportunities

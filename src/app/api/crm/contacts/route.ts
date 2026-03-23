@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 
-// GET /api/crm/contacts?search=&customer_id=&vendor_id=&type=&tag_id=
+// GET /api/crm/contacts?search=&customer_id=&vendor_id=&type=&tag_id=&page=1&limit=50
 export async function GET(req: NextRequest) {
   const appUser = await requireUser()
   if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -13,6 +13,10 @@ export async function GET(req: NextRequest) {
   const vendorId = searchParams.get('vendor_id')
   const type = searchParams.get('type')
   const tagId = searchParams.get('tag_id')
+  const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
+  const limit = Math.min(200, Math.max(1, parseInt(searchParams.get('limit') ?? '50', 10)))
+  const from = (page - 1) * limit
+  const to = from + limit - 1
 
   const adminClient = createAdminClient()
 
@@ -24,27 +28,33 @@ export async function GET(req: NextRequest) {
       .eq('tag_id', tagId)
       .eq('entity_type', 'contact')
     tagFilterIds = (tagRows ?? []).map((r: any) => r.entity_id)
-    if (tagFilterIds.length === 0) return NextResponse.json([])
+    if (tagFilterIds.length === 0) return NextResponse.json({ contacts: [], total: 0, page, limit })
   }
 
-  let query = adminClient
-    .from('crm_contacts')
-    .select('id, first_name, last_name, title, email, phone, type_of_contact, customer_id, vendor_id, created_at, updated_at')
-    .order('last_name')
-    .order('first_name')
-
-  if (search) {
-    query = query.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`)
+  const applyFilters = (q: any) => {
+    if (search) q = q.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`)
+    if (customerId) q = q.eq('customer_id', customerId)
+    if (vendorId) q = q.eq('vendor_id', vendorId)
+    if (type) q = q.eq('type_of_contact', type)
+    if (tagFilterIds) q = q.in('id', tagFilterIds)
+    return q
   }
-  if (customerId) query = query.eq('customer_id', customerId)
-  if (vendorId) query = query.eq('vendor_id', vendorId)
-  if (type) query = query.eq('type_of_contact', type)
-  if (tagFilterIds) query = query.in('id', tagFilterIds)
 
-  const { data, error } = await query
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  const [countRes, dataRes] = await Promise.all([
+    applyFilters(adminClient.from('crm_contacts').select('*', { count: 'exact', head: true })),
+    applyFilters(
+      adminClient
+        .from('crm_contacts')
+        .select('id, first_name, last_name, title, email, phone, type_of_contact, customer_id, vendor_id, created_at, updated_at')
+        .order('last_name')
+        .order('first_name')
+    ).range(from, to),
+  ])
 
-  const contacts = data ?? []
+  if (dataRes.error) return NextResponse.json({ error: dataRes.error.message }, { status: 500 })
+
+  const total = countRes.count ?? 0
+  const contacts = (dataRes.data as any[]) ?? []
   const customerIds = [...new Set(contacts.map((c: any) => c.customer_id).filter(Boolean))]
   const vendorIds2 = [...new Set(contacts.map((c: any) => c.vendor_id).filter(Boolean))]
   const contactIds = contacts.map((c: any) => c.id)
@@ -85,7 +95,7 @@ export async function GET(req: NextRequest) {
     tags: tagsMap[c.id] ?? [],
   }))
 
-  return NextResponse.json(enriched)
+  return NextResponse.json({ contacts: enriched, total, page, limit })
 }
 
 // POST /api/crm/contacts

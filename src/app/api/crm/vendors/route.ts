@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 
-// GET /api/crm/vendors?search=&tag_id=
+// GET /api/crm/vendors?search=&tag_id=&page=1&limit=50
 export async function GET(req: NextRequest) {
   const appUser = await requireUser()
   if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -10,6 +10,10 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const search = searchParams.get('search')?.trim()
   const tagId = searchParams.get('tag_id')
+  const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
+  const limit = Math.min(200, Math.max(1, parseInt(searchParams.get('limit') ?? '50', 10)))
+  const from = (page - 1) * limit
+  const to = from + limit - 1
 
   const adminClient = createAdminClient()
 
@@ -21,21 +25,29 @@ export async function GET(req: NextRequest) {
       .eq('tag_id', tagId)
       .eq('entity_type', 'vendor')
     tagFilterIds = (tagRows ?? []).map((r: any) => r.entity_id)
-    if (tagFilterIds.length === 0) return NextResponse.json([])
+    if (tagFilterIds.length === 0) return NextResponse.json({ vendors: [], total: 0, page, limit })
   }
 
-  let query = adminClient
-    .from('crm_vendors')
-    .select('id, name, phone, website, product_line, specialty, premier_group_member, created_at, updated_at')
-    .order('name')
+  const applyFilters = (q: any) => {
+    if (search) q = q.ilike('name', `%${search}%`)
+    if (tagFilterIds) q = q.in('id', tagFilterIds)
+    return q
+  }
 
-  if (search) query = query.ilike('name', `%${search}%`)
-  if (tagFilterIds) query = query.in('id', tagFilterIds)
+  const [countRes, dataRes] = await Promise.all([
+    applyFilters(adminClient.from('crm_vendors').select('*', { count: 'exact', head: true })),
+    applyFilters(
+      adminClient
+        .from('crm_vendors')
+        .select('id, name, phone, website, product_line, specialty, premier_group_member, created_at, updated_at')
+        .order('name')
+    ).range(from, to),
+  ])
 
-  const { data, error } = await query
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (dataRes.error) return NextResponse.json({ error: dataRes.error.message }, { status: 500 })
 
-  const rows = data ?? []
+  const total = countRes.count ?? 0
+  const rows = (dataRes.data as any[]) ?? []
   const vendorIds = rows.map((v: any) => v.id)
 
   const entityTagsRes = vendorIds.length > 0
@@ -54,7 +66,7 @@ export async function GET(req: NextRequest) {
     if (tag) tagsMap[eid].push(tag)
   }
 
-  return NextResponse.json(rows.map((v: any) => ({ ...v, tags: tagsMap[v.id] ?? [] })))
+  return NextResponse.json({ vendors: rows.map((v: any) => ({ ...v, tags: tagsMap[v.id] ?? [] })), total, page, limit })
 }
 
 // POST /api/crm/vendors

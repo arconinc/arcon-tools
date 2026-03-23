@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 
 // GET /api/crm/tasks
-// ?assigned_to=me|<uuid>  ?status=  ?category=  ?due_before=  ?opportunity_id=  ?customer_id=  ?vendor_id=
+// ?assigned_to=me|<uuid>  ?status=  ?category=  ?due_before=  ?opportunity_id=  ?customer_id=  ?vendor_id=  ?page=1&limit=50
 export async function GET(req: NextRequest) {
   const appUser = await requireUser()
   if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -16,44 +16,55 @@ export async function GET(req: NextRequest) {
   const opportunityId = searchParams.get('opportunity_id')
   const customerId = searchParams.get('customer_id')
   const vendorId = searchParams.get('vendor_id')
+  const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
+  const limit = Math.min(200, Math.max(1, parseInt(searchParams.get('limit') ?? '50', 10)))
+  const from = (page - 1) * limit
+  const to = from + limit - 1
 
   // Resolve "me" to current user id
   const isMine = assignedTo === 'me'
   const resolvedAssignedTo = isMine ? appUser.id : assignedTo
 
   const adminClient = createAdminClient()
-  let query = adminClient
-    .from('crm_tasks')
-    .select('id, title, assigned_to, task_owner, category, priority, due_date, status, progress, opportunity_id, customer_id, vendor_id, contact_id, created_at, updated_at')
-    .order('due_date', { ascending: true, nullsFirst: false })
 
-  if (resolvedAssignedTo) {
-    if (isMine) {
-      // Show tasks where the user is either assigned or is the task owner
-      query = query.or(`assigned_to.eq.${resolvedAssignedTo},task_owner.eq.${resolvedAssignedTo}`)
-    } else {
-      query = query.eq('assigned_to', resolvedAssignedTo)
+  const applyFilters = (q: any) => {
+    if (resolvedAssignedTo) {
+      if (isMine) {
+        q = q.or(`assigned_to.eq.${resolvedAssignedTo},task_owner.eq.${resolvedAssignedTo}`)
+      } else {
+        q = q.eq('assigned_to', resolvedAssignedTo)
+      }
     }
-  }
-  if (status) {
-    // Support comma-separated statuses
-    const statuses = status.split(',').map((s) => s.trim()).filter(Boolean)
-    if (statuses.length === 1) {
-      query = query.eq('status', statuses[0])
-    } else if (statuses.length > 1) {
-      query = query.in('status', statuses)
+    if (status) {
+      const statuses = status.split(',').map((s) => s.trim()).filter(Boolean)
+      if (statuses.length === 1) {
+        q = q.eq('status', statuses[0])
+      } else if (statuses.length > 1) {
+        q = q.in('status', statuses)
+      }
     }
+    if (category) q = q.eq('category', category)
+    if (dueBefore) q = q.lte('due_date', dueBefore)
+    if (opportunityId) q = q.eq('opportunity_id', opportunityId)
+    if (customerId) q = q.eq('customer_id', customerId)
+    if (vendorId) q = q.eq('vendor_id', vendorId)
+    return q
   }
-  if (category) query = query.eq('category', category)
-  if (dueBefore) query = query.lte('due_date', dueBefore)
-  if (opportunityId) query = query.eq('opportunity_id', opportunityId)
-  if (customerId) query = query.eq('customer_id', customerId)
-  if (vendorId) query = query.eq('vendor_id', vendorId)
 
-  const { data, error } = await query
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  const [countRes, dataRes] = await Promise.all([
+    applyFilters(adminClient.from('crm_tasks').select('*', { count: 'exact', head: true })),
+    applyFilters(
+      adminClient
+        .from('crm_tasks')
+        .select('id, title, assigned_to, task_owner, category, priority, due_date, status, progress, opportunity_id, customer_id, vendor_id, contact_id, created_at, updated_at')
+        .order('due_date', { ascending: true, nullsFirst: false })
+    ).range(from, to),
+  ])
 
-  const rows = data ?? []
+  if (dataRes.error) return NextResponse.json({ error: dataRes.error.message }, { status: 500 })
+
+  const total = countRes.count ?? 0
+  const rows = (dataRes.data as any[]) ?? []
 
   // Batch-enrich: user names for assigned_to
   const userIds = [...new Set(rows.map((t: any) => t.assigned_to).filter(Boolean))]
@@ -114,7 +125,7 @@ export async function GET(req: NextRequest) {
       : null,
   }))
 
-  return NextResponse.json(enriched)
+  return NextResponse.json({ tasks: enriched, total, page, limit })
 }
 
 // POST /api/crm/tasks

@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 
+const PAGE_SIZE = 50
+
 type TagOption = { id: string; name: string; color: string }
 
 type OppListItem = {
@@ -49,6 +51,7 @@ function isOverdue(iso: string | null) {
 export default function OpportunitiesPage() {
   const router = useRouter()
   const [rawOpps, setRawOpps] = useState<OppListItem[]>([])
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [allTags, setAllTags] = useState<TagOption[]>([])
   const [search, setSearch] = useState('')
@@ -56,26 +59,36 @@ export default function OpportunitiesPage() {
   const [stageFilter, setStageFilter] = useState('')
   const [ownerFilter, setOwnerFilter] = useState('')
   const [tagFilter, setTagFilter] = useState('')
+  const [page, setPage] = useState(1)
 
   useEffect(() => {
     fetch('/api/crm/tags').then((r) => r.json()).then((d) => { if (Array.isArray(d)) setAllTags(d) })
   }, [])
 
-  const fetchOpps = useCallback(async () => {
+  const fetchOpps = useCallback(async (currentPage: number) => {
     setLoading(true)
     const params = new URLSearchParams()
     if (statusFilter) params.set('status', statusFilter)
     if (stageFilter) params.set('stage', stageFilter)
     if (tagFilter) params.set('tag_id', tagFilter)
+    params.set('page', String(currentPage))
+    params.set('limit', String(PAGE_SIZE))
     try {
       const res = await fetch(`/api/crm/opportunities?${params}`)
       const data = await res.json()
-      const items: OppListItem[] = Array.isArray(data.items) ? data.items : []
-      setRawOpps(items)
+      setRawOpps(Array.isArray(data.items) ? data.items : [])
+      setTotal(typeof data.total === 'number' ? data.total : 0)
     } finally {
       setLoading(false)
     }
   }, [statusFilter, stageFilter, tagFilter])
+
+  // Reset to page 1 on server-side filter change
+  useEffect(() => { setPage(1) }, [statusFilter, stageFilter, tagFilter])
+
+  useEffect(() => {
+    fetchOpps(page)
+  }, [fetchOpps, page])
 
   const opps = (() => {
     let items = rawOpps
@@ -103,10 +116,6 @@ export default function OpportunitiesPage() {
     return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]))
   })()
 
-  useEffect(() => {
-    fetchOpps()
-  }, [fetchOpps])
-
   const openCount = opps.filter((o) => o.status === 'open').length
   const openValue = opps
     .filter((o) => o.status === 'open' && o.value != null)
@@ -114,8 +123,12 @@ export default function OpportunitiesPage() {
 
   const activeFilters = !!(search || statusFilter || stageFilter || ownerFilter || tagFilter)
 
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const rangeFrom = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+  const rangeTo = Math.min(page * PAGE_SIZE, total)
+
   return (
-    <div className="max-w-6xl mx-auto px-6 py-8">
+    <div className="w-full px-6 py-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -278,9 +291,30 @@ export default function OpportunitiesPage() {
             ))}
           </tbody>
         </table>
-        {!loading && opps.length > 0 && (
-          <div className="px-5 py-3 border-t border-slate-100 text-xs text-slate-400">
-            {opps.length} opportunit{opps.length !== 1 ? 'ies' : 'y'}
+        {!loading && total > 0 && (
+          <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between gap-4 flex-wrap">
+            <span className="text-xs text-slate-400">
+              Showing {rangeFrom}–{rangeTo} of {total} opportunit{total !== 1 ? 'ies' : 'y'}
+            </span>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="px-3 py-1.5 text-xs font-semibold border border-slate-200 rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Previous
+                </button>
+                <span className="text-xs text-slate-500 px-1">Page {page} of {totalPages}</span>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="px-3 py-1.5 text-xs font-semibold border border-slate-200 rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

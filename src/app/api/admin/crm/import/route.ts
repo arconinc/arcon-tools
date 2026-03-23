@@ -1,87 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
+import * as XLSX from 'xlsx'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 
-// ─── CSV Parser ───────────────────────────────────────────────────────────────
-
-function parseCSV(text: string): Record<string, string>[] {
-  const lines: string[] = []
-  let current = ''
-  let inQuotes = false
-
-  for (let i = 0; i < text.length; i++) {
-    const ch = text[i]
-    if (ch === '"') {
-      if (inQuotes && text[i + 1] === '"') {
-        current += '"'
-        i++
-      } else {
-        inQuotes = !inQuotes
-      }
-    } else if (ch === '\n' && !inQuotes) {
-      lines.push(current)
-      current = ''
-    } else if (ch === '\r' && !inQuotes) {
-      // skip
-    } else {
-      current += ch
-    }
-  }
-  if (current) lines.push(current)
-
-  if (lines.length === 0) return []
-
-  const headers = splitCSVLine(lines[0])
-  const rows: Record<string, string>[] = []
-
-  for (let i = 1; i < lines.length; i++) {
-    const line = lines[i].trim()
-    if (!line) continue
-    const cols = splitCSVLine(line)
-    const row: Record<string, string> = {}
-    for (let j = 0; j < headers.length; j++) {
-      row[headers[j]] = cols[j] ?? ''
-    }
-    rows.push(row)
-  }
-
-  return rows
-}
-
-function splitCSVLine(line: string): string[] {
-  const fields: string[] = []
-  let current = ''
-  let inQuotes = false
-
-  for (let i = 0; i < line.length; i++) {
-    const ch = line[i]
-    if (ch === '"') {
-      if (inQuotes && line[i + 1] === '"') {
-        current += '"'
-        i++
-      } else {
-        inQuotes = !inQuotes
-      }
-    } else if (ch === ',' && !inQuotes) {
-      fields.push(current)
-      current = ''
-    } else {
-      current += ch
-    }
-  }
-  fields.push(current)
-  return fields
-}
-
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
-function str(v: string | undefined): string | null {
-  const s = v?.trim()
+function str(v: unknown): string | null {
+  if (v === null || v === undefined) return null
+  const s = String(v).trim()
   return s || null
 }
 
-function bool(v: string | undefined): boolean | null {
-  const s = v?.trim().toUpperCase()
+function bool(v: unknown): boolean | null {
+  const s = String(v ?? '').trim().toUpperCase()
   if (!s) return null
   if (s === 'TRUE' || s === 'YES' || s === '1') return true
   if (s === 'FALSE' || s === 'NO' || s === '0') return false
@@ -89,33 +20,32 @@ function bool(v: string | undefined): boolean | null {
 }
 
 // OrganisationOwner format: "insightly_id;email@domain.com" — extract email
-function extractOwnerEmail(owner: string | undefined): string | null {
-  const s = owner?.trim()
+function extractOwnerEmail(owner: unknown): string | null {
+  const s = str(owner)
   if (!s) return null
   const parts = s.split(';')
   return parts[1]?.trim() || null
 }
 
 // Map Insightly Company Type to destination table(s)
-function classifyRecord(companyType: string): { isCustomer: boolean; isVendor: boolean } {
-  const t = companyType.trim().toLowerCase()
+function classifyRecord(companyType: unknown): { isCustomer: boolean; isVendor: boolean } {
+  const t = str(companyType)?.toLowerCase() ?? ''
   if (t === 'vendor') return { isCustomer: false, isVendor: true }
   if (t === 'customer and vendor') return { isCustomer: true, isVendor: true }
   return { isCustomer: true, isVendor: false }
 }
 
 // Map Insightly Client Status to CrmClientStatus
-function mapClientStatus(row: Record<string, string>): string {
-  const cs = row['Client Status']?.trim()
+function mapClientStatus(row: Record<string, unknown>): string {
+  const cs = str(row['Client Status'])
   if (cs === 'Active') return 'Active'
   if (cs === 'Prospective') return 'Prospective'
   if (cs === 'Former') return 'Former'
-  // If Company Type is Prospect, default to Prospective
-  if (row['Company Type']?.trim().toLowerCase() === 'prospect') return 'Prospective'
+  if (str(row['Company Type'])?.toLowerCase() === 'prospect') return 'Prospective'
   return 'Prospective'
 }
 
-// Merge: new value takes precedence, but fall back to existing if new is null
+// Merge: new non-null value wins; otherwise keep existing
 function merge<T>(newVal: T | null, existingVal: T | null | undefined): T | null {
   return newVal !== null ? newVal : (existingVal ?? null)
 }
@@ -129,19 +59,30 @@ export async function POST(req: NextRequest) {
 
   const adminClient = createAdminClient()
 
-  // ── Parse CSV from multipart form ─────────────────────────────────────────
-  let csvText: string
+  // ── Parse XLSX from multipart form ────────────────────────────────────────
+  let rows: Record<string, unknown>[]
   try {
     const formData = await req.formData()
     const file = formData.get('file') as File | null
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
-    csvText = await file.text()
+
+    const arrayBuffer = await file.arrayBuffer()
+    const workbook = XLSX.read(arrayBuffer, { type: 'array' })
+
+    const sheetName = workbook.SheetNames[0]
+    if (!sheetName) return NextResponse.json({ error: 'No sheets found in workbook' }, { status: 400 })
+
+    const sheet = workbook.Sheets[sheetName]
+    // defval: '' ensures missing cells come back as empty string rather than undefined
+    rows = XLSX.utils.sheet_to_json<Record<string, unknown>>(sheet, {
+      defval: '',
+      raw: false,      // return all values as strings (preserves phone/zip formatting)
+    })
   } catch {
-    return NextResponse.json({ error: 'Failed to read uploaded file' }, { status: 400 })
+    return NextResponse.json({ error: 'Failed to parse Excel file' }, { status: 400 })
   }
 
-  const rows = parseCSV(csvText)
-  if (rows.length === 0) return NextResponse.json({ error: 'CSV is empty or invalid' }, { status: 400 })
+  if (rows.length === 0) return NextResponse.json({ error: 'Spreadsheet is empty or has no data rows' }, { status: 400 })
 
   // ── Load users for owner email → UUID lookup ──────────────────────────────
   const { data: users } = await adminClient.from('users').select('id, email, display_name')
@@ -157,7 +98,7 @@ export async function POST(req: NextRequest) {
     .not('insightly_id', 'is', null)
   const existingCustomerMap = new Map<string, Record<string, unknown>>()
   for (const c of existingCustomersRaw ?? []) {
-    if (c.insightly_id) existingCustomerMap.set(c.insightly_id, c)
+    if (c.insightly_id) existingCustomerMap.set(String(c.insightly_id), c)
   }
 
   const { data: existingVendorsRaw } = await adminClient
@@ -166,18 +107,17 @@ export async function POST(req: NextRequest) {
     .not('insightly_id', 'is', null)
   const existingVendorMap = new Map<string, Record<string, unknown>>()
   for (const v of existingVendorsRaw ?? []) {
-    if (v.insightly_id) existingVendorMap.set(v.insightly_id, v)
+    if (v.insightly_id) existingVendorMap.set(String(v.insightly_id), v)
   }
 
   // ── Ensure required tags exist ─────────────────────────────────────────────
-  // Collect all tag names from CSV + type-derived tags
   const allTagNamesNeeded = new Set<string>()
   for (const row of rows) {
     for (const col of ['Tag1', 'Tag2', 'Tag3', 'Tag4', 'Tag5', 'Tag6', 'Tag7', 'Tag8', 'Tag9']) {
       const t = str(row[col])
       if (t) allTagNamesNeeded.add(t)
     }
-    const ct = row['Company Type']?.trim().toLowerCase()
+    const ct = str(row['Company Type'])?.toLowerCase()
     if (ct === 'competitor') allTagNamesNeeded.add('Competitor')
     if (ct === 'association') allTagNamesNeeded.add('Association')
   }
@@ -188,11 +128,11 @@ export async function POST(req: NextRequest) {
 
   let tagsCreated = 0
   const DEFAULT_COLORS: Record<string, string> = {
-    'delete': '#ef4444',
-    'deleteerin': '#f97316',
+    'delete':          '#ef4444',
+    'deleteerin':      '#f97316',
     'productshowcase': '#22c55e',
-    'competitor': '#64748b',
-    'association': '#3b82f6',
+    'competitor':      '#64748b',
+    'association':     '#3b82f6',
   }
 
   for (const tagName of allTagNamesNeeded) {
@@ -213,68 +153,66 @@ export async function POST(req: NextRequest) {
   // ── Process rows ──────────────────────────────────────────────────────────
   const customerUpserts: Record<string, unknown>[] = []
   const vendorUpserts: Record<string, unknown>[] = []
-  // Map insightly_id → tag names for entity_tags linking
   const customerTagNames = new Map<string, string[]>()
-  const vendorTagNames = new Map<string, string[]>()
-  const unmatchedOwners = new Set<string>()
+  const vendorTagNames   = new Map<string, string[]>()
+  const unmatchedOwners  = new Set<string>()
   const errors: string[] = []
 
   for (const row of rows) {
+    // RecordId may be a number in XLSX — always convert to string
     const insightlyId = str(row['RecordId'])
     if (!insightlyId) continue
 
-    const ownerRaw = row['OrganisationOwner']?.trim()
-    const ownerEmail = extractOwnerEmail(ownerRaw)
+    const ownerEmail = extractOwnerEmail(row['OrganisationOwner'])
     let assignedTo: string | null = null
     if (ownerEmail) {
       assignedTo = userByEmail.get(ownerEmail.toLowerCase()) ?? null
       if (!assignedTo) unmatchedOwners.add(ownerEmail)
     }
 
-    const { isCustomer, isVendor } = classifyRecord(row['Company Type'] ?? '')
+    const { isCustomer, isVendor } = classifyRecord(row['Company Type'])
 
-    // Collect tag names for this record
     const rowTagNames: string[] = []
     for (const col of ['Tag1', 'Tag2', 'Tag3', 'Tag4', 'Tag5', 'Tag6', 'Tag7', 'Tag8', 'Tag9']) {
       const t = str(row[col])
       if (t) rowTagNames.push(t)
     }
-    const ct = row['Company Type']?.trim().toLowerCase()
+    const ct = str(row['Company Type'])?.toLowerCase()
     if (ct === 'competitor') rowTagNames.push('Competitor')
     if (ct === 'association') rowTagNames.push('Association')
 
     if (isCustomer) {
       const ex = existingCustomerMap.get(insightlyId)
       customerUpserts.push({
-        insightly_id:      insightlyId,
-        name:              str(row['OrganizationName']) ?? (ex as any)?.name ?? 'Unnamed',
-        client_status:     merge(mapClientStatus(row), (ex as any)?.client_status),
-        phone:             merge(str(row['Phone']), (ex as any)?.phone),
-        fax:               merge(str(row['Fax']), (ex as any)?.fax),
-        website:           merge(str(row['Website']), (ex as any)?.website),
-        email_domains:     merge(str(row['EmailDomain']), (ex as any)?.email_domains),
-        billing_address1:  merge(str(row['BillingAddressStreet']), (ex as any)?.billing_address1),
-        billing_city:      merge(str(row['BillingAddressCity']), (ex as any)?.billing_city),
-        billing_state:     merge(str(row['BillingAddressState']), (ex as any)?.billing_state),
-        billing_zip:       merge(str(row['BillingAddressPostalCode']), (ex as any)?.billing_zip),
-        billing_country:   merge(str(row['BillingAddressCountry']), (ex as any)?.billing_country),
-        shipping_address1: merge(str(row['ShippingAddressStreet']), (ex as any)?.shipping_address1),
-        shipping_city:     merge(str(row['ShippingAddressCity']), (ex as any)?.shipping_city),
-        shipping_state:    merge(str(row['ShippingAddressState']), (ex as any)?.shipping_state),
-        shipping_zip:      merge(str(row['ShippingAddressPostalCode']), (ex as any)?.shipping_zip),
-        shipping_country:  merge(str(row['ShippingAddressCountry']), (ex as any)?.shipping_country),
-        description:       merge(str(row['Background']), (ex as any)?.description),
-        artwork_notes:     merge(str(row['Artwork Notes']), (ex as any)?.artwork_notes),
-        general_logo_color:merge(str(row['General Logo Color']), (ex as any)?.general_logo_color),
-        formal_pms_colors: merge(str(row['Formal PMS Colors']), (ex as any)?.formal_pms_colors),
-        industry:          merge(str(row['Industry']), (ex as any)?.industry),
-        notes:             merge(str(row['Additional Information']), (ex as any)?.notes),
-        power_units:       merge(str(row['Power Units / Trucks & Trailers']), (ex as any)?.power_units),
-        mta:               merge(bool(row['MTA?']), (ex as any)?.mta),
-        mta_trucking:      merge(str(row['MTA/Trucking']), (ex as any)?.mta_trucking),
-        assigned_to:       assignedTo ?? (ex as any)?.assigned_to ?? null,
-        created_by:        (ex as any)?.created_by ?? appUser.id,
-        updated_at:        new Date().toISOString(),
+        insightly_id:       insightlyId,
+        name:               str(row['OrganizationName']) ?? (ex as any)?.name ?? 'Unnamed',
+        client_status:      merge(mapClientStatus(row), (ex as any)?.client_status),
+        phone:              merge(str(row['Phone']), (ex as any)?.phone),
+        fax:                merge(str(row['Fax']), (ex as any)?.fax),
+        website:            merge(str(row['Website']), (ex as any)?.website),
+        email_domains:      merge(str(row['EmailDomain']), (ex as any)?.email_domains),
+        billing_address1:   merge(str(row['BillingAddressStreet']), (ex as any)?.billing_address1),
+        billing_city:       merge(str(row['BillingAddressCity']), (ex as any)?.billing_city),
+        billing_state:      merge(str(row['BillingAddressState']), (ex as any)?.billing_state),
+        billing_zip:        merge(str(row['BillingAddressPostalCode']), (ex as any)?.billing_zip),
+        billing_country:    merge(str(row['BillingAddressCountry']), (ex as any)?.billing_country),
+        shipping_address1:  merge(str(row['ShippingAddressStreet']), (ex as any)?.shipping_address1),
+        shipping_city:      merge(str(row['ShippingAddressCity']), (ex as any)?.shipping_city),
+        shipping_state:     merge(str(row['ShippingAddressState']), (ex as any)?.shipping_state),
+        shipping_zip:       merge(str(row['ShippingAddressPostalCode']), (ex as any)?.shipping_zip),
+        shipping_country:   merge(str(row['ShippingAddressCountry']), (ex as any)?.shipping_country),
+        description:        merge(str(row['Background']), (ex as any)?.description),
+        artwork_notes:      merge(str(row['Artwork Notes']), (ex as any)?.artwork_notes),
+        general_logo_color: merge(str(row['General Logo Color']), (ex as any)?.general_logo_color),
+        formal_pms_colors:  merge(str(row['Formal PMS Colors']), (ex as any)?.formal_pms_colors),
+        industry:           merge(str(row['Industry']), (ex as any)?.industry),
+        notes:              merge(str(row['Additional Information']), (ex as any)?.notes),
+        power_units:        merge(str(row['Power Units / Trucks & Trailers']), (ex as any)?.power_units),
+        mta:                merge(bool(row['MTA?']), (ex as any)?.mta),
+        mta_trucking:       merge(str(row['MTA/Trucking']), (ex as any)?.mta_trucking),
+        assigned_to:        assignedTo ?? (ex as any)?.assigned_to ?? null,
+        created_by:         (ex as any)?.created_by ?? appUser.id,
+        updated_at:         new Date().toISOString(),
       })
       customerTagNames.set(insightlyId, rowTagNames)
     }
@@ -315,13 +253,11 @@ export async function POST(req: NextRequest) {
 
   // ── Upsert in batches of 100 ──────────────────────────────────────────────
   const BATCH = 100
-  let customersInserted = 0
-  let customersUpdated = 0
-  let vendorsInserted = 0
-  let vendorsUpdated = 0
+  let customersInserted = 0, customersUpdated = 0
+  let vendorsInserted = 0,   vendorsUpdated = 0
 
   const prevCustomerIds = new Set(existingCustomerMap.keys())
-  const prevVendorIds = new Set(existingVendorMap.keys())
+  const prevVendorIds   = new Set(existingVendorMap.keys())
 
   for (let i = 0; i < customerUpserts.length; i += BATCH) {
     const chunk = customerUpserts.slice(i, i + BATCH)
@@ -332,8 +268,7 @@ export async function POST(req: NextRequest) {
       errors.push(`Customer batch ${Math.floor(i / BATCH) + 1}: ${error.message}`)
     } else {
       for (const r of chunk) {
-        const iid = r.insightly_id as string
-        if (prevCustomerIds.has(iid)) customersUpdated++
+        if (prevCustomerIds.has(r.insightly_id as string)) customersUpdated++
         else customersInserted++
       }
     }
@@ -348,58 +283,44 @@ export async function POST(req: NextRequest) {
       errors.push(`Vendor batch ${Math.floor(i / BATCH) + 1}: ${error.message}`)
     } else {
       for (const r of chunk) {
-        const iid = r.insightly_id as string
-        if (prevVendorIds.has(iid)) vendorsUpdated++
+        if (prevVendorIds.has(r.insightly_id as string)) vendorsUpdated++
         else vendorsInserted++
       }
     }
   }
 
   // ── Re-link tags for all imported entities ────────────────────────────────
-  // Fetch final insightly_id → DB id mapping for customers and vendors
-  const importedCustInsightlyIds = customerUpserts.map(r => r.insightly_id as string)
-  const importedVendorInsightlyIds = vendorUpserts.map(r => r.insightly_id as string)
-
   const fetchIds = async (table: string, ids: string[]) => {
-    if (ids.length === 0) return new Map<string, string>()
     const map = new Map<string, string>()
     for (let i = 0; i < ids.length; i += 500) {
-      const chunk = ids.slice(i, i + 500)
       const { data } = await adminClient
         .from(table)
         .select('id, insightly_id')
-        .in('insightly_id', chunk)
-      for (const r of data ?? []) map.set(r.insightly_id, r.id)
+        .in('insightly_id', ids.slice(i, i + 500))
+      for (const r of data ?? []) map.set(String(r.insightly_id), r.id)
     }
     return map
   }
 
+  const importedCustIds   = customerUpserts.map(r => r.insightly_id as string)
+  const importedVendorIds = vendorUpserts.map(r => r.insightly_id as string)
+
   const [custIdMap, vendorIdMap] = await Promise.all([
-    fetchIds('crm_customers', importedCustInsightlyIds),
-    fetchIds('crm_vendors', importedVendorInsightlyIds),
+    importedCustIds.length > 0   ? fetchIds('crm_customers', importedCustIds)   : Promise.resolve(new Map()),
+    importedVendorIds.length > 0 ? fetchIds('crm_vendors',   importedVendorIds) : Promise.resolve(new Map()),
   ])
 
-  // Delete old tag links for all imported entities, then re-insert
-  const custDbIds = [...custIdMap.values()]
+  const custDbIds   = [...custIdMap.values()]
   const vendorDbIds = [...vendorIdMap.values()]
 
-  if (custDbIds.length > 0) {
-    for (let i = 0; i < custDbIds.length; i += 500) {
-      await adminClient
-        .from('crm_entity_tags')
-        .delete()
-        .eq('entity_type', 'customer')
-        .in('entity_id', custDbIds.slice(i, i + 500))
-    }
+  // Delete old tag links, then re-insert from XLSX data
+  for (let i = 0; i < custDbIds.length; i += 500) {
+    await adminClient.from('crm_entity_tags').delete()
+      .eq('entity_type', 'customer').in('entity_id', custDbIds.slice(i, i + 500))
   }
-  if (vendorDbIds.length > 0) {
-    for (let i = 0; i < vendorDbIds.length; i += 500) {
-      await adminClient
-        .from('crm_entity_tags')
-        .delete()
-        .eq('entity_type', 'vendor')
-        .in('entity_id', vendorDbIds.slice(i, i + 500))
-    }
+  for (let i = 0; i < vendorDbIds.length; i += 500) {
+    await adminClient.from('crm_entity_tags').delete()
+      .eq('entity_type', 'vendor').in('entity_id', vendorDbIds.slice(i, i + 500))
   }
 
   const tagLinkInserts: { tag_id: string; entity_type: string; entity_id: string }[] = []
@@ -412,7 +333,6 @@ export async function POST(req: NextRequest) {
       if (tagId) tagLinkInserts.push({ tag_id: tagId, entity_type: 'customer', entity_id: dbId })
     }
   }
-
   for (const [iid, tagNames] of vendorTagNames) {
     const dbId = vendorIdMap.get(iid)
     if (!dbId) continue
@@ -423,16 +343,14 @@ export async function POST(req: NextRequest) {
   }
 
   for (let i = 0; i < tagLinkInserts.length; i += BATCH) {
-    const { error } = await adminClient
-      .from('crm_entity_tags')
-      .insert(tagLinkInserts.slice(i, i + BATCH))
+    const { error } = await adminClient.from('crm_entity_tags').insert(tagLinkInserts.slice(i, i + BATCH))
     if (error) errors.push(`Tag linking batch ${Math.floor(i / BATCH) + 1}: ${error.message}`)
   }
 
   return NextResponse.json({
-    customers: { inserted: customersInserted, updated: customersUpdated },
-    vendors:   { inserted: vendorsInserted,  updated: vendorsUpdated },
-    tags_created: tagsCreated,
+    customers:        { inserted: customersInserted, updated: customersUpdated },
+    vendors:          { inserted: vendorsInserted,   updated: vendorsUpdated },
+    tags_created:     tagsCreated,
     unmatched_owners: [...unmatchedOwners].sort(),
     errors,
   })

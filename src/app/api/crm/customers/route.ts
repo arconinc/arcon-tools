@@ -2,7 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 
-// GET /api/crm/customers?search=&status=&assigned_to=&tag_id=
+// GET /api/crm/customers?search=&status=&assigned_to=&tag_id=&page=1&limit=50
 export async function GET(req: NextRequest) {
   const appUser = await requireUser()
   if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -12,35 +12,51 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get('status')
   const assignedTo = searchParams.get('assigned_to')
   const tagId = searchParams.get('tag_id')
+  const hasTags = searchParams.get('has_tags') === 'true'
+  const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
+  const limit = Math.min(200, Math.max(1, parseInt(searchParams.get('limit') ?? '50', 10)))
+  const from = (page - 1) * limit
+  const to = from + limit - 1
 
   const adminClient = createAdminClient()
 
-  // If filtering by tag, get matching entity IDs first
+  // If filtering by tag or has_tags, get matching entity IDs first
   let tagFilterIds: string[] | null = null
-  if (tagId) {
-    const { data: tagRows } = await adminClient
+  if (tagId || hasTags) {
+    let tagQuery = adminClient
       .from('crm_entity_tags')
       .select('entity_id')
-      .eq('tag_id', tagId)
       .eq('entity_type', 'customer')
-    tagFilterIds = (tagRows ?? []).map((r: any) => r.entity_id)
-    if (tagFilterIds.length === 0) return NextResponse.json([])
+    if (tagId) tagQuery = tagQuery.eq('tag_id', tagId)
+    const { data: tagRows } = await tagQuery
+    tagFilterIds = [...new Set((tagRows ?? []).map((r: any) => r.entity_id))]
+    if (tagFilterIds.length === 0) return NextResponse.json({ customers: [], total: 0, page, limit })
   }
 
-  let query = adminClient
-    .from('crm_customers')
-    .select('id, name, client_status, phone, website, assigned_to, created_at, updated_at')
-    .order('name')
+  const applyFilters = (q: any) => {
+    if (search) q = q.ilike('name', `%${search}%`)
+    if (status) q = q.eq('client_status', status)
+    if (assignedTo) q = q.eq('assigned_to', assignedTo)
+    if (tagFilterIds) q = q.in('id', tagFilterIds)
+    return q
+  }
 
-  if (search) query = query.ilike('name', `%${search}%`)
-  if (status) query = query.eq('client_status', status)
-  if (assignedTo) query = query.eq('assigned_to', assignedTo)
-  if (tagFilterIds) query = query.in('id', tagFilterIds)
+  const [countRes, dataRes] = await Promise.all([
+    applyFilters(adminClient.from('crm_customers').select('*', { count: 'exact', head: true })),
+    applyFilters(
+      adminClient
+        .from('crm_customers')
+        .select('id, name, client_status, phone, website, assigned_to, created_at, updated_at')
+        .order('name')
+    ).range(from, to),
+  ])
 
-  const { data, error } = await query
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (dataRes.error) return NextResponse.json({ error: dataRes.error.message }, { status: 500 })
 
-  const rows = data ?? []
+  const total = countRes.count ?? 0
+  const data = dataRes.data
+
+  const rows = (data as any[]) ?? []
   const userIds = [...new Set(rows.map((c: any) => c.assigned_to).filter(Boolean))]
   const custIds = rows.map((c: any) => c.id)
 
@@ -74,7 +90,7 @@ export async function GET(req: NextRequest) {
     tags: tagsMap[c.id] ?? [],
   }))
 
-  return NextResponse.json(enriched)
+  return NextResponse.json({ customers: enriched, total, page, limit })
 }
 
 // POST /api/crm/customers

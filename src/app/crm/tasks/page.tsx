@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 
+const PAGE_SIZE = 50
+
 type TaskListItem = {
   id: string
   title: string
@@ -82,44 +84,56 @@ const LINKED_TYPE_BADGE: Record<string, string> = {
 
 export default function TasksPage() {
   const router = useRouter()
-  const [tasks, setTasks] = useState<TaskListItem[]>([])
+  const [allTasks, setAllTasks] = useState<TaskListItem[]>([])
+  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('')
   const [categoryFilter, setCategoryFilter] = useState('')
+  const [page, setPage] = useState(1)
 
-  const fetchTasks = useCallback(async () => {
+  const fetchTasks = useCallback(async (currentPage: number) => {
     setLoading(true)
     const params = new URLSearchParams()
     if (statusFilter) params.set('status', statusFilter)
     if (categoryFilter) params.set('category', categoryFilter)
+    params.set('page', String(currentPage))
+    params.set('limit', String(PAGE_SIZE))
     try {
       const res = await fetch(`/api/crm/tasks?${params}`)
       const data = await res.json()
-      let items: TaskListItem[] = Array.isArray(data) ? data : []
-      if (search) {
-        const q = search.toLowerCase()
-        items = items.filter(
-          (t) =>
-            t.title.toLowerCase().includes(q) ||
-            (t.assigned_user_name ?? '').toLowerCase().includes(q) ||
-            (t.linked_to_name ?? '').toLowerCase().includes(q) ||
-            (t.category ?? '').toLowerCase().includes(q)
-        )
-      }
-      setTasks(items)
+      setAllTasks(Array.isArray(data.tasks) ? data.tasks : [])
+      setTotal(typeof data.total === 'number' ? data.total : 0)
     } finally {
       setLoading(false)
     }
-  }, [search, statusFilter, categoryFilter])
+  }, [statusFilter, categoryFilter])
+
+  useEffect(() => { setPage(1) }, [statusFilter, categoryFilter])
 
   useEffect(() => {
-    const t = setTimeout(fetchTasks, 300)
+    const t = setTimeout(() => fetchTasks(page), 300)
     return () => clearTimeout(t)
-  }, [fetchTasks])
+  }, [fetchTasks, page])
+
+  const tasks = (() => {
+    if (!search) return allTasks
+    const q = search.toLowerCase()
+    return allTasks.filter(
+      (t) =>
+        t.title.toLowerCase().includes(q) ||
+        (t.assigned_user_name ?? '').toLowerCase().includes(q) ||
+        (t.linked_to_name ?? '').toLowerCase().includes(q) ||
+        (t.category ?? '').toLowerCase().includes(q)
+    )
+  })()
+
+  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
+  const rangeFrom = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
+  const rangeTo = Math.min(page * PAGE_SIZE, total)
 
   return (
-    <div className="max-w-7xl mx-auto px-6 py-8">
+    <div className="w-full px-6 py-8">
       {/* Header */}
       <div className="flex items-center justify-between mb-6">
         <div>
@@ -273,9 +287,30 @@ export default function TasksPage() {
             })}
           </tbody>
         </table>
-        {!loading && tasks.length > 0 && (
-          <div className="px-5 py-3 border-t border-slate-100 text-xs text-slate-400">
-            {tasks.length} task{tasks.length !== 1 ? 's' : ''}
+        {!loading && total > 0 && (
+          <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between gap-4 flex-wrap">
+            <span className="text-xs text-slate-400">
+              Showing {rangeFrom}–{rangeTo} of {total} task{total !== 1 ? 's' : ''}
+            </span>
+            {totalPages > 1 && (
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setPage((p) => Math.max(1, p - 1))}
+                  disabled={page === 1}
+                  className="px-3 py-1.5 text-xs font-semibold border border-slate-200 rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Previous
+                </button>
+                <span className="text-xs text-slate-500 px-1">Page {page} of {totalPages}</span>
+                <button
+                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
+                  disabled={page === totalPages}
+                  className="px-3 py-1.5 text-xs font-semibold border border-slate-200 rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                >
+                  Next
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
