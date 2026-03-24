@@ -161,7 +161,7 @@ export default function AdminUsersPage() {
     <div className="max-w-3xl mx-auto">
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Users</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Employees</h1>
           <p className="text-sm text-slate-500 mt-1">
             Manage user roles and profile data. Pre-load users before they log in, or edit existing users.
           </p>

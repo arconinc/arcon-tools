@@ -1,5 +1,10 @@
 // ─── App User ───────────────────────────────────────────────────────────────
 
+export type OfficeLocation = 'Remote' | 'Minnesota' | 'Arizona' | 'Colorado'
+export type EmploymentType = 'full-time' | 'part-time' | 'contractor'
+// Placeholder team list — update to match actual company teams
+export type EmployeeTeam = 'Sales' | 'Marketing' | 'IT' | 'Operations' | 'Finance' | 'HR'
+
 export interface AppUser {
   id: string
   email: string
@@ -17,6 +22,53 @@ export interface AppUser {
   state: string | null
   zip: string | null
   phone: string | null
+  clickup_user_id: string | null
+  // Employee profile fields
+  manager_id: string | null
+  profile_image_url: string | null
+  job_title: string | null
+  team: EmployeeTeam | null
+  office_location: OfficeLocation | null
+  employment_type: EmploymentType | null
+  bio_json: Record<string, unknown>
+  bio_html: string | null
+  skills: string[]
+  interests: string[]
+  linkedin_url: string | null
+  timezone: string | null
+}
+
+// ─── Employee Directory ──────────────────────────────────────────────────────
+
+export interface EmployeeSummary {
+  id: string
+  display_name: string
+  email: string
+  job_title: string | null
+  team: EmployeeTeam | null
+  office_location: OfficeLocation | null
+  employment_type: EmploymentType | null
+  profile_image_url: string | null
+  avatar_url: string | null
+  start_date: string | null
+}
+
+export interface EmployeeProfile extends EmployeeSummary {
+  phone: string | null
+  linkedin_url: string | null
+  timezone: string | null
+  bio_html: string | null
+  bio_json: Record<string, unknown>
+  skills: string[]
+  interests: string[]
+  manager: {
+    id: string
+    display_name: string
+    job_title: string | null
+    profile_image_url: string | null
+    avatar_url: string | null
+  } | null
+  direct_reports: EmployeeSummary[]
 }
 
 export interface BirthdayEvent {

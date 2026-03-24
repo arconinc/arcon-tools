@@ -92,7 +92,8 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
       items: [
         { href: '/news', label: 'News & Announcements', icon: MegaphoneIcon, adminMatch: true },
         { href: '#', label: 'Birthdays & Anniversaries', icon: CakeIcon },
-        { href: '#', label: 'Employee Directory', icon: UsersIcon },
+        { href: '/employees', label: 'Employee Directory', icon: UsersIcon, adminMatch: true },
+        { href: '/profile', label: 'My Profile', icon: UserAdminIcon, adminMatch: true },
       ],
     },
     {
@@ -125,7 +126,8 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
         { href: '/admin/crm-tags', label: 'CRM Tags', icon: TagIcon, adminMatch: true },
         { href: '/admin/crm-import', label: 'CRM Import', icon: UploadIcon, adminMatch: true },
         { href: '/admin/stores', label: 'Stores', icon: StoreIcon, adminMatch: true },
-        { href: '/admin/users', label: 'Users', icon: UserAdminIcon, adminMatch: true },
+        { href: '/admin/employees', label: 'Employees', icon: UserAdminIcon, adminMatch: true },
+        { href: '/admin/users', label: 'Manage Users', icon: UserAdminIcon, adminMatch: true },
         { href: '/admin/audit-log', label: 'Audit Log', icon: LogIcon, adminMatch: true },
       ],
     })
