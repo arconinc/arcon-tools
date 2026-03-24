@@ -57,6 +57,13 @@ async function parseXlsxPreview(file: File): Promise<Preview> {
 
 // ─── Page ─────────────────────────────────────────────────────────────────────
 
+interface NormalizeResult {
+  customers: number
+  vendors: number
+  contacts: number
+  skipped: number
+}
+
 export default function CrmImportPage() {
   const fileRef = useRef<HTMLInputElement>(null)
   const [importType, setImportType] = useState<'vendors' | 'customers' | null>(null)
@@ -66,6 +73,9 @@ export default function CrmImportPage() {
   const [importing, setImporting] = useState(false)
   const [result, setResult] = useState<ImportResult | null>(null)
   const [error, setError] = useState<string | null>(null)
+  const [normalizing, setNormalizing] = useState(false)
+  const [normalizeResult, setNormalizeResult] = useState<NormalizeResult | null>(null)
+  const [normalizeError, setNormalizeError] = useState<string | null>(null)
 
   async function handleFileChange(e: React.ChangeEvent<HTMLInputElement>) {
     const f = e.target.files?.[0] ?? null
@@ -108,6 +118,22 @@ export default function CrmImportPage() {
       setError('Network error — import may have partially completed. Check the CRM.')
     } finally {
       setImporting(false)
+    }
+  }
+
+  async function handleNormalize() {
+    setNormalizing(true)
+    setNormalizeResult(null)
+    setNormalizeError(null)
+    try {
+      const res = await fetch('/api/admin/crm/normalize-phones', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) { setNormalizeError(data.error ?? 'Normalization failed'); return }
+      setNormalizeResult(data as NormalizeResult)
+    } catch {
+      setNormalizeError('Network error during normalization')
+    } finally {
+      setNormalizing(false)
     }
   }
 
@@ -328,6 +354,32 @@ export default function CrmImportPage() {
           {error}
         </div>
       )}
+
+      {/* Normalize phone numbers */}
+      <div className="bg-white border border-slate-200 rounded-2xl p-5 mt-6">
+        <h2 className="text-sm font-semibold text-slate-700 mb-1">Normalize Phone Numbers</h2>
+        <p className="text-xs text-slate-500 mb-4">
+          Retroactively format all phone numbers in the database to (NNN) NNN-NNNN. Safe to run multiple times — only updates numbers that are not yet in the correct format.
+        </p>
+        <button
+          onClick={handleNormalize}
+          disabled={normalizing}
+          className="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-lg disabled:opacity-60 transition-colors"
+        >
+          {normalizing ? 'Normalizing…' : 'Normalize All Phone Numbers'}
+        </button>
+        {normalizeError && (
+          <p className="mt-3 text-sm text-red-600">{normalizeError}</p>
+        )}
+        {normalizeResult && (
+          <div className="mt-4 grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <StatBox label="Customers" value={normalizeResult.customers} color="blue" />
+            <StatBox label="Vendors" value={normalizeResult.vendors} color="green" />
+            <StatBox label="Contacts" value={normalizeResult.contacts} color="purple" />
+            <StatBox label="Already formatted / skipped" value={normalizeResult.skipped} />
+          </div>
+        )}
+      </div>
 
       {/* Field mapping reference */}
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden mt-6">

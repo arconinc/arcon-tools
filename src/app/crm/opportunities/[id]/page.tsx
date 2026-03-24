@@ -312,15 +312,10 @@ export default function OpportunityDetailPage() {
 
   // Dropdown data
   const [crmUsers, setCrmUsers] = useState<DropdownUser[]>([])
-  const [customers, setCustomers] = useState<DropdownCustomer[]>([])
 
   useEffect(() => {
-    Promise.all([
-      fetch('/api/crm/users').then((r) => r.json()),
-      fetch('/api/crm/customers').then((r) => r.json()),
-    ]).then(([users, custs]) => {
+    fetch('/api/crm/users').then((r) => r.json()).then((users) => {
       if (Array.isArray(users)) setCrmUsers(users)
-      if (Array.isArray(custs)) setCustomers(custs)
     })
   }, [])
   const [activeTab, setActiveTab] = useState<'details' | 'related' | 'activity'>('details')
@@ -348,6 +343,30 @@ export default function OpportunityDetailPage() {
   })
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
+
+  // Customer autocomplete
+  const [custSearch, setCustSearch] = useState(prefillCustomerName)
+  const [custResults, setCustResults] = useState<DropdownCustomer[]>([])
+  const [custOpen, setCustOpen] = useState(false)
+  const [custLoading, setCustLoading] = useState(false)
+
+  useEffect(() => {
+    if (!isNew) return
+    const q = custSearch.trim()
+    if (!q || createForm.customer_id) { setCustResults([]); return }
+    const timer = setTimeout(async () => {
+      setCustLoading(true)
+      try {
+        const res = await fetch(`/api/crm/customers?search=${encodeURIComponent(q)}&limit=20`)
+        const data = await res.json()
+        setCustResults(Array.isArray(data.customers) ? data.customers : [])
+        setCustOpen(true)
+      } finally {
+        setCustLoading(false)
+      }
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [custSearch]) // eslint-disable-line react-hooks/exhaustive-deps
 
   // Tags
   const [tagIds, setTagIds] = useState<string[]>([])
@@ -529,14 +548,41 @@ export default function OpportunityDetailPage() {
             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
               Customer <span className="text-red-500">*</span>
             </label>
-            <select value={createForm.customer_id} required
-              onChange={(e) => setCreateForm((p) => ({ ...p, customer_id: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-              <option value="">— Select Customer —</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
-            </select>
+            <div className="relative">
+              <input
+                type="text"
+                value={custSearch}
+                placeholder="Search customers…"
+                autoComplete="off"
+                onChange={(e) => {
+                  setCustSearch(e.target.value)
+                  setCreateForm((p) => ({ ...p, customer_id: '', customer_name: '' }))
+                  setCustOpen(true)
+                }}
+                onFocus={() => { if (custResults.length > 0) setCustOpen(true) }}
+                onBlur={() => setTimeout(() => setCustOpen(false), 150)}
+                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
+              />
+              {custLoading && (
+                <span className="absolute right-3 top-2.5 text-xs text-slate-400">Searching…</span>
+              )}
+              {custOpen && custResults.length > 0 && (
+                <ul className="absolute z-50 w-full mt-1 bg-white border border-slate-200 rounded-lg shadow-lg max-h-52 overflow-y-auto text-sm">
+                  {custResults.map((c) => (
+                    <li key={c.id}
+                      onMouseDown={() => {
+                        setCreateForm((p) => ({ ...p, customer_id: c.id, customer_name: c.name }))
+                        setCustSearch(c.name)
+                        setCustOpen(false)
+                        setCustResults([])
+                      }}
+                      className="px-3 py-2 cursor-pointer hover:bg-purple-50 hover:text-purple-800">
+                      {c.name}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </div>
           </div>
 
           <div className="grid grid-cols-2 gap-4">

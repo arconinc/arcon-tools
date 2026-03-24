@@ -182,7 +182,7 @@ export default function CustomersPage() {
                     <img
                       src={c.logo_url}
                       alt=""
-                      className="h-7 w-7 rounded object-contain bg-white border border-slate-100"
+                      className="h-7 w-7 rounded object-cover bg-white border border-slate-100"
                       onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
                     />
                   ) : (

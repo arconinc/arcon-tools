@@ -39,7 +39,7 @@ export async function GET(req: NextRequest) {
     applyFilters(
       adminClient
         .from('crm_vendors')
-        .select('id, name, phone, website, product_line, specialty, premier_group_member, created_at, updated_at')
+        .select('id, name, phone, website, product_line, specialty, premier_group_member, logo_url, created_at, updated_at')
         .order('name')
     ).range(from, to),
   ])

@@ -55,14 +55,19 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (existing) {
-    // Link FK if not already linked
+    // Link FK if not already linked, and sync linkedin if found
+    const linkedinFromCache = (existing.links as { name: string; url: string }[] | null)
+      ?.find((l) => l.name.toLowerCase() === 'linkedin')?.url ?? null
+    const cacheUpdate: Record<string, unknown> = {}
     if (entity.brand_data_id !== existing.id) {
-      await adminClient
-        .from(table)
-        .update({ brand_data_id: existing.id, logo_url: existing.logo_url })
-        .eq('id', entity_id)
+      cacheUpdate.brand_data_id = existing.id
+      cacheUpdate.logo_url = existing.logo_url
     }
-    return NextResponse.json({ brand_data: existing, cached: true })
+    if (linkedinFromCache) cacheUpdate.linkedin = linkedinFromCache
+    if (Object.keys(cacheUpdate).length > 0) {
+      await adminClient.from(table).update(cacheUpdate).eq('id', entity_id)
+    }
+    return NextResponse.json({ brand_data: existing, cached: true, linkedin: linkedinFromCache })
   }
 
   // Fetch from Brandfetch
@@ -132,11 +137,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'server_error', message: 'Failed to save brand data.' }, { status: 500 })
   }
 
-  // Update entity with brand_data_id and denormalized logo_url
-  await adminClient
-    .from(table)
-    .update({ brand_data_id: brandData.id, logo_url: brandData.logo_url })
-    .eq('id', entity_id)
+  // Extract LinkedIn URL from brand links
+  const linkedinUrl = (bf.links as { name: string; url: string }[] | null)
+    ?.find((l) => l.name.toLowerCase() === 'linkedin')?.url ?? null
 
-  return NextResponse.json({ brand_data: brandData, cached: false })
+  // Update entity with brand_data_id, denormalized logo_url, and linkedin if found
+  const entityUpdate: Record<string, unknown> = { brand_data_id: brandData.id, logo_url: brandData.logo_url }
+  if (linkedinUrl) entityUpdate.linkedin = linkedinUrl
+  await adminClient.from(table).update(entityUpdate).eq('id', entity_id)
+
+  return NextResponse.json({ brand_data: brandData, cached: false, linkedin: linkedinUrl })
 }

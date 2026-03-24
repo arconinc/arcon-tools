@@ -46,7 +46,7 @@ export async function GET(req: NextRequest) {
     applyFilters(
       adminClient
         .from('crm_customers')
-        .select('id, name, client_status, phone, website, assigned_to, created_at, updated_at')
+        .select('id, name, client_status, phone, website, assigned_to, logo_url, created_at, updated_at')
         .order('name')
     ).range(from, to),
   ])

@@ -114,13 +114,19 @@ function buildCompanySummary(company: BrandDataLocal['company']): string | null 
   return parts.length ? parts.join(', ') + '.' : null
 }
 
-function Field({ label, value, password, multiline }: { label: string; value: string | null | undefined; password?: boolean; multiline?: boolean }) {
+function Field({ label, value, password, multiline, link, email }: { label: string; value: string | null | undefined; password?: boolean; multiline?: boolean; link?: boolean; email?: boolean }) {
+  const display = value
+    ? password ? '••••••••'
+      : link
+        ? <a href={value} target="_blank" rel="noopener noreferrer" className="text-purple-700 hover:underline break-all">{value.replace(/^https?:\/\//, '')}</a>
+        : email
+          ? <a href={`mailto:${value}`} className="text-purple-700 hover:underline">{value}</a>
+          : <span className={multiline ? 'whitespace-pre-wrap' : ''}>{value}</span>
+    : <span className="text-slate-400">—</span>
   return (
     <div>
       <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-0.5">{label}</div>
-      <div className={`text-sm text-slate-800${multiline ? ' whitespace-pre-wrap' : ''}`}>
-        {value ? (password ? '••••••••' : value) : <span className="text-slate-400">—</span>}
-      </div>
+      <div className="text-sm text-slate-800">{display}</div>
     </div>
   )
 }
@@ -195,7 +201,12 @@ export default function VendorDetailPage() {
       const data = await res.json()
       if (!res.ok) { setBrandError(data.message ?? 'Failed to fetch brand data.'); return }
       setBrandData(data.brand_data)
-      setVendor((prev) => prev ? { ...prev, logo_url: data.brand_data.logo_url, brand_data: data.brand_data } : prev)
+      setVendor((prev) => prev ? {
+        ...prev,
+        logo_url: data.brand_data.logo_url,
+        brand_data: data.brand_data,
+        ...(data.linkedin ? { linkedin: data.linkedin } : {}),
+      } : prev)
     } finally { setBrandFetching(false) }
   }
 
@@ -447,8 +458,8 @@ export default function VendorDetailPage() {
                 ) : (
                   <>
                     <Field label="Phone" value={vendor.phone} />
-                    <Field label="Website" value={vendor.website} />
-                    <Field label="LinkedIn" value={vendor.linkedin} />
+                    <Field label="Website" value={vendor.website} link />
+                    <Field label="LinkedIn" value={vendor.linkedin} link />
                     <div className="col-span-3"><Field label="Description" value={vendor.description} /></div>
                   </>
                 )}
@@ -479,7 +490,7 @@ export default function VendorDetailPage() {
                       <Field label="Product Line" value={vendor.product_line} />
                       <Field label="Specialty" value={vendor.specialty} />
                       <Field label="Arcon Account #" value={vendor.arcon_account_number} />
-                      <Field label="Online Store" value={vendor.online_store} />
+                      <Field label="Online Store" value={vendor.online_store} link />
                       <Field label="Arcon Username" value={vendor.arcon_username} />
                       <Field label="Arcon Password" value={vendor.arcon_password} password />
                     </>
@@ -530,7 +541,11 @@ export default function VendorDetailPage() {
                         ].map((row) => (
                           <tr key={row.label} className="group">
                             <td className="py-1.5 pr-4 text-xs font-semibold text-slate-400 uppercase tracking-wide whitespace-nowrap w-28">{row.label}</td>
-                            <td className="py-1.5 pr-4 text-slate-700">{row.email ?? <span className="text-slate-300">—</span>}</td>
+                            <td className="py-1.5 pr-4 text-slate-700">
+                              {row.email
+                                ? <a href={`mailto:${row.email}`} className="text-purple-700 hover:underline">{row.email}</a>
+                                : <span className="text-slate-300">—</span>}
+                            </td>
                             <td className="py-1.5 text-xs text-slate-500 whitespace-nowrap">
                               {row.cutoff ? <span className="px-1.5 py-0.5 bg-slate-100 rounded text-slate-600">{row.cutoff}</span> : null}
                             </td>
@@ -542,64 +557,72 @@ export default function VendorDetailPage() {
                 )}
               </div>
 
-              {/* Billing Address */}
-              {(editing || vendor.billing_address1 || vendor.billing_city) && (
+              {/* Billing + Shipping Address */}
+              {(editing || vendor.billing_address1 || vendor.billing_city || vendor.shipping_address1 || vendor.shipping_city) && (
                 <div className="border-t border-slate-100">
-                  <div className="px-5 py-2 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
-                    <div className="w-0.5 h-3.5 bg-purple-300 rounded-full" />
-                    <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Billing Address</h3>
-                  </div>
-                  <div className="px-5 py-4 grid grid-cols-3 gap-3">
-                    {editing ? (
-                      <>
-                        <div className="col-span-2"><FI label="Address 1" name="billing_address1" value={(ef.billing_address1 as string) ?? ''} onChange={handleEditChange} /></div>
-                        <FI label="Address 2" name="billing_address2" value={(ef.billing_address2 as string) ?? ''} onChange={handleEditChange} />
-                        <FI label="City" name="billing_city" value={(ef.billing_city as string) ?? ''} onChange={handleEditChange} />
-                        <FI label="State" name="billing_state" value={(ef.billing_state as string) ?? ''} onChange={handleEditChange} />
-                        <FI label="ZIP" name="billing_zip" value={(ef.billing_zip as string) ?? ''} onChange={handleEditChange} />
-                        <div className="col-span-3"><FI label="Country" name="billing_country" value={(ef.billing_country as string) ?? ''} onChange={handleEditChange} /></div>
-                      </>
-                    ) : (
-                      <>
-                        {vendor.billing_address1 && <div className="col-span-2"><Field label="Address 1" value={vendor.billing_address1} /></div>}
-                        {vendor.billing_address2 && <Field label="Address 2" value={vendor.billing_address2} />}
-                        {vendor.billing_city && <Field label="City" value={vendor.billing_city} />}
-                        {vendor.billing_state && <Field label="State" value={vendor.billing_state} />}
-                        {vendor.billing_zip && <Field label="ZIP" value={vendor.billing_zip} />}
-                        {vendor.billing_country && <Field label="Country" value={vendor.billing_country} />}
-                      </>
-                    )}
-                  </div>
-                </div>
-              )}
-
-              {/* Shipping Address */}
-              {(editing || vendor.shipping_address1 || vendor.shipping_city) && (
-                <div className="border-t border-slate-100">
-                  <div className="px-5 py-2 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
-                    <div className="w-0.5 h-3.5 bg-purple-300 rounded-full" />
-                    <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Shipping Address</h3>
-                  </div>
-                  <div className="px-5 py-4 grid grid-cols-3 gap-3">
-                    {editing ? (
-                      <>
-                        <div className="col-span-2"><FI label="Address 1" name="shipping_address1" value={(ef.shipping_address1 as string) ?? ''} onChange={handleEditChange} /></div>
-                        <FI label="Address 2" name="shipping_address2" value={(ef.shipping_address2 as string) ?? ''} onChange={handleEditChange} />
-                        <FI label="City" name="shipping_city" value={(ef.shipping_city as string) ?? ''} onChange={handleEditChange} />
-                        <FI label="State" name="shipping_state" value={(ef.shipping_state as string) ?? ''} onChange={handleEditChange} />
-                        <FI label="ZIP" name="shipping_zip" value={(ef.shipping_zip as string) ?? ''} onChange={handleEditChange} />
-                        <div className="col-span-3"><FI label="Country" name="shipping_country" value={(ef.shipping_country as string) ?? ''} onChange={handleEditChange} /></div>
-                      </>
-                    ) : (
-                      <>
-                        {vendor.shipping_address1 && <div className="col-span-2"><Field label="Address 1" value={vendor.shipping_address1} /></div>}
-                        {vendor.shipping_address2 && <Field label="Address 2" value={vendor.shipping_address2} />}
-                        {vendor.shipping_city && <Field label="City" value={vendor.shipping_city} />}
-                        {vendor.shipping_state && <Field label="State" value={vendor.shipping_state} />}
-                        {vendor.shipping_zip && <Field label="ZIP" value={vendor.shipping_zip} />}
-                        {vendor.shipping_country && <Field label="Country" value={vendor.shipping_country} />}
-                      </>
-                    )}
+                  <div className="grid grid-cols-2 divide-x divide-slate-100">
+                    {/* Billing */}
+                    <div>
+                      <div className="px-5 py-2 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                        <div className="w-0.5 h-3.5 bg-purple-300 rounded-full" />
+                        <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Billing Address</h3>
+                      </div>
+                      <div className="px-5 py-4">
+                        {editing ? (
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="col-span-2"><FI label="Address 1" name="billing_address1" value={(ef.billing_address1 as string) ?? ''} onChange={handleEditChange} /></div>
+                            <div className="col-span-2"><FI label="Address 2" name="billing_address2" value={(ef.billing_address2 as string) ?? ''} onChange={handleEditChange} /></div>
+                            <FI label="City" name="billing_city" value={(ef.billing_city as string) ?? ''} onChange={handleEditChange} />
+                            <FI label="State" name="billing_state" value={(ef.billing_state as string) ?? ''} onChange={handleEditChange} />
+                            <FI label="ZIP" name="billing_zip" value={(ef.billing_zip as string) ?? ''} onChange={handleEditChange} />
+                            <div className="col-span-2"><FI label="Country" name="billing_country" value={(ef.billing_country as string) ?? ''} onChange={handleEditChange} /></div>
+                          </div>
+                        ) : (
+                          <div className="text-sm text-slate-800 leading-snug">
+                            {vendor.billing_address1 && <div>{vendor.billing_address1}</div>}
+                            {vendor.billing_address2 && <div>{vendor.billing_address2}</div>}
+                            {(vendor.billing_city || vendor.billing_state || vendor.billing_zip) && (
+                              <div>
+                                {[vendor.billing_city, vendor.billing_state].filter(Boolean).join(', ')}
+                                {vendor.billing_zip ? ` ${vendor.billing_zip}` : ''}
+                              </div>
+                            )}
+                            {vendor.billing_country && <div>{vendor.billing_country}</div>}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {/* Shipping */}
+                    <div>
+                      <div className="px-5 py-2 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                        <div className="w-0.5 h-3.5 bg-purple-300 rounded-full" />
+                        <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Shipping Address</h3>
+                      </div>
+                      <div className="px-5 py-4">
+                        {editing ? (
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="col-span-2"><FI label="Address 1" name="shipping_address1" value={(ef.shipping_address1 as string) ?? ''} onChange={handleEditChange} /></div>
+                            <div className="col-span-2"><FI label="Address 2" name="shipping_address2" value={(ef.shipping_address2 as string) ?? ''} onChange={handleEditChange} /></div>
+                            <FI label="City" name="shipping_city" value={(ef.shipping_city as string) ?? ''} onChange={handleEditChange} />
+                            <FI label="State" name="shipping_state" value={(ef.shipping_state as string) ?? ''} onChange={handleEditChange} />
+                            <FI label="ZIP" name="shipping_zip" value={(ef.shipping_zip as string) ?? ''} onChange={handleEditChange} />
+                            <div className="col-span-2"><FI label="Country" name="shipping_country" value={(ef.shipping_country as string) ?? ''} onChange={handleEditChange} /></div>
+                          </div>
+                        ) : (
+                          <div className="text-sm text-slate-800 leading-snug">
+                            {vendor.shipping_address1 && <div>{vendor.shipping_address1}</div>}
+                            {vendor.shipping_address2 && <div>{vendor.shipping_address2}</div>}
+                            {(vendor.shipping_city || vendor.shipping_state || vendor.shipping_zip) && (
+                              <div>
+                                {[vendor.shipping_city, vendor.shipping_state].filter(Boolean).join(', ')}
+                                {vendor.shipping_zip ? ` ${vendor.shipping_zip}` : ''}
+                              </div>
+                            )}
+                            {vendor.shipping_country && <div>{vendor.shipping_country}</div>}
+                          </div>
+                        )}
+                      </div>
+                    </div>
                   </div>
                 </div>
               )}

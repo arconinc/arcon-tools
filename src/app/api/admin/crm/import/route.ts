@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
+import { formatPhone } from '@/lib/phone'
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -189,7 +190,7 @@ export async function POST(req: NextRequest) {
         insightly_id:       insightlyId,
         name:               str(row['OrganizationName']) ?? (ex as any)?.name ?? 'Unnamed',
         client_status:      merge(mapClientStatus(row), (ex as any)?.client_status),
-        phone:              merge(str(row['Phone']), (ex as any)?.phone),
+        phone:              merge(formatPhone(str(row['Phone'])) ?? str(row['Phone']), (ex as any)?.phone),
         fax:                merge(str(row['Fax']), (ex as any)?.fax),
         website:            merge(str(row['Website']), (ex as any)?.website),
         email_domains:      merge(str(row['EmailDomain']), (ex as any)?.email_domains),
@@ -224,7 +225,7 @@ export async function POST(req: NextRequest) {
       vendorUpserts.push({
         insightly_id:           insightlyId,
         name:                   str(row['OrganizationName']) ?? (ex as any)?.name ?? 'Unnamed',
-        phone:                  merge(str(row['Phone']), (ex as any)?.phone),
+        phone:                  merge(formatPhone(str(row['Phone'])) ?? str(row['Phone']), (ex as any)?.phone),
         fax:                    merge(str(row['Fax']), (ex as any)?.fax),
         website:                merge(str(row['Website']), (ex as any)?.website),
         description:            merge(str(row['Background']), (ex as any)?.description),

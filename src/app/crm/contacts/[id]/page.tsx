@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import TagPicker from '@/components/crm/TagPicker'
+import { formatPhoneInput } from '@/lib/phone'
 
 type DropdownUser = { id: string; display_name: string; email: string }
 type DropdownCustomer = { id: string; name: string }
@@ -129,8 +130,10 @@ export default function ContactDetailPage() {
 
   function startEdit() { if (!contact) return; setEditForm({ ...contact }); setEditing(true) }
   function cancelEdit() { setEditing(false); setEditForm({}) }
+  const PHONE_FIELDS = new Set(['phone', 'home_phone', 'mobile_phone', 'other_phone'])
   function handleEditChange(field: string, value: string) {
-    setEditForm((prev) => ({ ...prev, [field]: value || null }))
+    const formatted = PHONE_FIELDS.has(field) ? formatPhoneInput(value) : value
+    setEditForm((prev) => ({ ...prev, [field]: formatted || null }))
   }
 
   async function saveEdit() {
@@ -211,7 +214,7 @@ export default function ContactDetailPage() {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Phone</label>
-              <input type="tel" value={createForm.phone} onChange={(e) => setCreateForm((p) => ({ ...p, phone: e.target.value }))}
+              <input type="tel" value={createForm.phone} onChange={(e) => setCreateForm((p) => ({ ...p, phone: formatPhoneInput(e.target.value) }))}
                 className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
             </div>
           </div>
