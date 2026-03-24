@@ -642,6 +642,26 @@ export interface CrmFile {
   created_at: string
 }
 
+export interface CrmArtwork {
+  id: string
+  customer_id: string
+  name: string
+  description: string | null
+  file_name: string | null
+  file_size: number | null
+  mime_type: string | null
+  width: number | null
+  height: number | null
+  url: string
+  cloudinary_public_id: string | null
+  cloudinary_resource_type: string | null
+  thumbnail_url: string | null
+  is_drive_link: boolean
+  added_by: string
+  created_at: string
+  updated_at: string
+}
+
 export interface CrmSalesGoal {
   id: string
   user_id: string

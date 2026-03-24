@@ -164,7 +164,7 @@ export default function CustomerDetailPage() {
       if (Array.isArray(users)) setCrmUsers(users)
     })
   }, [])
-  const [activeTab, setActiveTab] = useState<'details' | 'related' | 'activity'>('details')
+  const [activeTab, setActiveTab] = useState<'details' | 'related' | 'activity' | 'artwork'>('details')
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState<Partial<CustomerDetail>>({})
   const [saving, setSaving] = useState(false)
@@ -176,6 +176,106 @@ export default function CustomerDetailPage() {
   const [brandFetching, setBrandFetching] = useState(false)
   const [brandError, setBrandError] = useState<string | null>(null)
   const [brandShowFull, setBrandShowFull] = useState(false)
+
+  // Artwork tab state
+  type ArtworkItem = {
+    id: string; customer_id: string; name: string; description: string | null
+    file_name: string | null; file_size: number | null; mime_type: string | null
+    width: number | null; height: number | null; url: string
+    cloudinary_public_id: string | null; cloudinary_resource_type: string | null
+    thumbnail_url: string | null; is_drive_link: boolean
+    added_by: string; created_at: string; updated_at: string
+  }
+  const [artwork, setArtwork] = useState<ArtworkItem[]>([])
+  const [artworkLoaded, setArtworkLoaded] = useState(false)
+  const [artworkLoading, setArtworkLoading] = useState(false)
+  const [showArtworkModal, setShowArtworkModal] = useState(false)
+  const [artworkMode, setArtworkMode] = useState<'upload' | 'drive'>('upload')
+  const [artworkFile, setArtworkFile] = useState<File | null>(null)
+  const [artworkName, setArtworkName] = useState('')
+  const [artworkDesc, setArtworkDesc] = useState('')
+  const [artworkDriveUrl, setArtworkDriveUrl] = useState('')
+  const [artworkUploading, setArtworkUploading] = useState(false)
+  const [artworkError, setArtworkError] = useState<string | null>(null)
+
+  async function loadArtwork() {
+    if (!customer || artworkLoaded) return
+    setArtworkLoading(true)
+    try {
+      const res = await fetch(`/api/crm/artwork?customer_id=${customer.id}`)
+      if (res.ok) setArtwork(await res.json())
+    } finally {
+      setArtworkLoading(false)
+      setArtworkLoaded(true)
+    }
+  }
+
+  async function handleArtworkSubmit(e: React.FormEvent) {
+    e.preventDefault()
+    if (!customer) return
+    setArtworkUploading(true)
+    setArtworkError(null)
+    try {
+      let payload: Record<string, unknown> = {
+        customer_id: customer.id,
+        name: artworkName,
+        description: artworkDesc || null,
+        is_drive_link: artworkMode === 'drive',
+      }
+
+      if (artworkMode === 'upload' && artworkFile) {
+        const form = new FormData()
+        form.append('file', artworkFile)
+        form.append('customer_id', customer.id)
+        const uploadRes = await fetch('/api/crm/artwork/upload', { method: 'POST', body: form })
+        if (!uploadRes.ok) {
+          const err = await uploadRes.json()
+          setArtworkError(err.error ?? 'Upload failed')
+          return
+        }
+        const uploaded = await uploadRes.json()
+        payload = { ...payload, ...uploaded }
+      } else if (artworkMode === 'drive') {
+        payload.url = artworkDriveUrl
+      }
+
+      const saveRes = await fetch('/api/crm/artwork', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      })
+      if (!saveRes.ok) {
+        const err = await saveRes.json()
+        setArtworkError(err.error ?? 'Save failed')
+        return
+      }
+      const saved = await saveRes.json()
+      setArtwork((prev) => [saved, ...prev])
+      setShowArtworkModal(false)
+      setArtworkFile(null)
+      setArtworkName('')
+      setArtworkDesc('')
+      setArtworkDriveUrl('')
+      setArtworkMode('upload')
+    } finally {
+      setArtworkUploading(false)
+    }
+  }
+
+  async function handleArtworkDelete(id: string) {
+    if (!confirm('Delete this artwork?')) return
+    const res = await fetch(`/api/crm/artwork/${id}`, { method: 'DELETE' })
+    if (res.ok || res.status === 204) {
+      setArtwork((prev) => prev.filter((a) => a.id !== id))
+    }
+  }
+
+  function formatBytes(bytes: number | null) {
+    if (!bytes) return null
+    if (bytes < 1024) return `${bytes} B`
+    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
+  }
 
   useEffect(() => {
     if (customer) setTagIds((customer.tags ?? []).map((t) => t.id))
@@ -432,10 +532,13 @@ export default function CustomerDetailPage() {
 
       {/* Tabs */}
       <div className="flex gap-1 mb-3">
-        {(['details', 'related', 'activity'] as const).map((tab) => (
+        {(['details', 'related', 'activity', 'artwork'] as const).map((tab) => (
           <button
             key={tab}
-            onClick={() => setActiveTab(tab)}
+            onClick={() => {
+              setActiveTab(tab)
+              if (tab === 'artwork') loadArtwork()
+            }}
             className={`px-4 py-1.5 text-sm font-semibold rounded-lg capitalize transition-colors ${
               activeTab === tab ? 'bg-purple-700 text-white' : 'text-slate-600 hover:bg-slate-100'
             }`}
@@ -445,6 +548,9 @@ export default function CustomerDetailPage() {
               <span className="ml-1.5 text-xs opacity-70">
                 {customer.contacts.length + customer.opportunities.length + customer.files.length}
               </span>
+            )}
+            {tab === 'artwork' && artworkLoaded && artwork.length > 0 && (
+              <span className="ml-1.5 text-xs opacity-70">{artwork.length}</span>
             )}
           </button>
         ))}
@@ -839,6 +945,196 @@ export default function CustomerDetailPage() {
         <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center text-sm text-slate-400">
           Task activity for this customer will appear here once the Tasks feature is complete.{' '}
           <button onClick={() => router.push(`/crm/tasks?customer_id=${customer.id}`)} className="text-purple-700 hover:underline">View tasks →</button>
+        </div>
+      )}
+
+      {/* ── Artwork Tab ── */}
+      {activeTab === 'artwork' && (
+        <div className="space-y-4">
+          {/* Header */}
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-700">
+              Artwork{artworkLoaded ? ` (${artwork.length})` : ''}
+            </h2>
+            <button
+              onClick={() => { setShowArtworkModal(true); setArtworkError(null) }}
+              className="px-3 py-1.5 bg-purple-700 text-white text-sm font-semibold rounded-lg hover:bg-purple-800 transition-colors"
+            >
+              + Add Artwork
+            </button>
+          </div>
+
+          {/* Loading */}
+          {artworkLoading && (
+            <div className="text-center py-10 text-sm text-slate-400">Loading artwork…</div>
+          )}
+
+          {/* Empty state */}
+          {artworkLoaded && !artworkLoading && artwork.length === 0 && (
+            <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center text-sm text-slate-400">
+              No artwork yet. Upload files or link Google Drive assets.
+            </div>
+          )}
+
+          {/* Grid */}
+          {artwork.length > 0 && (
+            <div className="grid grid-cols-3 gap-4">
+              {artwork.map((item) => {
+                const thumb = item.thumbnail_url ?? null
+                const ext = item.file_name?.split('.').pop()?.toUpperCase() ?? '?'
+                const date = new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
+
+                return (
+                  <div key={item.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col">
+                    {/* Preview area */}
+                    <a href={item.url} target="_blank" rel="noopener noreferrer" className="block">
+                      {item.is_drive_link ? (
+                        <div className="h-36 bg-slate-50 flex items-center justify-center">
+                          {/* Google Drive icon */}
+                          <svg className="w-14 h-14" viewBox="0 0 87.3 78" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3L27.5 50H0c0 1.55.4 3.1 1.2 4.5L6.6 66.85z" fill="#0066DA"/>
+                            <path d="M43.65 25L29.9 1.2c-1.35.8-2.5 1.9-3.3 3.3L1.2 45.5c-.8 1.4-1.2 2.95-1.2 4.5h27.5L43.65 25z" fill="#00AC47"/>
+                            <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H60.1l5.9 11.5 7.55 12.3z" fill="#EA4335"/>
+                            <path d="M43.65 25L57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.45-4.5 1.2L43.65 25z" fill="#00832D"/>
+                            <path d="M60.1 50H27.5L13.75 76.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2L60.1 50z" fill="#2684FC"/>
+                            <path d="M73.4 26.5l-12.85-22.3c-.8-1.4-1.95-2.5-3.3-3.3L43.65 25 60.1 50h27.45c0-1.55-.4-3.1-1.2-4.5L73.4 26.5z" fill="#FFBA00"/>
+                          </svg>
+                        </div>
+                      ) : thumb ? (
+                        <div className="h-36 bg-slate-100 overflow-hidden relative">
+                          <img src={thumb} alt={item.name} className="w-full h-full object-contain"
+                            onError={(e) => {
+                              const img = e.target as HTMLImageElement
+                              img.style.display = 'none'
+                              const fallback = img.nextElementSibling as HTMLElement | null
+                              if (fallback) fallback.style.display = 'flex'
+                            }}
+                          />
+                          <div className="absolute inset-0 hidden items-center justify-center bg-slate-50">
+                            <span className="text-2xl font-black text-slate-300">{ext}</span>
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="h-36 bg-slate-50 flex items-center justify-center">
+                          <span className="text-2xl font-black text-slate-300">{ext}</span>
+                        </div>
+                      )}
+                    </a>
+
+                    {/* Metadata */}
+                    <div className="p-3 flex flex-col gap-1 flex-1">
+                      <div className="text-sm font-semibold text-slate-800 truncate" title={item.name}>{item.name}</div>
+                      {item.description && (
+                        <div className="text-xs text-slate-500 line-clamp-2">{item.description}</div>
+                      )}
+                      <div className="text-xs text-slate-400 mt-auto pt-1 space-y-0.5">
+                        {item.is_drive_link
+                          ? <span>Google Drive</span>
+                          : (
+                            <span>
+                              {item.mime_type?.split('/')[1]?.toUpperCase() ?? ext}
+                              {item.width && item.height ? ` · ${item.width}×${item.height}` : ''}
+                              {item.file_size ? ` · ${formatBytes(item.file_size)}` : ''}
+                            </span>
+                          )
+                        }
+                        <div>{date}</div>
+                      </div>
+                      <button
+                        onClick={() => handleArtworkDelete(item.id)}
+                        className="mt-2 text-xs text-red-500 hover:text-red-700 text-left transition-colors"
+                      >
+                        Delete
+                      </button>
+                    </div>
+                  </div>
+                )
+              })}
+            </div>
+          )}
+
+          {/* Upload Modal */}
+          {showArtworkModal && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+              <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+                  <h3 className="text-base font-semibold text-slate-800">Add Artwork</h3>
+                  <button onClick={() => setShowArtworkModal(false)} className="text-slate-400 hover:text-slate-600">
+                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                    </svg>
+                  </button>
+                </div>
+                <form onSubmit={handleArtworkSubmit} className="p-6 space-y-4">
+                  {/* Mode toggle */}
+                  <div className="flex gap-2">
+                    <button type="button"
+                      onClick={() => setArtworkMode('upload')}
+                      className={`flex-1 py-1.5 text-sm font-semibold rounded-lg border transition-colors ${artworkMode === 'upload' ? 'bg-purple-700 text-white border-purple-700' : 'text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                    >Upload File</button>
+                    <button type="button"
+                      onClick={() => setArtworkMode('drive')}
+                      className={`flex-1 py-1.5 text-sm font-semibold rounded-lg border transition-colors ${artworkMode === 'drive' ? 'bg-purple-700 text-white border-purple-700' : 'text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                    >Google Drive Link</button>
+                  </div>
+
+                  {artworkMode === 'upload' ? (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">File</label>
+                      <input type="file" required
+                        onChange={(e) => {
+                          const f = e.target.files?.[0] ?? null
+                          setArtworkFile(f)
+                          if (f && !artworkName) setArtworkName(f.name.replace(/\.[^.]+$/, ''))
+                        }}
+                        className="block w-full text-sm text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
+                      />
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Google Drive URL</label>
+                      <input type="url" required value={artworkDriveUrl} onChange={(e) => setArtworkDriveUrl(e.target.value)}
+                        placeholder="https://drive.google.com/..."
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+                      />
+                    </div>
+                  )}
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Name <span className="text-red-400">*</span></label>
+                    <input type="text" required value={artworkName} onChange={(e) => setArtworkName(e.target.value)}
+                      placeholder="e.g. Primary Logo"
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-xs font-semibold text-slate-600 mb-1">Description</label>
+                    <textarea value={artworkDesc} onChange={(e) => setArtworkDesc(e.target.value)}
+                      placeholder="Optional notes about this file…"
+                      rows={2}
+                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 resize-none"
+                    />
+                  </div>
+
+                  {artworkError && (
+                    <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{artworkError}</p>
+                  )}
+
+                  <div className="flex gap-2 pt-1">
+                    <button type="button" onClick={() => setShowArtworkModal(false)}
+                      className="flex-1 py-2 text-sm font-semibold text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
+                    >Cancel</button>
+                    <button type="submit" disabled={artworkUploading}
+                      className="flex-1 py-2 text-sm font-semibold text-white bg-purple-700 rounded-lg hover:bg-purple-800 disabled:opacity-50 transition-colors"
+                    >
+                      {artworkUploading ? 'Uploading…' : 'Save'}
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
