@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
+import QuickAddTask from '@/components/crm/QuickAddTask'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -430,6 +431,29 @@ export default function MyTasksPage() {
             </svg>
             New Task
           </button>
+        </div>
+
+        {/* Quick-add input */}
+        <div style={{ marginBottom: 16 }}>
+          <QuickAddTask
+            onTaskCreated={(created) => {
+              setTasks(prev => [...prev, {
+                id: created.id,
+                title: created.title,
+                category: created.category,
+                priority: created.priority as TaskItem['priority'],
+                status: created.status as TaskItem['status'],
+                due_date: created.due_date,
+                progress: created.progress ?? 0,
+                linked_to_name: null,
+                linked_to_type: null,
+                opportunity_id: null,
+                customer_id: null,
+                vendor_id: null,
+                contact_id: null,
+              }])
+            }}
+          />
         </div>
 
         {/* Controls */}

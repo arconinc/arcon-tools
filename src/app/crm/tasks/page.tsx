@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import QuickAddTask from '@/components/crm/QuickAddTask'
 
 const PAGE_SIZE = 50
 
@@ -149,6 +150,16 @@ export default function TasksPage() {
           </svg>
           New Task
         </button>
+      </div>
+
+      {/* Quick-add input */}
+      <div className="mb-5">
+        <QuickAddTask
+          onTaskCreated={(created) => {
+            setAllTasks(prev => [{ ...created, assigned_user_name: null, linked_to_name: null, linked_to_type: null, opportunity_id: null, customer_id: null, vendor_id: null, contact_id: null } as TaskListItem, ...prev])
+            setTotal(t => t + 1)
+          }}
+        />
       </div>
 
       {/* Filters */}

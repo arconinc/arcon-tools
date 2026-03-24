@@ -22,18 +22,13 @@ export async function GET(req: NextRequest) {
   const to = from + limit - 1
 
   // Resolve "me" to current user id
-  const isMine = assignedTo === 'me'
-  const resolvedAssignedTo = isMine ? appUser.id : assignedTo
+  const resolvedAssignedTo = assignedTo === 'me' ? appUser.id : assignedTo
 
   const adminClient = createAdminClient()
 
   const applyFilters = (q: any) => {
     if (resolvedAssignedTo) {
-      if (isMine) {
-        q = q.or(`assigned_to.eq.${resolvedAssignedTo},task_owner.eq.${resolvedAssignedTo}`)
-      } else {
-        q = q.eq('assigned_to', resolvedAssignedTo)
-      }
+      q = q.eq('assigned_to', resolvedAssignedTo)
     }
     if (status) {
       const statuses = status.split(',').map((s) => s.trim()).filter(Boolean)

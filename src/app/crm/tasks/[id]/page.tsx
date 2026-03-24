@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAppUser } from '@/components/layout/AppShell'
+import EntitySearchPicker from '@/components/crm/EntitySearchPicker'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -11,9 +12,6 @@ type TaskStatus = 'not_started' | 'in_progress' | 'completed' | 'waiting_on_appr
 type TaskPriority = 'low' | 'medium' | 'high'
 
 type DropdownUser = { id: string; display_name: string; email: string }
-type DropdownCustomer = { id: string; name: string }
-type DropdownVendor = { id: string; name: string }
-type DropdownOpportunity = { id: string; name: string }
 type DropdownContact = { id: string; first_name: string; last_name: string }
 
 type Attachment = {
@@ -513,19 +511,18 @@ export default function TaskDetailPage() {
 
   // Dropdown data
   const [crmUsers, setCrmUsers] = useState<DropdownUser[]>([])
-  const [customers, setCustomers] = useState<DropdownCustomer[]>([])
-  const [vendors, setVendors] = useState<DropdownVendor[]>([])
-  const [opportunities, setOpportunities] = useState<DropdownOpportunity[]>([])
   const [contacts, setContacts] = useState<DropdownContact[]>([])
+
+  // Display names for create form link pickers
+  const [createLinkNames, setCreateLinkNames] = useState<{
+    opportunity: string | null; customer: string | null; vendor: string | null
+  }>({ opportunity: null, customer: null, vendor: null })
 
   useEffect(() => {
     Promise.all([
       fetch('/api/crm/users').then((r) => r.json()),
-      fetch('/api/crm/customers').then((r) => r.json()),
-      fetch('/api/crm/vendors').then((r) => r.json()),
-      fetch('/api/crm/opportunities').then((r) => r.json()),
       fetch('/api/crm/contacts').then((r) => r.json()),
-    ]).then(([users, custs, vends, opps, conts]) => {
+    ]).then(([users, conts]) => {
       if (Array.isArray(users)) {
         setCrmUsers(users)
         // Pre-select the current user in the assigned_to field for new tasks
@@ -534,10 +531,6 @@ export default function TaskDetailPage() {
           if (me) setCreateForm((prev) => ({ ...prev, assigned_to: me.id }))
         }
       }
-      if (Array.isArray(custs)) setCustomers(custs)
-      if (Array.isArray(vends)) setVendors(vends)
-      // opportunities API returns { items: [...], pipeline_total: ... }
-      if (opps?.items && Array.isArray(opps.items)) setOpportunities(opps.items)
       if (Array.isArray(conts)) setContacts(conts)
     })
   }, [])
@@ -745,39 +738,42 @@ export default function TaskDetailPage() {
           <div className="border-t border-slate-100 pt-4">
             <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Link To (optional — select one)</div>
             <div className="grid grid-cols-2 gap-4">
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Opportunity</label>
-                <select value={cf.opportunity_id}
-                  onChange={(e) => setCreateForm((p) => ({ ...p, opportunity_id: e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                  <option value="">— None —</option>
-                  {opportunities.map((o) => (
-                    <option key={o.id} value={o.id}>{o.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Customer</label>
-                <select value={cf.customer_id}
-                  onChange={(e) => setCreateForm((p) => ({ ...p, customer_id: e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                  <option value="">— None —</option>
-                  {customers.map((c) => (
-                    <option key={c.id} value={c.id}>{c.name}</option>
-                  ))}
-                </select>
-              </div>
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Vendor</label>
-                <select value={cf.vendor_id}
-                  onChange={(e) => setCreateForm((p) => ({ ...p, vendor_id: e.target.value }))}
-                  className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                  <option value="">— None —</option>
-                  {vendors.map((v) => (
-                    <option key={v.id} value={v.id}>{v.name}</option>
-                  ))}
-                </select>
-              </div>
+              <EntitySearchPicker
+                label="Opportunity"
+                apiPath="/api/crm/opportunities"
+                resultsKey="items"
+                value={cf.opportunity_id || null}
+                displayName={createLinkNames.opportunity}
+                onSelect={(id, name) => {
+                  setCreateForm((p) => ({ ...p, opportunity_id: id ?? '' }))
+                  setCreateLinkNames((p) => ({ ...p, opportunity: name }))
+                }}
+                placeholder="Search opportunities…"
+              />
+              <EntitySearchPicker
+                label="Customer"
+                apiPath="/api/crm/customers"
+                resultsKey="customers"
+                value={cf.customer_id || null}
+                displayName={createLinkNames.customer}
+                onSelect={(id, name) => {
+                  setCreateForm((p) => ({ ...p, customer_id: id ?? '' }))
+                  setCreateLinkNames((p) => ({ ...p, customer: name }))
+                }}
+                placeholder="Search customers…"
+              />
+              <EntitySearchPicker
+                label="Vendor"
+                apiPath="/api/crm/vendors"
+                resultsKey="vendors"
+                value={cf.vendor_id || null}
+                displayName={createLinkNames.vendor}
+                onSelect={(id, name) => {
+                  setCreateForm((p) => ({ ...p, vendor_id: id ?? '' }))
+                  setCreateLinkNames((p) => ({ ...p, vendor: name }))
+                }}
+                placeholder="Search vendors…"
+              />
               <div>
                 <label className="block text-xs text-slate-500 mb-1">Contact</label>
                 <select value={cf.contact_id}
@@ -986,39 +982,39 @@ export default function TaskDetailPage() {
                   <div className="col-span-2 border-t border-slate-100 pt-4">
                     <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Linked Record</div>
                     <div className="grid grid-cols-2 gap-4">
-                      <div>
-                        <label className="block text-xs text-slate-500 mb-1">Opportunity</label>
-                        <select value={(ef.opportunity_id as string) ?? ''}
-                          onChange={(e) => handleEditChange('opportunity_id', e.target.value)}
-                          className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                          <option value="">— None —</option>
-                          {opportunities.map((o) => (
-                            <option key={o.id} value={o.id}>{o.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs text-slate-500 mb-1">Customer</label>
-                        <select value={(ef.customer_id as string) ?? ''}
-                          onChange={(e) => handleEditChange('customer_id', e.target.value)}
-                          className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                          <option value="">— None —</option>
-                          {customers.map((c) => (
-                            <option key={c.id} value={c.id}>{c.name}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs text-slate-500 mb-1">Vendor</label>
-                        <select value={(ef.vendor_id as string) ?? ''}
-                          onChange={(e) => handleEditChange('vendor_id', e.target.value)}
-                          className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                          <option value="">— None —</option>
-                          {vendors.map((v) => (
-                            <option key={v.id} value={v.id}>{v.name}</option>
-                          ))}
-                        </select>
-                      </div>
+                      <EntitySearchPicker
+                        label="Opportunity"
+                        apiPath="/api/crm/opportunities"
+                        resultsKey="items"
+                        value={(ef.opportunity_id as string) ?? null}
+                        displayName={(ef.opportunity as { name: string } | null)?.name ?? null}
+                        onSelect={(id, name) =>
+                          setEditForm((p) => ({ ...p, opportunity_id: id ?? null, opportunity: id ? { id, name: name! } : null }))
+                        }
+                        placeholder="Search opportunities…"
+                      />
+                      <EntitySearchPicker
+                        label="Customer"
+                        apiPath="/api/crm/customers"
+                        resultsKey="customers"
+                        value={(ef.customer_id as string) ?? null}
+                        displayName={(ef.customer as { name: string } | null)?.name ?? null}
+                        onSelect={(id, name) =>
+                          setEditForm((p) => ({ ...p, customer_id: id ?? null, customer: id ? { id, name: name! } : null }))
+                        }
+                        placeholder="Search customers…"
+                      />
+                      <EntitySearchPicker
+                        label="Vendor"
+                        apiPath="/api/crm/vendors"
+                        resultsKey="vendors"
+                        value={(ef.vendor_id as string) ?? null}
+                        displayName={(ef.vendor as { name: string } | null)?.name ?? null}
+                        onSelect={(id, name) =>
+                          setEditForm((p) => ({ ...p, vendor_id: id ?? null, vendor: id ? { id, name: name! } : null }))
+                        }
+                        placeholder="Search vendors…"
+                      />
                       <div>
                         <label className="block text-xs text-slate-500 mb-1">Contact</label>
                         <select value={(ef.contact_id as string) ?? ''}
