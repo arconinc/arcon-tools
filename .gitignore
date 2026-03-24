@@ -42,3 +42,4 @@ next-env.d.ts
 /docs/
 /design-preview.html
 /firebase-debug.log
+/data/

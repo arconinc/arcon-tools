@@ -28,15 +28,17 @@ function extractOwnerEmail(owner: unknown): string | null {
   return parts[1]?.trim() || null
 }
 
-// Map Insightly Client Status to CrmClientStatus
+// Map Company Type to CrmClientStatus
 function mapClientStatus(row: Record<string, unknown>): string {
-  const cs = str(row['Client Status'])
-  if (cs === 'Active') return 'Active'
-  if (cs === 'Prospective') return 'Prospective'
-  if (cs === 'Former') return 'Former'
-  if (str(row['Company Type'])?.toLowerCase() === 'prospect') return 'Prospective'
+  const ct = str(row['Company Type'])?.toLowerCase()
+  if (ct === 'prospect') return 'Prospective'
+  // Customer, Customer Over $250K, Customer and Vendor, Other, blank → Active
   return 'Active'
 }
+
+const KNOWN_COMPANY_TYPES = new Set([
+  'prospect', 'customer', 'vendor', 'customer and vendor', 'customer over $250k',
+])
 
 // Merge: new non-null value wins; otherwise keep existing
 function merge<T>(newVal: T | null, existingVal: T | null | undefined): T | null {
@@ -117,9 +119,12 @@ export async function POST(req: NextRequest) {
       const t = str(row[col])
       if (t) allTagNamesNeeded.add(t)
     }
-    const ct = str(row['Company Type'])?.toLowerCase()
-    if (ct && ct !== 'vendor' && ct !== 'customer') {
-      allTagNamesNeeded.add(str(row['Company Type'])!)
+    const ct = str(row['Company Type'])
+    if (ct) {
+      const ctL = ct.toLowerCase()
+      if (ctL === 'customer over $250k') allTagNamesNeeded.add('Over $250K')
+      else if (ctL === 'customer and vendor') allTagNamesNeeded.add(ct)
+      else if (!KNOWN_COMPANY_TYPES.has(ctL)) allTagNamesNeeded.add(ct)
     }
   }
 
@@ -154,9 +159,10 @@ export async function POST(req: NextRequest) {
   // ── Process rows ──────────────────────────────────────────────────────────
   const customerUpserts: Record<string, unknown>[] = []
   const vendorUpserts: Record<string, unknown>[] = []
-  const customerTagNames = new Map<string, string[]>()
-  const vendorTagNames   = new Map<string, string[]>()
-  const unmatchedOwners  = new Set<string>()
+  const customerTagNames    = new Map<string, string[]>()
+  const vendorTagNames      = new Map<string, string[]>()
+  const customerAndVendorIds = new Set<string>()
+  const unmatchedOwners     = new Set<string>()
   const errors: string[] = []
 
   for (const row of rows) {
@@ -179,10 +185,14 @@ export async function POST(req: NextRequest) {
       const t = str(row[col])
       if (t) rowTagNames.push(t)
     }
-    const ct = str(row['Company Type'])?.toLowerCase()
-    if (ct && ct !== 'vendor' && ct !== 'customer') {
-      rowTagNames.push(str(row['Company Type'])!)
+    const ct = str(row['Company Type'])
+    const ctLower = ct?.toLowerCase()
+    if (ct) {
+      if (ctLower === 'customer over $250k') rowTagNames.push('Over $250K')
+      else if (ctLower === 'customer and vendor') rowTagNames.push(ct)
+      else if (!KNOWN_COMPANY_TYPES.has(ctLower!)) rowTagNames.push(ct)
     }
+    if (ctLower === 'customer and vendor') customerAndVendorIds.add(insightlyId)
 
     if (isCustomer) {
       const ex = existingCustomerMap.get(insightlyId)
@@ -363,10 +373,36 @@ export async function POST(req: NextRequest) {
     if (error) errors.push(`Tag linking batch ${Math.floor(i / BATCH) + 1}: ${error.message}`)
   }
 
+  // ── Link vendor records for "Customer and Vendor" customers ───────────────
+  let vendorLinksSet = 0
+  if (customerAndVendorIds.size > 0) {
+    const { data: linkedVendors } = await adminClient
+      .from('crm_vendors')
+      .select('id, insightly_id')
+      .in('insightly_id', [...customerAndVendorIds])
+    const vendorDbByInsightlyId = new Map<string, string>()
+    for (const v of linkedVendors ?? []) {
+      if (v.insightly_id) vendorDbByInsightlyId.set(String(v.insightly_id), v.id)
+    }
+    for (const iid of customerAndVendorIds) {
+      const custDbId   = custIdMap.get(iid)
+      const vendorDbId = vendorDbByInsightlyId.get(iid)
+      if (custDbId && vendorDbId) {
+        const { error } = await adminClient
+          .from('crm_customers')
+          .update({ vendor_id: vendorDbId })
+          .eq('id', custDbId)
+        if (error) errors.push(`Vendor link for insightly_id ${iid}: ${error.message}`)
+        else vendorLinksSet++
+      }
+    }
+  }
+
   return NextResponse.json({
     customers:        { inserted: customersInserted, updated: customersUpdated },
     vendors:          { inserted: vendorsInserted,   updated: vendorsUpdated },
     tags_created:     tagsCreated,
+    vendor_links_set: vendorLinksSet,
     unmatched_owners: [...unmatchedOwners].sort(),
     errors,
   })

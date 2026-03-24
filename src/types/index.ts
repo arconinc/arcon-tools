@@ -500,6 +500,7 @@ export interface CrmVendor {
   industry: string | null
   notes: string | null
   insightly_id: string | null
+  vendor_id: string | null
   assigned_to: string | null
   created_by: string
   created_at: string
