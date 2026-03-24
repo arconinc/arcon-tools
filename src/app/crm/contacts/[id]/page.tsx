@@ -4,11 +4,10 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import TagPicker from '@/components/crm/TagPicker'
+import EntitySearchPicker from '@/components/crm/EntitySearchPicker'
 import { formatPhoneInput } from '@/lib/phone'
 
 type DropdownUser = { id: string; display_name: string; email: string }
-type DropdownCustomer = { id: string; name: string }
-type DropdownVendor = { id: string; name: string }
 type TagOption = { id: string; name: string; color: string }
 
 type ContactDetail = {
@@ -77,23 +76,17 @@ export default function ContactDetailPage() {
 
   // Dropdown data
   const [crmUsers, setCrmUsers] = useState<DropdownUser[]>([])
-  const [customers, setCustomers] = useState<DropdownCustomer[]>([])
-  const [vendors, setVendors] = useState<DropdownVendor[]>([])
 
   useEffect(() => {
-    Promise.all([
-      fetch('/api/crm/users').then((r) => r.json()),
-      fetch('/api/crm/customers').then((r) => r.json()),
-      fetch('/api/crm/vendors').then((r) => r.json()),
-    ]).then(([users, custs, vends]) => {
+    fetch('/api/crm/users').then((r) => r.json()).then((users) => {
       if (Array.isArray(users)) setCrmUsers(users)
-      if (Array.isArray(custs)) setCustomers(custs)
-      if (Array.isArray(vends)) setVendors(vends)
     })
   }, [])
   const [activeTab, setActiveTab] = useState<'details' | 'related' | 'activity'>('details')
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState<Partial<ContactDetail>>({})
+  const [editCustomerName, setEditCustomerName] = useState<string | null>(null)
+  const [editVendorName, setEditVendorName] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
   // Tags — always-editable, saves immediately
@@ -135,8 +128,19 @@ export default function ContactDetailPage() {
       .finally(() => setLoading(false))
   }, [id, isNew])
 
-  function startEdit() { if (!contact) return; setEditForm({ ...contact }); setEditing(true) }
-  function cancelEdit() { setEditing(false); setEditForm({}) }
+  function startEdit() {
+    if (!contact) return
+    setEditForm({ ...contact })
+    setEditCustomerName(contact.customer?.name ?? null)
+    setEditVendorName(contact.vendor?.name ?? null)
+    setEditing(true)
+  }
+  function cancelEdit() {
+    setEditing(false)
+    setEditForm({})
+    setEditCustomerName(null)
+    setEditVendorName(null)
+  }
   const PHONE_FIELDS = new Set(['phone', 'home_phone', 'mobile_phone', 'other_phone'])
   function handleEditChange(field: string, value: string) {
     const formatted = PHONE_FIELDS.has(field) ? formatPhoneInput(value) : value
@@ -154,7 +158,9 @@ export default function ContactDetailPage() {
       })
       const data = await res.json()
       if (!res.ok) { alert(data.error ?? 'Save failed'); return }
-      setContact((prev) => prev ? { ...prev, ...data } : prev)
+      // Re-fetch full contact to get updated nested relations (customer, vendor)
+      const full = await fetch(`/api/crm/contacts/${contact.id}`).then((r) => r.json())
+      if (!full.error) setContact(full)
       setEditing(false)
     } finally { setSaving(false) }
   }
@@ -232,22 +238,24 @@ export default function ContactDetailPage() {
               <option>Customer</option><option>Vendor</option><option>Prospect</option><option>Partner</option><option>Other</option>
             </select>
           </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Link to Customer</label>
-            <select value={createForm.customer_id} onChange={(e) => setCreateForm((p) => ({ ...p, customer_id: e.target.value }))}
-              className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-              <option value="">— None —</option>
-              {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-            </select>
-          </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Link to Vendor</label>
-            <select value={createForm.vendor_id} onChange={(e) => setCreateForm((p) => ({ ...p, vendor_id: e.target.value }))}
-              className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-              <option value="">— None —</option>
-              {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-            </select>
-          </div>
+          <EntitySearchPicker
+            label="Link to Customer"
+            apiPath="/api/crm/customers"
+            resultsKey="customers"
+            value={createForm.customer_id || null}
+            displayName={null}
+            onSelect={(id) => setCreateForm((p) => ({ ...p, customer_id: id ?? '' }))}
+            placeholder="Search customers…"
+          />
+          <EntitySearchPicker
+            label="Link to Vendor"
+            apiPath="/api/crm/vendors"
+            resultsKey="vendors"
+            value={createForm.vendor_id || null}
+            displayName={null}
+            onSelect={(id) => setCreateForm((p) => ({ ...p, vendor_id: id ?? '' }))}
+            placeholder="Search vendors…"
+          />
           <div className="flex gap-3 pt-1">
             <button type="submit" disabled={creating}
               className="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl disabled:opacity-60 transition-colors">
@@ -489,22 +497,24 @@ export default function ContactDetailPage() {
                           {crmUsers.map((u) => <option key={u.id} value={u.id}>{u.display_name}</option>)}
                         </select>
                       </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Link to Customer</label>
-                        <select value={(ef.customer_id as string) ?? ''} onChange={(e) => handleEditChange('customer_id', e.target.value)}
-                          className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                          <option value="">— None —</option>
-                          {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
-                        </select>
-                      </div>
-                      <div>
-                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Link to Vendor</label>
-                        <select value={(ef.vendor_id as string) ?? ''} onChange={(e) => handleEditChange('vendor_id', e.target.value)}
-                          className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                          <option value="">— None —</option>
-                          {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
-                        </select>
-                      </div>
+                      <EntitySearchPicker
+                        label="Link to Customer"
+                        apiPath="/api/crm/customers"
+                        resultsKey="customers"
+                        value={(ef.customer_id as string) || null}
+                        displayName={editCustomerName}
+                        onSelect={(id, name) => { handleEditChange('customer_id', id ?? ''); setEditCustomerName(name) }}
+                        placeholder="Search customers…"
+                      />
+                      <EntitySearchPicker
+                        label="Link to Vendor"
+                        apiPath="/api/crm/vendors"
+                        resultsKey="vendors"
+                        value={(ef.vendor_id as string) || null}
+                        displayName={editVendorName}
+                        onSelect={(id, name) => { handleEditChange('vendor_id', id ?? ''); setEditVendorName(name) }}
+                        placeholder="Search vendors…"
+                      />
                       <div className="col-span-2">
                         <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Description</label>
                         <textarea rows={3} value={(ef.description as string) ?? ''} onChange={(e) => handleEditChange('description', e.target.value)}

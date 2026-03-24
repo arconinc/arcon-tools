@@ -47,7 +47,9 @@ export function useStore() {
 }
 
 interface UserContextValue {
-  user: { email: string; display_name: string; is_admin: boolean; avatar_url?: string | null } | null
+  user: {
+      id: string;
+      email: string; display_name: string; is_admin: boolean; avatar_url?: string | null } | null
 }
 
 export const UserContext = createContext<UserContextValue>({ user: null })

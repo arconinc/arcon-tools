@@ -51,7 +51,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { id } = await params
   const body = await req.json()
-  const { id: _id, created_at: _ca, created_by: _cb, tag_ids, tags: _tags, ...updates } = body
+  const { id: _id, created_at: _ca, updated_at: _ua, created_by: _cb, tag_ids, tags: _tags, customer: _customer, vendor: _vendor, files: _files, ...updates } = body
 
   const adminClient = createAdminClient()
 
