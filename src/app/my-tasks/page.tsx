@@ -125,7 +125,7 @@ export default function MyTasksPage() {
       const res = await fetch('/api/crm/tasks?assigned_to=me')
       if (!res.ok) throw new Error('Failed to fetch')
       const data = await res.json()
-      setTasks(Array.isArray(data) ? data : [])
+      setTasks(Array.isArray(data.tasks) ? data.tasks : [])
     } catch {
       setTasks([])
     } finally {

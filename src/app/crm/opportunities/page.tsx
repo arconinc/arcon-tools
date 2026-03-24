@@ -26,6 +26,50 @@ type OppListItem = {
 
 const STAGES = ['Send Quote', 'Follow Up on Quote', 'Quote Accepted', 'Send Thank You Email']
 
+function PipelineMini({ stage, status }: { stage: string | null; status: string }) {
+  const isClosed = status === 'won' || status === 'lost'
+  const currentIdx = stage ? STAGES.indexOf(stage) : -1
+
+  return (
+    <div className="flex items-center gap-0 min-w-[180px]">
+      {STAGES.map((s, idx) => {
+        const isActive = s === stage
+        const isPast = currentIdx > idx
+        const segColor = isClosed
+          ? status === 'won'
+            ? 'bg-green-100 text-green-700'
+            : 'bg-red-50 text-red-400'
+          : isActive
+          ? 'bg-purple-700 text-white'
+          : isPast
+          ? 'bg-purple-100 text-purple-600'
+          : 'bg-slate-100 text-slate-400'
+        const arrowColor = isClosed
+          ? status === 'won'
+            ? 'border-l-green-100'
+            : 'border-l-red-50'
+          : isActive
+          ? 'border-l-purple-700'
+          : isPast
+          ? 'border-l-purple-100'
+          : 'border-l-slate-100'
+
+        return (
+          <div key={s} className="flex items-center flex-1 min-w-0">
+            <div
+              title={s}
+              className={`flex-1 py-1 text-[10px] font-medium text-center truncate ${segColor} ${idx === 0 ? 'rounded-l' : ''} ${idx === STAGES.length - 1 ? 'rounded-r' : ''}`}
+            />
+            {idx < STAGES.length - 1 && (
+              <div className={`w-0 h-0 border-t-[10px] border-b-[10px] border-l-[7px] border-t-transparent border-b-transparent z-10 -mx-px flex-shrink-0 ${arrowColor}`} />
+            )}
+          </div>
+        )
+      })}
+    </div>
+  )
+}
+
 const STATUS_BADGE: Record<string, string> = {
   open: 'bg-blue-100 text-blue-800',
   won: 'bg-green-100 text-green-800',
@@ -224,7 +268,7 @@ export default function OpportunitiesPage() {
               <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Customer</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Value</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Stage</th>
+              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Pipeline</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden xl:table-cell">Tags</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden xl:table-cell">Forecast Close</th>
@@ -259,10 +303,8 @@ export default function OpportunitiesPage() {
                 <td className="px-5 py-3.5 font-medium text-slate-900">{o.name}</td>
                 <td className="px-5 py-3.5 text-slate-600 hidden md:table-cell">{o.customer_name ?? '—'}</td>
                 <td className="px-5 py-3.5 font-semibold text-slate-700">{fmt$(o.value)}</td>
-                <td className="px-5 py-3.5 text-slate-500 hidden lg:table-cell">
-                  {o.pipeline_stage
-                    ? <span className="text-xs bg-purple-50 text-purple-700 px-2 py-0.5 rounded font-medium">{o.pipeline_stage}</span>
-                    : <span className="text-slate-300">—</span>}
+                <td className="px-5 py-3.5 hidden lg:table-cell">
+                  <PipelineMini stage={o.pipeline_stage} status={o.status} />
                 </td>
                 <td className="px-5 py-3.5">
                   <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold capitalize ${STATUS_BADGE[o.status] ?? 'bg-slate-100 text-slate-600'}`}>

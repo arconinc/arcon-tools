@@ -36,11 +36,18 @@ const TYPE_COLORS: Record<string, string> = {
   Other: 'bg-slate-100 text-slate-700',
 }
 
-function Field({ label, value }: { label: string; value: string | null | undefined }) {
+function Field({ label, value, link, email }: { label: string; value: string | null | undefined; link?: boolean; email?: boolean }) {
+  const display = value
+    ? link
+      ? <a href={value} target="_blank" rel="noopener noreferrer" className="text-purple-700 hover:underline break-all">{value.replace(/^https?:\/\//, '')}</a>
+      : email
+        ? <a href={`mailto:${value}`} className="text-purple-700 hover:underline">{value}</a>
+        : <span>{value}</span>
+    : <span className="text-slate-400">—</span>
   return (
     <div>
-      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">{label}</div>
-      <div className="text-sm text-slate-800">{value || <span className="text-slate-400">—</span>}</div>
+      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-0.5">{label}</div>
+      <div className="text-sm text-slate-800">{display}</div>
     </div>
   )
 }
@@ -50,9 +57,9 @@ function FI({ label, name, value, onChange, type = 'text' }: {
 }) {
   return (
     <div>
-      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">{label}</label>
+      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">{label}</label>
       <input type={type} value={value} onChange={(e) => onChange(name, e.target.value)}
-        className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white" />
+        className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white" />
     </div>
   )
 }
@@ -181,71 +188,67 @@ export default function ContactDetailPage() {
 
   if (isNew) {
     return (
-      <div className="max-w-2xl mx-auto px-6 py-8">
-        <Link href="/crm/contacts" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-6">
+      <div className="max-w-2xl mx-auto px-6 py-6">
+        <Link href="/crm/contacts" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-5">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
           Contacts
         </Link>
-        <h1 className="text-2xl font-bold text-slate-900 mb-6">New Contact</h1>
-        <form onSubmit={handleCreate} className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
+        <h1 className="text-xl font-bold text-slate-900 mb-4">New Contact</h1>
+        <form onSubmit={handleCreate} className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
           {createError && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{createError}</div>}
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">First Name <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">First Name <span className="text-red-500">*</span></label>
               <input type="text" value={createForm.first_name} onChange={(e) => setCreateForm((p) => ({ ...p, first_name: e.target.value }))} required
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Last Name <span className="text-red-500">*</span></label>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Last Name <span className="text-red-500">*</span></label>
               <input type="text" value={createForm.last_name} onChange={(e) => setCreateForm((p) => ({ ...p, last_name: e.target.value }))} required
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Title / Role</label>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Title / Role</label>
             <input type="text" value={createForm.title} onChange={(e) => setCreateForm((p) => ({ ...p, title: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
+              className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
           </div>
-          <div className="grid grid-cols-2 gap-4">
+          <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Email</label>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Email</label>
               <input type="email" value={createForm.email} onChange={(e) => setCreateForm((p) => ({ ...p, email: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Phone</label>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Phone</label>
               <input type="tel" value={createForm.phone} onChange={(e) => setCreateForm((p) => ({ ...p, phone: formatPhoneInput(e.target.value) }))}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
             </div>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Type of Contact</label>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Type of Contact</label>
             <select value={createForm.type_of_contact} onChange={(e) => setCreateForm((p) => ({ ...p, type_of_contact: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+              className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
               <option>Customer</option><option>Vendor</option><option>Prospect</option><option>Partner</option><option>Other</option>
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Link to Customer</label>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Link to Customer</label>
             <select value={createForm.customer_id} onChange={(e) => setCreateForm((p) => ({ ...p, customer_id: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+              className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
               <option value="">— None —</option>
-              {customers.map((c) => (
-                <option key={c.id} value={c.id}>{c.name}</option>
-              ))}
+              {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
           <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Link to Vendor</label>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Link to Vendor</label>
             <select value={createForm.vendor_id} onChange={(e) => setCreateForm((p) => ({ ...p, vendor_id: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+              className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
               <option value="">— None —</option>
-              {vendors.map((v) => (
-                <option key={v.id} value={v.id}>{v.name}</option>
-              ))}
+              {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
             </select>
           </div>
-          <div className="flex gap-3 pt-2">
+          <div className="flex gap-3 pt-1">
             <button type="submit" disabled={creating}
               className="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl disabled:opacity-60 transition-colors">
               {creating ? 'Creating…' : 'Create Contact'}
@@ -261,9 +264,9 @@ export default function ContactDetailPage() {
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto px-6 py-8 animate-pulse space-y-4">
+      <div className="px-6 py-5 animate-pulse space-y-3">
         <div className="h-5 bg-slate-100 rounded w-24" />
-        <div className="h-28 bg-slate-100 rounded-2xl" />
+        <div className="h-24 bg-slate-100 rounded-2xl" />
         <div className="h-64 bg-slate-100 rounded-2xl" />
       </div>
     )
@@ -271,9 +274,9 @@ export default function ContactDetailPage() {
 
   if (error || !contact) {
     return (
-      <div className="max-w-4xl mx-auto px-6 py-8">
+      <div className="px-6 py-5">
         <Link href="/crm/contacts" className="text-sm text-slate-500 hover:text-slate-700">← Contacts</Link>
-        <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">{error ?? 'Contact not found'}</div>
+        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">{error ?? 'Contact not found'}</div>
       </div>
     )
   }
@@ -281,51 +284,47 @@ export default function ContactDetailPage() {
   const ef = editForm as Partial<ContactDetail>
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8">
-      <Link href="/crm/contacts" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-5">
+    <div className="px-6 py-5">
+      <Link href="/crm/contacts" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-3">
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
         Contacts
       </Link>
 
       {/* Header */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 mb-5">
-        <div className="flex items-start gap-4">
-          <div className="w-14 h-14 bg-purple-100 rounded-full flex items-center justify-center text-lg font-bold text-purple-700 flex-shrink-0">
+      <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-3">
+        <div className="flex items-center gap-4">
+          <div className="w-12 h-12 bg-purple-100 rounded-full flex items-center justify-center text-base font-bold text-purple-700 flex-shrink-0">
             {contact.first_name[0]}{contact.last_name[0]}
           </div>
           <div className="flex-1 min-w-0">
-            <h1 className="text-2xl font-bold text-slate-900">{contact.first_name} {contact.last_name}</h1>
-            <div className="flex items-center gap-3 mt-2 flex-wrap">
-              {contact.title && <span className="text-sm text-slate-600">{contact.title}</span>}
+            <div className="flex items-center gap-3 flex-wrap">
+              <h1 className="text-xl font-bold text-slate-900">{contact.first_name} {contact.last_name}</h1>
               <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${TYPE_COLORS[contact.type_of_contact] ?? TYPE_COLORS.Other}`}>
                 {contact.type_of_contact}
               </span>
-              {contact.email && <span className="text-sm text-slate-500">{contact.email}</span>}
-              {contact.phone && <span className="text-sm text-slate-500">{contact.phone}</span>}
             </div>
-            {(contact.customer || contact.vendor) && (
-              <div className="mt-2">
-                {contact.customer && (
-                  <Link href={`/crm/customers/${contact.customer.id}`} className="text-sm text-purple-700 hover:underline">
-                    {contact.customer.name}
-                  </Link>
-                )}
-                {contact.vendor && (
-                  <Link href={`/crm/vendors/${contact.vendor.id}`} className="text-sm text-purple-700 hover:underline">
-                    {contact.vendor.name}
-                  </Link>
-                )}
-              </div>
-            )}
+            <div className="flex items-center gap-4 mt-1 flex-wrap">
+              {contact.title && <span className="text-xs text-slate-500">{contact.title}</span>}
+              {contact.email && (
+                <a href={`mailto:${contact.email}`} className="text-xs text-purple-700 hover:underline">{contact.email}</a>
+              )}
+              {contact.phone && <span className="text-xs text-slate-500">{contact.phone}</span>}
+              {contact.customer && (
+                <Link href={`/crm/customers/${contact.customer.id}`} className="text-xs text-purple-700 hover:underline">{contact.customer.name}</Link>
+              )}
+              {contact.vendor && (
+                <Link href={`/crm/vendors/${contact.vendor.id}`} className="text-xs text-purple-700 hover:underline">{contact.vendor.name}</Link>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-5">
+      <div className="flex gap-1 mb-3">
         {(['details', 'related', 'activity'] as const).map((tab) => (
           <button key={tab} onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-sm font-semibold rounded-lg capitalize transition-colors ${
+            className={`px-4 py-1.5 text-sm font-semibold rounded-lg capitalize transition-colors ${
               activeTab === tab ? 'bg-purple-700 text-white' : 'text-slate-600 hover:bg-slate-100'
             }`}>
             {tab}
@@ -335,138 +334,221 @@ export default function ContactDetailPage() {
 
       {/* ── Details Tab ── */}
       {activeTab === 'details' && (
-        <div className="space-y-5">
-          {/* Card 1: Name & Occupation + Contact Details */}
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
-              <h2 className="text-sm font-semibold text-slate-700">Name & Contact Details</h2>
-              {!editing ? (
-                <button onClick={startEdit} className="px-3 py-1.5 text-xs font-semibold border border-slate-300 text-slate-600 rounded-lg hover:bg-white transition-colors">Edit</button>
-              ) : (
-                <div className="flex gap-2">
-                  <button onClick={saveEdit} disabled={saving} className="px-3 py-1.5 text-xs font-semibold bg-purple-700 text-white rounded-lg hover:bg-purple-800 disabled:opacity-60 transition-colors">{saving ? 'Saving…' : 'Save'}</button>
-                  <button onClick={cancelEdit} className="px-3 py-1.5 text-xs font-semibold border border-slate-300 text-slate-600 rounded-lg hover:bg-white transition-colors">Cancel</button>
+        <div className="grid grid-cols-3 gap-4 items-start">
+          {/* Main column */}
+          <div className="col-span-2 space-y-3">
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+              {/* Header */}
+              <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50">
+                <h2 className="text-sm font-semibold text-slate-700">Name &amp; Contact Details</h2>
+                {!editing ? (
+                  <button onClick={startEdit} className="px-3 py-1 text-xs font-semibold border border-slate-300 text-slate-600 rounded-lg hover:bg-white transition-colors">Edit</button>
+                ) : (
+                  <div className="flex gap-2">
+                    <button onClick={saveEdit} disabled={saving} className="px-3 py-1 text-xs font-semibold bg-purple-700 text-white rounded-lg hover:bg-purple-800 disabled:opacity-60 transition-colors">{saving ? 'Saving…' : 'Save'}</button>
+                    <button onClick={cancelEdit} className="px-3 py-1 text-xs font-semibold border border-slate-300 text-slate-600 rounded-lg hover:bg-white transition-colors">Cancel</button>
+                  </div>
+                )}
+              </div>
+
+              {/* Basic contact fields */}
+              <div className="px-5 py-4 grid grid-cols-3 gap-3">
+                {editing ? (
+                  <>
+                    <FI label="First Name" name="first_name" value={(ef.first_name as string) ?? ''} onChange={handleEditChange} />
+                    <FI label="Last Name" name="last_name" value={(ef.last_name as string) ?? ''} onChange={handleEditChange} />
+                    <FI label="Title / Role" name="title" value={(ef.title as string) ?? ''} onChange={handleEditChange} />
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Type of Contact</label>
+                      <select value={(ef.type_of_contact as string) ?? 'Customer'} onChange={(e) => handleEditChange('type_of_contact', e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                        <option>Customer</option><option>Vendor</option><option>Prospect</option><option>Partner</option><option>Other</option>
+                      </select>
+                    </div>
+                    <FI label="Primary Email" name="email" value={(ef.email as string) ?? ''} onChange={handleEditChange} type="email" />
+                    <FI label="Industry" name="industry" value={(ef.industry as string) ?? ''} onChange={handleEditChange} />
+                    <FI label="Phone (Main)" name="phone" value={(ef.phone as string) ?? ''} onChange={handleEditChange} type="tel" />
+                    <FI label="Mobile Phone" name="mobile_phone" value={(ef.mobile_phone as string) ?? ''} onChange={handleEditChange} type="tel" />
+                    <FI label="Home Phone" name="home_phone" value={(ef.home_phone as string) ?? ''} onChange={handleEditChange} type="tel" />
+                    <FI label="Other Phone" name="other_phone" value={(ef.other_phone as string) ?? ''} onChange={handleEditChange} type="tel" />
+                    <div className="col-span-3">
+                      <FI label="LinkedIn" name="linkedin" value={(ef.linkedin as string) ?? ''} onChange={handleEditChange} type="url" />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <Field label="Title / Role" value={contact.title} />
+                    <Field label="Type of Contact" value={contact.type_of_contact} />
+                    <Field label="Industry" value={contact.industry} />
+                    <Field label="Primary Email" value={contact.email} email />
+                    <Field label="Phone (Main)" value={contact.phone} />
+                    <Field label="Mobile Phone" value={contact.mobile_phone} />
+                    <Field label="Home Phone" value={contact.home_phone} />
+                    <Field label="Other Phone" value={contact.other_phone} />
+                    <Field label="LinkedIn" value={contact.linkedin} link />
+                  </>
+                )}
+              </div>
+
+              {/* Addresses */}
+              {(editing || contact.mailing_address1 || contact.mailing_city || contact.other_address1 || contact.other_city) && (
+                <div className="border-t border-slate-100">
+                  <div className="grid grid-cols-2 divide-x divide-slate-100">
+                    {/* Mailing */}
+                    <div>
+                      <div className="px-5 py-2 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                        <div className="w-0.5 h-3.5 bg-purple-300 rounded-full" />
+                        <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Mailing Address</h3>
+                      </div>
+                      <div className="px-5 py-4">
+                        {editing ? (
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="col-span-2"><FI label="Address 1" name="mailing_address1" value={(ef.mailing_address1 as string) ?? ''} onChange={handleEditChange} /></div>
+                            <div className="col-span-2"><FI label="Address 2" name="mailing_address2" value={(ef.mailing_address2 as string) ?? ''} onChange={handleEditChange} /></div>
+                            <FI label="City" name="mailing_city" value={(ef.mailing_city as string) ?? ''} onChange={handleEditChange} />
+                            <FI label="State" name="mailing_state" value={(ef.mailing_state as string) ?? ''} onChange={handleEditChange} />
+                            <FI label="ZIP" name="mailing_zip" value={(ef.mailing_zip as string) ?? ''} onChange={handleEditChange} />
+                            <div className="col-span-2"><FI label="Country" name="mailing_country" value={(ef.mailing_country as string) ?? ''} onChange={handleEditChange} /></div>
+                          </div>
+                        ) : (
+                          <div className="text-sm text-slate-800 leading-snug">
+                            {contact.mailing_address1 && <div>{contact.mailing_address1}</div>}
+                            {contact.mailing_address2 && <div>{contact.mailing_address2}</div>}
+                            {(contact.mailing_city || contact.mailing_state || contact.mailing_zip) && (
+                              <div>
+                                {[contact.mailing_city, contact.mailing_state].filter(Boolean).join(', ')}
+                                {contact.mailing_zip ? ` ${contact.mailing_zip}` : ''}
+                              </div>
+                            )}
+                            {contact.mailing_country && <div>{contact.mailing_country}</div>}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                    {/* Other */}
+                    <div>
+                      <div className="px-5 py-2 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                        <div className="w-0.5 h-3.5 bg-purple-300 rounded-full" />
+                        <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Other Address</h3>
+                      </div>
+                      <div className="px-5 py-4">
+                        {editing ? (
+                          <div className="grid grid-cols-2 gap-3">
+                            <div className="col-span-2"><FI label="Address 1" name="other_address1" value={(ef.other_address1 as string) ?? ''} onChange={handleEditChange} /></div>
+                            <div className="col-span-2"><FI label="Address 2" name="other_address2" value={(ef.other_address2 as string) ?? ''} onChange={handleEditChange} /></div>
+                            <FI label="City" name="other_city" value={(ef.other_city as string) ?? ''} onChange={handleEditChange} />
+                            <FI label="State" name="other_state" value={(ef.other_state as string) ?? ''} onChange={handleEditChange} />
+                            <FI label="ZIP" name="other_zip" value={(ef.other_zip as string) ?? ''} onChange={handleEditChange} />
+                            <div className="col-span-2"><FI label="Country" name="other_country" value={(ef.other_country as string) ?? ''} onChange={handleEditChange} /></div>
+                          </div>
+                        ) : (
+                          <div className="text-sm text-slate-800 leading-snug">
+                            {contact.other_address1 && <div>{contact.other_address1}</div>}
+                            {contact.other_address2 && <div>{contact.other_address2}</div>}
+                            {(contact.other_city || contact.other_state || contact.other_zip) && (
+                              <div>
+                                {[contact.other_city, contact.other_state].filter(Boolean).join(', ')}
+                                {contact.other_zip ? ` ${contact.other_zip}` : ''}
+                              </div>
+                            )}
+                            {contact.other_country && <div>{contact.other_country}</div>}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  </div>
                 </div>
               )}
-            </div>
-            <div className="p-6 grid grid-cols-2 gap-5">
-              {editing ? (
-                <>
-                  <FI label="First Name" name="first_name" value={(ef.first_name as string) ?? ''} onChange={handleEditChange} />
-                  <FI label="Last Name" name="last_name" value={(ef.last_name as string) ?? ''} onChange={handleEditChange} />
-                  <FI label="Title / Role" name="title" value={(ef.title as string) ?? ''} onChange={handleEditChange} />
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Type of Contact</label>
-                    <select value={(ef.type_of_contact as string) ?? 'Customer'} onChange={(e) => handleEditChange('type_of_contact', e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                      <option>Customer</option><option>Vendor</option><option>Prospect</option><option>Partner</option><option>Other</option>
-                    </select>
-                  </div>
-                  <FI label="Primary Email" name="email" value={(ef.email as string) ?? ''} onChange={handleEditChange} type="email" />
-                  <FI label="Industry" name="industry" value={(ef.industry as string) ?? ''} onChange={handleEditChange} />
-                  <FI label="Phone (Main)" name="phone" value={(ef.phone as string) ?? ''} onChange={handleEditChange} type="tel" />
-                  <FI label="Mobile Phone" name="mobile_phone" value={(ef.mobile_phone as string) ?? ''} onChange={handleEditChange} type="tel" />
-                  <FI label="Home Phone" name="home_phone" value={(ef.home_phone as string) ?? ''} onChange={handleEditChange} type="tel" />
-                  <FI label="Other Phone" name="other_phone" value={(ef.other_phone as string) ?? ''} onChange={handleEditChange} type="tel" />
-                  <FI label="LinkedIn" name="linkedin" value={(ef.linkedin as string) ?? ''} onChange={handleEditChange} type="url" />
-                </>
-              ) : (
-                <>
-                  <Field label="Title / Role" value={contact.title} />
-                  <Field label="Type of Contact" value={contact.type_of_contact} />
-                  <Field label="Primary Email" value={contact.email} />
-                  <Field label="Industry" value={contact.industry} />
-                  <Field label="Phone (Main)" value={contact.phone} />
-                  <Field label="Mobile Phone" value={contact.mobile_phone} />
-                  <Field label="Home Phone" value={contact.home_phone} />
-                  <Field label="Other Phone" value={contact.other_phone} />
-                  <Field label="LinkedIn" value={contact.linkedin} />
-                </>
-              )}
-            </div>
-          </div>
 
-          {/* Tags card */}
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
-              <div className="flex items-center gap-2">
-                <svg className="w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
-                </svg>
-                <h2 className="text-sm font-semibold text-slate-700">Tags</h2>
+              {/* Arcon Program Data */}
+              <div className="border-t border-slate-100">
+                <div className="px-5 py-2 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                  <div className="w-0.5 h-3.5 bg-purple-300 rounded-full" />
+                  <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Arcon Program Data</h3>
+                </div>
+                <div className="px-5 py-4 grid grid-cols-2 gap-3">
+                  {editing ? (
+                    <>
+                      <div className="col-span-2">
+                        <FI label="Products Purchased" name="products_purchased" value={(ef.products_purchased as string) ?? ''} onChange={handleEditChange} />
+                      </div>
+                      <FI label="Organization Website" name="organization_website" value={(ef.organization_website as string) ?? ''} onChange={handleEditChange} type="url" />
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Arcon Salesperson</label>
+                        <select value={(ef.arcon_salesperson as string) ?? ''} onChange={(e) => handleEditChange('arcon_salesperson', e.target.value)}
+                          className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                          <option value="">— None —</option>
+                          {crmUsers.map((u) => <option key={u.id} value={u.id}>{u.display_name}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Contact Owner</label>
+                        <select value={(ef.contact_owner as string) ?? ''} onChange={(e) => handleEditChange('contact_owner', e.target.value)}
+                          className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                          <option value="">— None —</option>
+                          {crmUsers.map((u) => <option key={u.id} value={u.id}>{u.display_name}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Link to Customer</label>
+                        <select value={(ef.customer_id as string) ?? ''} onChange={(e) => handleEditChange('customer_id', e.target.value)}
+                          className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                          <option value="">— None —</option>
+                          {customers.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
+                        </select>
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Link to Vendor</label>
+                        <select value={(ef.vendor_id as string) ?? ''} onChange={(e) => handleEditChange('vendor_id', e.target.value)}
+                          className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                          <option value="">— None —</option>
+                          {vendors.map((v) => <option key={v.id} value={v.id}>{v.name}</option>)}
+                        </select>
+                      </div>
+                      <div className="col-span-2">
+                        <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Description</label>
+                        <textarea rows={3} value={(ef.description as string) ?? ''} onChange={(e) => handleEditChange('description', e.target.value)}
+                          className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none" />
+                      </div>
+                    </>
+                  ) : (
+                    <>
+                      {contact.products_purchased && (
+                        <div className="col-span-2"><Field label="Products Purchased" value={contact.products_purchased} /></div>
+                      )}
+                      <Field label="Organization Website" value={contact.organization_website} link />
+                      {contact.description && (
+                        <div className="col-span-2"><Field label="Description" value={contact.description} /></div>
+                      )}
+                    </>
+                  )}
+                </div>
               </div>
-              {tagSaving && <span className="text-xs text-slate-400">Saving…</span>}
-            </div>
-            <div className="p-4">
-              <TagPicker value={tagIds} onChange={handleTagsChange} placeholder="Add tags to this contact…" />
+
+              {/* Meta */}
+              <div className="border-t border-slate-100 px-5 py-3 bg-slate-50 flex gap-6 text-xs text-slate-400">
+                <span>Created {new Date(contact.created_at).toLocaleDateString()}</span>
+                <span>Updated {new Date(contact.updated_at).toLocaleDateString()}</span>
+              </div>
             </div>
           </div>
 
-          {/* Card 2: Arcon Program Data */}
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
-              <h2 className="text-sm font-semibold text-slate-700">Arcon Program Data</h2>
-            </div>
-            <div className="p-6 grid grid-cols-2 gap-5">
-              {editing ? (
-                <>
-                  <div className="col-span-2">
-                    <FI label="Products Purchased" name="products_purchased" value={(ef.products_purchased as string) ?? ''} onChange={handleEditChange} />
-                  </div>
-                  <FI label="Organization Website" name="organization_website" value={(ef.organization_website as string) ?? ''} onChange={handleEditChange} type="url" />
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Arcon Salesperson</label>
-                    <select value={(ef.arcon_salesperson as string) ?? ''} onChange={(e) => handleEditChange('arcon_salesperson', e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                      <option value="">— None —</option>
-                      {crmUsers.map((u) => (
-                        <option key={u.id} value={u.id}>{u.display_name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Contact Owner</label>
-                    <select value={(ef.contact_owner as string) ?? ''} onChange={(e) => handleEditChange('contact_owner', e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                      <option value="">— None —</option>
-                      {crmUsers.map((u) => (
-                        <option key={u.id} value={u.id}>{u.display_name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Link to Customer</label>
-                    <select value={(ef.customer_id as string) ?? ''} onChange={(e) => handleEditChange('customer_id', e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                      <option value="">— None —</option>
-                      {customers.map((c) => (
-                        <option key={c.id} value={c.id}>{c.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Link to Vendor</label>
-                    <select value={(ef.vendor_id as string) ?? ''} onChange={(e) => handleEditChange('vendor_id', e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                      <option value="">— None —</option>
-                      {vendors.map((v) => (
-                        <option key={v.id} value={v.id}>{v.name}</option>
-                      ))}
-                    </select>
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Description</label>
-                    <textarea rows={3} value={(ef.description as string) ?? ''} onChange={(e) => handleEditChange('description', e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none" />
-                  </div>
-                </>
-              ) : (
-                <>
-                  <div className="col-span-2"><Field label="Products Purchased" value={contact.products_purchased} /></div>
-                  <Field label="Organization Website" value={contact.organization_website} />
-                  <div className="col-span-2"><Field label="Description" value={contact.description} /></div>
-                </>
-              )}
+          {/* Sidebar */}
+          <div className="space-y-3">
+            {/* Tags card */}
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+              <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
+                <div className="flex items-center gap-2">
+                  <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
+                  </svg>
+                  <h2 className="text-sm font-semibold text-slate-700">Tags</h2>
+                </div>
+                {tagSaving && <span className="text-xs text-slate-400">Saving…</span>}
+              </div>
+              <div className="p-3">
+                <TagPicker value={tagIds} onChange={handleTagsChange} placeholder="Add tags…" />
+              </div>
             </div>
           </div>
         </div>
@@ -474,10 +556,10 @@ export default function ContactDetailPage() {
 
       {/* ── Related Tab ── */}
       {activeTab === 'related' && (
-        <div className="space-y-5">
+        <div className="space-y-3">
           {/* Linked Organizations */}
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 bg-slate-50">
+            <div className="px-5 py-3 border-b border-slate-100 bg-slate-50">
               <h2 className="text-sm font-semibold text-slate-700">Organizations</h2>
             </div>
             <div className="p-5">
@@ -512,7 +594,7 @@ export default function ContactDetailPage() {
 
           {/* Files */}
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 bg-slate-50">
+            <div className="px-5 py-3 border-b border-slate-100 bg-slate-50">
               <h2 className="text-sm font-semibold text-slate-700">Files ({contact.files.length})</h2>
             </div>
             {contact.files.length === 0
