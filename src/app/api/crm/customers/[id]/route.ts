@@ -36,6 +36,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   const tags = (entityTagsRes.data ?? []).map((r: any) => r.crm_tags).filter(Boolean)
 
+  let brand_data = null
+  if (customer.brand_data_id) {
+    const { data } = await adminClient.from('crm_brand_data').select('*').eq('id', customer.brand_data_id).single()
+    brand_data = data ?? null
+  }
+
   return NextResponse.json({
     ...customer,
     contacts: contactsRes.data ?? [],
@@ -44,6 +50,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     assigned_user: assignedUserRes.data ?? null,
     created_by_user: createdByUserRes.data ?? null,
     tags,
+    brand_data,
   })
 }
 
@@ -58,6 +65,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   // Strip read-only fields and extract tag_ids
   const { id: _id, created_at: _ca, updated_at: _ua, created_by: _cb, tag_ids, tags: _tags,
           assigned_user: _au, created_by_user: _cbu, contacts: _c, opportunities: _o, files: _f,
+          brand_data: _bd,
           ...updates } = body
 
   const adminClient = createAdminClient()

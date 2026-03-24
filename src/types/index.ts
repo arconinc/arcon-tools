@@ -304,6 +304,30 @@ export type CrmTaskCategory =
   | 'Waiting On Approval' | 'Waiting On Client Approval'
   | 'Warehouse Fulfillment' | 'Warehouse Knitting' | 'Warehouse Ship' | 'Warehouse To Do'
 
+export interface CrmBrandData {
+  id: string
+  domain: string
+  brandfetch_id: string | null
+  name: string | null
+  description: string | null
+  long_description: string | null
+  logo_url: string | null
+  icon_url: string | null
+  colors: { hex: string; type: string; brightness: number }[] | null
+  links: { name: string; url: string }[] | null
+  company: {
+    employees: number | null
+    foundedYear: number | null
+    industries: { name: string; slug: string }[] | null
+    location: { city: string | null; state: string | null; country: string | null } | null
+    kind: string | null
+  } | null
+  raw_data: object
+  fetched_at: string
+  created_at: string
+  updated_at: string
+}
+
 export interface CrmCustomer {
   id: string
   name: string
@@ -340,6 +364,8 @@ export interface CrmCustomer {
   created_by: string
   created_at: string
   updated_at: string
+  logo_url: string | null
+  brand_data_id: string | null
 }
 
 export interface CrmVendor {
@@ -388,6 +414,8 @@ export interface CrmVendor {
   created_by: string
   created_at: string
   updated_at: string
+  logo_url: string | null
+  brand_data_id: string | null
 }
 
 export interface CrmContact {
@@ -541,11 +569,13 @@ export interface CrmCustomerDetail extends CrmCustomer {
   files: CrmFile[]
   assigned_user: { id: string; display_name: string; email: string } | null
   created_by_user: { id: string; display_name: string; email: string } | null
+  brand_data: CrmBrandData | null
 }
 
 export interface CrmVendorDetail extends CrmVendor {
   contacts: CrmContact[]
   files: CrmFile[]
+  brand_data: CrmBrandData | null
 }
 
 export interface CrmContactDetail extends CrmContact {

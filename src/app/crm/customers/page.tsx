@@ -13,6 +13,7 @@ type CustomerListItem = {
   client_status: 'Prospective' | 'Active' | 'Former' | null
   phone: string | null
   website: string | null
+  logo_url: string | null
   assigned_to: string | null
   assigned_user_name: string | null
   tags: TagOption[]
@@ -142,6 +143,7 @@ export default function CustomersPage() {
         <table className="w-full text-sm">
           <thead className="bg-slate-50 border-b border-slate-200">
             <tr>
+              <th className="px-3 py-3 w-10"></th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
               <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Phone</th>
@@ -154,9 +156,9 @@ export default function CustomersPage() {
             {loading && (
               Array.from({ length: 5 }).map((_, i) => (
                 <tr key={i}>
-                  {[...Array(6)].map((_, j) => (
+                  {[...Array(7)].map((_, j) => (
                     <td key={j} className="px-5 py-3.5">
-                      <div className="h-4 bg-slate-100 rounded animate-pulse" style={{ width: j === 0 ? '60%' : '40%' }} />
+                      <div className="h-4 bg-slate-100 rounded animate-pulse" style={{ width: j === 0 ? '28px' : j === 1 ? '60%' : '40%' }} />
                     </td>
                   ))}
                 </tr>
@@ -164,7 +166,7 @@ export default function CustomersPage() {
             )}
             {!loading && customers.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-5 py-12 text-center text-sm text-slate-400">
+                <td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-400">
                   {search || status || tagFilter ? 'No customers match your filters.' : 'No customers yet. Create one to get started.'}
                 </td>
               </tr>
@@ -175,6 +177,20 @@ export default function CustomersPage() {
                 onClick={() => router.push(`/crm/customers/${c.id}`)}
                 className="hover:bg-slate-50 cursor-pointer transition-colors"
               >
+                <td className="px-3 py-3.5">
+                  {c.logo_url ? (
+                    <img
+                      src={c.logo_url}
+                      alt=""
+                      className="h-7 w-7 rounded object-contain bg-white border border-slate-100"
+                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+                    />
+                  ) : (
+                    <div className="h-7 w-7 rounded bg-purple-100 flex items-center justify-center text-purple-700 font-bold text-[10px] flex-shrink-0">
+                      {c.name.slice(0, 2).toUpperCase()}
+                    </div>
+                  )}
+                </td>
                 <td className="px-5 py-3.5 font-medium text-slate-900">{c.name}</td>
                 <td className="px-5 py-3.5">{statusBadge(c.client_status)}</td>
                 <td className="px-5 py-3.5 text-slate-600 hidden md:table-cell">{c.phone ?? '—'}</td>
