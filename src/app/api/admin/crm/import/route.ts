@@ -35,7 +35,7 @@ function mapClientStatus(row: Record<string, unknown>): string {
   if (cs === 'Prospective') return 'Prospective'
   if (cs === 'Former') return 'Former'
   if (str(row['Company Type'])?.toLowerCase() === 'prospect') return 'Prospective'
-  return 'Prospective'
+  return 'Active'
 }
 
 // Merge: new non-null value wins; otherwise keep existing

@@ -114,7 +114,8 @@ export default function BirthdaysPage() {
               <div className="bday-card">
                 {section.events.map((b) => {
                   const isBday = b.type === 'birthday'
-                  const sub = isBday ? 'Birthday' : `${b.years}yr Anniversary`
+                  const eventType = isBday ? 'Birthday' : `${b.years}yr Anniversary`
+                  const sub = b.job_title ? `${eventType} · ${b.job_title}` : eventType
                   const absDays = Math.abs(b.days_until)
                   const badgeText = b.days_until === 0 ? 'Today!' : b.days_until === 1 ? 'Tomorrow' : b.days_until < 0 ? `${absDays} day${absDays === 1 ? '' : 's'} ago` : `${b.days_until} days`
                   const tier = !isBday && b.years ? (b.years >= 15 ? 'hof' : b.years >= 10 ? 'legend' : b.years >= 5 ? 'milestone' : 'standard') : 'standard'

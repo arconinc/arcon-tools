@@ -80,6 +80,7 @@ export interface BirthdayEvent {
   date_label: string   // e.g. "Mar 15" or "Today"
   years?: number       // years of service (anniversaries only)
   avatar_url?: string | null
+  job_title?: string | null
 }
 
 // ─── Store ───────────────────────────────────────────────────────────────────
@@ -330,6 +331,43 @@ export const CARRIERS: Carrier[] = [
   { id: 'CanadaPost', name: 'Canada Post', trackingUrlTemplate: 'https://www.canadapost-postescanada.ca/track-reperage/en#/search?searchFor={tracking}' },
   { id: 'Other', name: 'Other', trackingUrlTemplate: '' },
 ]
+
+// ─── Documents ───────────────────────────────────────────────────────────────
+
+export interface DocSection {
+  id: string
+  name: string
+  sort_order: number
+  created_at: string
+}
+
+export interface DocFolder {
+  id: string
+  section_id: string
+  name: string
+  sort_order: number
+  created_at: string
+}
+
+export interface DriveDocument {
+  id: string
+  folder_id: string
+  title: string
+  drive_url: string
+  drive_file_id: string | null
+  description: string | null
+  sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface DocFolderWithDocuments extends DocFolder {
+  documents: DriveDocument[]
+}
+
+export interface DocSectionWithFolders extends DocSection {
+  folders: DocFolderWithDocuments[]
+}
 
 // ─── CRM ─────────────────────────────────────────────────────────────────────
 

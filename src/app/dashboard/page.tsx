@@ -119,7 +119,7 @@ export default function DashboardPage() {
     fetch('/api/crm/tasks?assigned_to=me&status=not_started,in_progress,waiting_on_approval,waiting_on_client_approval,need_changes')
       .then((r) => r.json())
       .then((data) => {
-        if (Array.isArray(data)) setMyTasks(data.slice(0, 8))
+        if (Array.isArray(data?.tasks)) setMyTasks(data.tasks.slice(0, 8))
       })
       .catch(() => {})
       .finally(() => setTasksLoading(false))
@@ -438,19 +438,7 @@ export default function DashboardPage() {
           </div>
         </div>
 
-        {/* Quick links */}
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
-          <div style={{ fontSize: 14, fontWeight: 700, color: '#111' }}>Quick Links</div>
-          <div style={{ fontSize: 11, color: '#aaa' }}>Most used tools</div>
-        </div>
-        <div className="quick-grid">
-          {QUICK_LINKS.map((ql) => (
-            <Link key={ql.label} href={ql.href} className="quick-link">
-              <div className="ql-icon" style={{ background: ql.bg }}>{ql.icon}</div>
-              <div className="ql-label">{ql.label}</div>
-            </Link>
-          ))}
-        </div>
+        {/* Quick links — hidden for now */}
 
         {/* Two-column section */}
         <div className="two-col">
@@ -459,7 +447,7 @@ export default function DashboardPage() {
           <div className="card">
             <div className="card-header">
               <div className="card-title">My Tasks</div>
-              <Link href="/crm/tasks" className="card-action" style={{ textDecoration: 'none' }}>
+              <Link href="/my-tasks" className="card-action" style={{ textDecoration: 'none' }}>
                 View all →
               </Link>
             </div>
@@ -536,7 +524,8 @@ export default function DashboardPage() {
               ) : (
                 bdayEvents.map((b) => {
                   const isBday = b.type === 'birthday'
-                  const sub = isBday ? 'Birthday' : `${b.years}yr Anniversary`
+                  const eventType = isBday ? 'Birthday' : `${b.years}yr Anniversary`
+                  const sub = b.job_title ? `${eventType} · ${b.job_title}` : eventType
                   const absDays = Math.abs(b.days_until)
                   const badge = b.days_until === 0 ? 'Today!' : b.days_until === 1 ? 'Tomorrow' : b.days_until < 0 ? `${absDays} day${absDays === 1 ? '' : 's'} ago` : `${b.days_until} days`
                   const tier = !isBday && b.years ? (b.years >= 15 ? 'hof' : b.years >= 10 ? 'legend' : b.years >= 5 ? 'milestone' : 'standard') : 'standard'

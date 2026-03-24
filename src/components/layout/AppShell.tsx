@@ -83,17 +83,17 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
       label: 'Tasks',
       items: [
         { href: '/my-tasks', label: 'My Tasks', icon: TaskCheckIcon, adminMatch: true },
-        { href: '#', label: 'Team Board', icon: BoardIcon },
-        { href: '#', label: 'Backlog', icon: ArchiveIcon },
+        { href: '#', label: 'Team Board', icon: BoardIcon, soon: true },
+        { href: '#', label: 'Backlog', icon: ArchiveIcon, soon: true },
       ],
     },
     {
       label: 'Company',
       items: [
         { href: '/news', label: 'News & Announcements', icon: MegaphoneIcon, adminMatch: true },
-        { href: '#', label: 'Birthdays & Anniversaries', icon: CakeIcon },
+        { href: '/birthdays', label: 'Birthdays & Anniversaries', icon: CakeIcon },
         { href: '/employees', label: 'Employee Directory', icon: UsersIcon, adminMatch: true },
-        { href: '/profile', label: 'My Profile', icon: UserAdminIcon, adminMatch: true },
+        { href: '/profile', label: 'My Profile', icon: UserAdminIcon },
       ],
     },
     {
@@ -108,8 +108,8 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
     {
       label: 'HR',
       items: [
-        { href: '#', label: 'Documents', icon: DocumentIcon },
-        { href: '#', label: 'PTO Request', icon: CalendarIcon },
+        { href: '/documents', label: 'Documents', icon: DocumentIcon, adminMatch: true },
+        { href: '#', label: 'PTO Request', icon: CalendarIcon, soon: true },
       ],
     },
   ]
@@ -122,6 +122,7 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
         { href: '/admin/banner-strip', label: 'Banner Strip', icon: TickerIcon, adminMatch: true },
         { href: '/admin/countdown', label: 'Countdown', icon: CountdownIcon, adminMatch: true },
         { href: '/admin/news', label: 'News', icon: MegaphoneIcon, adminMatch: true },
+        { href: '/admin/documents', label: 'Documents', icon: DocumentIcon, adminMatch: true },
         { href: '/admin/crm-goals', label: 'Sales Goals', icon: GoalIcon, adminMatch: true },
         { href: '/admin/crm-tags', label: 'CRM Tags', icon: TagIcon, adminMatch: true },
         { href: '/admin/crm-import', label: 'CRM Import', icon: UploadIcon, adminMatch: true },
