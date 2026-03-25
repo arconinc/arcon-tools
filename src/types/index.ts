@@ -542,6 +542,24 @@ export interface CrmContact {
   tags: string[]
   customer_id: string | null
   vendor_id: string | null
+  // Insightly import fields
+  insightly_id: string | null
+  salutation: string | null
+  fax: string | null
+  assistant_phone: string | null
+  assistant_name: string | null
+  date_of_birth: string | null
+  email_opted_out: boolean | null
+  important_date_1_name: string | null
+  important_date_1: string | null
+  important_date_2_name: string | null
+  important_date_2: string | null
+  important_date_3_name: string | null
+  important_date_3: string | null
+  last_activity_date: string | null
+  next_activity_date: string | null
+  profile_segmentation: string | null
+  product_showcase_invite: string | null
   created_by: string
   created_at: string
   updated_at: string

@@ -15,6 +15,7 @@ interface ImportResult {
   customers: { inserted: number; updated: number }
   vendors: { inserted: number; updated: number }
   opportunities: { inserted: number; updated: number }
+  contacts: { inserted: number; updated: number }
   tags_created: number
   unmatched_owners: string[]
   unmatched_orgs: string[]
@@ -23,7 +24,7 @@ interface ImportResult {
 
 // ─── Client-side XLSX preview parser ─────────────────────────────────────────
 
-async function parseXlsxPreview(file: File, importType: 'vendors' | 'customers' | 'opportunities' | null): Promise<Preview> {
+async function parseXlsxPreview(file: File, importType: 'vendors' | 'customers' | 'opportunities' | 'contacts' | null): Promise<Preview> {
   const arrayBuffer = await file.arrayBuffer()
   const workbook = XLSX.read(arrayBuffer, { type: 'array' })
   const sheet = workbook.Sheets[workbook.SheetNames[0]]
@@ -39,9 +40,16 @@ async function parseXlsxPreview(file: File, importType: 'vendors' | 'customers' 
   }
 
   for (const row of rows) {
-    for (const col of ['Tag1', 'Tag2', 'Tag3', 'Tag4', 'Tag5', 'Tag6', 'Tag7', 'Tag8', 'Tag9']) {
-      const t = String(row[col] ?? '').trim()
-      if (t) tagSet.add(t)
+    if (importType === 'contacts') {
+      for (const col of ['ContactTag1', 'ContactTag2', 'ContactTag3', 'ContactTag4', 'ContactTag5', 'ContactTag6', 'ContactTag7', 'ContactTag8', 'ContactTag9']) {
+        const t = String(row[col] ?? '').trim()
+        if (t) tagSet.add(t)
+      }
+    } else {
+      for (const col of ['Tag1', 'Tag2', 'Tag3', 'Tag4', 'Tag5', 'Tag6', 'Tag7', 'Tag8', 'Tag9']) {
+        const t = String(row[col] ?? '').trim()
+        if (t) tagSet.add(t)
+      }
     }
 
     if (importType === 'opportunities') {
@@ -49,7 +57,7 @@ async function parseXlsxPreview(file: File, importType: 'vendors' | 'customers' 
         const email = extractEmail(row[col])
         if (email) ownerEmailSet.add(email)
       }
-    } else {
+    } else if (importType !== 'contacts') {
       const ct = String(row['Company Type'] ?? '').trim().toLowerCase()
       if (ct && ct !== 'vendor' && ct !== 'customer') {
         tagSet.add(String(row['Company Type']).trim())
@@ -77,7 +85,7 @@ interface NormalizeResult {
 
 export default function CrmImportPage() {
   const fileRef = useRef<HTMLInputElement>(null)
-  const [importType, setImportType] = useState<'vendors' | 'customers' | 'opportunities' | null>(null)
+  const [importType, setImportType] = useState<'vendors' | 'customers' | 'opportunities' | 'contacts' | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<Preview | null>(null)
   const [previewing, setPreviewing] = useState(false)
@@ -171,8 +179,8 @@ export default function CrmImportPage() {
       <div className="bg-white border border-slate-200 rounded-2xl p-5 mb-5">
         <h2 className="text-sm font-semibold text-slate-700 mb-4">Import Type</h2>
 
-        <div className="flex gap-2 mb-5">
-          {(['vendors', 'customers', 'opportunities'] as const).map(type => (
+        <div className="flex gap-2 mb-5 flex-wrap">
+          {(['vendors', 'customers', 'opportunities', 'contacts'] as const).map(type => (
             <button
               key={type}
               onClick={() => setImportType(type)}
@@ -182,7 +190,7 @@ export default function CrmImportPage() {
                   : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
               }`}
             >
-              {type === 'vendors' ? 'Vendors' : type === 'customers' ? 'Customers' : 'Opportunities'}
+              {type === 'vendors' ? 'Vendors' : type === 'customers' ? 'Customers' : type === 'opportunities' ? 'Opportunities' : 'Contacts'}
             </button>
           ))}
         </div>
@@ -221,7 +229,7 @@ export default function CrmImportPage() {
           <div className="grid grid-cols-2 gap-3 mb-5">
             <StatBox label="Total Records" value={preview.total} />
             <StatBox
-              label={`→ ${importType === 'vendors' ? 'Vendors' : importType === 'customers' ? 'Customers' : 'Opportunities'}`}
+              label={`→ ${importType === 'vendors' ? 'Vendors' : importType === 'customers' ? 'Customers' : importType === 'opportunities' ? 'Opportunities' : 'Contacts'}`}
               value={preview.total}
               color={importType === 'vendors' ? 'green' : importType === 'customers' ? 'blue' : 'purple'}
             />
@@ -262,7 +270,7 @@ export default function CrmImportPage() {
             >
               {importing
                 ? 'Importing…'
-                : `Import ${preview.total.toLocaleString()} as ${importType === 'vendors' ? 'Vendors' : importType === 'customers' ? 'Customers' : 'Opportunities'}`}
+                : `Import ${preview.total.toLocaleString()} as ${importType === 'vendors' ? 'Vendors' : importType === 'customers' ? 'Customers' : importType === 'opportunities' ? 'Opportunities' : 'Contacts'}`}
             </button>
             <button
               onClick={reset}
@@ -301,14 +309,14 @@ export default function CrmImportPage() {
           <div className="grid grid-cols-1 gap-3 mb-5">
             <div className="bg-slate-50 rounded-xl p-4">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                {importType === 'vendors' ? 'Vendors' : importType === 'customers' ? 'Customers' : 'Opportunities'}
+                {importType === 'vendors' ? 'Vendors' : importType === 'customers' ? 'Customers' : importType === 'opportunities' ? 'Opportunities' : 'Contacts'}
               </p>
               <p className="text-sm text-slate-700">
                 <span className="font-semibold text-green-700">
-                  {importType === 'vendors' ? result.vendors.inserted : importType === 'customers' ? result.customers.inserted : result.opportunities?.inserted ?? 0}
+                  {importType === 'vendors' ? result.vendors.inserted : importType === 'customers' ? result.customers.inserted : importType === 'opportunities' ? (result.opportunities?.inserted ?? 0) : (result.contacts?.inserted ?? 0)}
                 </span> inserted &nbsp;·&nbsp;
                 <span className="font-semibold text-blue-700">
-                  {importType === 'vendors' ? result.vendors.updated : importType === 'customers' ? result.customers.updated : result.opportunities?.updated ?? 0}
+                  {importType === 'vendors' ? result.vendors.updated : importType === 'customers' ? result.customers.updated : importType === 'opportunities' ? (result.opportunities?.updated ?? 0) : (result.contacts?.updated ?? 0)}
                 </span> updated
               </p>
             </div>
@@ -357,10 +365,10 @@ export default function CrmImportPage() {
 
           <div className="pt-3 border-t border-slate-100 flex gap-3">
             <a
-              href={importType === 'vendors' ? '/crm/vendors' : importType === 'customers' ? '/crm/customers' : '/crm/opportunities'}
+              href={importType === 'vendors' ? '/crm/vendors' : importType === 'customers' ? '/crm/customers' : importType === 'opportunities' ? '/crm/opportunities' : '/crm/contacts'}
               className="px-4 py-2 text-sm font-semibold bg-purple-700 hover:bg-purple-800 text-white rounded-lg transition-colors"
             >
-              {importType === 'vendors' ? 'View Vendors' : importType === 'customers' ? 'View Customers' : 'View Opportunities'}
+              {importType === 'vendors' ? 'View Vendors' : importType === 'customers' ? 'View Customers' : importType === 'opportunities' ? 'View Opportunities' : 'View Contacts'}
             </a>
             <button
               onClick={reset}
@@ -439,6 +447,51 @@ export default function CrmImportPage() {
             ['Arcon Account Number', 'arcon_account_number (Vendors)'],
             ['Arcon Username/Password', 'arcon_username / arcon_password (Vendors)'],
             ['*Email fields', 'vendor email columns (Vendors)'],
+          ].map(([xlsx, db]) => (
+            <div key={xlsx} className="flex gap-2 py-1 text-xs border-b border-slate-50 last:border-0">
+              <span className="font-mono text-slate-500 shrink-0 w-40 truncate">{xlsx}</span>
+              <span className="text-slate-700">{db}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Contacts field mapping reference */}
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden mt-4">
+        <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+          <h2 className="text-sm font-semibold text-slate-700">Field Mapping Reference — Contacts</h2>
+        </div>
+        <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1">
+          {[
+            ['RecordId', 'insightly_id (deduplication key)'],
+            ['FirstName / LastName', 'first_name / last_name'],
+            ['Salutation', 'salutation'],
+            ['Role', 'title'],
+            ['EmailAddress', 'email'],
+            ['BusinessPhone', 'phone (formatted)'],
+            ['HomePhone / MobilePhone', 'home_phone / mobile_phone'],
+            ['OtherPhone / Fax', 'other_phone / fax'],
+            ['AssistantPhone / AssistantName', 'assistant_phone / assistant_name'],
+            ['LinkedIn URL', 'linkedin'],
+            ['MailAddress*', 'mailing_address1, city, state, zip, country'],
+            ['OtherAddress*', 'other_address1, city, state, zip, country'],
+            ['Background', 'description'],
+            ['Industry', 'industry'],
+            ['Type of Contact', 'type_of_contact (Customer/Vendor/Prospect/Partner/Other)'],
+            ['Products Purchased', 'products_purchased'],
+            ['Organization Website', 'organization_website'],
+            ['Arcon Salesperson', 'arcon_salesperson'],
+            ['ContactOwner', 'contact_owner (display name)'],
+            ['DateOfBirth', 'date_of_birth'],
+            ['EmailOptedOut', 'email_opted_out'],
+            ['ImportantDate1–3 Name/Value', 'important_date_1–3_name / important_date_1–3'],
+            ['DateOfLastActivity', 'last_activity_date'],
+            ['DateOfNextActivity', 'next_activity_date'],
+            ['Profile Segmentation', 'profile_segmentation'],
+            ['Product Showcase Invite', 'product_showcase_invite'],
+            ['OrganizationRecordId', 'customer_id or vendor_id (matched via insightly_id)'],
+            ['Organization', 'customer_id or vendor_id (fallback name match)'],
+            ['ContactTag1–Tag9', 'crm_entity_tags (created if new)'],
           ].map(([xlsx, db]) => (
             <div key={xlsx} className="flex gap-2 py-1 text-xs border-b border-slate-50 last:border-0">
               <span className="font-mono text-slate-500 shrink-0 w-40 truncate">{xlsx}</span>

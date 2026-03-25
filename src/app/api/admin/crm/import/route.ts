@@ -91,15 +91,15 @@ export async function POST(req: NextRequest) {
 
   // ── Parse XLSX from multipart form ────────────────────────────────────────
   let rows: Record<string, unknown>[]
-  let importType: 'vendors' | 'customers' | 'opportunities'
+  let importType: 'vendors' | 'customers' | 'opportunities' | 'contacts'
   try {
     const formData = await req.formData()
     const file = formData.get('file') as File | null
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
 
     const rawImportType = formData.get('importType') as string | null
-    if (!rawImportType || (rawImportType !== 'vendors' && rawImportType !== 'customers' && rawImportType !== 'opportunities')) {
-      return NextResponse.json({ error: 'importType must be "vendors", "customers", or "opportunities"' }, { status: 400 })
+    if (!rawImportType || (rawImportType !== 'vendors' && rawImportType !== 'customers' && rawImportType !== 'opportunities' && rawImportType !== 'contacts')) {
+      return NextResponse.json({ error: 'importType must be "vendors", "customers", "opportunities", or "contacts"' }, { status: 400 })
     }
     importType = rawImportType
 
@@ -124,8 +124,10 @@ export async function POST(req: NextRequest) {
   // ── Load users for owner email → UUID lookup ──────────────────────────────
   const { data: users } = await adminClient.from('users').select('id, email, display_name')
   const userByEmail = new Map<string, string>()
+  const userByDisplayName = new Map<string, string>()
   for (const u of users ?? []) {
     if (u.email) userByEmail.set(u.email.toLowerCase(), u.id)
+    if (u.display_name) userByDisplayName.set(u.display_name.toLowerCase().trim(), u.id)
   }
 
   // ── Load existing records by insightly_id for COALESCE merge ─────────────
@@ -156,22 +158,57 @@ export async function POST(req: NextRequest) {
     if (o.insightly_id) existingOppMap.set(String(o.insightly_id), o)
   }
 
-  // ── Load customers for opportunity org lookup ──────────────────────────────
+  const { data: existingContactsRaw } = await adminClient
+    .from('crm_contacts')
+    .select('*')
+    .not('insightly_id', 'is', null)
+  const existingContactMap = new Map<string, Record<string, unknown>>()
+  for (const c of existingContactsRaw ?? []) {
+    if (c.insightly_id) existingContactMap.set(String(c.insightly_id), c)
+  }
+
+  // ── Paginated fetch helper (bypasses Supabase default 1000-row limit) ────────
+  async function fetchAllRows(table: string, columns: string): Promise<Record<string, unknown>[]> {
+    const all: Record<string, unknown>[] = []
+    const PAGE = 1000
+    let from = 0
+    while (true) {
+      const { data } = await adminClient.from(table).select(columns).range(from, from + PAGE - 1)
+      if (!data || data.length === 0) break
+      all.push(...(data as unknown as Record<string, unknown>[]))
+      if (data.length < PAGE) break
+      from += PAGE
+    }
+    return all
+  }
+
+  // ── Load customers/vendors for org lookup (opportunities + contacts) ───────
   const customerByInsightlyId = new Map<string, string>()
   const customerByName = new Map<string, string>()
-  if (importType === 'opportunities') {
-    const { data: allCustomers } = await adminClient
-      .from('crm_customers').select('id, name, insightly_id')
-    for (const c of allCustomers ?? []) {
-      if (c.insightly_id) customerByInsightlyId.set(String(c.insightly_id), c.id)
-      if (c.name) customerByName.set(c.name.toLowerCase().trim(), c.id)
+  const vendorByInsightlyId = new Map<string, string>()
+  const vendorByName = new Map<string, string>()
+  if (importType === 'opportunities' || importType === 'contacts') {
+    const allCustomers = await fetchAllRows('crm_customers', 'id, name, insightly_id')
+    for (const c of allCustomers) {
+      if (c.insightly_id) customerByInsightlyId.set(String(c.insightly_id), c.id as string)
+      if (c.name) customerByName.set((c.name as string).toLowerCase().trim(), c.id as string)
+    }
+  }
+  if (importType === 'contacts') {
+    const allVendors = await fetchAllRows('crm_vendors', 'id, name, insightly_id')
+    for (const v of allVendors) {
+      if (v.insightly_id) vendorByInsightlyId.set(String(v.insightly_id), v.id as string)
+      if (v.name) vendorByName.set((v.name as string).toLowerCase().trim(), v.id as string)
     }
   }
 
   // ── Ensure required tags exist ─────────────────────────────────────────────
   const allTagNamesNeeded = new Set<string>()
   for (const row of rows) {
-    for (const col of ['Tag1', 'Tag2', 'Tag3', 'Tag4', 'Tag5', 'Tag6', 'Tag7', 'Tag8', 'Tag9']) {
+    const tagCols = importType === 'contacts'
+      ? ['ContactTag1', 'ContactTag2', 'ContactTag3', 'ContactTag4', 'ContactTag5', 'ContactTag6', 'ContactTag7', 'ContactTag8', 'ContactTag9']
+      : ['Tag1', 'Tag2', 'Tag3', 'Tag4', 'Tag5', 'Tag6', 'Tag7', 'Tag8', 'Tag9']
+    for (const col of tagCols) {
       const t = str(row[col])
       if (t) allTagNamesNeeded.add(t)
     }
@@ -216,9 +253,11 @@ export async function POST(req: NextRequest) {
   const customerUpserts: Record<string, unknown>[] = []
   const vendorUpserts: Record<string, unknown>[] = []
   const opportunityUpserts: Record<string, unknown>[] = []
+  const contactUpserts: Record<string, unknown>[] = []
   const customerTagNames    = new Map<string, string[]>()
   const vendorTagNames      = new Map<string, string[]>()
   const opportunityTagNames = new Map<string, string[]>()
+  const contactTagNames     = new Map<string, string[]>()
   const customerAndVendorIds = new Set<string>()
   const unmatchedOwners     = new Set<string>()
   const unmatchedOrgs       = new Set<string>()
@@ -240,13 +279,17 @@ export async function POST(req: NextRequest) {
     const isVendor   = importType === 'vendors'
 
     const rowTagNames: string[] = []
-    for (const col of ['Tag1', 'Tag2', 'Tag3', 'Tag4', 'Tag5', 'Tag6', 'Tag7', 'Tag8', 'Tag9']) {
+    const isContacts = importType === 'contacts'
+    const tagCols = isContacts
+      ? ['ContactTag1', 'ContactTag2', 'ContactTag3', 'ContactTag4', 'ContactTag5', 'ContactTag6', 'ContactTag7', 'ContactTag8', 'ContactTag9']
+      : ['Tag1', 'Tag2', 'Tag3', 'Tag4', 'Tag5', 'Tag6', 'Tag7', 'Tag8', 'Tag9']
+    for (const col of tagCols) {
       const t = str(row[col])
       if (t) rowTagNames.push(t)
     }
     const ct = str(row['Company Type'])
     const ctLower = ct?.toLowerCase()
-    if (ct) {
+    if (!isContacts && ct) {
       if (ctLower === 'customer over $250k') rowTagNames.push('Over $250K')
       else if (ctLower === 'customer and vendor') rowTagNames.push(ct)
       else if (!KNOWN_COMPANY_TYPES.has(ctLower!)) rowTagNames.push(ct)
@@ -383,6 +426,93 @@ export async function POST(req: NextRequest) {
       })
       opportunityTagNames.set(insightlyId, rowTagNames)
     }
+
+    if (importType === 'contacts') {
+      const orgInsightlyId = str(row['OrganizationRecordId'])
+      const orgName = str(row['Organization'])?.toLowerCase().trim()
+
+      // Try to link to customer
+      let contactCustomerId = orgInsightlyId ? customerByInsightlyId.get(orgInsightlyId) ?? null : null
+      if (!contactCustomerId && orgName) contactCustomerId = customerByName.get(orgName) ?? null
+
+      // Try to link to vendor
+      let contactVendorId = orgInsightlyId ? vendorByInsightlyId.get(orgInsightlyId) ?? null : null
+      if (!contactVendorId && orgName) contactVendorId = vendorByName.get(orgName) ?? null
+
+      if (!contactCustomerId && !contactVendorId && (orgInsightlyId || orgName)) {
+        unmatchedOrgs.add(str(row['Organization']) ?? orgInsightlyId ?? insightlyId)
+      }
+
+      // Map type_of_contact to valid enum values
+      const rawType = str(row['Type of Contact'])
+      const VALID_CONTACT_TYPES = new Set(['Customer', 'Vendor', 'Prospect', 'Partner', 'Other'])
+      const typeOfContact = rawType && VALID_CONTACT_TYPES.has(rawType) ? rawType : 'Other'
+
+      // arcon_salesperson: "insightly_id;email@domain.com" format → look up by email
+      const arconSalespersonEmail = extractOwnerEmail(row['Arcon Salesperson'])
+      const arconSalespersonId = arconSalespersonEmail
+        ? userByEmail.get(arconSalespersonEmail.toLowerCase()) ?? null
+        : null
+      if (arconSalespersonEmail && !arconSalespersonId) unmatchedOwners.add(arconSalespersonEmail)
+
+      // contact_owner: plain display name → look up by display_name
+      const contactOwnerName = str(row['ContactOwner'])
+      const contactOwnerId = contactOwnerName
+        ? userByDisplayName.get(contactOwnerName.toLowerCase().trim()) ?? null
+        : null
+
+      const ex = existingContactMap.get(insightlyId)
+      contactUpserts.push({
+        insightly_id:            insightlyId,
+        first_name:              str(row['FirstName']) ?? (ex as any)?.first_name ?? '',
+        last_name:               str(row['LastName']) ?? (ex as any)?.last_name ?? '',
+        salutation:              merge(str(row['Salutation']), (ex as any)?.salutation),
+        title:                   merge(str(row['Role']), (ex as any)?.title),
+        email:                   merge(str(row['EmailAddress']), (ex as any)?.email),
+        phone:                   merge(formatPhone(str(row['BusinessPhone'])) ?? str(row['BusinessPhone']), (ex as any)?.phone),
+        home_phone:              merge(str(row['HomePhone']), (ex as any)?.home_phone),
+        mobile_phone:            merge(str(row['MobilePhone']), (ex as any)?.mobile_phone),
+        other_phone:             merge(str(row['OtherPhone']), (ex as any)?.other_phone),
+        fax:                     merge(str(row['Fax']), (ex as any)?.fax),
+        assistant_phone:         merge(str(row['AssistantPhone']), (ex as any)?.assistant_phone),
+        assistant_name:          merge(str(row['AssistantName']), (ex as any)?.assistant_name),
+        linkedin:                merge(str(row['LinkedIn URL']), (ex as any)?.linkedin),
+        mailing_address1:        merge(str(row['MailAddressStreet']), (ex as any)?.mailing_address1),
+        mailing_city:            merge(str(row['MailAddressCity']), (ex as any)?.mailing_city),
+        mailing_state:           merge(str(row['MailAddressState']), (ex as any)?.mailing_state),
+        mailing_zip:             merge(str(row['MailAddressPostalCode']), (ex as any)?.mailing_zip),
+        mailing_country:         merge(str(row['MailAddressCountry']), (ex as any)?.mailing_country),
+        other_address1:          merge(str(row['OtherAddressStreet']), (ex as any)?.other_address1),
+        other_city:              merge(str(row['OtherAddressCity']), (ex as any)?.other_city),
+        other_state:             merge(str(row['OtherAddressState']), (ex as any)?.other_state),
+        other_zip:               merge(str(row['OtherAddressPostalCode']), (ex as any)?.other_zip),
+        other_country:           merge(str(row['OtherAddressCountry']), (ex as any)?.other_country),
+        description:             merge(str(row['Background']), (ex as any)?.description),
+        industry:                merge(str(row['Industry']), (ex as any)?.industry),
+        type_of_contact:         typeOfContact,
+        products_purchased:      merge(str(row['Products Purchased']), (ex as any)?.products_purchased),
+        organization_website:    merge(str(row['Organization Website']), (ex as any)?.organization_website),
+        arcon_salesperson:       arconSalespersonId ?? (ex as any)?.arcon_salesperson ?? null,
+        contact_owner:           contactOwnerId ?? (ex as any)?.contact_owner ?? null,
+        date_of_birth:           merge(str(row['DateOfBirth']), (ex as any)?.date_of_birth),
+        email_opted_out:         merge(bool(row['EmailOptedOut']), (ex as any)?.email_opted_out),
+        important_date_1_name:   merge(str(row['ImportantDate1Name']), (ex as any)?.important_date_1_name),
+        important_date_1:        merge(parseDate(row['ImportantDate1']), (ex as any)?.important_date_1),
+        important_date_2_name:   merge(str(row['ImportantDate2Name']), (ex as any)?.important_date_2_name),
+        important_date_2:        merge(parseDate(row['ImportantDate2']), (ex as any)?.important_date_2),
+        important_date_3_name:   merge(str(row['ImportantDate3Name']), (ex as any)?.important_date_3_name),
+        important_date_3:        merge(parseDate(row['ImportantDate3']), (ex as any)?.important_date_3),
+        last_activity_date:      merge(parseDate(row['DateOfLastActivity']), (ex as any)?.last_activity_date),
+        next_activity_date:      merge(parseDate(row['DateOfNextActivity']), (ex as any)?.next_activity_date),
+        profile_segmentation:    merge(str(row['Profile Segmentation']), (ex as any)?.profile_segmentation),
+        product_showcase_invite: merge(str(row['Product Showcase Invite']), (ex as any)?.product_showcase_invite),
+        customer_id:             contactCustomerId ?? (ex as any)?.customer_id ?? null,
+        vendor_id:               contactVendorId ?? (ex as any)?.vendor_id ?? null,
+        created_by:              (ex as any)?.created_by ?? appUser.id,
+        updated_at:              new Date().toISOString(),
+      })
+      contactTagNames.set(insightlyId, rowTagNames)
+    }
   }
 
   // ── Upsert in batches of 100 ──────────────────────────────────────────────
@@ -390,9 +520,11 @@ export async function POST(req: NextRequest) {
   let customersInserted = 0, customersUpdated = 0
   let vendorsInserted = 0,   vendorsUpdated = 0
   let opportunitiesInserted = 0, opportunitiesUpdated = 0
+  let contactsInserted = 0,  contactsUpdated = 0
 
-  const prevCustomerIds = new Set(existingCustomerMap.keys())
-  const prevVendorIds   = new Set(existingVendorMap.keys())
+  const prevCustomerIds  = new Set(existingCustomerMap.keys())
+  const prevVendorIds    = new Set(existingVendorMap.keys())
+  const prevContactIds   = new Set(existingContactMap.keys())
 
   for (let i = 0; i < customerUpserts.length; i += BATCH) {
     const chunk = customerUpserts.slice(i, i + BATCH)
@@ -440,6 +572,21 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  for (let i = 0; i < contactUpserts.length; i += BATCH) {
+    const chunk = contactUpserts.slice(i, i + BATCH)
+    const { error } = await adminClient
+      .from('crm_contacts')
+      .upsert(chunk as any, { onConflict: 'insightly_id' })
+    if (error) {
+      errors.push(`Contact batch ${Math.floor(i / BATCH) + 1}: ${error.message}`)
+    } else {
+      for (const r of chunk) {
+        if (prevContactIds.has(r.insightly_id as string)) contactsUpdated++
+        else contactsInserted++
+      }
+    }
+  }
+
   // ── Re-link tags for all imported entities ────────────────────────────────
   const fetchIds = async (table: string, ids: string[]) => {
     const map = new Map<string, string>()
@@ -453,19 +600,22 @@ export async function POST(req: NextRequest) {
     return map
   }
 
-  const importedCustIds   = customerUpserts.map(r => r.insightly_id as string)
-  const importedVendorIds = vendorUpserts.map(r => r.insightly_id as string)
-  const importedOppIds    = opportunityUpserts.map(r => r.insightly_id as string)
+  const importedCustIds     = customerUpserts.map(r => r.insightly_id as string)
+  const importedVendorIds   = vendorUpserts.map(r => r.insightly_id as string)
+  const importedOppIds      = opportunityUpserts.map(r => r.insightly_id as string)
+  const importedContactIds  = contactUpserts.map(r => r.insightly_id as string)
 
-  const [custIdMap, vendorIdMap, oppIdMap] = await Promise.all([
-    importedCustIds.length > 0   ? fetchIds('crm_customers',     importedCustIds)   : Promise.resolve(new Map()),
-    importedVendorIds.length > 0 ? fetchIds('crm_vendors',       importedVendorIds) : Promise.resolve(new Map()),
-    importedOppIds.length > 0    ? fetchIds('crm_opportunities',  importedOppIds)    : Promise.resolve(new Map()),
+  const [custIdMap, vendorIdMap, oppIdMap, contactIdMap] = await Promise.all([
+    importedCustIds.length > 0    ? fetchIds('crm_customers',    importedCustIds)    : Promise.resolve(new Map()),
+    importedVendorIds.length > 0  ? fetchIds('crm_vendors',      importedVendorIds)  : Promise.resolve(new Map()),
+    importedOppIds.length > 0     ? fetchIds('crm_opportunities', importedOppIds)     : Promise.resolve(new Map()),
+    importedContactIds.length > 0 ? fetchIds('crm_contacts',     importedContactIds) : Promise.resolve(new Map()),
   ])
 
-  const custDbIds   = [...custIdMap.values()]
-  const vendorDbIds = [...vendorIdMap.values()]
-  const oppDbIds    = [...oppIdMap.values()]
+  const custDbIds    = [...custIdMap.values()]
+  const vendorDbIds  = [...vendorIdMap.values()]
+  const oppDbIds     = [...oppIdMap.values()]
+  const contactDbIds = [...contactIdMap.values()]
 
   // Delete old tag links, then re-insert from XLSX data
   for (let i = 0; i < custDbIds.length; i += 500) {
@@ -509,6 +659,19 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  for (let i = 0; i < contactDbIds.length; i += 500) {
+    await adminClient.from('crm_entity_tags').delete()
+      .eq('entity_type', 'contact').in('entity_id', contactDbIds.slice(i, i + 500))
+  }
+  for (const [iid, tagNames] of contactTagNames) {
+    const dbId = contactIdMap.get(iid)
+    if (!dbId) continue
+    for (const tn of tagNames) {
+      const tagId = tagByName.get(tn.toLowerCase())
+      if (tagId) tagLinkInserts.push({ tag_id: tagId, entity_type: 'contact', entity_id: dbId })
+    }
+  }
+
   for (let i = 0; i < tagLinkInserts.length; i += BATCH) {
     const { error } = await adminClient.from('crm_entity_tags').insert(tagLinkInserts.slice(i, i + BATCH))
     if (error) errors.push(`Tag linking batch ${Math.floor(i / BATCH) + 1}: ${error.message}`)
@@ -540,9 +703,10 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({
-    customers:        { inserted: customersInserted,     updated: customersUpdated },
-    vendors:          { inserted: vendorsInserted,       updated: vendorsUpdated },
+    customers:        { inserted: customersInserted,    updated: customersUpdated },
+    vendors:          { inserted: vendorsInserted,      updated: vendorsUpdated },
     opportunities:    { inserted: opportunitiesInserted, updated: opportunitiesUpdated },
+    contacts:         { inserted: contactsInserted,     updated: contactsUpdated },
     tags_created:     tagsCreated,
     vendor_links_set: vendorLinksSet,
     unmatched_owners: [...unmatchedOwners].sort(),
