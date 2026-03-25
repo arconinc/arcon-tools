@@ -3,6 +3,9 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
+import {
+  BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
+} from 'recharts'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -32,12 +35,17 @@ type DashboardData = {
   my_pipeline: PipelineOpp[]
   my_pipeline_total: number
   closing_soon: ClosingSoonOpp[]
+  closing_soon_count: number
   leaderboard: LeaderboardEntry[]
   goal_progress: GoalEntry[]
   my_tasks: TaskItem[]
+  my_tasks_overdue_count: number
   current_month: number
   current_year: number
 }
+
+type ChartBucket = { label: string; [name: string]: number | string }
+type PipelineChartData = { buckets: ChartBucket[]; salespeople: string[] }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -69,6 +77,67 @@ const TASK_STATUS_LABEL: Record<string, string> = {
   waiting_on_approval: 'Waiting Approval',
   waiting_on_client_approval: 'Waiting Client',
   need_changes: 'Need Changes',
+}
+
+// ── Chart color palette ────────────────────────────────────────────────────────
+
+const CHART_COLORS = [
+  '#7c3aed', '#6366f1', '#0ea5e9', '#14b8a6', '#f59e0b',
+  '#f97316', '#ef4444', '#ec4899', '#84cc16', '#8b5cf6',
+]
+
+// ── Pipeline Chart ─────────────────────────────────────────────────────────────
+
+function PipelineChart() {
+  const [data, setData] = useState<PipelineChartData | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    fetch('/api/crm/pipeline-chart')
+      .then((r) => r.json())
+      .then((d) => { if (!d.error) setData(d) })
+      .finally(() => setLoading(false))
+  }, [])
+
+  const isEmpty = !data || data.salespeople.length === 0
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden mb-5">
+      <SectionHeader title="Open Pipeline by Close Month" />
+      {loading ? (
+        <div className="h-56 flex items-center justify-center">
+          <div className="w-6 h-6 border-2 border-purple-600 border-t-transparent rounded-full animate-spin" />
+        </div>
+      ) : isEmpty ? (
+        <EmptyState text="No open opportunities with a forecast close date." />
+      ) : (
+        <div className="px-5 pt-4 pb-5">
+          <ResponsiveContainer width="100%" height={260}>
+            <BarChart data={data!.buckets} margin={{ top: 4, right: 8, left: 0, bottom: 0 }} barCategoryGap="25%" barGap={3}>
+              <CartesianGrid strokeDasharray="3 3" stroke="#f1f5f9" vertical={false} />
+              <XAxis dataKey="label" tick={{ fontSize: 12, fill: '#64748b' }} axisLine={false} tickLine={false} />
+              <YAxis
+                tickFormatter={(v) => fmt$(v)}
+                tick={{ fontSize: 11, fill: '#94a3b8' }}
+                axisLine={false}
+                tickLine={false}
+                width={58}
+              />
+              <Tooltip
+                formatter={(value, name) => [fmt$(typeof value === 'number' ? value : 0), name as string]}
+                contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e2e8f0' }}
+                cursor={{ fill: '#f8fafc' }}
+              />
+              <Legend wrapperStyle={{ fontSize: 12, paddingTop: 12 }} />
+              {data!.salespeople.map((name, i) => (
+                <Bar key={name} dataKey={name} fill={CHART_COLORS[i % CHART_COLORS.length]} radius={[3, 3, 0, 0]} />
+              ))}
+            </BarChart>
+          </ResponsiveContainer>
+        </div>
+      )}
+    </div>
+  )
 }
 
 // ── Section header ────────────────────────────────────────────────────────────
@@ -165,15 +234,18 @@ export default function CrmDashboardPage() {
         </div>
         <div className="bg-white border border-slate-200 rounded-2xl px-5 py-4">
           <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Closing Soon</div>
-          <div className="text-3xl font-bold text-amber-600">{data.closing_soon.length}</div>
+          <div className="text-3xl font-bold text-amber-600">{data.closing_soon_count}</div>
           <div className="text-xs text-slate-400 mt-1">due within 30 days</div>
         </div>
         <div className="bg-white border border-slate-200 rounded-2xl px-5 py-4">
           <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Tasks Overdue</div>
-          <div className="text-3xl font-bold text-red-600">{data.my_tasks.length}</div>
+          <div className="text-3xl font-bold text-red-600">{data.my_tasks_overdue_count}</div>
           <div className="text-xs text-slate-400 mt-1">due today or past due</div>
         </div>
       </div>
+
+      {/* Pipeline chart */}
+      <PipelineChart />
 
       <div className="grid grid-cols-2 gap-5 mb-5">
 

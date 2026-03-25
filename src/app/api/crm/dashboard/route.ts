@@ -24,8 +24,10 @@ export async function GET() {
   const [
     myPipelineRes,
     closingSoonRes,
+    closingSoonCountRes,
     teamOppsRes,
     myTasksRes,
+    myTasksOverdueCountRes,
     allUsersRes,
     goalsRes,
   ] = await Promise.all([
@@ -37,7 +39,7 @@ export async function GET() {
       .eq('status', 'open')
       .order('value', { ascending: false }),
 
-    // Closing soon: any owner, open, forecast close within 30 days
+    // Closing soon rows (capped at 20 for the list card)
     adminClient
       .from('crm_opportunities')
       .select('id, name, customer_id, assigned_to, value, pipeline_stage, forecast_close_date, status')
@@ -47,6 +49,14 @@ export async function GET() {
       .order('forecast_close_date', { ascending: true })
       .limit(20),
 
+    // Closing soon exact count (for stat card)
+    adminClient
+      .from('crm_opportunities')
+      .select('*', { count: 'exact', head: true })
+      .eq('status', 'open')
+      .lte('forecast_close_date', closingSoonStr)
+      .gte('forecast_close_date', todayStr),
+
     // Team open opps for leaderboard (all reps)
     adminClient
       .from('crm_opportunities')
@@ -54,7 +64,7 @@ export async function GET() {
       .eq('status', 'open')
       .not('assigned_to', 'is', null),
 
-    // My tasks due today or overdue
+    // My tasks due today or overdue (capped at 10 for the list card)
     adminClient
       .from('crm_tasks')
       .select('id, title, status, priority, due_date, category, customer_id, opportunity_id')
@@ -63,6 +73,14 @@ export async function GET() {
       .lte('due_date', todayStr)
       .order('due_date', { ascending: true })
       .limit(10),
+
+    // My tasks overdue exact count (for stat card)
+    adminClient
+      .from('crm_tasks')
+      .select('*', { count: 'exact', head: true })
+      .eq('assigned_to', appUser.id)
+      .neq('status', 'completed')
+      .lte('due_date', todayStr),
 
     // All users (for leaderboard + goal progress display names)
     adminClient.from('users').select('id, display_name'),
@@ -74,6 +92,9 @@ export async function GET() {
       .eq('year', now.getFullYear())
       .eq('month', now.getMonth() + 1),
   ])
+
+  const closingSoonCount = closingSoonCountRes.count ?? 0
+  const myTasksOverdueCount = myTasksOverdueCountRes.count ?? 0
 
   // Won opportunities this month (for goal progress)
   const { data: wonThisMonth } = await adminClient
@@ -178,9 +199,11 @@ export async function GET() {
     my_pipeline: myPipeline,
     my_pipeline_total: myPipelineTotal,
     closing_soon: closingSoon,
+    closing_soon_count: closingSoonCount,
     leaderboard,
     goal_progress: goalProgress,
     my_tasks: myTasks,
+    my_tasks_overdue_count: myTasksOverdueCount,
     current_month: now.getMonth() + 1,
     current_year: now.getFullYear(),
   })
