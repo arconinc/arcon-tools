@@ -11,7 +11,7 @@ import { setGAUser, trackPageView } from '@/lib/analytics'
 
 interface AppShellProps {
   children: React.ReactNode
-  user: { email: string; display_name: string; is_admin: boolean; avatar_url?: string | null }
+  user: { id: string; email: string; display_name: string; is_admin: boolean; avatar_url?: string | null }
 }
 
 type NavBadge = { text: string; variant: 'purple' | 'green' | 'muted' }

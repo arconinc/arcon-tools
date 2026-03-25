@@ -45,6 +45,41 @@ function merge<T>(newVal: T | null, existingVal: T | null | undefined): T | null
   return newVal !== null ? newVal : (existingVal ?? null)
 }
 
+// ─── Opportunity field mappers ─────────────────────────────────────────────────
+
+function mapOpportunityStatus(v: unknown): string {
+  const s = str(v)?.toUpperCase()
+  if (s === 'WON') return 'won'
+  if (s === 'LOST') return 'lost'
+  return 'open'
+}
+
+function mapPipelineStage(v: unknown): string | null {
+  const s = str(v)
+  if (!s) return null
+  const stages = ['Send Quote', 'Follow Up on Quote', 'Quote Accepted', 'Send Thank You Email']
+  return stages.find(st => st.toLowerCase() === s.toLowerCase()) ?? null
+}
+
+function mapOpportunityCategory(v: unknown): string | null {
+  const s = str(v)
+  if (!s) return null
+  const cats = ['Apparel', 'Packaging Product', 'Print Product', 'Promotional Product', 'Signage', 'Store/Ecommerce Build']
+  return cats.find(c => c.toLowerCase() === s.toLowerCase()) ?? null
+}
+
+function parseDate(v: unknown): string | null {
+  const s = str(v)
+  if (!s) return null
+  const d = new Date(s)
+  return isNaN(d.getTime()) ? null : d.toISOString()
+}
+
+function parseNumber(v: unknown): number | null {
+  const n = parseFloat(String(v ?? ''))
+  return isNaN(n) ? null : n
+}
+
 // ─── POST /api/admin/crm/import ───────────────────────────────────────────────
 
 export async function POST(req: NextRequest) {
@@ -56,15 +91,15 @@ export async function POST(req: NextRequest) {
 
   // ── Parse XLSX from multipart form ────────────────────────────────────────
   let rows: Record<string, unknown>[]
-  let importType: 'vendors' | 'customers'
+  let importType: 'vendors' | 'customers' | 'opportunities'
   try {
     const formData = await req.formData()
     const file = formData.get('file') as File | null
     if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
 
     const rawImportType = formData.get('importType') as string | null
-    if (!rawImportType || (rawImportType !== 'vendors' && rawImportType !== 'customers')) {
-      return NextResponse.json({ error: 'importType must be "vendors" or "customers"' }, { status: 400 })
+    if (!rawImportType || (rawImportType !== 'vendors' && rawImportType !== 'customers' && rawImportType !== 'opportunities')) {
+      return NextResponse.json({ error: 'importType must be "vendors", "customers", or "opportunities"' }, { status: 400 })
     }
     importType = rawImportType
 
@@ -110,6 +145,27 @@ export async function POST(req: NextRequest) {
   const existingVendorMap = new Map<string, Record<string, unknown>>()
   for (const v of existingVendorsRaw ?? []) {
     if (v.insightly_id) existingVendorMap.set(String(v.insightly_id), v)
+  }
+
+  const { data: existingOppsRaw } = await adminClient
+    .from('crm_opportunities')
+    .select('*')
+    .not('insightly_id', 'is', null)
+  const existingOppMap = new Map<string, Record<string, unknown>>()
+  for (const o of existingOppsRaw ?? []) {
+    if (o.insightly_id) existingOppMap.set(String(o.insightly_id), o)
+  }
+
+  // ── Load customers for opportunity org lookup ──────────────────────────────
+  const customerByInsightlyId = new Map<string, string>()
+  const customerByName = new Map<string, string>()
+  if (importType === 'opportunities') {
+    const { data: allCustomers } = await adminClient
+      .from('crm_customers').select('id, name, insightly_id')
+    for (const c of allCustomers ?? []) {
+      if (c.insightly_id) customerByInsightlyId.set(String(c.insightly_id), c.id)
+      if (c.name) customerByName.set(c.name.toLowerCase().trim(), c.id)
+    }
   }
 
   // ── Ensure required tags exist ─────────────────────────────────────────────
@@ -159,10 +215,13 @@ export async function POST(req: NextRequest) {
   // ── Process rows ──────────────────────────────────────────────────────────
   const customerUpserts: Record<string, unknown>[] = []
   const vendorUpserts: Record<string, unknown>[] = []
+  const opportunityUpserts: Record<string, unknown>[] = []
   const customerTagNames    = new Map<string, string[]>()
   const vendorTagNames      = new Map<string, string[]>()
+  const opportunityTagNames = new Map<string, string[]>()
   const customerAndVendorIds = new Set<string>()
   const unmatchedOwners     = new Set<string>()
+  const unmatchedOrgs       = new Set<string>()
   const errors: string[] = []
 
   for (const row of rows) {
@@ -275,12 +334,62 @@ export async function POST(req: NextRequest) {
       })
       vendorTagNames.set(insightlyId, rowTagNames)
     }
+
+    if (importType === 'opportunities') {
+      const orgInsightlyId = str(row['OrganizationId'])
+      const orgName = str(row['OrganizationName'])
+      let customerId = orgInsightlyId ? customerByInsightlyId.get(orgInsightlyId) ?? null : null
+      if (!customerId && orgName) customerId = customerByName.get(orgName.toLowerCase().trim()) ?? null
+      if (!customerId) {
+        unmatchedOrgs.add(orgName ?? orgInsightlyId ?? insightlyId)
+        continue
+      }
+
+      const assignedEmail  = extractOwnerEmail(row['UserResponsibleEmailAddress'])
+      const csrEmail       = extractOwnerEmail(row['CSR'])
+      const designerEmail  = extractOwnerEmail(row['Designer'])
+      const oppAssignedTo     = assignedEmail  ? userByEmail.get(assignedEmail.toLowerCase())  ?? null : null
+      const csrUserId         = csrEmail       ? userByEmail.get(csrEmail.toLowerCase())       ?? null : null
+      const designerUserId    = designerEmail  ? userByEmail.get(designerEmail.toLowerCase())  ?? null : null
+      if (assignedEmail  && !oppAssignedTo)    unmatchedOwners.add(assignedEmail)
+      if (csrEmail       && !csrUserId)        unmatchedOwners.add(csrEmail)
+      if (designerEmail  && !designerUserId)   unmatchedOwners.add(designerEmail)
+
+      const ex = existingOppMap.get(insightlyId)
+      opportunityUpserts.push({
+        insightly_id:        insightlyId,
+        name:                str(row['OpportunityName']) ?? (ex as any)?.name ?? 'Unnamed',
+        customer_id:         customerId,
+        description:         merge(str(row['Details']), (ex as any)?.description),
+        probability:         merge(parseNumber(row['Probability']), (ex as any)?.probability),
+        value:               merge(parseNumber(row['BidAmount']), (ex as any)?.value),
+        bid_currency:        merge(str(row['BidCurrency']), (ex as any)?.bid_currency),
+        bid_type:            merge(str(row['BidType']), (ex as any)?.bid_type),
+        bid_duration:        merge(str(row['BidDuration']), (ex as any)?.bid_duration),
+        forecast_close_date: merge(parseDate(row['ForecastCloseDate']), (ex as any)?.forecast_close_date),
+        closed_at:           merge(parseDate(row['ActualCloseDate']), (ex as any)?.closed_at),
+        last_activity_date:  merge(parseDate(row['DateOfLastActivity']), (ex as any)?.last_activity_date),
+        next_activity_date:  merge(parseDate(row['DateOfNextActivity']), (ex as any)?.next_activity_date),
+        pipeline_stage:      merge(mapPipelineStage(row['PipelineCurrentStage']), (ex as any)?.pipeline_stage),
+        pipeline_name:       merge(str(row['PipelineName']), (ex as any)?.pipeline_name),
+        category:            merge(mapOpportunityCategory(row['OpportunityCategory']), (ex as any)?.category),
+        status:              merge(mapOpportunityStatus(row['CurrentState']), (ex as any)?.status) ?? 'open',
+        status_reason:       merge(str(row['LastStateChangeReason']), (ex as any)?.status_reason),
+        assigned_to:         oppAssignedTo ?? (ex as any)?.assigned_to ?? null,
+        csr_user_id:         csrUserId ?? (ex as any)?.csr_user_id ?? null,
+        designer_user_id:    designerUserId ?? (ex as any)?.designer_user_id ?? null,
+        created_by:          (ex as any)?.created_by ?? appUser.id,
+        updated_at:          new Date().toISOString(),
+      })
+      opportunityTagNames.set(insightlyId, rowTagNames)
+    }
   }
 
   // ── Upsert in batches of 100 ──────────────────────────────────────────────
   const BATCH = 100
   let customersInserted = 0, customersUpdated = 0
   let vendorsInserted = 0,   vendorsUpdated = 0
+  let opportunitiesInserted = 0, opportunitiesUpdated = 0
 
   const prevCustomerIds = new Set(existingCustomerMap.keys())
   const prevVendorIds   = new Set(existingVendorMap.keys())
@@ -315,6 +424,22 @@ export async function POST(req: NextRequest) {
     }
   }
 
+  const prevOppIds = new Set(existingOppMap.keys())
+  for (let i = 0; i < opportunityUpserts.length; i += BATCH) {
+    const chunk = opportunityUpserts.slice(i, i + BATCH)
+    const { error } = await adminClient
+      .from('crm_opportunities')
+      .upsert(chunk as any, { onConflict: 'insightly_id' })
+    if (error) {
+      errors.push(`Opportunity batch ${Math.floor(i / BATCH) + 1}: ${error.message}`)
+    } else {
+      for (const r of chunk) {
+        if (prevOppIds.has(r.insightly_id as string)) opportunitiesUpdated++
+        else opportunitiesInserted++
+      }
+    }
+  }
+
   // ── Re-link tags for all imported entities ────────────────────────────────
   const fetchIds = async (table: string, ids: string[]) => {
     const map = new Map<string, string>()
@@ -330,14 +455,17 @@ export async function POST(req: NextRequest) {
 
   const importedCustIds   = customerUpserts.map(r => r.insightly_id as string)
   const importedVendorIds = vendorUpserts.map(r => r.insightly_id as string)
+  const importedOppIds    = opportunityUpserts.map(r => r.insightly_id as string)
 
-  const [custIdMap, vendorIdMap] = await Promise.all([
-    importedCustIds.length > 0   ? fetchIds('crm_customers', importedCustIds)   : Promise.resolve(new Map()),
-    importedVendorIds.length > 0 ? fetchIds('crm_vendors',   importedVendorIds) : Promise.resolve(new Map()),
+  const [custIdMap, vendorIdMap, oppIdMap] = await Promise.all([
+    importedCustIds.length > 0   ? fetchIds('crm_customers',     importedCustIds)   : Promise.resolve(new Map()),
+    importedVendorIds.length > 0 ? fetchIds('crm_vendors',       importedVendorIds) : Promise.resolve(new Map()),
+    importedOppIds.length > 0    ? fetchIds('crm_opportunities',  importedOppIds)    : Promise.resolve(new Map()),
   ])
 
   const custDbIds   = [...custIdMap.values()]
   const vendorDbIds = [...vendorIdMap.values()]
+  const oppDbIds    = [...oppIdMap.values()]
 
   // Delete old tag links, then re-insert from XLSX data
   for (let i = 0; i < custDbIds.length; i += 500) {
@@ -365,6 +493,19 @@ export async function POST(req: NextRequest) {
     for (const tn of tagNames) {
       const tagId = tagByName.get(tn.toLowerCase())
       if (tagId) tagLinkInserts.push({ tag_id: tagId, entity_type: 'vendor', entity_id: dbId })
+    }
+  }
+
+  for (let i = 0; i < oppDbIds.length; i += 500) {
+    await adminClient.from('crm_entity_tags').delete()
+      .eq('entity_type', 'opportunity').in('entity_id', oppDbIds.slice(i, i + 500))
+  }
+  for (const [iid, tagNames] of opportunityTagNames) {
+    const dbId = oppIdMap.get(iid)
+    if (!dbId) continue
+    for (const tn of tagNames) {
+      const tagId = tagByName.get(tn.toLowerCase())
+      if (tagId) tagLinkInserts.push({ tag_id: tagId, entity_type: 'opportunity', entity_id: dbId })
     }
   }
 
@@ -399,11 +540,13 @@ export async function POST(req: NextRequest) {
   }
 
   return NextResponse.json({
-    customers:        { inserted: customersInserted, updated: customersUpdated },
-    vendors:          { inserted: vendorsInserted,   updated: vendorsUpdated },
+    customers:        { inserted: customersInserted,     updated: customersUpdated },
+    vendors:          { inserted: vendorsInserted,       updated: vendorsUpdated },
+    opportunities:    { inserted: opportunitiesInserted, updated: opportunitiesUpdated },
     tags_created:     tagsCreated,
     vendor_links_set: vendorLinksSet,
     unmatched_owners: [...unmatchedOwners].sort(),
+    unmatched_orgs:   [...unmatchedOrgs].sort(),
     errors,
   })
 }

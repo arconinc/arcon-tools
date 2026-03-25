@@ -14,14 +14,16 @@ interface Preview {
 interface ImportResult {
   customers: { inserted: number; updated: number }
   vendors: { inserted: number; updated: number }
+  opportunities: { inserted: number; updated: number }
   tags_created: number
   unmatched_owners: string[]
+  unmatched_orgs: string[]
   errors: string[]
 }
 
 // ─── Client-side XLSX preview parser ─────────────────────────────────────────
 
-async function parseXlsxPreview(file: File): Promise<Preview> {
+async function parseXlsxPreview(file: File, importType: 'vendors' | 'customers' | 'opportunities' | null): Promise<Preview> {
   const arrayBuffer = await file.arrayBuffer()
   const workbook = XLSX.read(arrayBuffer, { type: 'array' })
   const sheet = workbook.Sheets[workbook.SheetNames[0]]
@@ -30,20 +32,29 @@ async function parseXlsxPreview(file: File): Promise<Preview> {
   const tagSet = new Set<string>()
   const ownerEmailSet = new Set<string>()
 
-  for (const row of rows) {
-    const ct = String(row['Company Type'] ?? '').trim().toLowerCase()
+  function extractEmail(raw: unknown): string | null {
+    const s = String(raw ?? '').trim()
+    if (!s) return null
+    return s.split(';')[1]?.trim() || null
+  }
 
+  for (const row of rows) {
     for (const col of ['Tag1', 'Tag2', 'Tag3', 'Tag4', 'Tag5', 'Tag6', 'Tag7', 'Tag8', 'Tag9']) {
       const t = String(row[col] ?? '').trim()
       if (t) tagSet.add(t)
     }
-    if (ct && ct !== 'vendor' && ct !== 'customer') {
-      tagSet.add(String(row['Company Type']).trim())
-    }
 
-    const ownerRaw = String(row['OrganisationOwner'] ?? '').trim()
-    if (ownerRaw) {
-      const email = ownerRaw.split(';')[1]?.trim()
+    if (importType === 'opportunities') {
+      for (const col of ['UserResponsibleEmailAddress', 'CSR', 'Designer']) {
+        const email = extractEmail(row[col])
+        if (email) ownerEmailSet.add(email)
+      }
+    } else {
+      const ct = String(row['Company Type'] ?? '').trim().toLowerCase()
+      if (ct && ct !== 'vendor' && ct !== 'customer') {
+        tagSet.add(String(row['Company Type']).trim())
+      }
+      const email = extractEmail(row['OrganisationOwner'])
       if (email) ownerEmailSet.add(email)
     }
   }
@@ -66,7 +77,7 @@ interface NormalizeResult {
 
 export default function CrmImportPage() {
   const fileRef = useRef<HTMLInputElement>(null)
-  const [importType, setImportType] = useState<'vendors' | 'customers' | null>(null)
+  const [importType, setImportType] = useState<'vendors' | 'customers' | 'opportunities' | null>(null)
   const [file, setFile] = useState<File | null>(null)
   const [preview, setPreview] = useState<Preview | null>(null)
   const [previewing, setPreviewing] = useState(false)
@@ -87,7 +98,7 @@ export default function CrmImportPage() {
 
     setPreviewing(true)
     try {
-      setPreview(await parseXlsxPreview(f))
+      setPreview(await parseXlsxPreview(f, importType))
     } catch {
       setError('Failed to read file. Make sure it is a valid .xlsx file.')
     } finally {
@@ -161,7 +172,7 @@ export default function CrmImportPage() {
         <h2 className="text-sm font-semibold text-slate-700 mb-4">Import Type</h2>
 
         <div className="flex gap-2 mb-5">
-          {(['vendors', 'customers'] as const).map(type => (
+          {(['vendors', 'customers', 'opportunities'] as const).map(type => (
             <button
               key={type}
               onClick={() => setImportType(type)}
@@ -171,7 +182,7 @@ export default function CrmImportPage() {
                   : 'bg-white text-slate-600 border-slate-300 hover:bg-slate-50'
               }`}
             >
-              {type === 'vendors' ? 'Vendors' : 'Customers'}
+              {type === 'vendors' ? 'Vendors' : type === 'customers' ? 'Customers' : 'Opportunities'}
             </button>
           ))}
         </div>
@@ -210,9 +221,9 @@ export default function CrmImportPage() {
           <div className="grid grid-cols-2 gap-3 mb-5">
             <StatBox label="Total Records" value={preview.total} />
             <StatBox
-              label={`→ ${importType === 'vendors' ? 'Vendors' : 'Customers'}`}
+              label={`→ ${importType === 'vendors' ? 'Vendors' : importType === 'customers' ? 'Customers' : 'Opportunities'}`}
               value={preview.total}
-              color={importType === 'vendors' ? 'green' : 'blue'}
+              color={importType === 'vendors' ? 'green' : importType === 'customers' ? 'blue' : 'purple'}
             />
           </div>
 
@@ -251,7 +262,7 @@ export default function CrmImportPage() {
             >
               {importing
                 ? 'Importing…'
-                : `Import ${preview.total.toLocaleString()} as ${importType === 'vendors' ? 'Vendors' : importType === 'customers' ? 'Customers' : '…'}`}
+                : `Import ${preview.total.toLocaleString()} as ${importType === 'vendors' ? 'Vendors' : importType === 'customers' ? 'Customers' : 'Opportunities'}`}
             </button>
             <button
               onClick={reset}
@@ -290,14 +301,14 @@ export default function CrmImportPage() {
           <div className="grid grid-cols-1 gap-3 mb-5">
             <div className="bg-slate-50 rounded-xl p-4">
               <p className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">
-                {importType === 'vendors' ? 'Vendors' : 'Customers'}
+                {importType === 'vendors' ? 'Vendors' : importType === 'customers' ? 'Customers' : 'Opportunities'}
               </p>
               <p className="text-sm text-slate-700">
                 <span className="font-semibold text-green-700">
-                  {importType === 'vendors' ? result.vendors.inserted : result.customers.inserted}
+                  {importType === 'vendors' ? result.vendors.inserted : importType === 'customers' ? result.customers.inserted : result.opportunities?.inserted ?? 0}
                 </span> inserted &nbsp;·&nbsp;
                 <span className="font-semibold text-blue-700">
-                  {importType === 'vendors' ? result.vendors.updated : result.customers.updated}
+                  {importType === 'vendors' ? result.vendors.updated : importType === 'customers' ? result.customers.updated : result.opportunities?.updated ?? 0}
                 </span> updated
               </p>
             </div>
@@ -307,6 +318,19 @@ export default function CrmImportPage() {
             <p className="text-sm text-slate-600 mb-3">
               <span className="font-semibold">{result.tags_created}</span> new tag{result.tags_created !== 1 ? 's' : ''} created
             </p>
+          )}
+
+          {result.unmatched_orgs?.length > 0 && (
+            <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+              <p className="text-xs font-semibold text-amber-800 mb-1.5">
+                {result.unmatched_orgs.length} org{result.unmatched_orgs.length !== 1 ? 's' : ''} not matched to a customer — opportunities skipped:
+              </p>
+              <div className="flex flex-wrap gap-1">
+                {result.unmatched_orgs.map(e => (
+                  <span key={e} className="px-2 py-0.5 rounded text-xs bg-amber-100 text-amber-700 font-medium">{e}</span>
+                ))}
+              </div>
+            </div>
           )}
 
           {result.unmatched_owners.length > 0 && (
@@ -333,10 +357,10 @@ export default function CrmImportPage() {
 
           <div className="pt-3 border-t border-slate-100 flex gap-3">
             <a
-              href={importType === 'vendors' ? '/crm/vendors' : '/crm/customers'}
+              href={importType === 'vendors' ? '/crm/vendors' : importType === 'customers' ? '/crm/customers' : '/crm/opportunities'}
               className="px-4 py-2 text-sm font-semibold bg-purple-700 hover:bg-purple-800 text-white rounded-lg transition-colors"
             >
-              {importType === 'vendors' ? 'View Vendors' : 'View Customers'}
+              {importType === 'vendors' ? 'View Vendors' : importType === 'customers' ? 'View Customers' : 'View Opportunities'}
             </a>
             <button
               onClick={reset}
@@ -384,7 +408,7 @@ export default function CrmImportPage() {
       {/* Field mapping reference */}
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden mt-6">
         <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50">
-          <h2 className="text-sm font-semibold text-slate-700">Field Mapping Reference</h2>
+          <h2 className="text-sm font-semibold text-slate-700">Field Mapping Reference — Customers &amp; Vendors</h2>
         </div>
         <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1">
           {[
@@ -415,6 +439,39 @@ export default function CrmImportPage() {
             ['Arcon Account Number', 'arcon_account_number (Vendors)'],
             ['Arcon Username/Password', 'arcon_username / arcon_password (Vendors)'],
             ['*Email fields', 'vendor email columns (Vendors)'],
+          ].map(([xlsx, db]) => (
+            <div key={xlsx} className="flex gap-2 py-1 text-xs border-b border-slate-50 last:border-0">
+              <span className="font-mono text-slate-500 shrink-0 w-40 truncate">{xlsx}</span>
+              <span className="text-slate-700">{db}</span>
+            </div>
+          ))}
+        </div>
+      </div>
+
+      {/* Opportunities field mapping reference */}
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden mt-4">
+        <div className="px-5 py-3.5 border-b border-slate-100 bg-slate-50">
+          <h2 className="text-sm font-semibold text-slate-700">Field Mapping Reference — Opportunities</h2>
+        </div>
+        <div className="p-5 grid grid-cols-1 sm:grid-cols-2 gap-x-8 gap-y-1">
+          {[
+            ['RecordId', 'insightly_id (deduplication key)'],
+            ['OpportunityName', 'name'],
+            ['Details', 'description'],
+            ['OrganizationId', 'customer_id (matched via crm_customers.insightly_id)'],
+            ['OrganizationName', 'customer_id (fallback name match)'],
+            ['BidAmount', 'value'],
+            ['Probability', 'probability'],
+            ['ForecastCloseDate', 'forecast_close_date'],
+            ['ActualCloseDate', 'closed_at'],
+            ['PipelineCurrentStage', 'pipeline_stage (enum matched)'],
+            ['OpportunityCategory', 'category (enum matched)'],
+            ['CurrentState', 'status (WON/LOST/else → open)'],
+            ['LastStateChangeReason', 'status_reason'],
+            ['UserResponsibleEmailAddress', 'assigned_to (matched by email)'],
+            ['CSR', 'csr_user_id (matched by email)'],
+            ['Designer', 'designer_user_id (matched by email)'],
+            ['Tag1–Tag9', 'crm_entity_tags (created if new)'],
           ].map(([xlsx, db]) => (
             <div key={xlsx} className="flex gap-2 py-1 text-xs border-b border-slate-50 last:border-0">
               <span className="font-mono text-slate-500 shrink-0 w-40 truncate">{xlsx}</span>

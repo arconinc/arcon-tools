@@ -553,14 +553,23 @@ export interface CrmOpportunity {
   customer_id: string
   assigned_to: string | null
   pipeline_stage: CrmPipelineStage | null
+  pipeline_name: string | null
   value: number | null
+  bid_currency: string | null
+  bid_type: string | null
+  bid_duration: string | null
   probability: number | null
   status: CrmOpportunityStatus
   status_reason: string | null
   category: CrmOpportunityCategory | null
   forecast_close_date: string | null
+  last_activity_date: string | null
+  next_activity_date: string | null
   description: string | null
   closed_at: string | null
+  insightly_id: string | null
+  csr_user_id: string | null
+  designer_user_id: string | null
   created_by: string
   created_at: string
   updated_at: string
