@@ -65,7 +65,7 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
     {
       label: 'Home',
       items: [
-        { href: '/dashboard', label: 'Dashboard', icon: HomeIcon },
+        { href: '/dashboard', label: 'Home', icon: HomeIcon },
       ],
     },
     {
@@ -153,7 +153,37 @@ export default function AppShell({ children, user }: AppShellProps) {
   const [countdown, setCountdown] = useState<CountdownConfig | null>(null)
   const [countdownDisplay, setCountdownDisplay] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
+  const [profileOpen, setProfileOpen] = useState(false)
+  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
+
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem('nav-collapsed-sections')
+      if (saved) setCollapsedSections(new Set(JSON.parse(saved)))
+    } catch {}
+  }, [])
   const countdownRef = useRef<CountdownConfig | null>(null)
+  const profileRef = useRef<HTMLDivElement | null>(null)
+
+  function toggleSection(label: string) {
+    setCollapsedSections(prev => {
+      const next = new Set(prev)
+      next.has(label) ? next.delete(label) : next.add(label)
+      try { localStorage.setItem('nav-collapsed-sections', JSON.stringify([...next])) } catch {}
+      return next
+    })
+  }
+
+  useEffect(() => {
+    if (!profileOpen) return
+    function handleClickOutside(e: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(e.target as Node)) {
+        setProfileOpen(false)
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside)
+    return () => document.removeEventListener('mousedown', handleClickOutside)
+  }, [profileOpen])
 
   useEffect(() => {
     fetch('/api/stores')
@@ -295,52 +325,66 @@ export default function AppShell({ children, user }: AppShellProps) {
                   <span style={{ color: '#6b1e98', fontSize: 22, fontWeight: 900, lineHeight: 1 }}>.</span>
                 </div>
               ) : (
-                <div style={{ padding: '0 16px' }}>
-                  <div style={{ display: 'inline-flex', alignItems: 'center', border: '2px solid #fff', padding: '6px 10px' }}>
-                    <span style={{ color: '#fff', fontSize: 13, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
+                <div style={{ display: 'flex', justifyContent: 'center' }}>
+                  <Link href="/dashboard" style={{ textDecoration: 'none', display: 'inline-flex', alignItems: 'center', background: 'transparent', border: '2px solid #fff', padding: '5px 15px', borderRadius: 2 }}>
+                    <span style={{ color: '#fff', fontSize: 15, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>
                       The Arc
                     </span>
                     <span style={{ color: '#6b1e98', fontSize: 18, fontWeight: 900, lineHeight: 1, marginLeft: 1 }}>.</span>
-                  </div>
-                  <div style={{ color: '#666', fontSize: 10, fontWeight: 600, letterSpacing: '0.1em', textTransform: 'uppercase', marginTop: 8 }}>
-                    Intranet
-                  </div>
+                  </Link>
                 </div>
               )}
             </div>
 
             {/* Nav */}
             <nav style={{ flex: 1, paddingBottom: 16 }}>
-              {navSections.map((section, si) => (
-                <div key={si}>
-                  {si > 0 && <div style={{ height: 1, background: '#1e1e1e', margin: '4px 0' }} />}
-                  <div style={{ paddingTop: sidebarCollapsed ? 4 : 14, paddingBottom: 2 }}>
-                    {!sidebarCollapsed && (
-                      <div style={{ color: '#444', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase', padding: '0 16px 6px' }}>
-                        {section.label}
-                      </div>
-                    )}
-                    {section.items.map((item) => {
-                      const active = item.href !== '#' && (
-                        item.adminMatch
-                          ? pathname.startsWith(item.href)
-                          : pathname === item.href
-                      )
-                      return (
-                        <SidebarNavItem
-                          key={item.href + item.label}
-                          item={item}
-                          active={active}
-                          onClick={() => setSidebarOpen(false)}
-                          collapsed={sidebarCollapsed}
-                          onHover={sidebarCollapsed ? (y) => setTooltip({ label: item.label, y }) : undefined}
-                          onHoverEnd={sidebarCollapsed ? () => setTooltip(null) : undefined}
-                        />
-                      )
-                    })}
+              {navSections.map((section, si) => {
+                const isSectionCollapsed = !sidebarCollapsed && collapsedSections.has(section.label)
+                return (
+                  <div key={si}>
+                    {si > 0 && <div style={{ height: 1, background: '#2a2a2a', margin: '6px 0' }} />}
+                    <div style={{ paddingTop: sidebarCollapsed ? 4 : 10, paddingBottom: isSectionCollapsed ? 4 : 2 }}>
+                      {!sidebarCollapsed && (
+                        <button
+                          onClick={() => toggleSection(section.label)}
+                          style={{
+                            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                            padding: '0 16px 6px', background: 'none', border: 'none', cursor: 'pointer',
+                          }}
+                        >
+                          <span style={{ color: '#666', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                            {section.label}
+                          </span>
+                          <svg
+                            width="10" height="10" fill="none" stroke="#555" viewBox="0 0 24 24"
+                            style={{ transition: 'transform 0.2s', transform: isSectionCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', flexShrink: 0 }}
+                          >
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                          </svg>
+                        </button>
+                      )}
+                      {!isSectionCollapsed && section.items.map((item) => {
+                        const active = item.href !== '#' && (
+                          item.adminMatch
+                            ? pathname.startsWith(item.href)
+                            : pathname === item.href
+                        )
+                        return (
+                          <SidebarNavItem
+                            key={item.href + item.label}
+                            item={item}
+                            active={active}
+                            onClick={() => setSidebarOpen(false)}
+                            collapsed={sidebarCollapsed}
+                            onHover={sidebarCollapsed ? (y) => setTooltip({ label: item.label, y }) : undefined}
+                            onHoverEnd={sidebarCollapsed ? () => setTooltip(null) : undefined}
+                          />
+                        )
+                      })}
+                    </div>
                   </div>
-                </div>
-              ))}
+                )
+              })}
             </nav>
 
             {/* User footer */}
@@ -512,14 +556,54 @@ export default function AppShell({ children, user }: AppShellProps) {
                   <div style={{ position: 'absolute', top: 6, right: 6, width: 7, height: 7, background: '#6b1e98', borderRadius: '50%', border: '1.5px solid #fff' }} />
                 </div>
 
-                {/* Avatar */}
-                {user.avatar_url ? (
-                  <img src={user.avatar_url} alt={user.display_name} referrerPolicy="no-referrer" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
-                ) : (
-                  <div style={{ width: 32, height: 32, background: '#6b1e98', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, fontWeight: 700 }}>
-                    {initials}
-                  </div>
-                )}
+                {/* Avatar + profile dropdown */}
+                <div ref={profileRef} style={{ position: 'relative' }}>
+                  <button
+                    onClick={() => setProfileOpen(o => !o)}
+                    style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                    title={user.display_name}
+                  >
+                    {user.avatar_url ? (
+                      <img src={user.avatar_url} alt={user.display_name} referrerPolicy="no-referrer" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ width: 32, height: 32, background: '#6b1e98', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, fontWeight: 700 }}>
+                        {initials}
+                      </div>
+                    )}
+                  </button>
+                  {profileOpen && (
+                    <div style={{
+                      position: 'absolute', top: 40, right: 0, zIndex: 100,
+                      background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8,
+                      boxShadow: '0 4px 16px rgba(0,0,0,0.10)',
+                      minWidth: 180, overflow: 'hidden',
+                    }}>
+                      <div style={{ padding: '10px 14px 8px', borderBottom: '1px solid #f0f0f0' }}>
+                        <div style={{ fontSize: 13, fontWeight: 600, color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.display_name}</div>
+                        <div style={{ fontSize: 11, color: '#888', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.email}</div>
+                      </div>
+                      <Link
+                        href="/profile"
+                        onClick={() => setProfileOpen(false)}
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '9px 14px', fontSize: 13, color: '#333', textDecoration: 'none' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#f5f5f5' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                      >
+                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                        My Profile
+                      </Link>
+                      <button
+                        onClick={() => { setProfileOpen(false); handleSignOut() }}
+                        style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', padding: '9px 14px', fontSize: 13, color: '#dc2626', background: 'none', border: 'none', cursor: 'pointer', textAlign: 'left', borderTop: '1px solid #f0f0f0' }}
+                        onMouseEnter={e => { e.currentTarget.style.background = '#fef2f2' }}
+                        onMouseLeave={e => { e.currentTarget.style.background = 'transparent' }}
+                      >
+                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
+                        Sign out
+                      </button>
+                    </div>
+                  )}
+                </div>
               </div>
             </header>
 
@@ -636,7 +720,7 @@ function SidebarNavItem({
     alignItems: 'center',
     gap: 9,
     padding: '7px 14px',
-    color: active ? '#fff' : '#888',
+    color: active ? '#fff' : '#a5a5a5',
     fontSize: 13,
     borderRadius: 4,
     margin: '1px 8px',
