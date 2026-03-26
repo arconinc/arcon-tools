@@ -197,6 +197,7 @@ export default function CustomerDetailPage() {
   const [artworkDriveUrl, setArtworkDriveUrl] = useState('')
   const [artworkUploading, setArtworkUploading] = useState(false)
   const [artworkError, setArtworkError] = useState<string | null>(null)
+  const [vectorizingIds, setVectorizingIds] = useState<Set<string>>(new Set())
 
   async function loadArtwork() {
     if (!customer || artworkLoaded) return
@@ -259,6 +260,30 @@ export default function CustomerDetailPage() {
       setArtworkMode('upload')
     } finally {
       setArtworkUploading(false)
+    }
+  }
+
+  async function handleVectorize(item: ArtworkItem) {
+    setVectorizingIds((prev) => new Set(prev).add(item.id))
+    try {
+      const res = await fetch(`/api/crm/artwork/${item.id}/vectorize`)
+      if (!res.ok) {
+        alert('Vectorize failed. Check that this is a supported image type.')
+        return
+      }
+      const blob = await res.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${item.name}.eps`
+      a.click()
+      URL.revokeObjectURL(url)
+    } finally {
+      setVectorizingIds((prev) => {
+        const s = new Set(prev)
+        s.delete(item.id)
+        return s
+      })
     }
   }
 
@@ -1040,12 +1065,25 @@ export default function CustomerDetailPage() {
                         }
                         <div>{date}</div>
                       </div>
-                      <button
-                        onClick={() => handleArtworkDelete(item.id)}
-                        className="mt-2 text-xs text-red-500 hover:text-red-700 text-left transition-colors"
-                      >
-                        Delete
-                      </button>
+                      <div className="mt-2 flex items-center gap-3">
+                        {!item.is_drive_link &&
+                          item.cloudinary_resource_type === 'image' &&
+                          (item.mime_type === 'image/png' || item.mime_type === 'image/jpeg') && (
+                          <button
+                            onClick={() => handleVectorize(item)}
+                            disabled={vectorizingIds.has(item.id)}
+                            className="text-xs text-purple-600 hover:text-purple-800 transition-colors disabled:opacity-50"
+                          >
+                            {vectorizingIds.has(item.id) ? 'Vectorizing…' : 'Vectorize → EPS'}
+                          </button>
+                        )}
+                        <button
+                          onClick={() => handleArtworkDelete(item.id)}
+                          className="text-xs text-red-500 hover:text-red-700 transition-colors"
+                        >
+                          Delete
+                        </button>
+                      </div>
                     </div>
                   </div>
                 )
