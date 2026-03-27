@@ -597,9 +597,38 @@ function StoreTable({
                     >
                       {store.store_name}
                     </span>
-                    <span style={{ fontSize: 10, color: '#94a3b8', fontFamily: 'ui-monospace, monospace', marginTop: 1 }}>
-                      {store.store_id}
-                    </span>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 1 }} onClick={e => e.stopPropagation()}>
+                      <span style={{ fontSize: 10, color: '#94a3b8', fontFamily: 'ui-monospace, monospace' }}>
+                        {store.store_id}
+                      </span>
+                      <a
+                        href={`https://manage.promobullitstores.com/admin/v3/index.html#/store/dashboard/${store.store_id}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        title="Open in Uducat"
+                        style={{ color: '#94a3b8', lineHeight: 0, display: 'inline-flex' }}
+                        className="hover:text-purple-600 transition-colors"
+                      >
+                        <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
+                        </svg>
+                      </a>
+                      {store.domain && (
+                        <a
+                          href={`https://${store.domain}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          title="Open storefront"
+                          style={{ color: '#94a3b8', lineHeight: 0, display: 'inline-flex' }}
+                          className="hover:text-purple-600 transition-colors"
+                        >
+                          <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                          </svg>
+                        </a>
+                      )}
+                    </div>
                   </div>
 
                   {/* Data column cells */}

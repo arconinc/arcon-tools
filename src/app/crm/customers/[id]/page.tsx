@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import TagPicker from '@/components/crm/TagPicker'
 import { formatPhoneInput } from '@/lib/phone'
+import { useFormValidation, inputCls, selectCls, FieldError } from '@/lib/form-validation'
 
 type DropdownUser = { id: string; display_name: string; email: string }
 type TagOption = { id: string; name: string; color: string }
@@ -35,7 +36,9 @@ type CustomerDetail = {
   general_logo_color: string | null; formal_pms_colors: string | null
   assigned_to: string | null; created_by: string; created_at: string; updated_at: string
   logo_url: string | null; brand_data_id: string | null; brand_data: BrandDataLocal | null
-  contacts: { id: string; first_name: string; last_name: string; title: string | null; email: string | null; phone: string | null }[]
+  commissioned_client: string | null; tax_exempt: boolean
+  stores: { id: string; store_id: string; store_name: string; status: string; is_active: boolean }[]
+  contacts: { id: string; first_name: string; last_name: string; title: string | null; email: string | null; phone: string | null; department: string | null }[]
   opportunities: { id: string; name: string; value: number | null; status: string; pipeline_stage: string | null; forecast_close_date: string | null }[]
   files: { id: string; label: string; url: string; created_at: string }[]
   assigned_user: { id: string; display_name: string; email: string } | null
@@ -100,6 +103,10 @@ function buildCompanySummary(company: BrandDataLocal['company']): string | null 
 type CreateForm = {
   name: string; client_status: string; assigned_to: string; phone: string; website: string
   linkedin: string; email_domains: string; description: string
+  commissioned_client: string; tax_exempt: string
+  billing_address1: string; billing_city: string; billing_state: string; billing_zip: string
+  orderer_first_name: string; orderer_last_name: string; orderer_email: string
+  ap_first_name: string; ap_last_name: string; ap_email: string
 }
 
 const STATUS_BADGE: Record<string, string> = {
@@ -164,6 +171,12 @@ export default function CustomerDetailPage() {
       if (Array.isArray(users)) setCrmUsers(users)
     })
   }, [])
+
+  useEffect(() => {
+    fetch('/api/crm/tags').then((r) => r.json()).then((data) => {
+      if (Array.isArray(data)) setAllCrmTags(data)
+    })
+  }, [])
   const [activeTab, setActiveTab] = useState<'details' | 'related' | 'activity' | 'artwork'>('details')
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState<Partial<CustomerDetail>>({})
@@ -171,6 +184,16 @@ export default function CustomerDetailPage() {
 
   const [tagIds, setTagIds] = useState<string[]>([])
   const [tagSaving, setTagSaving] = useState(false)
+  const [aturianError, setAturianError] = useState<string | null>(null)
+  const [allCrmTags, setAllCrmTags] = useState<TagOption[]>([])
+
+  const [createTagIds, setCreateTagIds] = useState<string[]>([])
+  const { errors: createErrors, validate: validateCreate, clearError: clearCreateError } = useFormValidation<CreateForm>()
+
+  const [showAddContact, setShowAddContact] = useState(false)
+  const [addContactForm, setAddContactForm] = useState({ first_name: '', last_name: '', email: '', phone: '', title: '', department: '' })
+  const [addContactSaving, setAddContactSaving] = useState(false)
+  const [addContactError, setAddContactError] = useState<string | null>(null)
 
   const [brandData, setBrandData] = useState<BrandDataLocal | null>(null)
   const [brandFetching, setBrandFetching] = useState(false)
@@ -324,7 +347,38 @@ export default function CustomerDetailPage() {
     } finally { setBrandFetching(false) }
   }
 
+  const ATURIAN_TAG_NAME = 'Add to Aturian'
+
   async function handleTagsChange(newIds: string[]) {
+    setAturianError(null)
+    if (customer) {
+      const addedIds = newIds.filter((tid) => !tagIds.includes(tid))
+      if (addedIds.length > 0) {
+        const aturianTag = allCrmTags.find(
+          (t) => t.name.trim().toLowerCase() === ATURIAN_TAG_NAME.toLowerCase()
+        )
+        if (aturianTag && addedIds.includes(aturianTag.id)) {
+          const missing: string[] = []
+          if (!customer.name?.trim()) missing.push('Company Name')
+          if (!customer.phone?.trim()) missing.push('Corporate Phone')
+          if (!customer.billing_address1?.trim()) missing.push('Billing Address')
+          if (!customer.assigned_to) missing.push('Sales Consultant (Assigned To)')
+          if (!customer.commissioned_client?.trim()) missing.push('Commissioned Client')
+          if (customer.tax_exempt === null || customer.tax_exempt === undefined) missing.push('Tax Exempt')
+          const hasAPContact = customer.contacts.some(
+            (c) => c.department === 'Accounting' && c.email?.trim()
+          )
+          if (!hasAPContact) missing.push('AP Contact (Accounting dept. contact with email)')
+
+          if (missing.length > 0) {
+            setAturianError(
+              `Cannot add "Add to Aturian" — complete these first: ${missing.join(', ')}`
+            )
+            return
+          }
+        }
+      }
+    }
     setTagIds(newIds)
     if (!customer?.id) return
     setTagSaving(true)
@@ -338,7 +392,10 @@ export default function CustomerDetailPage() {
   }
 
   const [createForm, setCreateForm] = useState<CreateForm>({
-    name: '', client_status: '', assigned_to: '', phone: '', website: '', linkedin: '', email_domains: '', description: '',
+    name: '', client_status: '', assigned_to: '', phone: '', website: '', linkedin: '', email_domains: '', description: '', commissioned_client: '', tax_exempt: '',
+    billing_address1: '', billing_city: '', billing_state: '', billing_zip: '',
+    orderer_first_name: '', orderer_last_name: '', orderer_email: '',
+    ap_first_name: '', ap_last_name: '', ap_email: '',
   })
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
@@ -358,14 +415,42 @@ export default function CustomerDetailPage() {
   function startEdit() {
     if (!customer) return
     setEditForm({ ...customer })
+    setAturianError(null)
     setEditing(true)
   }
 
-  function cancelEdit() { setEditing(false); setEditForm({}) }
+  function cancelEdit() { setEditing(false); setEditForm({}); setAturianError(null) }
 
   function handleEditChange(field: string, value: string) {
     const formatted = field === 'phone' ? formatPhoneInput(value) : value
     setEditForm((prev) => ({ ...prev, [field]: formatted || null }))
+  }
+
+  function handleEditBoolChange(field: string, value: boolean) {
+    setEditForm((prev) => ({ ...prev, [field]: value }))
+  }
+
+  async function handleAddContact(e: React.FormEvent) {
+    e.preventDefault()
+    if (!customer) return
+    if (!addContactForm.first_name.trim() || !addContactForm.last_name.trim()) {
+      setAddContactError('First name and last name are required')
+      return
+    }
+    setAddContactSaving(true)
+    setAddContactError(null)
+    try {
+      const res = await fetch('/api/crm/contacts', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...addContactForm, customer_id: customer.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) { setAddContactError(data.error ?? 'Failed to create contact'); return }
+      setCustomer((prev) => prev ? { ...prev, contacts: [...prev.contacts, data] } : prev)
+      setShowAddContact(false)
+      setAddContactForm({ first_name: '', last_name: '', email: '', phone: '', title: '', department: '' })
+    } finally { setAddContactSaving(false) }
   }
 
   async function saveEdit() {
@@ -386,7 +471,33 @@ export default function CustomerDetailPage() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
-    if (!createForm.name.trim()) { setCreateError('Name is required'); return }
+
+    const aturianTag = allCrmTags.find((t) => t.name.trim().toLowerCase() === 'add to aturian')
+    const aturianActive = !!(aturianTag && createTagIds.includes(aturianTag.id))
+
+    const req = (msg: string) => ({ test: (v: string) => !!v?.trim(), message: msg })
+    const rules = {
+      name: [req('Company name is required')],
+      ...(aturianActive && {
+        assigned_to:         [{ test: (v: string) => !!v, message: 'Sales Consultant is required' }],
+        commissioned_client: [req('Commissioned Client is required')],
+        tax_exempt:          [{ test: (v: string) => v === 'yes' || v === 'no', message: 'Please select Yes or No' }],
+        billing_address1:    [req('Street address is required')],
+        billing_city:        [req('City is required')],
+        billing_state:       [req('State is required')],
+        billing_zip:         [req('ZIP code is required')],
+        phone:               [req('Corporate phone is required')],
+        orderer_first_name:  [req('Orderer first name is required')],
+        orderer_last_name:   [req('Orderer last name is required')],
+        orderer_email:       [req('Orderer email is required')],
+        ap_first_name:       [req('AP contact first name is required')],
+        ap_last_name:        [req('AP contact last name is required')],
+        ap_email:            [req('AP contact email is required')],
+      }),
+    }
+
+    if (!validateCreate(createForm, rules)) return
+
     setCreating(true)
     setCreateError(null)
     try {
@@ -402,11 +513,50 @@ export default function CustomerDetailPage() {
           linkedin: createForm.linkedin || null,
           email_domains: createForm.email_domains || null,
           description: createForm.description || null,
+          commissioned_client: createForm.commissioned_client || null,
+          tax_exempt: createForm.tax_exempt === 'yes',
+          billing_address1: createForm.billing_address1 || null,
+          billing_city: createForm.billing_city || null,
+          billing_state: createForm.billing_state || null,
+          billing_zip: createForm.billing_zip || null,
+          tag_ids: createTagIds,
         }),
       })
       const data = await res.json()
       if (!res.ok) { setCreateError(data.error ?? 'Create failed'); return }
-      router.push(`/crm/customers/${data.id}`)
+
+      const customerId = data.id
+      const contactCreates: Promise<unknown>[] = []
+
+      if (createForm.orderer_first_name.trim() && createForm.orderer_last_name.trim()) {
+        contactCreates.push(fetch('/api/crm/contacts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            first_name: createForm.orderer_first_name.trim(),
+            last_name: createForm.orderer_last_name.trim(),
+            email: createForm.orderer_email || null,
+            customer_id: customerId,
+          }),
+        }))
+      }
+
+      if (createForm.ap_first_name.trim() && createForm.ap_last_name.trim()) {
+        contactCreates.push(fetch('/api/crm/contacts', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            first_name: createForm.ap_first_name.trim(),
+            last_name: createForm.ap_last_name.trim(),
+            email: createForm.ap_email || null,
+            department: 'Accounting',
+            customer_id: customerId,
+          }),
+        }))
+      }
+
+      await Promise.all(contactCreates)
+      router.push(`/crm/customers/${customerId}`)
     } finally { setCreating(false) }
   }
 
@@ -421,51 +571,242 @@ export default function CustomerDetailPage() {
           Customers
         </Link>
         <h1 className="text-xl font-bold text-slate-900 mb-4">New Customer</h1>
-        <form onSubmit={handleCreate} className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
+        <form onSubmit={handleCreate} className="space-y-4">
           {createError && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{createError}</div>}
-          <div className="grid grid-cols-3 gap-3">
-            <div className="col-span-3">
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Name <span className="text-red-500">*</span></label>
-              <input type="text" value={createForm.name} onChange={(e) => setCreateForm((p) => ({ ...p, name: e.target.value }))} required
-                className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
+
+          {/* Company Info */}
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
+              <h2 className="text-sm font-semibold text-slate-700">Company Information</h2>
             </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Status</label>
-              <select value={createForm.client_status} onChange={(e) => setCreateForm((p) => ({ ...p, client_status: e.target.value }))}
-                className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                <option value="">— Select —</option>
-                <option>Prospective</option>
-                <option>Active</option>
-                <option>Former</option>
-              </select>
-            </div>
-            <div className="col-span-2">
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Assigned To</label>
-              <select value={createForm.assigned_to} onChange={(e) => setCreateForm((p) => ({ ...p, assigned_to: e.target.value }))}
-                className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                <option value="">— Unassigned —</option>
-                {crmUsers.map((u) => (
-                  <option key={u.id} value={u.id}>{u.display_name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Phone</label>
-              <input type="tel" value={createForm.phone} onChange={(e) => setCreateForm((p) => ({ ...p, phone: formatPhoneInput(e.target.value) }))}
-                className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
-            </div>
-            <div className="col-span-2">
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Website</label>
-              <input type="url" value={createForm.website} onChange={(e) => setCreateForm((p) => ({ ...p, website: e.target.value }))}
-                className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
-            </div>
-            <div className="col-span-3">
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Description</label>
-              <textarea rows={3} value={createForm.description} onChange={(e) => setCreateForm((p) => ({ ...p, description: e.target.value }))}
-                className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none" />
+            <div className="px-5 py-4 grid grid-cols-3 gap-4">
+              <div className="col-span-3">
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">Company Name <span className="text-red-500">*</span></label>
+                <p className="text-xs text-slate-400 italic mb-1">Full Corporate Company Name</p>
+                <input type="text" value={createForm.name}
+                  onChange={(e) => { setCreateForm((p) => ({ ...p, name: e.target.value })); clearCreateError('name') }}
+                  className={inputCls(createErrors.name)} />
+                <FieldError error={createErrors.name} />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">Sales Consultant</label>
+                <select value={createForm.assigned_to}
+                  onChange={(e) => { setCreateForm((p) => ({ ...p, assigned_to: e.target.value })); clearCreateError('assigned_to') }}
+                  className={selectCls(createErrors.assigned_to)}>
+                  <option value="">— Unassigned —</option>
+                  {crmUsers.map((u) => (
+                    <option key={u.id} value={u.id}>{u.display_name}</option>
+                  ))}
+                </select>
+                <FieldError error={createErrors.assigned_to} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</label>
+                <select value={createForm.client_status}
+                  onChange={(e) => setCreateForm((p) => ({ ...p, client_status: e.target.value }))}
+                  className={selectCls()}>
+                  <option value="">— Select —</option>
+                  <option>Prospective</option>
+                  <option>Active</option>
+                  <option>Former</option>
+                </select>
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">Commissioned Client</label>
+                <select value={createForm.commissioned_client}
+                  onChange={(e) => { setCreateForm((p) => ({ ...p, commissioned_client: e.target.value })); clearCreateError('commissioned_client') }}
+                  className={selectCls(createErrors.commissioned_client)}>
+                  <option value="">— Select —</option>
+                  <option>Standard</option>
+                  <option>Standard with Split</option>
+                  <option>Standard Non Credit Card Store</option>
+                </select>
+                <FieldError error={createErrors.commissioned_client} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">Tax Exempt</label>
+                <div className="flex gap-4">
+                  <label className="inline-flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="tax_exempt" value="yes"
+                      checked={createForm.tax_exempt === 'yes'}
+                      onChange={() => { setCreateForm((p) => ({ ...p, tax_exempt: 'yes' })); clearCreateError('tax_exempt') }}
+                      className="w-4 h-4 border-slate-300 text-purple-600 focus:ring-purple-400" />
+                    <span className="text-sm text-slate-700">Yes</span>
+                  </label>
+                  <label className="inline-flex items-center gap-2 cursor-pointer">
+                    <input type="radio" name="tax_exempt" value="no"
+                      checked={createForm.tax_exempt === 'no'}
+                      onChange={() => { setCreateForm((p) => ({ ...p, tax_exempt: 'no' })); clearCreateError('tax_exempt') }}
+                      className="w-4 h-4 border-slate-300 text-purple-600 focus:ring-purple-400" />
+                    <span className="text-sm text-slate-700">No</span>
+                  </label>
+                </div>
+                <FieldError error={createErrors.tax_exempt} />
+              </div>
+                  <p className="text-xs text-slate-400 italic mb-2 col-span-3">Is the customer tax exempt? (need to include exemption form to Amy — cannot mark exempt without correct paperwork)</p>
             </div>
           </div>
-          <div className="flex gap-3 pt-1">
+
+          {/* Address & Contact */}
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
+              <h2 className="text-sm font-semibold text-slate-700">Address &amp; Contact</h2>
+            </div>
+            <div className="px-5 py-4 grid grid-cols-3 gap-4">
+              <div className="col-span-3">
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">Street Address</label>
+                <input type="text" value={createForm.billing_address1}
+                  onChange={(e) => { setCreateForm((p) => ({ ...p, billing_address1: e.target.value })); clearCreateError('billing_address1') }}
+                  className={inputCls(createErrors.billing_address1)} />
+                <FieldError error={createErrors.billing_address1} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">City</label>
+                <input type="text" value={createForm.billing_city}
+                  onChange={(e) => { setCreateForm((p) => ({ ...p, billing_city: e.target.value })); clearCreateError('billing_city') }}
+                  className={inputCls(createErrors.billing_city)} />
+                <FieldError error={createErrors.billing_city} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">State</label>
+                <input type="text" value={createForm.billing_state}
+                  onChange={(e) => { setCreateForm((p) => ({ ...p, billing_state: e.target.value })); clearCreateError('billing_state') }}
+                  className={inputCls(createErrors.billing_state)} />
+                <FieldError error={createErrors.billing_state} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">ZIP</label>
+                <input type="text" value={createForm.billing_zip}
+                  onChange={(e) => { setCreateForm((p) => ({ ...p, billing_zip: e.target.value })); clearCreateError('billing_zip') }}
+                  className={inputCls(createErrors.billing_zip)} />
+                <FieldError error={createErrors.billing_zip} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">Corporate Phone</label>
+                <input type="tel" value={createForm.phone}
+                  onChange={(e) => { setCreateForm((p) => ({ ...p, phone: formatPhoneInput(e.target.value) })); clearCreateError('phone') }}
+                  className={inputCls(createErrors.phone)} />
+                <FieldError error={createErrors.phone} />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Website</label>
+                <input type="url" value={createForm.website}
+                  onChange={(e) => setCreateForm((p) => ({ ...p, website: e.target.value }))}
+                  className={inputCls()} />
+              </div>
+            </div>
+          </div>
+
+          {/* Orderer Contact */}
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
+              <h2 className="text-sm font-semibold text-slate-700">Orderer Contact</h2>
+              <p className="text-xs text-slate-400 mt-0.5">Will be created as a linked contact on this customer.</p>
+            </div>
+            <div className="px-5 py-4 grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">First Name</label>
+                <input type="text" value={createForm.orderer_first_name}
+                  onChange={(e) => { setCreateForm((p) => ({ ...p, orderer_first_name: e.target.value })); clearCreateError('orderer_first_name') }}
+                  className={inputCls(createErrors.orderer_first_name)} />
+                <FieldError error={createErrors.orderer_first_name} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Last Name</label>
+                <input type="text" value={createForm.orderer_last_name}
+                  onChange={(e) => { setCreateForm((p) => ({ ...p, orderer_last_name: e.target.value })); clearCreateError('orderer_last_name') }}
+                  className={inputCls(createErrors.orderer_last_name)} />
+                <FieldError error={createErrors.orderer_last_name} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Email</label>
+                <input type="email" value={createForm.orderer_email}
+                  onChange={(e) => { setCreateForm((p) => ({ ...p, orderer_email: e.target.value })); clearCreateError('orderer_email') }}
+                  className={inputCls(createErrors.orderer_email)} />
+                <FieldError error={createErrors.orderer_email} />
+              </div>
+            </div>
+          </div>
+
+          {/* AP Contact */}
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
+              <h2 className="text-sm font-semibold text-slate-700">AP Contact</h2>
+              <p className="text-xs text-slate-400 mt-0.5">Will be created as an Accounting-department contact on this customer.</p>
+            </div>
+            <div className="px-5 py-4 grid grid-cols-3 gap-4">
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">First Name</label>
+                <input type="text" value={createForm.ap_first_name}
+                  onChange={(e) => { setCreateForm((p) => ({ ...p, ap_first_name: e.target.value })); clearCreateError('ap_first_name') }}
+                  className={inputCls(createErrors.ap_first_name)} />
+                <FieldError error={createErrors.ap_first_name} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Last Name</label>
+                <input type="text" value={createForm.ap_last_name}
+                  onChange={(e) => { setCreateForm((p) => ({ ...p, ap_last_name: e.target.value })); clearCreateError('ap_last_name') }}
+                  className={inputCls(createErrors.ap_last_name)} />
+                <FieldError error={createErrors.ap_last_name} />
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Email</label>
+                <input type="email" value={createForm.ap_email}
+                  onChange={(e) => { setCreateForm((p) => ({ ...p, ap_email: e.target.value })); clearCreateError('ap_email') }}
+                  className={inputCls(createErrors.ap_email)} />
+                <FieldError error={createErrors.ap_email} />
+              </div>
+                <p className="text-xs text-slate-400 italic col-span-3">Accounts Payable Contact – Must be someone in Accounting</p>
+            </div>
+          </div>
+
+          {/* Tags */}
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
+              <h2 className="text-sm font-semibold text-slate-700">Tags</h2>
+            </div>
+            <div className="px-5 py-4 space-y-3">
+              <div className="flex items-start gap-3 p-3.5 bg-purple-50 border border-purple-200 rounded-xl">
+                <svg className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-purple-800">
+                    If this customer needs to be added to Aturian, click the button below. This will require all fields on this form to be filled out completely before saving.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      let tag = allCrmTags.find((t) => t.name.trim().toLowerCase() === 'add to aturian')
+                      if (!tag) {
+                        const res = await fetch('/api/crm/tags', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ name: 'Add to Aturian' }),
+                        })
+                        if (res.ok) {
+                          tag = await res.json()
+                          setAllCrmTags((prev) => [...prev, tag!])
+                        }
+                      }
+                      if (tag && !createTagIds.includes(tag.id)) {
+                        setCreateTagIds((prev) => [...prev, tag!.id])
+                      }
+                    }}
+                    disabled={!!allCrmTags.find((t) => t.name.trim().toLowerCase() === 'add to aturian') && createTagIds.includes(allCrmTags.find((t) => t.name.trim().toLowerCase() === 'add to aturian')!.id)}
+                    className="mt-2.5 px-3 py-1.5 text-xs font-semibold bg-purple-700 hover:bg-purple-800 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                  >
+                    {allCrmTags.find((t) => t.name.trim().toLowerCase() === 'add to aturian') && createTagIds.includes(allCrmTags.find((t) => t.name.trim().toLowerCase() === 'add to aturian')!.id)
+                      ? '✓ "Add to Aturian" tag added'
+                      : 'Add "Add to Aturian" Tag'}
+                  </button>
+                </div>
+              </div>
+              <TagPicker value={createTagIds} onChange={setCreateTagIds} placeholder="Add tags…" />
+            </div>
+          </div>
+
+          <div className="flex gap-3">
             <button type="submit" disabled={creating}
               className="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl disabled:opacity-60 transition-colors">
               {creating ? 'Creating…' : 'Create Customer'}
@@ -747,6 +1088,65 @@ export default function CustomerDetailPage() {
                 </div>
               </div>
 
+              {/* Aturian Onboarding */}
+              <div className="border-t border-slate-100">
+                <div className="px-5 py-2 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
+                  <div className="w-0.5 h-3.5 bg-purple-300 rounded-full" />
+                  <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Aturian Onboarding</h3>
+                </div>
+                <div className="px-5 py-4 grid grid-cols-2 gap-3">
+                  <div>
+                    <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-0.5">Sales Consultant</div>
+                    <div className="text-sm text-slate-800">{customer.assigned_user?.display_name ?? <span className="text-slate-400">—</span>}</div>
+                  </div>
+                  {editing ? (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Commissioned Client</label>
+                      <select value={(ef.commissioned_client as string) ?? ''}
+                        onChange={(e) => handleEditChange('commissioned_client', e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                        <option value="">— Select —</option>
+                        <option>Standard</option>
+                        <option>Standard with Split</option>
+                        <option>Standard Non Credit Card Store</option>
+                      </select>
+                    </div>
+                  ) : (
+                    <Field label="Commissioned Client" value={customer.commissioned_client} />
+                  )}
+                  {editing ? (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Tax Exempt</label>
+                      <div className="flex gap-4">
+                        <label className="inline-flex items-center gap-2 cursor-pointer">
+                          <input type="radio" name="edit_tax_exempt" value="yes"
+                            checked={(ef.tax_exempt as boolean) === true}
+                            onChange={() => handleEditBoolChange('tax_exempt', true)}
+                            className="w-4 h-4 border-slate-300 text-purple-600 focus:ring-purple-400" />
+                          <span className="text-sm text-slate-700">Yes</span>
+                        </label>
+                        <label className="inline-flex items-center gap-2 cursor-pointer">
+                          <input type="radio" name="edit_tax_exempt" value="no"
+                            checked={(ef.tax_exempt as boolean) === false}
+                            onChange={() => handleEditBoolChange('tax_exempt', false)}
+                            className="w-4 h-4 border-slate-300 text-purple-600 focus:ring-purple-400" />
+                          <span className="text-sm text-slate-700">No</span>
+                        </label>
+                      </div>
+                    </div>
+                  ) : (
+                    <div>
+                      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-0.5">Tax Exempt</div>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${
+                        customer.tax_exempt ? 'bg-green-100 text-green-800' : 'bg-slate-100 text-slate-600'
+                      }`}>
+                        {customer.tax_exempt ? 'Yes' : 'No'}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
               {/* Notes */}
               {(editing || customer.notes) && (
                 <div className="border-t border-slate-100">
@@ -786,6 +1186,11 @@ export default function CustomerDetailPage() {
               </div>
               <div className="p-3">
                 <TagPicker value={tagIds} onChange={handleTagsChange} placeholder="Add tags…" />
+                {aturianError && (
+                  <div className="mt-2 p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 leading-relaxed">
+                    {aturianError}
+                  </div>
+                )}
               </div>
             </div>
 
@@ -886,7 +1291,7 @@ export default function CustomerDetailPage() {
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
             <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50">
               <h2 className="text-sm font-semibold text-slate-700">Contacts ({customer.contacts.length})</h2>
-              <button onClick={() => router.push(`/crm/contacts/new?customer_id=${customer.id}`)}
+              <button onClick={() => { setShowAddContact(true); setAddContactError(null) }}
                 className="text-xs font-semibold text-purple-700 hover:text-purple-900">
                 + Add
               </button>
@@ -902,7 +1307,9 @@ export default function CustomerDetailPage() {
                       </div>
                       <div className="flex-1 min-w-0">
                         <div className="text-sm font-medium text-slate-800">{c.first_name} {c.last_name}</div>
-                        {c.title && <div className="text-xs text-slate-400">{c.title}</div>}
+                        {(c.title || c.department) && (
+                          <div className="text-xs text-slate-400">{[c.title, c.department].filter(Boolean).join(' · ')}</div>
+                        )}
                       </div>
                       <div className="text-xs text-slate-400 truncate max-w-[120px]">{c.email ?? ''}</div>
                     </div>
@@ -1197,6 +1604,77 @@ export default function CustomerDetailPage() {
               </div>
             </div>
           )}
+        </div>
+      )}
+
+      {/* Quick-Create Contact Modal */}
+      {showAddContact && (
+        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowAddContact(false)}>
+          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
+            <h2 className="text-base font-semibold text-slate-800 mb-4">Add Contact</h2>
+            <form onSubmit={handleAddContact} className="space-y-3">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">First Name *</label>
+                  <input value={addContactForm.first_name} onChange={(e) => setAddContactForm(p => ({ ...p, first_name: e.target.value }))}
+                    className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Last Name *</label>
+                  <input value={addContactForm.last_name} onChange={(e) => setAddContactForm(p => ({ ...p, last_name: e.target.value }))}
+                    className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Email</label>
+                <input type="email" value={addContactForm.email} onChange={(e) => setAddContactForm(p => ({ ...p, email: e.target.value }))}
+                  className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Phone</label>
+                  <input value={addContactForm.phone} onChange={(e) => setAddContactForm(p => ({ ...p, phone: e.target.value }))}
+                    className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                </div>
+                <div>
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Title</label>
+                  <input value={addContactForm.title} onChange={(e) => setAddContactForm(p => ({ ...p, title: e.target.value }))}
+                    className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Department</label>
+                <select value={addContactForm.department} onChange={(e) => setAddContactForm(p => ({ ...p, department: e.target.value }))}
+                  className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                  <option value="">— None —</option>
+                  <option>Accounting</option>
+                  <option>C-Suite</option>
+                  <option>Customer Service</option>
+                  <option>Finance</option>
+                  <option>HR</option>
+                  <option>IT</option>
+                  <option>Legal</option>
+                  <option>Management</option>
+                  <option>Marketing</option>
+                  <option>Operations</option>
+                  <option>Purchasing</option>
+                  <option>Sales</option>
+                  <option>Other</option>
+                </select>
+              </div>
+              {addContactError && <div className="text-xs text-red-600">{addContactError}</div>}
+              <div className="flex gap-2 pt-1">
+                <button type="submit" disabled={addContactSaving}
+                  className="flex-1 py-2 text-sm font-semibold bg-purple-700 hover:bg-purple-800 disabled:opacity-50 text-white rounded-xl transition-colors">
+                  {addContactSaving ? 'Adding…' : 'Add Contact'}
+                </button>
+                <button type="button" onClick={() => setShowAddContact(false)}
+                  className="flex-1 py-2 text-sm font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
+                  Cancel
+                </button>
+              </div>
+            </form>
+          </div>
         </div>
       )}
     </div>

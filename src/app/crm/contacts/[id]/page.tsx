@@ -23,6 +23,7 @@ type ContactDetail = {
   products_purchased: string | null; organization_website: string | null
   arcon_salesperson: string | null; contact_owner: string | null; tags: TagOption[]
   customer_id: string | null; vendor_id: string | null
+  department: string | null
   created_by: string; created_at: string; updated_at: string
   customer: { id: string; name: string; website: string | null } | null
   vendor: { id: string; name: string; website: string | null } | null
@@ -373,6 +374,26 @@ export default function ContactDetailPage() {
                         <option>Customer</option><option>Vendor</option><option>Prospect</option><option>Partner</option><option>Other</option>
                       </select>
                     </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Department</label>
+                      <select value={(ef.department as string) ?? ''} onChange={(e) => handleEditChange('department', e.target.value)}
+                        className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                        <option value="">— None —</option>
+                        <option>Accounting</option>
+                        <option>C-Suite</option>
+                        <option>Customer Service</option>
+                        <option>Finance</option>
+                        <option>HR</option>
+                        <option>IT</option>
+                        <option>Legal</option>
+                        <option>Management</option>
+                        <option>Marketing</option>
+                        <option>Operations</option>
+                        <option>Purchasing</option>
+                        <option>Sales</option>
+                        <option>Other</option>
+                      </select>
+                    </div>
                     <FI label="Primary Email" name="email" value={(ef.email as string) ?? ''} onChange={handleEditChange} type="email" />
                     <FI label="Industry" name="industry" value={(ef.industry as string) ?? ''} onChange={handleEditChange} />
                     <FI label="Phone (Main)" name="phone" value={(ef.phone as string) ?? ''} onChange={handleEditChange} type="tel" />
@@ -387,6 +408,7 @@ export default function ContactDetailPage() {
                   <>
                     <Field label="Title / Role" value={contact.title} />
                     <Field label="Type of Contact" value={contact.type_of_contact} />
+                    <Field label="Department" value={contact.department} />
                     <Field label="Industry" value={contact.industry} />
                     <Field label="Primary Email" value={contact.email} email />
                     <Field label="Phone (Main)" value={contact.phone} />

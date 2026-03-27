@@ -489,6 +489,8 @@ export interface CrmCustomer {
   updated_at: string
   logo_url: string | null
   brand_data_id: string | null
+  commissioned_client: string | null
+  tax_exempt: boolean
 }
 
 export interface CrmVendor {
@@ -593,6 +595,7 @@ export interface CrmContact {
   next_activity_date: string | null
   profile_segmentation: string | null
   product_showcase_invite: string | null
+  department: string | null
   created_by: string
   created_at: string
   updated_at: string
