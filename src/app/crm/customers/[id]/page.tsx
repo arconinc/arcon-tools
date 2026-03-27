@@ -962,6 +962,30 @@ export default function CustomerDetailPage() {
                 </div>
             }
           </div>
+
+          {/* Stores */}
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="px-5 py-3 border-b border-slate-100 bg-slate-50">
+              <h2 className="text-sm font-semibold text-slate-700">Stores ({(customer.stores ?? []).length})</h2>
+            </div>
+            {(customer.stores ?? []).length === 0
+              ? <div className="px-5 py-5 text-sm text-slate-400 text-center">No stores linked.</div>
+              : <div className="divide-y divide-slate-100">
+                  {(customer.stores ?? []).map((s) => (
+                    <div key={s.id} onClick={() => router.push(`/stores/${s.id}`)}
+                      className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 cursor-pointer transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-slate-800">{s.store_name}</div>
+                        <div className="text-xs text-slate-400">{s.store_id}</div>
+                      </div>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${s.is_active ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                        {s.is_active ? 'Active' : 'Inactive'}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+            }
+          </div>
         </div>
       )}
 

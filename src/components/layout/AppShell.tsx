@@ -99,6 +99,7 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
     {
       label: 'E-Commerce',
       items: [
+        { href: '/stores', label: 'Stores', icon: StoreIcon, adminMatch: true },
         { href: '/tasks/add-tracking', label: 'Add Tracking', icon: PackageIcon },
         { href: '#', label: 'Customer Lookup', icon: SearchIcon, soon: true },
         { href: '#', label: 'Order History', icon: ClipboardListIcon, soon: true },

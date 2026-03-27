@@ -19,10 +19,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (error || !customer) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   // Fetch related data in parallel
-  const [contactsRes, oppsRes, filesRes, assignedUserRes, createdByUserRes, entityTagsRes] = await Promise.all([
+  const [contactsRes, oppsRes, filesRes, storesRes, assignedUserRes, createdByUserRes, entityTagsRes] = await Promise.all([
     adminClient.from('crm_contacts').select('id, first_name, last_name, title, email, phone, type_of_contact').eq('customer_id', id).order('last_name'),
     adminClient.from('crm_opportunities').select('id, name, value, status, pipeline_stage, forecast_close_date, assigned_to').eq('customer_id', id).order('created_at', { ascending: false }),
     adminClient.from('crm_files').select('id, label, url, created_at').eq('customer_id', id).order('created_at', { ascending: false }),
+    adminClient.from('store_customer_links').select('stores(id, store_id, store_name, status, is_active)').eq('customer_id', id),
     customer.assigned_to
       ? adminClient.from('users').select('id, display_name, email').eq('id', customer.assigned_to).single()
       : Promise.resolve({ data: null }),
@@ -35,6 +36,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   ])
 
   const tags = (entityTagsRes.data ?? []).map((r: any) => r.crm_tags).filter(Boolean)
+  const stores = (storesRes.data ?? []).map((r: any) => r.stores).filter(Boolean)
 
   let brand_data = null
   if (customer.brand_data_id) {
@@ -47,6 +49,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     contacts: contactsRes.data ?? [],
     opportunities: oppsRes.data ?? [],
     files: filesRes.data ?? [],
+    stores,
     assigned_user: assignedUserRes.data ?? null,
     created_by_user: createdByUserRes.data ?? null,
     tags,

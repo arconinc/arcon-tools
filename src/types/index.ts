@@ -85,13 +85,46 @@ export interface BirthdayEvent {
 
 // ─── Store ───────────────────────────────────────────────────────────────────
 
+export type StoreStatus = 'Active' | 'Inactive'
+export type StoreRole = 'manager' | 'sales'
+
 export interface Store {
   id: string
   store_id: string
   store_name: string
   is_active: boolean
+  domain: string | null
+  status: StoreStatus
+  in_production: boolean
+  launch_date: string | null
+  takedown_date: string | null
+  last_order_at: string | null
+  store_types: string[]
+  who_pays: string[]
+  payment_methods: string[]
+  freight: string[]
+  unique_incentives: string | null
+  product_types: string[]
+  allowances: string | null
+  mandatory_notes: string[]
   created_at: string
   updated_at: string
+}
+
+export interface StoreAssignment {
+  id: string
+  store_id: string
+  user_id: string
+  role: StoreRole
+  created_at: string
+  user: { id: string; display_name: string; email: string; avatar_url: string | null; profile_image_url: string | null }
+}
+
+export interface StoreDetail extends Store {
+  assignments: StoreAssignment[]
+  customer: { id: string; name: string } | null
+  contacts: { id: string; first_name: string; last_name: string; email: string | null }[]
+  open_task_count: number
 }
 
 // ─── Audit Log ───────────────────────────────────────────────────────────────
@@ -620,6 +653,7 @@ export interface CrmTask {
   customer_id: string | null
   vendor_id: string | null
   contact_id: string | null
+  store_id: string | null
   created_by: string
   created_at: string
   updated_at: string
@@ -705,6 +739,7 @@ export interface CrmCustomerDetail extends CrmCustomer {
   contacts: CrmContact[]
   opportunities: CrmOpportunity[]
   files: CrmFile[]
+  stores: { id: string; store_id: string; store_name: string; status: StoreStatus; is_active: boolean }[]
   assigned_user: { id: string; display_name: string; email: string } | null
   created_by_user: { id: string; display_name: string; email: string } | null
   brand_data: CrmBrandData | null
