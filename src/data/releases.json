@@ -1,38 +1,314 @@
 [
   {
+    "version": "0.2.0",
+    "date": "2026-03-30",
+    "title": "Gmail Add-On",
+    "summary": "Create an add-on for Gmail to create tasks",
+    "changes": [
+      {
+        "category": "feature",
+        "description": "Add Gmail Add-on"
+      },
+      {
+        "category": "feature",
+        "description": "Stores tabs"
+      },
+      {
+        "category": "feature",
+        "description": "New customer"
+      },
+      {
+        "category": "feature",
+        "description": "Online stores"
+      },
+      {
+        "category": "feature",
+        "description": "Background on login screen"
+      },
+      {
+        "category": "feature",
+        "description": "Vectorize"
+      },
+      {
+        "category": "feature",
+        "description": "Import Contacts"
+      },
+      {
+        "category": "feature",
+        "description": "Opportunities"
+      },
+      {
+        "category": "feature",
+        "description": "Import opportunities"
+      },
+      {
+        "category": "feature",
+        "description": "Quick add task and quick fill goals"
+      },
+      {
+        "category": "feature",
+        "description": "Artwork"
+      },
+      {
+        "category": "feature",
+        "description": "Clipboard"
+      },
+      {
+        "category": "feature",
+        "description": "Document"
+      },
+      {
+        "category": "feature",
+        "description": "Employees"
+      },
+      {
+        "category": "feature",
+        "description": "Search"
+      },
+      {
+        "category": "feature",
+        "description": "View details"
+      },
+      {
+        "category": "feature",
+        "description": "View details"
+      },
+      {
+        "category": "feature",
+        "description": "Brand details"
+      },
+      {
+        "category": "feature",
+        "description": "Billing and shipping"
+      },
+      {
+        "category": "feature",
+        "description": "Google photos"
+      },
+      {
+        "category": "feature",
+        "description": "Paging"
+      },
+      {
+        "category": "feature",
+        "description": "Import"
+      },
+      {
+        "category": "feature",
+        "description": "Add tags"
+      },
+      {
+        "category": "feature",
+        "description": "My Tasks"
+      },
+      {
+        "category": "feature",
+        "description": "Tasks"
+      },
+      {
+        "category": "feature",
+        "description": "Add google analytics"
+      },
+      {
+        "category": "feature",
+        "description": "CRM"
+      },
+      {
+        "category": "feature",
+        "description": "CRM"
+      },
+      {
+        "category": "feature",
+        "description": "Ticker"
+      },
+      {
+        "category": "feature",
+        "description": "Mobile"
+      },
+      {
+        "category": "feature",
+        "description": "Adding in tasks"
+      },
+      {
+        "category": "feature",
+        "description": "Highlight anniversaries"
+      },
+      {
+        "category": "feature",
+        "description": "Menu collapse"
+      },
+      {
+        "category": "feature",
+        "description": "Birthdays and anniversaries"
+      },
+      {
+        "category": "feature",
+        "description": "Link to birthdays"
+      },
+      {
+        "category": "feature",
+        "description": "Fix date"
+      },
+      {
+        "category": "feature",
+        "description": "Fix date"
+      },
+      {
+        "category": "feature",
+        "description": "Fix date"
+      },
+      {
+        "category": "feature",
+        "description": "Add ticker"
+      },
+      {
+        "category": "feature",
+        "description": "Add news"
+      },
+      {
+        "category": "feature",
+        "description": "Add birthdays"
+      },
+      {
+        "category": "feature",
+        "description": "Banner Edit"
+      },
+      {
+        "category": "feature",
+        "description": "Add new mockup"
+      },
+      {
+        "category": "feature",
+        "description": "Remove standalone output mode for Vercel compatibility"
+      },
+      {
+        "category": "feature",
+        "description": "Initial commit"
+      },
+      {
+        "category": "feature",
+        "description": "Initial commit from Create Next App"
+      }
+    ]
+  },
+  {
     "version": "0.1.0",
     "date": "2026-03-30",
     "title": "Initial Launch",
     "summary": "First release of The Arc — Arcon's internal tools platform. Includes CRM, E-Commerce store management, HR tools, company communications, and a configurable dashboard.",
     "changes": [
-      { "category": "feature", "description": "CRM module with Customers, Vendors, Contacts, Opportunities, and Tasks" },
-      { "category": "feature", "description": "CRM bulk import from Insightly CSV exports for contacts and opportunities" },
-      { "category": "feature", "description": "Opportunity pipeline stage tracking with history" },
-      { "category": "feature", "description": "CRM task management with priority, comments, attachments, and progress tracking" },
-      { "category": "feature", "description": "CRM sales goals configuration and quick-fill via admin panel" },
-      { "category": "feature", "description": "CRM tagging system for customers, vendors, and contacts" },
-      { "category": "feature", "description": "Brand data enrichment via Brandfetch integration" },
-      { "category": "feature", "description": "Artwork library per customer with Cloudinary upload and vectorization" },
-      { "category": "feature", "description": "Online Stores with visual Gantt timeline and urgency status" },
-      { "category": "feature", "description": "Store detail tabs: Overview, Team, CRM Links, Tasks, Add Tracking" },
-      { "category": "feature", "description": "New Customer creation with direct push to Aturian (commissioned client, tax exempt, contact department)" },
-      { "category": "feature", "description": "Employee Directory with profiles, bios, skills, and manager hierarchy" },
-      { "category": "feature", "description": "Documents section with Google Drive integration" },
-      { "category": "feature", "description": "News & Announcements with Tiptap rich-text editor, cover images, and article types" },
-      { "category": "feature", "description": "Hero carousel banner with image upload and draft/publish workflow" },
-      { "category": "feature", "description": "Scrolling ticker strip with birthdays, anniversaries, news, holidays, and ClickUp tasks" },
-      { "category": "feature", "description": "Event countdown timer in the topbar" },
-      { "category": "feature", "description": "Birthdays & Anniversaries page with upcoming events" },
-      { "category": "feature", "description": "My Tasks dashboard card with live ClickUp integration per user" },
-      { "category": "feature", "description": "Google Search and Gmail quick-access in the topbar" },
-      { "category": "feature", "description": "Collapsible sidebar navigation with persistent section state" },
-      { "category": "improvement", "description": "Billing and shipping address management on CRM records" },
-      { "category": "improvement", "description": "Brand details panel with logo, colors, and company info on customer/vendor records" },
-      { "category": "improvement", "description": "Search, filtering, and pagination on CRM listing pages" },
-      { "category": "improvement", "description": "Per-user encrypted API credential storage" },
-      { "category": "improvement", "description": "Audit log for user actions" },
-      { "category": "improvement", "description": "Google Analytics (GA4) integration" },
-      { "category": "improvement", "description": "Mobile-responsive layout" }
+      {
+        "category": "feature",
+        "description": "CRM module with Customers, Vendors, Contacts, Opportunities, and Tasks"
+      },
+      {
+        "category": "feature",
+        "description": "CRM bulk import from Insightly CSV exports for contacts and opportunities"
+      },
+      {
+        "category": "feature",
+        "description": "Opportunity pipeline stage tracking with history"
+      },
+      {
+        "category": "feature",
+        "description": "CRM task management with priority, comments, attachments, and progress tracking"
+      },
+      {
+        "category": "feature",
+        "description": "CRM sales goals configuration and quick-fill via admin panel"
+      },
+      {
+        "category": "feature",
+        "description": "CRM tagging system for customers, vendors, and contacts"
+      },
+      {
+        "category": "feature",
+        "description": "Brand data enrichment via Brandfetch integration"
+      },
+      {
+        "category": "feature",
+        "description": "Artwork library per customer with Cloudinary upload and vectorization"
+      },
+      {
+        "category": "feature",
+        "description": "Online Stores with visual Gantt timeline and urgency status"
+      },
+      {
+        "category": "feature",
+        "description": "Store detail tabs: Overview, Team, CRM Links, Tasks, Add Tracking"
+      },
+      {
+        "category": "feature",
+        "description": "New Customer creation with direct push to Aturian (commissioned client, tax exempt, contact department)"
+      },
+      {
+        "category": "feature",
+        "description": "Employee Directory with profiles, bios, skills, and manager hierarchy"
+      },
+      {
+        "category": "feature",
+        "description": "Documents section with Google Drive integration"
+      },
+      {
+        "category": "feature",
+        "description": "News & Announcements with Tiptap rich-text editor, cover images, and article types"
+      },
+      {
+        "category": "feature",
+        "description": "Hero carousel banner with image upload and draft/publish workflow"
+      },
+      {
+        "category": "feature",
+        "description": "Scrolling ticker strip with birthdays, anniversaries, news, holidays, and ClickUp tasks"
+      },
+      {
+        "category": "feature",
+        "description": "Event countdown timer in the topbar"
+      },
+      {
+        "category": "feature",
+        "description": "Birthdays & Anniversaries page with upcoming events"
+      },
+      {
+        "category": "feature",
+        "description": "My Tasks dashboard card with live ClickUp integration per user"
+      },
+      {
+        "category": "feature",
+        "description": "Google Search and Gmail quick-access in the topbar"
+      },
+      {
+        "category": "feature",
+        "description": "Collapsible sidebar navigation with persistent section state"
+      },
+      {
+        "category": "improvement",
+        "description": "Billing and shipping address management on CRM records"
+      },
+      {
+        "category": "improvement",
+        "description": "Brand details panel with logo, colors, and company info on customer/vendor records"
+      },
+      {
+        "category": "improvement",
+        "description": "Search, filtering, and pagination on CRM listing pages"
+      },
+      {
+        "category": "improvement",
+        "description": "Per-user encrypted API credential storage"
+      },
+      {
+        "category": "improvement",
+        "description": "Audit log for user actions"
+      },
+      {
+        "category": "improvement",
+        "description": "Google Analytics (GA4) integration"
+      },
+      {
+        "category": "improvement",
+        "description": "Mobile-responsive layout"
+      }
     ]
   }
 ]
