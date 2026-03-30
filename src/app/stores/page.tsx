@@ -74,7 +74,7 @@ const URGENCY_LABEL: Record<string, { label: string; cls: string }> = {
 
 // ── column definitions ────────────────────────────────────────────────────────
 
-type ColKey = 'status' | 'domain' | 'in_production' | 'store_types' | 'who_pays'
+type ColKey = 'status' | 'domain' | 'manager' | 'sales_rep' | 'in_production' | 'store_types' | 'who_pays'
             | 'payment_methods' | 'freight' | 'product_types'
             | 'launch_date' | 'takedown_date' | 'last_order_at'
 
@@ -109,6 +109,18 @@ const COLUMNS: ColDef[] = [
     key: 'domain', label: 'Domain', width: 200,
     render: s => s.domain
       ? <span className="font-mono text-[11px] text-purple-700 bg-purple-50 px-2 py-0.5 rounded-full truncate max-w-full inline-block">{s.domain}</span>
+      : <span className="text-slate-300">—</span>,
+  },
+  {
+    key: 'manager', label: 'Manager', width: 140,
+    render: s => s.managers?.length
+      ? <span className="text-xs text-slate-700">{s.managers.join(', ')}</span>
+      : <span className="text-slate-300">—</span>,
+  },
+  {
+    key: 'sales_rep', label: 'Sales', width: 140,
+    render: s => s.sales_reps?.length
+      ? <span className="text-xs text-slate-700">{s.sales_reps.join(', ')}</span>
       : <span className="text-slate-300">—</span>,
   },
   {
@@ -167,7 +179,7 @@ const COLUMNS: ColDef[] = [
   },
 ]
 
-const DEFAULT_VISIBLE = new Set<ColKey>(['status', 'domain', 'store_types', 'who_pays', 'payment_methods', 'freight', 'product_types', 'launch_date', 'takedown_date'])
+const DEFAULT_VISIBLE = new Set<ColKey>(['status', 'domain', 'manager', 'sales_rep', 'store_types', 'who_pays', 'payment_methods', 'freight', 'product_types', 'launch_date', 'takedown_date'])
 
 // ── Column picker ─────────────────────────────────────────────────────────────
 
@@ -772,7 +784,7 @@ export default function StoresDashboardPage() {
   return (
     <>
       <style>{`
-        .stores-page { max-width: 1600px; margin: 0 auto; }
+        .stores-page { padding: 22px 28px 28px; }
         .stat-card { background: white; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px 20px; cursor: pointer; text-align: left; transition: all 0.15s; }
         .stat-card:hover { border-color: #cbd5e1; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
         .stat-val { font-size: 26px; font-weight: 700; color: #1e293b; line-height: 1; }

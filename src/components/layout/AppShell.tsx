@@ -100,7 +100,6 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
       label: 'E-Commerce',
       items: [
         { href: '/stores', label: 'Stores', icon: StoreIcon, adminMatch: true },
-        { href: '/tasks/add-tracking', label: 'Add Tracking', icon: PackageIcon },
         { href: '#', label: 'Customer Lookup', icon: SearchIcon, soon: true },
         { href: '#', label: 'Order History', icon: ClipboardListIcon, soon: true },
         { href: '#', label: 'Reporting', icon: ChartBarIcon, soon: true },
@@ -145,11 +144,9 @@ export default function AppShell({ children, user }: AppShellProps) {
   const router = useRouter()
   const supabase = createClient()
 
-  const [stores, setStores] = useState<Store[]>([])
   const [selectedStore, setSelectedStore] = useState<Store | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
-  const [storeError, setStoreError] = useState<string | null>(null)
   const [tooltip, setTooltip] = useState<{ label: string; y: number } | null>(null)
   const [countdown, setCountdown] = useState<CountdownConfig | null>(null)
   const [countdownDisplay, setCountdownDisplay] = useState('')
@@ -189,13 +186,9 @@ export default function AppShell({ children, user }: AppShellProps) {
   useEffect(() => {
     fetch('/api/stores')
       .then(async (r) => {
+        if (!r.ok) return
         const data = await r.json()
-        if (!r.ok) {
-          setStoreError(data.error ?? 'Failed to load stores')
-          return
-        }
         if (Array.isArray(data)) {
-          setStores(data)
           const savedId = sessionStorage.getItem('selectedStoreId')
           if (savedId) {
             const found = data.find((s: Store) => s.id === savedId)
@@ -203,7 +196,7 @@ export default function AppShell({ children, user }: AppShellProps) {
           }
         }
       })
-      .catch(() => setStoreError('Could not reach store API'))
+      .catch(() => {})
   }, [])
 
   useEffect(() => {
@@ -253,16 +246,6 @@ export default function AppShell({ children, user }: AppShellProps) {
     if (!searchQuery.trim()) return
     window.open(`https://www.google.com/search?q=${encodeURIComponent(searchQuery.trim())}`, '_blank', 'noopener,noreferrer')
     setSearchQuery('')
-  }
-
-  function handleStoreChange(e: React.ChangeEvent<HTMLSelectElement>) {
-    const store = stores.find((s) => s.id === e.target.value) ?? null
-    setSelectedStore(store)
-    if (store) {
-      sessionStorage.setItem('selectedStoreId', store.id)
-    } else {
-      sessionStorage.removeItem('selectedStoreId')
-    }
   }
 
   function handleHamburger() {
@@ -448,27 +431,6 @@ export default function AppShell({ children, user }: AppShellProps) {
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
                 </svg>
               </button>
-
-              {/* Store selector — E-Commerce pages only */}
-              {pathname.startsWith('/tasks') && (
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                  <div style={{ width: 7, height: 7, background: '#16a34a', borderRadius: '50%' }} />
-                  {storeError ? (
-                    <span style={{ fontSize: 13, color: '#dc2626' }}>{storeError}</span>
-                  ) : (
-                    <select
-                      value={selectedStore?.id ?? ''}
-                      onChange={handleStoreChange}
-                      style={{ background: '#fafafa', border: '1px solid #e5e7eb', borderRadius: 6, padding: '6px 12px', fontSize: 13, color: '#555', outline: 'none', cursor: 'pointer' }}
-                    >
-                      <option value="">{stores.length === 0 ? '— No stores configured —' : '— Select a Store —'}</option>
-                      {stores.map((s) => (
-                        <option key={s.id} value={s.id}>{s.store_name}</option>
-                      ))}
-                    </select>
-                  )}
-                </div>
-              )}
 
               {/* Countdown pill */}
               {countdown?.enabled && countdownDisplay && (
@@ -776,10 +738,6 @@ function SidebarNavItem({
 
 function HomeIcon({ className }: { className?: string }) {
   return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l9-9 9 9M4 10v10h6v-6h4v6h6V10" /></svg>
-}
-
-function PackageIcon({ className }: { className?: string }) {
-  return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8 5-8-5m16 0v10a2 2 0 01-2 2H6a2 2 0 01-2-2V7m16 0l-8-5-8 5" /></svg>
 }
 
 function SearchIcon({ className }: { className?: string }) {

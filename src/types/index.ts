@@ -109,6 +109,8 @@ export interface Store {
   mandatory_notes: string[]
   created_at: string
   updated_at: string
+  managers?: string[]
+  sales_reps?: string[]
 }
 
 export interface StoreAssignment {

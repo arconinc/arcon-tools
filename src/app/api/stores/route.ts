@@ -10,12 +10,20 @@ export async function GET() {
   const adminClient = createAdminClient()
   const { data, error } = await adminClient
     .from('stores')
-    .select('*')
+    .select('*, store_assignments(role, user:users(display_name))')
     .eq('is_active', true)
     .order('store_name')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const enriched = (data as any[]).map(({ store_assignments, ...store }) => ({
+    ...store,
+    managers: (store_assignments ?? []).filter((a: { role: string }) => a.role === 'manager').map((a: { user: { display_name: string } }) => a.user?.display_name).filter(Boolean),
+    sales_reps: (store_assignments ?? []).filter((a: { role: string }) => a.role === 'sales').map((a: { user: { display_name: string } }) => a.user?.display_name).filter(Boolean),
+  }))
+
+  return NextResponse.json(enriched)
 }
 
 export async function POST(request: Request) {
