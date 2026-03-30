@@ -91,6 +91,7 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
       label: 'Company',
       items: [
         { href: '/news', label: 'News & Announcements', icon: MegaphoneIcon, adminMatch: true },
+        { href: '/releases', label: 'Release Notes', icon: ReleaseIcon, adminMatch: true },
         { href: '/birthdays', label: 'Birthdays & Anniversaries', icon: CakeIcon },
         { href: '/employees', label: 'Employee Directory', icon: UsersIcon, adminMatch: true },
         { href: '/profile', label: 'My Profile', icon: UserAdminIcon },
@@ -778,6 +779,10 @@ function UsersIcon({ className }: { className?: string }) {
 
 function DocumentIcon({ className }: { className?: string }) {
   return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+}
+
+function ReleaseIcon({ className }: { className?: string }) {
+  return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" /></svg>
 }
 
 function CalendarIcon({ className }: { className?: string }) {

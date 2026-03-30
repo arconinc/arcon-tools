@@ -781,3 +781,20 @@ export interface CrmTaskDetail extends CrmTask {
   contact: { id: string; first_name: string; last_name: string } | null
   assigned_user: { id: string; display_name: string; email: string } | null
 }
+
+// ─── Release Notes ─────────────────────────────────────────────────────────────
+
+export type ReleaseChangeCategory = 'feature' | 'improvement' | 'bug_fix' | 'breaking_change'
+
+export interface ReleaseChange {
+  category: ReleaseChangeCategory
+  description: string
+}
+
+export interface Release {
+  version: string    // semver e.g. "0.1.0"
+  date: string       // "YYYY-MM-DD"
+  title: string
+  summary: string
+  changes: ReleaseChange[]
+}

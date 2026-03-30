@@ -1,0 +1,27 @@
+{
+  "timeZone": "America/Chicago",
+  "dependencies": {},
+  "exceptionLogging": "STACKDRIVER",
+  "runtimeVersion": "V8",
+  "oauthScopes": [
+    "https://www.googleapis.com/auth/gmail.addons.execute",
+    "https://www.googleapis.com/auth/gmail.readonly",
+    "https://www.googleapis.com/auth/script.external_request"
+  ],
+  "gmail": {
+    "name": "The Arc",
+    "logoUrl": "https://thearc.arconinc.com/favicon.ico",
+    "primaryColor": "#7c3aed",
+    "secondaryColor": "#5b21b6",
+    "authorizationCheckFunction": "onAuthorizationRequired",
+    "contextualTriggers": [
+      {
+        "unconditional": {},
+        "onTriggerFunction": "buildAddOn"
+      }
+    ],
+    "homepageTrigger": {
+      "runFunction": "buildHomePage"
+    }
+  }
+}
