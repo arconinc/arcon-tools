@@ -30,7 +30,7 @@ export async function proxy(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
   // Public paths
-  if (pathname === '/login' || pathname.startsWith('/auth/')) {
+  if (pathname === '/login' || pathname.startsWith('/auth/') || pathname.startsWith('/api/addon/')) {
     // If already logged in and going to /login, redirect to dashboard
     if (user && pathname === '/login') {
       return NextResponse.redirect(new URL('/dashboard', request.url))

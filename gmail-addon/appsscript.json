@@ -6,14 +6,15 @@
   "oauthScopes": [
     "https://www.googleapis.com/auth/gmail.addons.execute",
     "https://www.googleapis.com/auth/gmail.readonly",
-    "https://www.googleapis.com/auth/script.external_request"
+    "https://www.googleapis.com/auth/script.external_request",
+    "https://www.googleapis.com/auth/userinfo.email",
+    "openid"
   ],
   "gmail": {
     "name": "The Arc",
     "logoUrl": "https://thearc.arconinc.com/favicon.ico",
     "primaryColor": "#7c3aed",
     "secondaryColor": "#5b21b6",
-    "authorizationCheckFunction": "onAuthorizationRequired",
     "contextualTriggers": [
       {
         "unconditional": {},

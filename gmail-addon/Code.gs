@@ -62,30 +62,6 @@ function buildHomePage(e) {
   return buildHomeCard('', '', '', '', '');
 }
 
-/**
- * Required by Gmail Add-Ons when authorization is needed.
- */
-function onAuthorizationRequired(e, authorizationUrl) {
-  var authAction = CardService.newAuthorizationAction()
-    .setAuthorizationUrl(authorizationUrl);
-
-  return CardService.newCardBuilder()
-    .addSection(
-      CardService.newCardSection()
-        .addWidget(
-          CardService.newTextParagraph()
-            .setText('Authorization is required to use the Arc add-on.')
-        )
-        .addWidget(
-          CardService.newTextButton()
-            .setText('Authorize')
-            .setAuthorizationAction(authAction)
-        )
-    )
-    .build();
-}
-
-
 // ─── Home Card ───────────────────────────────────────────────────────────────
 
 /**
@@ -196,13 +172,8 @@ function showCreateTaskForm(e) {
     // If user fetch fails, fall back to an empty dropdown
   }
 
-  // Build assignee dropdown items
-  var assigneeItems = users.map(function(u) {
-    return CardService.newSelectionInput(CardService.SelectionInputType.DROPDOWN)
-      .setFieldName('dummy'); // placeholder; we build this below
-  });
-
-  var assigneeDropdown = CardService.newSelectionInput(CardService.SelectionInputType.DROPDOWN)
+  var assigneeDropdown = CardService.newSelectionInput()
+    .setType(CardService.SelectionInputType.DROPDOWN)
     .setTitle('Assign to')
     .setFieldName('assigned_to');
 
@@ -214,7 +185,8 @@ function showCreateTaskForm(e) {
   }
 
   // Build category dropdown
-  var categoryDropdown = CardService.newSelectionInput(CardService.SelectionInputType.DROPDOWN)
+  var categoryDropdown = CardService.newSelectionInput()
+    .setType(CardService.SelectionInputType.DROPDOWN)
     .setTitle('Category')
     .setFieldName('category');
 
@@ -223,7 +195,8 @@ function showCreateTaskForm(e) {
   });
 
   // Build priority dropdown
-  var priorityDropdown = CardService.newSelectionInput(CardService.SelectionInputType.DROPDOWN)
+  var priorityDropdown = CardService.newSelectionInput()
+    .setType(CardService.SelectionInputType.DROPDOWN)
     .setTitle('Priority')
     .setFieldName('priority');
 
@@ -415,12 +388,37 @@ function handleBack(e) {
 // ─── API Helpers ──────────────────────────────────────────────────────────────
 
 /**
+ * Returns the current user's email by decoding the OpenID Connect identity token.
+ * ScriptApp.getIdentityToken() is the approved way to get user identity in add-ons.
+ * Requires 'openid' and 'userinfo.email' scopes in appsscript.json.
+ * Cached for 5 minutes.
+ */
+function getCurrentUserEmail() {
+  var cache  = CacheService.getUserCache();
+  var cached = cache.get('arc_user_email');
+  if (cached) return cached;
+
+  var idToken = ScriptApp.getIdentityToken();
+  if (!idToken) throw new Error('Could not obtain identity token. Ensure the add-on is authorized.');
+
+  // Decode the JWT payload (middle segment, base64url encoded)
+  var payloadB64 = idToken.split('.')[1].replace(/-/g, '+').replace(/_/g, '/');
+  var payload    = JSON.parse(Utilities.newBlob(Utilities.base64Decode(payloadB64)).getDataAsString());
+  var email      = payload.email;
+
+  if (!email) throw new Error('Email not found in identity token. Ensure userinfo.email scope is granted.');
+
+  cache.put('arc_user_email', email, 300); // cache 5 minutes
+  return email;
+}
+
+/**
  * Makes an authenticated GET request to the Arc API.
  * @param {string} path  API path, e.g. '/api/addon/users'
  * @returns {Object}     Parsed JSON response
  */
 function arcApiGet(path) {
-  var userEmail = Session.getActiveUser().getEmail();
+  var userEmail = getCurrentUserEmail();
   var response  = UrlFetchApp.fetch(ARC_BASE_URL + path, {
     method:             'get',
     muteHttpExceptions: true,
@@ -444,7 +442,7 @@ function arcApiGet(path) {
  * @returns {Object}        Parsed JSON response
  */
 function arcApiPost(path, payload) {
-  var userEmail = Session.getActiveUser().getEmail();
+  var userEmail = getCurrentUserEmail();
   var response  = UrlFetchApp.fetch(ARC_BASE_URL + path, {
     method:             'post',
     muteHttpExceptions: true,
