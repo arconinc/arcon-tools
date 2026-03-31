@@ -51,7 +51,8 @@ export async function GET(req: NextRequest) {
     applyFilters(
       adminClient
         .from('crm_tasks')
-        .select('id, title, assigned_to, task_owner, category, priority, due_date, status, progress, opportunity_id, customer_id, vendor_id, contact_id, created_at, updated_at')
+        .select('id, title, assigned_to, task_owner, category, priority, due_date, status, progress, opportunity_id, customer_id, vendor_id, contact_id, sort_order, created_at, updated_at')
+        .order('sort_order', { ascending: true, nullsFirst: false })
         .order('due_date', { ascending: true, nullsFirst: false })
     ).range(from, to),
   ])

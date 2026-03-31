@@ -23,6 +23,7 @@ type TaskItem = {
   status: Status
   due_date: string | null
   progress: number
+  sort_order: number
   linked_to_name: string | null
   linked_to_type: 'opportunity' | 'customer' | 'vendor' | 'contact' | null
   opportunity_id: string | null
@@ -126,7 +127,17 @@ export default function MyTasksPage() {
       const res = await fetch('/api/crm/tasks?assigned_to=me')
       if (!res.ok) throw new Error('Failed to fetch')
       const data = await res.json()
-      setTasks(Array.isArray(data.tasks) ? data.tasks : [])
+      const loaded: TaskItem[] = Array.isArray(data.tasks) ? data.tasks : []
+      setTasks(loaded)
+      // Initialize column orders from persisted sort_order
+      const orders: Partial<Record<Status, string[]>> = {}
+      for (const col of COLUMNS) {
+        const colTasks = loaded
+          .filter((t) => t.status === col.id)
+          .sort((a, b) => a.sort_order - b.sort_order)
+        if (colTasks.length > 0) orders[col.id] = colTasks.map((t) => t.id)
+      }
+      setColumnOrders(orders)
     } catch {
       setTasks([])
     } finally {
@@ -224,6 +235,7 @@ export default function MyTasksPage() {
   }
 
   function handleCardDragOver(e: React.DragEvent, cardId: string) {
+    e.preventDefault()
     e.stopPropagation()
     const rect = (e.currentTarget as HTMLElement).getBoundingClientRect()
     const half = e.clientY < rect.top + rect.height / 2 ? 'top' : 'bottom'
@@ -272,30 +284,56 @@ export default function MyTasksPage() {
       if (fromIdx === -1) return
       const newIds = [...currentIds]
       newIds.splice(fromIdx, 1)
-      // Adjust insertIndex after removal
       const adjustedInsert = insertIndex > fromIdx ? insertIndex - 1 : insertIndex
       newIds.splice(adjustedInsert, 0, taskId)
       setColumnOrders((prev) => ({ ...prev, [colId]: newIds }))
+
+      // Persist new sort_orders for this column
+      const updates = newIds.map((id, i) => ({ id, sort_order: i * 1000 }))
+      setTasks((prev) => prev.map((t) => {
+        const u = updates.find((u) => u.id === t.id)
+        return u ? { ...t, sort_order: u.sort_order } : t
+      }))
+      fetch('/api/crm/tasks/reorder', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ updates }),
+      })
     } else {
       // Moving between columns: update status + position
       const targetIds = colTasks.map((t) => t.id)
       targetIds.splice(insertIndex, 0, taskId)
+      const sourceIds = (columnOrders[fromCol] ?? getColumnTasks(fromCol, filtered).map((t) => t.id))
+        .filter((id) => id !== taskId)
       setColumnOrders((prev) => ({
         ...prev,
         [colId]: targetIds,
-        // Remove from source column order if manual
-        ...(prev[fromCol] ? { [fromCol]: (prev[fromCol] as string[]).filter((id) => id !== taskId) } : {}),
+        [fromCol]: sourceIds,
       }))
 
-      // Optimistic status update
+      // Optimistic update
       setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, status: colId } : t))
       setUpdatingIds((s) => new Set(s).add(taskId))
 
+      // Build updates: moved task (with new status) + reorder both columns
+      const targetUpdates = targetIds.map((id, i) => ({
+        id,
+        sort_order: i * 1000,
+        ...(id === taskId ? { status: colId } : {}),
+      }))
+      const sourceUpdates = sourceIds.map((id, i) => ({ id, sort_order: i * 1000 }))
+      const allUpdates = [...targetUpdates, ...sourceUpdates]
+
+      setTasks((prev) => prev.map((t) => {
+        const u = allUpdates.find((u) => u.id === t.id)
+        return u ? { ...t, sort_order: u.sort_order } : t
+      }))
+
       try {
-        const res = await fetch(`/api/crm/tasks/${taskId}`, {
+        const res = await fetch('/api/crm/tasks/reorder', {
           method: 'PATCH',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ status: colId }),
+          body: JSON.stringify({ updates: allUpdates }),
         })
         if (!res.ok) throw new Error('Failed')
       } catch {
@@ -445,6 +483,7 @@ export default function MyTasksPage() {
                 status: created.status as TaskItem['status'],
                 due_date: created.due_date,
                 progress: created.progress ?? 0,
+                sort_order: created.sort_order ?? 0,
                 linked_to_name: null,
                 linked_to_type: null,
                 opportunity_id: null,

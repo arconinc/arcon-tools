@@ -659,6 +659,7 @@ export interface CrmTask {
   vendor_id: string | null
   contact_id: string | null
   store_id: string | null
+  sort_order: number
   created_by: string
   created_at: string
   updated_at: string

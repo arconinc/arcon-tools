@@ -1038,7 +1038,8 @@ export default function TaskDetailPage() {
                   <Field label="Assigned To" value={task.assigned_user?.display_name ?? null} />
                   {task.description && (
                     <div className="col-span-2">
-                      <Field label="Description" value={task.description} />
+                      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Description</div>
+                      <div className="text-sm text-slate-800 whitespace-pre-wrap">{task.description}</div>
                     </div>
                   )}
                   {linkedObj && (
