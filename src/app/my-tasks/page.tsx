@@ -1,7 +1,8 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
-import { useRouter } from 'next/navigation'
+import { useState, useEffect, useRef, Suspense } from 'react'
+import { useRouter, useSearchParams } from 'next/navigation'
+import { useAppUser } from '@/components/layout/AppShell'
 import QuickAddTask from '@/components/crm/QuickAddTask'
 
 // ── Types ────────────────────────────────────────────────────────────────────
@@ -24,6 +25,8 @@ type TaskItem = {
   due_date: string | null
   progress: number
   sort_order: number
+  assigned_to: string | null
+  assigned_user_name: string | null
   linked_to_name: string | null
   linked_to_type: 'opportunity' | 'customer' | 'vendor' | 'contact' | null
   opportunity_id: string | null
@@ -31,6 +34,16 @@ type TaskItem = {
   vendor_id: string | null
   contact_id: string | null
 }
+
+type UserOption = {
+  id: string
+  display_name: string
+  team: string | null
+  avatar_url: string | null
+  profile_image_url: string | null
+}
+
+type UserSelection = 'all' | Set<string>
 
 type DragOverCard = { id: string; half: 'top' | 'bottom' }
 
@@ -74,6 +87,31 @@ function PriorityIcon({ priority }: { priority: Priority }) {
   )
 }
 
+// ── UserAvatar ─────────────────────────────────────────────────────────────────
+
+function UserAvatar({ name, avatarUrl, size = 20 }: { name: string; avatarUrl: string | null; size?: number }) {
+  if (avatarUrl) {
+    return (
+      <img
+        src={avatarUrl}
+        alt={name}
+        style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+      />
+    )
+  }
+  const initials = name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
+  return (
+    <div style={{
+      width: size, height: size, borderRadius: '50%',
+      background: '#e9d5ff', color: '#6b21a8',
+      display: 'flex', alignItems: 'center', justifyContent: 'center',
+      fontSize: Math.floor(size * 0.42), fontWeight: 700, flexShrink: 0,
+    }}>
+      {initials}
+    </div>
+  )
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 function fmtDate(iso: string | null) {
@@ -101,18 +139,51 @@ const LINKED_TYPE_COLOR: Record<string, string> = {
   contact: '#0891b2',
 }
 
+// ── Wrapper (required for useSearchParams in Next.js App Router) ───────────────
+
+export default function MyTasksPageWrapper() {
+  return (
+    <Suspense fallback={<div />}>
+      <MyTasksPage />
+    </Suspense>
+  )
+}
+
 // ── Main page ─────────────────────────────────────────────────────────────────
 
-export default function MyTasksPage() {
+function MyTasksPage() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const { user: currentUser } = useAppUser()
+  const isTeamView = searchParams.get('view') === 'team'
+
   const [tasks, setTasks] = useState<TaskItem[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [hideCompleted, setHideCompleted] = useState(false)
+  const [hideCompleted, setHideCompleted] = useState(true)
   const [sortBy, setSortBy] = useState<'priority' | 'due_date'>('priority')
-
-  // columnOrders: manual ordering per column (overrides auto-sort when set)
   const [columnOrders, setColumnOrders] = useState<Partial<Record<Status, string[]>>>({})
+
+  // Filter state
+  const [allUsers, setAllUsers] = useState<UserOption[]>([])
+  const [selectedTeams, setSelectedTeams] = useState<UserSelection>('all')
+  const [selectedUserIds, setSelectedUserIds] = useState<UserSelection>('all')
+  const [initialized, setInitialized] = useState(false)
+
+  // Dropdown open state
+  const [teamsDropdownOpen, setTeamsDropdownOpen] = useState(false)
+  const [usersDropdownOpen, setUsersDropdownOpen] = useState(false)
+  const teamsDropdownRef = useRef<HTMLDivElement>(null)
+  const usersDropdownRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (teamsDropdownRef.current && !teamsDropdownRef.current.contains(e.target as Node)) setTeamsDropdownOpen(false)
+      if (usersDropdownRef.current && !usersDropdownRef.current.contains(e.target as Node)) setUsersDropdownOpen(false)
+    }
+    if (teamsDropdownOpen || usersDropdownOpen) document.addEventListener('mousedown', onClickOutside)
+    return () => document.removeEventListener('mousedown', onClickOutside)
+  }, [teamsDropdownOpen, usersDropdownOpen])
 
   // Drag state
   const dragTaskId = useRef<string | null>(null)
@@ -121,39 +192,141 @@ export default function MyTasksPage() {
   const [dragOverCard, setDragOverCard] = useState<DragOverCard | null>(null)
   const [updatingIds, setUpdatingIds] = useState<Set<string>>(new Set())
 
-  const fetchTasks = useCallback(async () => {
-    setLoading(true)
-    try {
-      const res = await fetch('/api/crm/tasks?assigned_to=me')
-      if (!res.ok) throw new Error('Failed to fetch')
-      const data = await res.json()
-      const loaded: TaskItem[] = Array.isArray(data.tasks) ? data.tasks : []
-      setTasks(loaded)
-      // Initialize column orders from persisted sort_order
-      const orders: Partial<Record<Status, string[]>> = {}
-      for (const col of COLUMNS) {
-        const colTasks = loaded
-          .filter((t) => t.status === col.id)
-          .sort((a, b) => a.sort_order - b.sort_order)
-        if (colTasks.length > 0) orders[col.id] = colTasks.map((t) => t.id)
-      }
-      setColumnOrders(orders)
-    } catch {
-      setTasks([])
-    } finally {
-      setLoading(false)
-    }
+  // Load all users for the filter bar
+  useEffect(() => {
+    fetch('/api/crm/users')
+      .then((r) => r.json())
+      .then((data: UserOption[]) => setAllUsers(Array.isArray(data) ? data : []))
+      .catch(() => {})
   }, [])
 
-  useEffect(() => { fetchTasks() }, [fetchTasks])
+  // Set initial filter once we know the current user
+  useEffect(() => {
+    if (currentUser && !initialized) {
+      setSelectedTeams('all')
+      setSelectedUserIds(isTeamView ? 'all' : new Set([currentUser.id]))
+      setInitialized(true)
+    }
+  }, [currentUser, initialized, isTeamView])
 
-  // Reset manual order when sort mode changes
+  // Stable keys for Set-based state (safe for useEffect deps)
+  const teamsKey = selectedTeams === 'all' ? 'all' : [...(selectedTeams as Set<string>)].sort().join(',')
+  const usersKey = selectedUserIds === 'all' ? 'all' : [...(selectedUserIds as Set<string>)].sort().join(',')
+
+  // Compute the effective user ID list from both filters (union)
+  function getEffectiveIds(): string[] | null {
+    if (selectedTeams === 'all' && selectedUserIds === 'all') return null
+    const ids = new Set<string>()
+    if (selectedTeams !== 'all') {
+      for (const u of allUsers) {
+        if (u.team && (selectedTeams as Set<string>).has(u.team)) ids.add(u.id)
+      }
+    }
+    if (selectedUserIds !== 'all') {
+      for (const id of selectedUserIds as Set<string>) ids.add(id)
+    }
+    return [...ids]
+  }
+
+  // Fetch tasks whenever either filter changes
+  useEffect(() => {
+    if (!initialized) return
+
+    const effectiveIds = getEffectiveIds()
+    let url: string
+    if (!effectiveIds || effectiveIds.length === 0) {
+      url = '/api/crm/tasks?assigned_to=all'
+    } else {
+      url = `/api/crm/tasks?assigned_to=${effectiveIds.join(',')}`
+    }
+
+    setLoading(true)
+    fetch(url)
+      .then((r) => { if (!r.ok) throw new Error('Failed'); return r.json() })
+      .then((data) => {
+        const loaded: TaskItem[] = Array.isArray(data.tasks) ? data.tasks : []
+        setTasks(loaded)
+        const orders: Partial<Record<Status, string[]>> = {}
+        for (const col of COLUMNS) {
+          const colTasks = loaded
+            .filter((t) => t.status === col.id)
+            .sort((a, b) => a.sort_order - b.sort_order)
+          if (colTasks.length > 0) orders[col.id] = colTasks.map((t) => t.id)
+        }
+        setColumnOrders(orders)
+      })
+      .catch(() => setTasks([]))
+      .finally(() => setLoading(false))
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [teamsKey, usersKey, initialized])
+
+  // ── Filter helpers ─────────────────────────────────────────────────────────
+
+  const effectiveIds = getEffectiveIds()
+  const isMeOnly = effectiveIds !== null && effectiveIds.length === 1 && effectiveIds[0] === currentUser?.id
+  const pageTitle = isMeOnly ? 'My Tasks' : 'Team Board'
+
+  const teams = [...new Set(allUsers.map((u) => u.team).filter(Boolean))].sort() as string[]
+
+  // Teams filter
+  function handleToggleTeam(team: string) {
+    if (selectedTeams === 'all') {
+      setSelectedTeams(new Set([team]))
+    } else {
+      const next = new Set(selectedTeams as Set<string>)
+      if (next.has(team)) {
+        next.delete(team)
+        setSelectedTeams(next.size === 0 ? 'all' : next)
+      } else {
+        next.add(team)
+        setSelectedTeams(next)
+      }
+    }
+    setColumnOrders({})
+  }
+
+  function isTeamSelected(team: string) {
+    return selectedTeams !== 'all' && (selectedTeams as Set<string>).has(team)
+  }
+
+  // Users filter
+  function handleSelectAllUsers() {
+    setSelectedUserIds('all')
+    setColumnOrders({})
+  }
+
+  function handleSelectMe() {
+    if (!currentUser) return
+    setSelectedUserIds(new Set([currentUser.id]))
+    setColumnOrders({})
+  }
+
+  function handleToggleUser(userId: string) {
+    if (selectedUserIds === 'all') {
+      setSelectedUserIds(new Set([userId]))
+    } else {
+      const next = new Set(selectedUserIds as Set<string>)
+      if (next.has(userId)) {
+        next.delete(userId)
+        setSelectedUserIds(next.size === 0 ? 'all' : next)
+      } else {
+        next.add(userId)
+        setSelectedUserIds(next)
+      }
+    }
+    setColumnOrders({})
+  }
+
+  function isUserSelected(userId: string) {
+    return selectedUserIds !== 'all' && (selectedUserIds as Set<string>).has(userId)
+  }
+
+  // ── Ordering ───────────────────────────────────────────────────────────────
+
   function handleSortChange(mode: 'priority' | 'due_date') {
     setSortBy(mode)
     setColumnOrders({})
   }
-
-  // ── Ordering ───────────────────────────────────────────────────────────────
 
   const autoSort = (arr: TaskItem[]) =>
     [...arr].sort((a, b) => {
@@ -178,7 +351,6 @@ export default function MyTasksPage() {
     const inCol = allFiltered.filter((t) => t.status === colId)
     const manual = columnOrders[colId]
     if (!manual) return autoSort(inCol)
-    // Apply manual order; append newly added tasks not yet in manual order
     const idSet = new Set(manual)
     const ordered = manual.map((id) => inCol.find((t) => t.id === id)).filter(Boolean) as TaskItem[]
     const extras = inCol.filter((t) => !idSet.has(t.id))
@@ -202,8 +374,12 @@ export default function MyTasksPage() {
     .filter((col) => !(hideCompleted && col.id === 'completed'))
     .map((col) => ({ ...col, tasks: getColumnTasks(col.id, filtered) }))
 
-  const totalMine = tasks.length
   const totalOpen = tasks.filter((t) => t.status !== 'completed').length
+
+  // Map user ID → profile photo (prefer profile_image_url, fall back to avatar_url)
+  const userPhotoMap = Object.fromEntries(
+    allUsers.map((u) => [u.id, u.profile_image_url ?? u.avatar_url])
+  )
 
   // ── Drag & Drop ────────────────────────────────────────────────────────────
 
@@ -268,8 +444,7 @@ export default function MyTasksPage() {
     const isSameColumn = fromCol === colId
     const colTasks = getColumnTasks(colId, filtered)
 
-    // Compute insert index based on dragOverCard
-    let insertIndex = colTasks.length // default: end
+    let insertIndex = colTasks.length
     if (overCard) {
       const overIdx = colTasks.findIndex((t) => t.id === overCard.id)
       if (overIdx !== -1) {
@@ -278,7 +453,6 @@ export default function MyTasksPage() {
     }
 
     if (isSameColumn) {
-      // Reorder within column
       const currentIds = colTasks.map((t) => t.id)
       const fromIdx = currentIds.indexOf(taskId)
       if (fromIdx === -1) return
@@ -288,7 +462,6 @@ export default function MyTasksPage() {
       newIds.splice(adjustedInsert, 0, taskId)
       setColumnOrders((prev) => ({ ...prev, [colId]: newIds }))
 
-      // Persist new sort_orders for this column
       const updates = newIds.map((id, i) => ({ id, sort_order: i * 1000 }))
       setTasks((prev) => prev.map((t) => {
         const u = updates.find((u) => u.id === t.id)
@@ -300,7 +473,6 @@ export default function MyTasksPage() {
         body: JSON.stringify({ updates }),
       })
     } else {
-      // Moving between columns: update status + position
       const targetIds = colTasks.map((t) => t.id)
       targetIds.splice(insertIndex, 0, taskId)
       const sourceIds = (columnOrders[fromCol] ?? getColumnTasks(fromCol, filtered).map((t) => t.id))
@@ -311,11 +483,9 @@ export default function MyTasksPage() {
         [fromCol]: sourceIds,
       }))
 
-      // Optimistic update
       setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, status: colId } : t))
       setUpdatingIds((s) => new Set(s).add(taskId))
 
-      // Build updates: moved task (with new status) + reorder both columns
       const targetUpdates = targetIds.map((id, i) => ({
         id,
         sort_order: i * 1000,
@@ -440,15 +610,149 @@ export default function MyTasksPage() {
         .priority-sort-btn:not(.active):hover {
           color: #333;
         }
+        .assignee-select-box {
+          display: flex;
+          align-items: center;
+          min-height: 36px;
+          background: #fff;
+          border: 1.5px solid #e5e7eb;
+          border-radius: 9px;
+          cursor: pointer;
+          transition: border-color 0.12s;
+          position: relative;
+          user-select: none;
+        }
+        .assignee-select-box:hover, .assignee-select-box.open {
+          border-color: #9333ea;
+        }
+        .assignee-chips-area {
+          flex: 1;
+          display: flex;
+          flex-wrap: wrap;
+          gap: 5px;
+          padding: 5px 8px;
+          min-width: 0;
+        }
+        .sel-chip {
+          display: inline-flex;
+          align-items: center;
+          gap: 4px;
+          padding: 2px 6px 2px 4px;
+          background: #ede9fe;
+          color: #5b21b6;
+          border-radius: 20px;
+          font-size: 11px;
+          font-weight: 600;
+          white-space: nowrap;
+          max-width: 130px;
+        }
+        .sel-chip-remove {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          width: 14px;
+          height: 14px;
+          border-radius: 50%;
+          border: none;
+          background: transparent;
+          color: #7c3aed;
+          cursor: pointer;
+          padding: 0;
+          flex-shrink: 0;
+          font-size: 13px;
+          line-height: 1;
+        }
+        .sel-chip-remove:hover {
+          background: #c4b5fd;
+        }
+        .assignee-chevron {
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          padding: 0 10px;
+          color: #9ca3af;
+          border-left: 1px solid #f3f4f6;
+          height: 100%;
+          align-self: stretch;
+          flex-shrink: 0;
+        }
+        .assignee-dropdown {
+          position: absolute;
+          top: calc(100% + 6px);
+          left: 0;
+          min-width: 100%;
+          width: max-content;
+          max-width: 320px;
+          background: #fff;
+          border: 1.5px solid #e5e7eb;
+          border-radius: 10px;
+          box-shadow: 0 8px 24px rgba(0,0,0,0.12);
+          z-index: 50;
+          overflow: hidden;
+        }
+        .dd-section-label {
+          font-size: 10px;
+          font-weight: 700;
+          text-transform: uppercase;
+          letter-spacing: 0.07em;
+          color: #9ca3af;
+          padding: 10px 12px 4px;
+        }
+        .dd-option {
+          display: flex;
+          align-items: center;
+          gap: 9px;
+          padding: 7px 12px;
+          cursor: pointer;
+          font-size: 13px;
+          font-weight: 500;
+          color: #222;
+          transition: background 0.08s;
+          border: none;
+          background: transparent;
+          width: 100%;
+          text-align: left;
+        }
+        .dd-option:hover {
+          background: #f5f3ff;
+        }
+        .dd-option.selected {
+          color: #6b21a8;
+        }
+        .dd-check {
+          width: 16px;
+          height: 16px;
+          border-radius: 4px;
+          border: 1.5px solid #d1d5db;
+          display: flex;
+          align-items: center;
+          justify-content: center;
+          flex-shrink: 0;
+          transition: background 0.1s, border-color 0.1s;
+        }
+        .dd-check.checked {
+          background: #6b1e98;
+          border-color: #6b1e98;
+        }
+        .dd-divider {
+          height: 1px;
+          background: #f3f4f6;
+          margin: 4px 0;
+        }
+        .dd-scroll {
+          max-height: 240px;
+          overflow-y: auto;
+          overscroll-behavior: contain;
+        }
       `}</style>
 
       {/* Header */}
       <div style={{ padding: '20px 24px 0', flexShrink: 0 }}>
-        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 16 }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 12 }}>
           <div>
-            <h1 style={{ fontSize: 22, fontWeight: 800, color: '#111', margin: 0 }}>My Tasks</h1>
+            <h1 style={{ fontSize: 22, fontWeight: 800, color: '#111', margin: 0 }}>{pageTitle}</h1>
             <p style={{ fontSize: 13, color: '#888', margin: '3px 0 0' }}>
-              {loading ? 'Loading…' : `${totalOpen} open · ${totalMine} total`}
+              {loading ? 'Loading…' : `${totalOpen} open · ${tasks.length} total`}
             </p>
           </div>
           <button
@@ -471,8 +775,170 @@ export default function MyTasksPage() {
           </button>
         </div>
 
+        {/* Filters row: Teams + Assignee dropdowns */}
+        {allUsers.length > 0 && (
+          <div style={{ display: 'flex', gap: 10, marginBottom: 12 }}>
+
+            {/* ── Teams dropdown ── */}
+            {teams.length > 0 && (
+              <div ref={teamsDropdownRef} style={{ position: 'relative', flex: '0 0 auto' }}>
+                <div
+                  className={`assignee-select-box${teamsDropdownOpen ? ' open' : ''}`}
+                  onClick={() => { setTeamsDropdownOpen((o) => !o); setUsersDropdownOpen(false) }}
+                  style={{ minWidth: 140 }}
+                >
+                  <div className="assignee-chips-area">
+                    {selectedTeams === 'all' ? (
+                      <span style={{ fontSize: 13, color: '#888', padding: '1px 2px' }}>All teams</span>
+                    ) : (
+                      [...(selectedTeams as Set<string>)].map((team) => (
+                        <span key={team} className="sel-chip">
+                          <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{team}</span>
+                          <button
+                            className="sel-chip-remove"
+                            onClick={(e) => { e.stopPropagation(); handleToggleTeam(team) }}
+                            title={`Remove ${team}`}
+                          >×</button>
+                        </span>
+                      ))
+                    )}
+                  </div>
+                  <div className="assignee-chevron">
+                    <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                      style={{ transform: teamsDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                    </svg>
+                  </div>
+                </div>
+                {teamsDropdownOpen && (
+                  <div className="assignee-dropdown">
+                    <div style={{ padding: '6px 0 2px' }}>
+                      <button
+                        className={`dd-option${selectedTeams === 'all' ? ' selected' : ''}`}
+                        onClick={() => { setSelectedTeams('all'); setColumnOrders({}); setTeamsDropdownOpen(false) }}
+                      >
+                        <span className={`dd-check${selectedTeams === 'all' ? ' checked' : ''}`}>
+                          {selectedTeams === 'all' && <svg width="10" height="10" fill="none" stroke="#fff" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                        </span>
+                        All teams
+                      </button>
+                    </div>
+                    <div className="dd-divider" />
+                    {teams.map((team) => {
+                      const sel = isTeamSelected(team)
+                      return (
+                        <button key={team} className={`dd-option${sel ? ' selected' : ''}`} onClick={() => handleToggleTeam(team)}>
+                          <span className={`dd-check${sel ? ' checked' : ''}`}>
+                            {sel && <svg width="10" height="10" fill="none" stroke="#fff" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                          </span>
+                          <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ color: '#9ca3af', flexShrink: 0 }}>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" />
+                          </svg>
+                          {team}
+                          <span style={{ fontSize: 11, color: '#aaa', marginLeft: 'auto' }}>
+                            {allUsers.filter((u) => u.team === team).length}
+                          </span>
+                        </button>
+                      )
+                    })}
+                    <div style={{ height: 4 }} />
+                  </div>
+                )}
+              </div>
+            )}
+
+            {/* ── Assignee dropdown ── */}
+            <div ref={usersDropdownRef} style={{ position: 'relative', flex: '1', maxWidth: 480 }}>
+              {(() => {
+                const selectedUsers = selectedUserIds === 'all'
+                  ? []
+                  : allUsers.filter((u) => (selectedUserIds as Set<string>).has(u.id))
+                return (
+                  <>
+                    <div
+                      className={`assignee-select-box${usersDropdownOpen ? ' open' : ''}`}
+                      onClick={() => { setUsersDropdownOpen((o) => !o); setTeamsDropdownOpen(false) }}
+                    >
+                      <div className="assignee-chips-area">
+                        {selectedUserIds === 'all' ? (
+                          <span style={{ fontSize: 13, color: '#888', padding: '1px 2px' }}>All assignees</span>
+                        ) : selectedUsers.length === 0 ? (
+                          <span style={{ fontSize: 13, color: '#bbb', padding: '1px 2px' }}>Select assignees…</span>
+                        ) : (
+                          selectedUsers.map((u) => (
+                            <span key={u.id} className="sel-chip">
+                              <UserAvatar name={u.display_name} avatarUrl={u.profile_image_url ?? u.avatar_url} size={14} />
+                              <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.display_name.split(' ')[0]}</span>
+                              <button
+                                className="sel-chip-remove"
+                                onClick={(e) => { e.stopPropagation(); handleToggleUser(u.id) }}
+                                title={`Remove ${u.display_name}`}
+                              >×</button>
+                            </span>
+                          ))
+                        )}
+                      </div>
+                      <div className="assignee-chevron">
+                        <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                          style={{ transform: usersDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                        </svg>
+                      </div>
+                    </div>
+                    {usersDropdownOpen && (
+                      <div className="assignee-dropdown">
+                        <div style={{ padding: '6px 0 2px' }}>
+                          <button
+                            className={`dd-option${selectedUserIds === 'all' ? ' selected' : ''}`}
+                            onClick={() => { handleSelectAllUsers(); setUsersDropdownOpen(false) }}
+                          >
+                            <span className={`dd-check${selectedUserIds === 'all' ? ' checked' : ''}`}>
+                              {selectedUserIds === 'all' && <svg width="10" height="10" fill="none" stroke="#fff" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                            </span>
+                            All assignees
+                          </button>
+                          {currentUser && (
+                            <button
+                              className={`dd-option${isMeOnly ? ' selected' : ''}`}
+                              onClick={() => { handleSelectMe(); setUsersDropdownOpen(false) }}
+                            >
+                              <span className={`dd-check${isMeOnly ? ' checked' : ''}`}>
+                                {isMeOnly && <svg width="10" height="10" fill="none" stroke="#fff" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                              </span>
+                              <UserAvatar name={currentUser.display_name} avatarUrl={currentUser.avatar_url ?? null} size={18} />
+                              Me ({currentUser.display_name})
+                            </button>
+                          )}
+                        </div>
+                        <div className="dd-divider" />
+                        <div className="dd-scroll">
+                          {allUsers.map((u) => {
+                            const sel = isUserSelected(u.id)
+                            return (
+                              <button key={u.id} className={`dd-option${sel ? ' selected' : ''}`} onClick={() => handleToggleUser(u.id)}>
+                                <span className={`dd-check${sel ? ' checked' : ''}`}>
+                                  {sel && <svg width="10" height="10" fill="none" stroke="#fff" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                                </span>
+                                <UserAvatar name={u.display_name} avatarUrl={u.profile_image_url ?? u.avatar_url} size={22} />
+                                <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.display_name}</span>
+                                {u.team && <span style={{ fontSize: 10, color: '#aaa', marginLeft: 'auto', paddingLeft: 8, flexShrink: 0 }}>{u.team}</span>}
+                              </button>
+                            )
+                          })}
+                        </div>
+                        <div style={{ height: 4 }} />
+                      </div>
+                    )}
+                  </>
+                )
+              })()}
+            </div>
+
+          </div>
+        )}
+
         {/* Quick-add input */}
-        <div style={{ marginBottom: 16 }}>
+        <div style={{ marginBottom: 12 }}>
           <QuickAddTask
             onTaskCreated={(created) => {
               setTasks(prev => [...prev, {
@@ -483,7 +949,9 @@ export default function MyTasksPage() {
                 status: created.status as TaskItem['status'],
                 due_date: created.due_date,
                 progress: created.progress ?? 0,
-                sort_order: created.sort_order ?? 0,
+                sort_order: (created as { sort_order?: number }).sort_order ?? 0,
+                assigned_to: currentUser?.id ?? null,
+                assigned_user_name: currentUser?.display_name ?? null,
                 linked_to_name: null,
                 linked_to_type: null,
                 opportunity_id: null,
@@ -603,6 +1071,8 @@ export default function MyTasksPage() {
               isDragOver={dragOverColumn === col.id}
               dragOverCard={dragOverCard}
               updatingIds={updatingIds}
+              showAssignee={!isMeOnly}
+              userPhotoMap={userPhotoMap}
               onDragStart={(e, id) => handleDragStart(e, id, col.id)}
               onDragEnd={handleDragEnd}
               onColumnDragOver={(e) => handleColumnDragOver(e, col.id)}
@@ -625,7 +1095,7 @@ export default function MyTasksPage() {
             </svg>
             <p style={{ fontSize: 15, fontWeight: 600 }}>No tasks found</p>
             <p style={{ fontSize: 13, marginTop: 4 }}>
-              {search ? 'Try a different search term' : 'You have no tasks assigned to you'}
+              {search ? 'Try a different search term' : 'No tasks assigned to the selected users'}
             </p>
           </div>
         )}
@@ -641,6 +1111,8 @@ function KanbanColumn({
   isDragOver,
   dragOverCard,
   updatingIds,
+  showAssignee,
+  userPhotoMap,
   onDragStart,
   onDragEnd,
   onColumnDragOver,
@@ -654,6 +1126,8 @@ function KanbanColumn({
   isDragOver: boolean
   dragOverCard: DragOverCard | null
   updatingIds: Set<string>
+  showAssignee: boolean
+  userPhotoMap: Record<string, string | null>
   onDragStart: (e: React.DragEvent, id: string) => void
   onDragEnd: () => void
   onColumnDragOver: (e: React.DragEvent) => void
@@ -730,6 +1204,8 @@ function KanbanColumn({
             key={task.id}
             task={task}
             isUpdating={updatingIds.has(task.id)}
+            showAssignee={showAssignee}
+            assigneePhoto={task.assigned_to ? (userPhotoMap[task.assigned_to] ?? null) : null}
             insertIndicator={
               dragOverCard?.id === task.id ? dragOverCard.half : null
             }
@@ -751,6 +1227,8 @@ function KanbanCard({
   task,
   isUpdating,
   insertIndicator,
+  showAssignee,
+  assigneePhoto,
   onDragStart,
   onDragEnd,
   onDragOver,
@@ -760,6 +1238,8 @@ function KanbanCard({
   task: TaskItem
   isUpdating: boolean
   insertIndicator: 'top' | 'bottom' | null
+  showAssignee: boolean
+  assigneePhoto: string | null
   onDragStart: (e: React.DragEvent, id: string) => void
   onDragEnd: () => void
   onDragOver: (e: React.DragEvent, cardId: string) => void
@@ -851,6 +1331,16 @@ function KanbanCard({
           </span>
         )}
       </div>
+
+      {/* Assignee badge (shown in team view) */}
+      {showAssignee && task.assigned_user_name && (
+        <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
+          <UserAvatar name={task.assigned_user_name} avatarUrl={assigneePhoto} size={16} />
+          <span style={{ fontSize: 10, color: '#888', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+            {task.assigned_user_name}
+          </span>
+        </div>
+      )}
     </div>
   )
 }

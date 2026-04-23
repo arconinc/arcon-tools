@@ -9,7 +9,7 @@ export async function GET() {
 
   const { data, error } = await createAdminClient()
     .from('users')
-    .select('id, display_name, email')
+    .select('id, display_name, email, team, avatar_url, profile_image_url')
     .order('display_name')
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

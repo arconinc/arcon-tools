@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 
 // GET /api/crm/tasks
-// ?assigned_to=me|<uuid>  ?status=  ?category=  ?due_before=  ?opportunity_id=  ?customer_id=  ?vendor_id=  ?page=1&limit=50
+// ?assigned_to=me|all|<uuid>|<uuid1>,<uuid2>  ?status=  ?category=  ?due_before=  ?opportunity_id=  ?customer_id=  ?vendor_id=  ?page=1&limit=50
 export async function GET(req: NextRequest) {
   const appUser = await requireUser()
   if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -21,14 +21,25 @@ export async function GET(req: NextRequest) {
   const from = (page - 1) * limit
   const to = from + limit - 1
 
-  // Resolve "me" to current user id
-  const resolvedAssignedTo = assignedTo === 'me' ? appUser.id : assignedTo
-
   const adminClient = createAdminClient()
 
+  // Resolve assigned_to into a list of user IDs (null = no filter / all users)
+  let assignedToIds: string[] | null = null
+  if (assignedTo && assignedTo !== 'all') {
+    if (assignedTo === 'me') {
+      assignedToIds = [appUser.id]
+    } else {
+      assignedToIds = assignedTo.split(',').map((s) => s.trim()).filter(Boolean)
+    }
+  }
+
   const applyFilters = (q: any) => {
-    if (resolvedAssignedTo) {
-      q = q.eq('assigned_to', resolvedAssignedTo)
+    if (assignedToIds) {
+      if (assignedToIds.length === 1) {
+        q = q.eq('assigned_to', assignedToIds[0])
+      } else {
+        q = q.in('assigned_to', assignedToIds)
+      }
     }
     if (status) {
       const statuses = status.split(',').map((s) => s.trim()).filter(Boolean)
