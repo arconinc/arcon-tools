@@ -4,6 +4,7 @@ import { useState, useEffect, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
 import { useAppUser } from '@/components/layout/AppShell'
 import QuickAddTask from '@/components/crm/QuickAddTask'
+import { TaskQuickEditPanel } from '@/components/crm/TaskQuickEditPanel'
 
 // ── Types ────────────────────────────────────────────────────────────────────
 
@@ -191,6 +192,9 @@ function MyTasksPage() {
   const [dragOverColumn, setDragOverColumn] = useState<Status | null>(null)
   const [dragOverCard, setDragOverCard] = useState<DragOverCard | null>(null)
   const [updatingIds, setUpdatingIds] = useState<Set<string>>(new Set())
+
+  // Context menu state for quick-edit panel
+  const [contextMenu, setContextMenu] = useState<{ taskId: string; position: { x: number; y: number } } | null>(null)
 
   // Load all users for the filter bar
   useEffect(() => {
@@ -511,6 +515,48 @@ function MyTasksPage() {
       } finally {
         setUpdatingIds((s) => { const n = new Set(s); n.delete(taskId); return n })
       }
+    }
+  }
+
+  // ── Context Menu (Right-click) ─────────────────────────────────────────────
+
+  function handleTaskContextMenu(e: React.MouseEvent, taskId: string) {
+    e.preventDefault()
+    e.stopPropagation()
+    setContextMenu({
+      taskId,
+      position: { x: e.clientX, y: e.clientY },
+    })
+  }
+
+  async function handleQuickUpdate(field: string, value: any) {
+    if (!contextMenu) return
+
+    const taskId = contextMenu.taskId
+    // Optimistically update local state
+    setTasks((prev) =>
+      prev.map((t) =>
+        t.id === taskId ? { ...t, [field]: value } : t
+      )
+    )
+
+    try {
+      const response = await fetch(`/api/crm/tasks/${taskId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ [field]: value }),
+      })
+
+      if (!response.ok) throw new Error('Failed to update task')
+
+      const updated = await response.json()
+      setTasks((prev) =>
+        prev.map((t) => (t.id === taskId ? { ...t, ...updated } : t))
+      )
+    } catch (error) {
+      console.error('Error updating task:', error)
+      // Error is handled by TaskQuickEditPanel, which reverts the field
+      throw error
     }
   }
 
@@ -1081,6 +1127,7 @@ function MyTasksPage() {
               onCardDragLeave={handleCardDragLeave}
               onDrop={(e) => handleDrop(e, col.id)}
               onCardClick={(id) => router.push(`/crm/tasks/${id}`)}
+              onCardContextMenu={handleTaskContextMenu}
             />
           ))
         )}
@@ -1100,6 +1147,22 @@ function MyTasksPage() {
           </div>
         )}
       </div>
+
+      {/* Quick-edit context menu */}
+      {contextMenu && (
+        (() => {
+          const task = tasks.find((t) => t.id === contextMenu.taskId)
+          return task ? (
+            <TaskQuickEditPanel
+              task={task}
+              position={contextMenu.position}
+              onClose={() => setContextMenu(null)}
+              onUpdate={handleQuickUpdate}
+              allUsers={allUsers}
+            />
+          ) : null
+        })()
+      )}
     </div>
   )
 }
@@ -1121,6 +1184,7 @@ function KanbanColumn({
   onCardDragLeave,
   onDrop,
   onCardClick,
+  onCardContextMenu,
 }: {
   col: { id: Status; label: string; color: string; bg: string; dotColor: string; tasks: TaskItem[] }
   isDragOver: boolean
@@ -1136,6 +1200,7 @@ function KanbanColumn({
   onCardDragLeave: (e: React.DragEvent) => void
   onDrop: (e: React.DragEvent) => void
   onCardClick: (id: string) => void
+  onCardContextMenu: (e: React.MouseEvent, taskId: string) => void
 }) {
   return (
     <div
@@ -1214,6 +1279,7 @@ function KanbanColumn({
             onDragOver={onCardDragOver}
             onDragLeave={onCardDragLeave}
             onClick={onCardClick}
+            onContextMenu={onCardContextMenu}
           />
         ))}
       </div>
@@ -1234,6 +1300,7 @@ function KanbanCard({
   onDragOver,
   onDragLeave,
   onClick,
+  onContextMenu,
 }: {
   task: TaskItem
   isUpdating: boolean
@@ -1245,6 +1312,7 @@ function KanbanCard({
   onDragOver: (e: React.DragEvent, cardId: string) => void
   onDragLeave: (e: React.DragEvent) => void
   onClick: (id: string) => void
+  onContextMenu: (e: React.MouseEvent, taskId: string) => void
 }) {
   const [isDragging, setIsDragging] = useState(false)
   const overdue = isOverdue(task.due_date, task.status)
@@ -1265,6 +1333,7 @@ function KanbanCard({
       onDragOver={(e) => onDragOver(e, task.id)}
       onDragLeave={onDragLeave}
       onClick={() => onClick(task.id)}
+      onContextMenu={(e) => onContextMenu(e, task.id)}
       className={`kanban-card${isDragging ? ' dragging' : ''}${isUpdating ? ' updating' : ''}${insertClass}`}
     >
       {/* Title row */}

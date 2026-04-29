@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import Link from 'next/link'
 import { StoreDetail } from '@/types'
 
 // ── Multi-select chip ─────────────────────────────────────────────────────────
@@ -211,6 +212,29 @@ export function OverviewTab({ store, onSaved }: { store: StoreDetail; onSaved: (
         <label className="block text-xs font-medium text-slate-500 mb-2">Mandatory Fields in Notes</label>
         <TagEditor value={form.mandatory_notes} onChange={v => set('mandatory_notes', v)} />
       </div>
+
+      {/* Linked Contacts */}
+      {store.contacts.length > 0 && (
+        <div className="pt-2 border-t border-slate-100">
+          <div className="flex items-center justify-between mb-3">
+            <label className="block text-xs font-medium text-slate-500">Linked Contacts</label>
+            <Link href="#crm" className="text-xs text-purple-600 hover:text-purple-700 font-medium">Manage</Link>
+          </div>
+          <div className="space-y-2">
+            {store.contacts.map(contact => (
+              <div key={contact.id} className="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200 rounded-xl">
+                <div className="w-8 h-8 rounded-full bg-slate-200 flex items-center justify-center text-slate-700 font-semibold text-sm shrink-0">
+                  {contact.first_name[0]}
+                </div>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-slate-800">{contact.first_name} {contact.last_name}</p>
+                  {contact.email && <p className="text-xs text-slate-400 truncate">{contact.email}</p>}
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
 
       {/* Save */}
       <div className="flex items-center gap-3 pt-2 border-t border-slate-100">
