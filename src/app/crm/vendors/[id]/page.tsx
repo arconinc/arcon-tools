@@ -759,6 +759,9 @@ export default function VendorDetailPage() {
                           <div className="flex items-start gap-2">
                             <div className="flex-1 min-w-0">
                               <p className="text-xs font-semibold text-slate-700 leading-snug">{form.name}</p>
+                              {form.description && (
+                                <p className="text-xs text-slate-400 mt-0.5">{form.description}</p>
+                              )}
                               {i === 0 && recommended.length > 1 && (
                                 <p className="text-xs text-purple-600 mt-0.5">Preferred</p>
                               )}

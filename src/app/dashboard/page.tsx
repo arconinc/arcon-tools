@@ -582,14 +582,19 @@ export default function DashboardPage() {
                           href={form.file_url}
                           target="_blank"
                           rel="noopener noreferrer"
-                          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', textDecoration: 'none', color: '#374151', fontSize: 12 }}
+                          style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '4px 0', textDecoration: 'none', color: '#374151' }}
                           className="form-dash-row"
                         >
-                          <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ flexShrink: 0, color: '#9ca3af' }}>
+                          <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ flexShrink: 0, color: '#9ca3af', marginTop: 1 }}>
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
                           </svg>
-                          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{form.name}</span>
-                          <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ flexShrink: 0, opacity: 0.3 }}>
+                          <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{form.name}</div>
+                            {form.description && (
+                              <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 1 }}>{form.description}</div>
+                            )}
+                          </div>
+                          <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ flexShrink: 0, opacity: 0.3, marginTop: 2 }}>
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
                           </svg>
                         </a>

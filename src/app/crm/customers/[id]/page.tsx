@@ -1277,18 +1277,22 @@ export default function CustomerDetailPage() {
                     {taxState && (() => {
                       const stateForms = getCustomerFormsByState(taxState, taxForms)
                       if (stateForms.length > 0) return (
-                        <div className="space-y-1.5">
+                        <div className="space-y-2">
                           {stateForms.map(form => (
-                            <a
-                              key={form.id}
-                              href={form.file_url}
-                              target="_blank"
-                              rel="noopener noreferrer"
-                              onClick={() => logFormDelivery(form.id)}
-                              className="flex items-center gap-1.5 text-xs font-semibold text-purple-700 hover:text-purple-900"
-                            >
-                              {taxLogging === form.id ? 'Opening…' : `↓ ${form.name}`}
-                            </a>
+                            <div key={form.id}>
+                              {form.description && (
+                                <p className="text-xs text-slate-400 mb-0.5">{form.description}</p>
+                              )}
+                              <a
+                                href={form.file_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                onClick={() => logFormDelivery(form.id)}
+                                className="flex items-center gap-1.5 text-xs font-semibold text-purple-700 hover:text-purple-900"
+                              >
+                                {taxLogging === form.id ? 'Opening…' : `↓ ${form.name}`}
+                              </a>
+                            </div>
                           ))}
                         </div>
                       )
