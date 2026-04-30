@@ -4,7 +4,8 @@ import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useAppUser } from '@/components/layout/AppShell'
 import { NewsFeed } from '@/components/news/NewsFeed'
-import { BannerSlide, BannerStripItem, BirthdayEvent } from '@/types'
+import { BannerSlide, BannerStripItem, BirthdayEvent, CrmForm } from '@/types'
+import { US_STATES } from '@/lib/forms-utils'
 
 
 const QUICK_LINKS = [
@@ -68,6 +69,9 @@ export default function DashboardPage() {
   const [myTasks, setMyTasks] = useState<CrmTask[]>([])
   const [tasksLoading, setTasksLoading] = useState(true)
   const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null)
+  const [forms, setForms] = useState<CrmForm[]>([])
+  const [formsSearch, setFormsSearch] = useState('')
+  const [formsState, setFormsState] = useState('')
 
   useEffect(() => {
     fetch('/api/banner-strip')
@@ -112,6 +116,13 @@ export default function DashboardPage() {
           setBdayCount(d.birthdays_this_week ?? 0)
         }
       })
+      .catch(() => {})
+  }, [])
+
+  useEffect(() => {
+    fetch('/api/forms')
+      .then((r) => r.json())
+      .then((data) => { if (Array.isArray(data?.forms)) setForms(data.forms) })
       .catch(() => {})
   }, [])
 
@@ -256,6 +267,9 @@ export default function DashboardPage() {
         .quick-link:hover { border-color: #6b1e98; box-shadow: 0 0 0 3px #f3e8ff; }
         .ql-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin: 0 auto 7px; font-size: 17px; }
         .ql-label { font-size: 11px; font-weight: 600; color: #555; }
+
+        /* ── Forms (dashboard) ── */
+        .form-dash-row:hover { color: #6b1e98 !important; }
 
         /* ── Responsive layout ── */
         .dash-content { padding: 22px 28px 28px; }
@@ -443,6 +457,9 @@ export default function DashboardPage() {
         {/* Two-column section */}
         <div className="two-col">
 
+          {/* Left column: My Tasks + Forms */}
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
+
           {/* My Tasks */}
           <div className="card">
             <div className="card-header">
@@ -512,6 +529,80 @@ export default function DashboardPage() {
             </div>
           </div>
 
+          {/* Forms */}
+          {forms.length > 0 && (() => {
+            const CATEGORY_LABELS: Record<string, string> = { vendor: 'Vendor', customer: 'Customer', general: 'General' }
+            const allStates = [...new Set(forms.flatMap(f => f.states_covered))].sort()
+            const searchLower = formsSearch.toLowerCase()
+            const filtered = forms.filter(f => {
+              const matchesSearch = !formsSearch || f.name.toLowerCase().includes(searchLower)
+              const matchesState = !formsState || f.states_covered.length === 0 || f.states_covered.includes(formsState)
+              return matchesSearch && matchesState
+            })
+            const grouped = ['vendor', 'customer', 'general'].map(cat => ({
+              cat, label: CATEGORY_LABELS[cat],
+              items: filtered.filter(f => f.category === cat),
+            })).filter(g => g.items.length > 0)
+            return (
+              <div className="card">
+                <div className="card-header" style={{ padding: '9px 14px' }}>
+                  <div className="card-title" style={{ fontSize: 12 }}>Forms</div>
+                  {user?.is_admin && (
+                    <Link href="/admin/forms" className="card-action" style={{ textDecoration: 'none', fontSize: 11 }}>Manage →</Link>
+                  )}
+                </div>
+                <div style={{ padding: '6px 14px 4px', display: 'flex', gap: 6, borderBottom: '1px solid #f3f4f6' }}>
+                  <input
+                    type="text"
+                    placeholder="Search…"
+                    value={formsSearch}
+                    onChange={e => setFormsSearch(e.target.value)}
+                    style={{ flex: 1, fontSize: 11, padding: '3px 7px', border: '1px solid #e5e7eb', borderRadius: 5, outline: 'none', minWidth: 0 }}
+                  />
+                  {allStates.length > 0 && (
+                    <select
+                      value={formsState}
+                      onChange={e => setFormsState(e.target.value)}
+                      style={{ fontSize: 11, padding: '3px 5px', border: '1px solid #e5e7eb', borderRadius: 5, outline: 'none', color: formsState ? '#111' : '#9ca3af', maxWidth: 120 }}
+                    >
+                      <option value="">All states</option>
+                      {allStates.map(s => <option key={s} value={s}>{US_STATES[s] ?? s}</option>)}
+                    </select>
+                  )}
+                </div>
+                <div className="card-body" style={{ padding: '8px 14px' }}>
+                  {grouped.length === 0 ? (
+                    <div style={{ fontSize: 11, color: '#bbb' }}>No forms match.</div>
+                  ) : grouped.map(({ cat, label, items }) => (
+                    <div key={cat} style={{ marginBottom: 8 }}>
+                      <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#bbb', marginBottom: 3 }}>{label}</div>
+                      {items.map(form => (
+                        <a
+                          key={form.id}
+                          href={form.file_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          style={{ display: 'flex', alignItems: 'center', gap: 6, padding: '3px 0', textDecoration: 'none', color: '#374151', fontSize: 12 }}
+                          className="form-dash-row"
+                        >
+                          <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ flexShrink: 0, color: '#9ca3af' }}>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                          </svg>
+                          <span style={{ flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{form.name}</span>
+                          <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ flexShrink: 0, opacity: 0.3 }}>
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                        </a>
+                      ))}
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )
+          })()}
+
+          </div>{/* end left column */}
+
           {/* Birthdays & Anniversaries */}
           <div className="card">
             <div className="card-header">
@@ -553,6 +644,7 @@ export default function DashboardPage() {
           </div>
 
         </div>
+
       </div>
     </>
   )

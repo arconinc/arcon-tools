@@ -783,6 +783,46 @@ export interface CrmTaskDetail extends CrmTask {
   assigned_user: { id: string; display_name: string; email: string } | null
 }
 
+// ─── Forms ────────────────────────────────────────────────────────────────────
+
+export type FormCategory = 'vendor' | 'customer' | 'general'
+export type DeliveryMethod = 'download' | 'email' | 'link' | 'in-person'
+
+export interface CrmForm {
+  id: string
+  name: string
+  category: FormCategory
+  file_url: string
+  file_size_bytes: number | null
+  mime_type: string
+  description: string | null
+  states_covered: string[]
+  is_active: boolean
+  version: number
+  created_by: string
+  created_at: string
+  updated_at: string
+  public_token: string | null
+  public_token_active: boolean
+}
+
+export interface FormDeliveryLog {
+  id: string
+  form_id: string
+  vendor_id: string | null
+  customer_id: string | null
+  sent_by_user_id: string
+  delivery_method: DeliveryMethod
+  sent_at: string
+  notes: string | null
+}
+
+export interface FormWithDeliveryHistory extends CrmForm {
+  delivery_count: number
+  last_delivered_at: string | null
+  last_delivered_by: { id: string; display_name: string } | null
+}
+
 // ─── Release Notes ─────────────────────────────────────────────────────────────
 
 export type ReleaseChangeCategory = 'feature' | 'improvement' | 'bug_fix' | 'breaking_change'

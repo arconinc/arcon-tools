@@ -18,6 +18,14 @@ npm run build    # production build
 npm run lint     # ESLint
 ```
 
+## Principles
+
+- **Don't assume. Don't hide confusion. Surface tradeoffs.** — Ask clarifying questions upfront rather than inferring intent. Explicitly discuss trade-offs between approaches instead of choosing silently.
+- **Minimum code that solves the problem. Nothing speculative.** — Only implement what's needed for the current requirement. Don't add infrastructure or patterns for hypothetical future use.
+- **Touch only what you must.** — Avoid refactoring or cleaning code outside the scope of your current task. Limit changes to files directly related to the requirement.
+- **Clean up only your own mess.** — You are responsible for the quality of code you write, not for fixing unrelated technical debt.
+- **Define success criteria.** — Be explicit about what "done" means before starting. How will you know the change is working? What should be tested?
+
 ## Project Structure
 ```
 src/

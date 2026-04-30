@@ -123,6 +123,7 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
         { href: '/admin/countdown', label: 'Countdown', icon: CountdownIcon, adminMatch: true },
         { href: '/admin/news', label: 'News', icon: MegaphoneIcon, adminMatch: true },
         { href: '/admin/documents', label: 'Documents', icon: DocumentIcon, adminMatch: true },
+        { href: '/admin/forms', label: 'Forms', icon: DocumentIcon, adminMatch: true },
         { href: '/admin/crm-goals', label: 'Sales Goals', icon: GoalIcon, adminMatch: true },
         { href: '/admin/crm-tags', label: 'CRM Tags', icon: TagIcon, adminMatch: true },
         { href: '/admin/crm-import', label: 'CRM Import', icon: UploadIcon, adminMatch: true },

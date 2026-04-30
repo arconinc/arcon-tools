@@ -6,6 +6,8 @@ import Link from 'next/link'
 import TagPicker from '@/components/crm/TagPicker'
 import { formatPhoneInput } from '@/lib/phone'
 import { useFormValidation, inputCls, selectCls, FieldError } from '@/lib/form-validation'
+import { CrmForm } from '@/types'
+import { getCustomerFormsByState, getGeneralForms, US_STATES } from '@/lib/forms-utils'
 
 type DropdownUser = { id: string; display_name: string; email: string }
 type TagOption = { id: string; name: string; color: string }
@@ -200,6 +202,14 @@ export default function CustomerDetailPage() {
   const [brandError, setBrandError] = useState<string | null>(null)
   const [brandShowFull, setBrandShowFull] = useState(false)
 
+  const [taxForms, setTaxForms] = useState<CrmForm[]>([])
+  const [taxState, setTaxState] = useState('')
+  const [taxLogging, setTaxLogging] = useState<string | null>(null)
+
+  useEffect(() => {
+    fetch('/api/admin/forms').then(r => r.json()).then(d => setTaxForms(d.forms ?? [])).catch(() => {})
+  }, [])
+
   // Artwork tab state
   type ArtworkItem = {
     id: string; customer_id: string; name: string; description: string | null
@@ -391,6 +401,20 @@ export default function CustomerDetailPage() {
     } finally { setTagSaving(false) }
   }
 
+  async function logFormDelivery(formId: string) {
+    if (!customer?.id) return
+    setTaxLogging(formId)
+    try {
+      await fetch(`/api/admin/forms/${formId}/delivery-log`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ customer_id: customer.id, delivery_method: 'download' }),
+      })
+    } finally {
+      setTaxLogging(null)
+    }
+  }
+
   const [createForm, setCreateForm] = useState<CreateForm>({
     name: '', client_status: '', assigned_to: '', phone: '', website: '', linkedin: '', email_domains: '', description: '', commissioned_client: '', tax_exempt: '',
     billing_address1: '', billing_city: '', billing_state: '', billing_zip: '',
@@ -407,6 +431,7 @@ export default function CustomerDetailPage() {
       .then((data) => {
         if (data.error) { setError(data.error); return }
         setCustomer(data)
+        if (data.billing_state && !taxState) setTaxState(data.billing_state)
       })
       .catch(() => setError('Failed to load customer'))
       .finally(() => setLoading(false))
@@ -1189,6 +1214,88 @@ export default function CustomerDetailPage() {
                 {aturianError && (
                   <div className="mt-2 p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 leading-relaxed">
                     {aturianError}
+                  </div>
+                )}
+              </div>
+            </div>
+
+            {/* Tax Documentation card */}
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+              <div className="px-4 py-3 border-b border-slate-100 bg-slate-50 flex items-center gap-2">
+                <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                </svg>
+                <h2 className="text-sm font-semibold text-slate-700">Tax Documentation</h2>
+              </div>
+              <div className="p-4 space-y-3">
+                {/* Tax exempt status */}
+                <div className="flex items-center gap-2">
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${customer.tax_exempt ? 'bg-green-100 text-green-700' : 'bg-slate-100 text-slate-500'}`}>
+                    {customer.tax_exempt ? 'Tax Exempt' : 'Not Tax Exempt'}
+                  </span>
+                </div>
+
+                {/* W9 */}
+                {(() => {
+                  const w9Forms = getGeneralForms(taxForms)
+                  if (w9Forms.length === 0) return null
+                  return (
+                    <div>
+                      <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Our W9</p>
+                      <div className="space-y-1.5">
+                        {w9Forms.map(form => (
+                          <a
+                            key={form.id}
+                            href={form.file_url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            onClick={() => logFormDelivery(form.id)}
+                            className="flex items-center gap-1.5 text-xs font-semibold text-purple-700 hover:text-purple-900"
+                          >
+                            {taxLogging === form.id ? 'Opening…' : `↓ ${form.name}`}
+                          </a>
+                        ))}
+                      </div>
+                    </div>
+                  )
+                })()}
+
+                {/* Customer exemption forms */}
+                {customer.tax_exempt && (
+                  <div>
+                    <p className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Exemption Forms</p>
+                    <select
+                      value={taxState}
+                      onChange={e => setTaxState(e.target.value)}
+                      className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white mb-2"
+                    >
+                      <option value="">Select a state…</option>
+                      {Object.entries(US_STATES).map(([abbr, name]) => (
+                        <option key={abbr} value={abbr}>{name}</option>
+                      ))}
+                    </select>
+                    {taxState && (() => {
+                      const stateForms = getCustomerFormsByState(taxState, taxForms)
+                      if (stateForms.length > 0) return (
+                        <div className="space-y-1.5">
+                          {stateForms.map(form => (
+                            <a
+                              key={form.id}
+                              href={form.file_url}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              onClick={() => logFormDelivery(form.id)}
+                              className="flex items-center gap-1.5 text-xs font-semibold text-purple-700 hover:text-purple-900"
+                            >
+                              {taxLogging === form.id ? 'Opening…' : `↓ ${form.name}`}
+                            </a>
+                          ))}
+                        </div>
+                      )
+                      return (
+                        <p className="text-xs text-slate-400 italic">No exemption form for {US_STATES[taxState] ?? taxState}. Contact Amy for guidance.</p>
+                      )
+                    })()}
                   </div>
                 )}
               </div>
