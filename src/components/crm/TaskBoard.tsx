@@ -295,11 +295,15 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
   async function handleQuickUpdate(field: string, value: unknown) {
     if (!contextMenu) return
     const taskId = contextMenu.taskId
-    setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, [field]: value } : t))
+    const patch = field === 'assignment' && value && typeof value === 'object'
+      ? value as { department: string | null; category: string | null }
+      : { [field]: value }
+
+    setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, ...patch } : t))
     const response = await fetch(`/api/crm/tasks/${taskId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ [field]: value }),
+      body: JSON.stringify(patch),
     })
     if (!response.ok) throw new Error('Failed to update task')
     const updated = await response.json()
@@ -596,13 +600,13 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
               setTasks((prev) => [...prev, {
                 id: created.id,
                 title: created.title,
-                department: (created as any).department ?? null,
+                department: created.department ?? null,
                 category: created.category,
                 priority: created.priority as KanbanTask['priority'],
                 status: created.status as KanbanTask['status'],
                 due_date: created.due_date,
                 progress: created.progress ?? 0,
-                sort_order: (created as any).sort_order ?? 0,
+                sort_order: created.sort_order ?? 0,
                 assigned_to: currentUser?.id ?? null,
                 assigned_user_name: currentUser?.display_name ?? null,
                 linked_to_name: null,
@@ -644,6 +648,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
           page={page}
           search={search}
           onPageChange={setPage}
+          onRowContextMenu={handleTaskContextMenu}
         />
       )}
 

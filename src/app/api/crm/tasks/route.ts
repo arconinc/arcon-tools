@@ -1,6 +1,35 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
+import { DEPARTMENTS, DEPARTMENT_CATEGORIES, getDepartmentForTaskCategory } from '@/lib/task-constants'
+import type { CrmTaskDepartment } from '@/types'
+
+function quotePostgrestValue(value: string) {
+  return `"${value.replace(/"/g, '\\"')}"`
+}
+
+function normalizeTaskAssignment(task: Record<string, unknown>) {
+  const normalized = { ...task }
+
+  if (
+    typeof normalized.department === 'string' &&
+    normalized.department &&
+    !(DEPARTMENTS as string[]).includes(normalized.department)
+  ) {
+    return { error: 'Invalid department' }
+  }
+
+  if (typeof normalized.category === 'string' && normalized.category) {
+    const categoryDepartment = getDepartmentForTaskCategory(normalized.category)
+    if (!categoryDepartment) return { error: 'Invalid category' }
+    if (normalized.department && normalized.department !== categoryDepartment) {
+      return { error: 'Category does not belong to selected department' }
+    }
+    normalized.department = categoryDepartment
+  }
+
+  return { task: normalized }
+}
 
 // GET /api/crm/tasks
 // ?assigned_to=me|all|<uuid>|<uuid1>,<uuid2>  ?status=  ?category=  ?department=  ?delegated_by_me=true  ?due_before=  ?opportunity_id=  ?customer_id=  ?vendor_id=  ?page=1&limit=50
@@ -54,7 +83,16 @@ export async function GET(req: NextRequest) {
         q = q.in('assigned_to', assignedToIds)
       }
     }
-    if (department) q = q.eq('department', department)
+    if (category) {
+      q = q.eq('category', category)
+    } else if (department) {
+      const departmentCategories = DEPARTMENT_CATEGORIES[department as CrmTaskDepartment] ?? []
+      if (departmentCategories.length > 0) {
+        q = q.or(`department.eq.${quotePostgrestValue(department)},category.in.(${departmentCategories.map(quotePostgrestValue).join(',')})`)
+      } else {
+        q = q.eq('department', department)
+      }
+    }
     if (status) {
       const statuses = status.split(',').map((s) => s.trim()).filter(Boolean)
       if (statuses.length === 1) {
@@ -63,7 +101,6 @@ export async function GET(req: NextRequest) {
         q = q.in('status', statuses)
       }
     }
-    if (category) q = q.eq('category', category)
     if (dueBefore) q = q.lte('due_date', dueBefore)
     if (opportunityId) q = q.eq('opportunity_id', opportunityId)
     if (customerId) q = q.eq('customer_id', customerId)
@@ -160,18 +197,21 @@ export async function POST(req: NextRequest) {
 
   const { id: _id, created_at: _ca, updated_at: _ua, created_by: _cb, ...safeRest } = rest
 
+  const normalized = normalizeTaskAssignment(safeRest)
+  if ('error' in normalized) return NextResponse.json({ error: normalized.error }, { status: 400 })
+
   const adminClient = createAdminClient()
   const { data, error } = await adminClient
     .from('crm_tasks')
     .insert({
       title: title.trim(),
-      ...safeRest,
+      ...normalized.task,
       created_by: appUser.id,
-      task_owner: safeRest.task_owner ?? appUser.id,
-      assigned_to: safeRest.assigned_to ?? appUser.id,
-      status: safeRest.status ?? 'not_started',
-      priority: safeRest.priority ?? 'medium',
-      progress: safeRest.progress ?? 0,
+      task_owner: normalized.task.task_owner ?? appUser.id,
+      assigned_to: normalized.task.assigned_to ?? appUser.id,
+      status: normalized.task.status ?? 'not_started',
+      priority: normalized.task.priority ?? 'medium',
+      progress: normalized.task.progress ?? 0,
     })
     .select()
     .single()

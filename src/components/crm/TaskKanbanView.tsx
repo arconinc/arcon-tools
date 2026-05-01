@@ -200,9 +200,9 @@ function KanbanCard({
         </div>
       )}
 
-      {/* Department badge (if present and not in department-specific view) */}
-      {task.department && (
-        <div style={{ marginBottom: 5 }}>
+      {/* Meta row */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center' }}>
+        {task.department && (
           <span style={{
             fontSize: 9, fontWeight: 700,
             background: '#f3e8ff', color: '#7c3aed',
@@ -211,11 +211,8 @@ function KanbanCard({
           }}>
             {task.department}
           </span>
-        </div>
-      )}
+        )}
 
-      {/* Meta row */}
-      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center' }}>
         {task.category && (
           <span style={{
             fontSize: 10, fontWeight: 600,
@@ -242,7 +239,20 @@ function KanbanCard({
             {task.linked_to_type.slice(0, 3).toUpperCase()} · {task.linked_to_name}
           </span>
         )}
+      </div>
 
+      {/* Footer row: assignee, due date, assign-to-me */}
+      <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0, flex: 1 }}>
+          {showAssignee && task.assigned_user_name && (
+            <>
+              <UserAvatar name={task.assigned_user_name} avatarUrl={assigneePhoto} size={16} />
+              <span style={{ fontSize: 10, color: '#888', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
+                {task.assigned_user_name}
+              </span>
+            </>
+          )}
+        </div>
         {dateStr && (
           <span style={{
             fontSize: 10, fontWeight: 600,
@@ -251,26 +261,15 @@ function KanbanCard({
             padding: '2px 7px', borderRadius: 5,
             display: 'flex', alignItems: 'center', gap: 3,
             marginLeft: 'auto',
+            whiteSpace: 'nowrap',
           }}>
             {overdue && (
-              <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg width="10" height="10" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
               </svg>
             )}
             {dateStr}
           </span>
-        )}
-      </div>
-
-      {/* Footer row: assignee badge + assign-to-me */}
-      <div style={{ marginTop: 8, display: 'flex', alignItems: 'center', gap: 5 }}>
-        {showAssignee && task.assigned_user_name && (
-          <>
-            <UserAvatar name={task.assigned_user_name} avatarUrl={assigneePhoto} size={16} />
-            <span style={{ fontSize: 10, color: '#888', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
-              {task.assigned_user_name}
-            </span>
-          </>
         )}
         {!task.assigned_to && showAssignToMe && onAssignToMe && (
           <button
@@ -279,7 +278,7 @@ function KanbanCard({
               fontSize: 10, fontWeight: 600, color: '#7c3aed',
               background: '#f3e8ff', border: 'none', borderRadius: 4,
               padding: '2px 6px', cursor: 'pointer',
-              marginLeft: 'auto', whiteSpace: 'nowrap',
+              marginLeft: dateStr ? 0 : 'auto', whiteSpace: 'nowrap',
             }}
             onMouseEnter={e => { e.currentTarget.style.background = '#e9d5ff' }}
             onMouseLeave={e => { e.currentTarget.style.background = '#f3e8ff' }}

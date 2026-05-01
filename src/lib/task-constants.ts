@@ -80,3 +80,44 @@ export const ALL_CATEGORIES: CrmTaskCategory[] = [
   ...DEPARTMENT_CATEGORIES.Sales,
   ...DEPARTMENT_CATEGORIES.General,
 ]
+
+export function getTaskCategoryLabel(category: string) {
+  return category
+    .replace(/^Store\/Ecommerce\s+/, '')
+    .replace(/^Warehouse\s+/, '')
+}
+
+export function getDepartmentForTaskCategory(category: string | null | undefined): CrmTaskDepartment | null {
+  if (!category) return null
+
+  for (const department of DEPARTMENTS) {
+    if ((DEPARTMENT_CATEGORIES[department] as string[]).includes(category)) {
+      return department
+    }
+  }
+
+  return null
+}
+
+export function encodeTaskAssignmentValue(department: string | null | undefined, category: string | null | undefined) {
+  if (category) return `category:${category}`
+  if (department) return `department:${department}`
+  return ''
+}
+
+export function parseTaskAssignmentValue(value: string): { department: CrmTaskDepartment | null; category: CrmTaskCategory | null } {
+  if (!value) return { department: null, category: null }
+
+  if (value.startsWith('department:')) {
+    const department = value.slice('department:'.length) as CrmTaskDepartment
+    return DEPARTMENTS.includes(department) ? { department, category: null } : { department: null, category: null }
+  }
+
+  if (value.startsWith('category:')) {
+    const category = value.slice('category:'.length) as CrmTaskCategory
+    const department = getDepartmentForTaskCategory(category)
+    return department ? { department, category } : { department: null, category: null }
+  }
+
+  return { department: null, category: null }
+}

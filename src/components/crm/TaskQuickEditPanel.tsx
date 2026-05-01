@@ -1,7 +1,13 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import { DEPARTMENTS, DEPARTMENT_CATEGORIES } from '@/lib/task-constants'
+import {
+  DEPARTMENTS,
+  DEPARTMENT_CATEGORIES,
+  encodeTaskAssignmentValue,
+  getTaskCategoryLabel,
+  parseTaskAssignmentValue,
+} from '@/lib/task-constants'
 import type { CrmTaskDepartment } from '@/types'
 
 export type Priority = 'low' | 'medium' | 'high'
@@ -26,7 +32,7 @@ type UserOption = {
   profile_image_url: string | null
 }
 
-type MenuField = 'assignee' | 'department' | 'category' | 'priority' | 'due_date'
+type MenuField = 'assignee' | 'assignment' | 'priority' | 'due_date'
 
 interface TaskQuickEditPanelProps {
   task: TaskItem
@@ -40,8 +46,14 @@ export function TaskQuickEditPanel({ task, position, onClose, onUpdate, allUsers
   const [selectedField, setSelectedField] = useState<MenuField | null>(null)
   const [loading, setLoading] = useState<string | null>(null)
   const [assigneeSearch, setAssigneeSearch] = useState('')
-  const [categorySearch, setCategorySearch] = useState('')
-  const [localDept, setLocalDept] = useState<CrmTaskDepartment | ''>(task.department as CrmTaskDepartment | '' ?? '')
+  const [assignmentSearch, setAssignmentSearch] = useState('')
+  const [localAssignment, setLocalAssignment] = useState<{
+    department: CrmTaskDepartment | null
+    category: string | null
+  }>({
+    department: (task.department as CrmTaskDepartment | null) ?? null,
+    category: task.category,
+  })
   const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -57,6 +69,13 @@ export function TaskQuickEditPanel({ task, position, onClose, onUpdate, allUsers
     }
   }, [onClose])
 
+  useEffect(() => {
+    setLocalAssignment({
+      department: (task.department as CrmTaskDepartment | null) ?? null,
+      category: task.category,
+    })
+  }, [task.id, task.department, task.category])
+
   const handleFieldChange = async (field: string, value: unknown) => {
     setLoading(field)
     try {
@@ -69,27 +88,31 @@ export function TaskQuickEditPanel({ task, position, onClose, onUpdate, allUsers
     }
   }
 
-  // When department changes in the panel, update local state and save
-  const handleDeptChange = async (dept: CrmTaskDepartment | '') => {
-    setLocalDept(dept)
-    await handleFieldChange('department', dept || null)
+  const handleAssignmentChange = async (value: string) => {
+    const assignment = parseTaskAssignmentValue(value)
+    setLocalAssignment(assignment)
+    await handleFieldChange('assignment', assignment)
   }
 
-  const activeDept = localDept || (task.department as CrmTaskDepartment | null) || ''
-  const availableCategories = activeDept
-    ? DEPARTMENT_CATEGORIES[activeDept as CrmTaskDepartment] ?? []
-    : Object.values(DEPARTMENT_CATEGORIES).flat()
+  const activeAssignmentValue = encodeTaskAssignmentValue(localAssignment.department, localAssignment.category)
+  const assignmentQuery = assignmentSearch.trim().toLowerCase()
 
   const filteredUsers = assigneeSearch.trim()
     ? allUsers.filter((u) => u.display_name.toLowerCase().includes(assigneeSearch.toLowerCase()))
     : allUsers
 
-  const filteredCategories = categorySearch.trim()
-    ? availableCategories.filter((c) => c.toLowerCase().includes(categorySearch.toLowerCase()))
-    : availableCategories
+  const filteredDepartments = DEPARTMENTS.map((department) => {
+    const categories = DEPARTMENT_CATEGORIES[department].filter((category) =>
+      !assignmentQuery ||
+      category.toLowerCase().includes(assignmentQuery) ||
+      getTaskCategoryLabel(category).toLowerCase().includes(assignmentQuery)
+    )
+    const departmentMatches = !assignmentQuery || department.toLowerCase().includes(assignmentQuery)
+    return { department, categories: departmentMatches ? DEPARTMENT_CATEGORIES[department] : categories, departmentMatches }
+  }).filter(({ categories, departmentMatches }) => departmentMatches || categories.length > 0)
 
   // Adjust position to stay within viewport
-  let adjustedPosition = { ...position }
+  const adjustedPosition = { ...position }
   if (typeof window !== 'undefined') {
     const panelWidth = 420
     const padding = 10
@@ -100,8 +123,8 @@ export function TaskQuickEditPanel({ task, position, onClose, onUpdate, allUsers
 
   const menuItems: Array<{ id: MenuField; label: string }> = [
     { id: 'assignee', label: 'Assign to' },
-    { id: 'department', label: 'Department' },
-    { id: 'category', label: 'Category' },
+    { id: 'assignment', label: '' +
+            'Category' },
     { id: 'priority', label: 'Priority' },
     { id: 'due_date', label: 'Due Date' },
   ]
@@ -170,53 +193,45 @@ export function TaskQuickEditPanel({ task, position, onClose, onUpdate, allUsers
             </div>
           )}
 
-          {selectedField === 'department' && (
+          {selectedField === 'assignment' && (
             <div>
-              <button
-                onClick={() => handleDeptChange('')}
-                style={{ width: '100%', padding: '8px 12px', fontSize: 12, border: 'none', background: !activeDept ? '#f5f3ff' : 'transparent', textAlign: 'left', cursor: 'pointer', color: !activeDept ? '#6b1e98' : '#222', fontWeight: !activeDept ? 600 : 400 }}>
-                None
-              </button>
-              {DEPARTMENTS.map((d) => (
-                <button key={d} onClick={() => handleDeptChange(d)}
-                  style={{ width: '100%', padding: '8px 12px', fontSize: 12, border: 'none', background: activeDept === d ? '#f5f3ff' : 'transparent', textAlign: 'left', cursor: 'pointer', color: activeDept === d ? '#6b1e98' : '#222', fontWeight: activeDept === d ? 600 : 400 }}
-                  onMouseEnter={(e) => { if (activeDept !== d) (e.currentTarget as HTMLButtonElement).style.background = '#f5f3ff' }}
-                  onMouseLeave={(e) => { if (activeDept !== d) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}>
-                  {d}
-                  {DEPARTMENT_CATEGORIES[d].length > 0 && (
-                    <span style={{ fontSize: 10, color: '#aaa', marginLeft: 6 }}>{DEPARTMENT_CATEGORIES[d].length} cats</span>
-                  )}
-                </button>
-              ))}
-            </div>
-          )}
-
-          {selectedField === 'category' && (
-            <div>
-              {activeDept && (
-                <div style={{ padding: '6px 12px 4px', fontSize: 10, fontWeight: 700, color: '#9ca3af', textTransform: 'uppercase', letterSpacing: '0.06em' }}>
-                  {activeDept}
-                </div>
-              )}
               <div style={{ padding: '8px 12px', borderBottom: '1px solid #e5e7eb' }}>
-                <input type="text" value={categorySearch} onChange={(e) => setCategorySearch(e.target.value)}
+                <input type="text" value={assignmentSearch} onChange={(e) => setAssignmentSearch(e.target.value)}
                   placeholder="Search…" autoFocus
                   style={{ width: '100%', padding: '6px 8px', fontSize: 12, border: '1px solid #d1d5db', borderRadius: 4, outline: 'none' }} />
               </div>
-              <button onClick={() => handleFieldChange('category', null)}
-                style={{ width: '100%', padding: '8px 12px', fontSize: 12, border: 'none', background: !task.category ? '#f5f3ff' : 'transparent', textAlign: 'left', cursor: 'pointer', color: '#999' }}>
+              <button onClick={() => handleAssignmentChange('')}
+                disabled={loading === 'assignment'}
+                style={{ width: '100%', padding: '8px 12px', fontSize: 12, border: 'none', background: !activeAssignmentValue ? '#f5f3ff' : 'transparent', textAlign: 'left', cursor: 'pointer', color: !activeAssignmentValue ? '#6b1e98' : '#999', fontWeight: !activeAssignmentValue ? 600 : 400 }}>
                 None
               </button>
-              {filteredCategories.map((cat) => (
-                <button key={cat} onClick={() => handleFieldChange('category', cat)}
-                  style={{ width: '100%', padding: '8px 12px', fontSize: 12, border: 'none', background: 'transparent', textAlign: 'left', cursor: 'pointer', color: '#222', fontWeight: task.category === cat ? 600 : 400 }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#f5f3ff' }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}>
-                  {cat}
-                </button>
+              {filteredDepartments.map(({ department, categories }) => (
+                <div key={department}>
+                  <button
+                    onClick={() => handleAssignmentChange(`department:${department}`)}
+                    disabled={loading === 'assignment'}
+                    style={{ width: '100%', padding: '8px 12px', fontSize: 12, border: 'none', background: activeAssignmentValue === `department:${department}` ? '#f5f3ff' : 'transparent', textAlign: 'left', cursor: 'pointer', color: activeAssignmentValue === `department:${department}` ? '#6b1e98' : '#222', fontWeight: 700 }}
+                    onMouseEnter={(e) => { if (activeAssignmentValue !== `department:${department}`) (e.currentTarget as HTMLButtonElement).style.background = '#f5f3ff' }}
+                    onMouseLeave={(e) => { if (activeAssignmentValue !== `department:${department}`) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
+                  >
+                    {department}
+                  </button>
+                  {categories.map((category) => (
+                    <button
+                      key={category}
+                      onClick={() => handleAssignmentChange(`category:${category}`)}
+                      disabled={loading === 'assignment'}
+                      style={{ width: '100%', padding: '7px 12px 7px 28px', fontSize: 12, border: 'none', background: activeAssignmentValue === `category:${category}` ? '#f5f3ff' : 'transparent', textAlign: 'left', cursor: 'pointer', color: activeAssignmentValue === `category:${category}` ? '#6b1e98' : '#222', fontWeight: activeAssignmentValue === `category:${category}` ? 600 : 400 }}
+                      onMouseEnter={(e) => { if (activeAssignmentValue !== `category:${category}`) (e.currentTarget as HTMLButtonElement).style.background = '#f5f3ff' }}
+                      onMouseLeave={(e) => { if (activeAssignmentValue !== `category:${category}`) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
+                    >
+                      {getTaskCategoryLabel(category)}
+                    </button>
+                  ))}
+                </div>
               ))}
-              {filteredCategories.length === 0 && (
-                <div style={{ padding: '12px', fontSize: 12, color: '#aaa', textAlign: 'center' }}>No categories</div>
+              {filteredDepartments.length === 0 && (
+                <div style={{ padding: '12px', fontSize: 12, color: '#aaa', textAlign: 'center' }}>No departments or categories</div>
               )}
             </div>
           )}

@@ -77,7 +77,7 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
     {
       label: 'CRM',
       items: [
-        { href: '/crm', label: 'Dashboard', icon: CrmDashIcon, adminMatch: true },
+        { href: '/crm', label: 'Dashboard', icon: CrmDashIcon },
         { href: '/crm/customers', label: 'Customers', icon: CrmCustomersIcon, adminMatch: true },
         { href: '/crm/vendors', label: 'Vendors', icon: BuildingIcon, adminMatch: true },
         { href: '/crm/contacts', label: 'Contacts', icon: CrmContactsIcon, adminMatch: true },
@@ -481,21 +481,30 @@ export default function AppShell({ children, user }: AppShellProps) {
                   color: '#fff',
                   borderRadius: 7,
                   padding: '5px 11px',
+                  width: 350,
+                  boxSizing: 'border-box',
                   fontSize: 12,
                   fontWeight: 600,
                   flexShrink: 0,
                   whiteSpace: 'nowrap',
-                  opacity: countdownFading ? 0 : 1,
-                  transition: 'opacity 0.3s ease',
                 }}>
                   <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ opacity: 0.75, flexShrink: 0 }}>
                     <circle cx="12" cy="12" r="10" strokeWidth={2} />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" />
                   </svg>
-                  <span style={{ opacity: 0.8, fontSize: 10, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    {countdownEvents[countdownIdx]?.title}
+                  <span style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 7,
+                    minWidth: 0,
+                    opacity: countdownFading ? 0 : 1,
+                    transition: 'opacity 0.3s ease',
+                  }}>
+                    <span style={{ opacity: 0.8, fontSize: 10, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                      {countdownEvents[countdownIdx]?.title}
+                    </span>
+                    <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: 13, flexShrink: 0 }}>{countdownDisplay}</span>
                   </span>
-                  <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: 13 }}>{countdownDisplay}</span>
                 </div>
               )}
 

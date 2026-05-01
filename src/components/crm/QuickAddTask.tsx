@@ -11,6 +11,7 @@ type CreatedTask = {
   status: string
   due_date: string | null
   progress: number
+  sort_order?: number | null
 }
 
 interface QuickAddTaskProps {
@@ -29,8 +30,13 @@ export default function QuickAddTask({ defaultDepartment, onTaskCreated }: Quick
     if (!title || adding) return
     setAdding(true)
     try {
-      const body: Record<string, unknown> = { title, category: 'To Do General' }
-      if (defaultDepartment) body.department = defaultDepartment
+      const body: Record<string, unknown> = { title }
+      if (defaultDepartment) {
+        body.department = defaultDepartment
+      } else {
+        body.department = 'General'
+        body.category = 'To Do General'
+      }
       const res = await fetch('/api/crm/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

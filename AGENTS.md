@@ -18,6 +18,9 @@ npm run build    # production build
 npm run lint     # ESLint
 ```
 
+## Verification Preference
+- Do not run `npm run lint`, `npm lit`, `npx tsc --noEmit --pretty false`, or other automated verification commands unless the user explicitly asks for them. When verification is skipped, state that clearly in the final response.
+
 ## Principles
 
 - **Don't assume. Don't hide confusion. Surface tradeoffs.** — Ask clarifying questions upfront rather than inferring intent. Explicitly discuss trade-offs between approaches instead of choosing silently.
@@ -143,7 +146,7 @@ const { selectedStore } = useStore()  // current e-commerce store
 <claude-mem-context>
 # Memory Context
 
-# $CMEM arcon-tools-app 2026-05-01 3:02pm CDT
+# $CMEM arcon-tools-app 2026-05-01 5:42pm CDT
 
 No previous sessions found.
 </claude-mem-context>

@@ -1,8 +1,69 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
+import { DEPARTMENTS, getDepartmentForTaskCategory } from '@/lib/task-constants'
 
-const TRACKED_FIELDS = ['status', 'assigned_to', 'priority', 'category', 'due_date', 'progress'] as const
+const TRACKED_FIELDS = ['status', 'assigned_to', 'department', 'priority', 'category', 'due_date', 'progress'] as const
+const TASK_UPDATE_FIELDS = [
+  'title',
+  'assigned_to',
+  'task_owner',
+  'department',
+  'category',
+  'priority',
+  'due_date',
+  'status',
+  'progress',
+  'description',
+  'opportunity_id',
+  'customer_id',
+  'vendor_id',
+  'contact_id',
+  'store_id',
+  'sort_order',
+] as const
+
+const TASK_UPDATE_FIELD_SET = new Set<string>(TASK_UPDATE_FIELDS)
+
+function pickTaskUpdates(body: Record<string, unknown>) {
+  const updates: Record<string, unknown> = {}
+  for (const [key, value] of Object.entries(body)) {
+    if (TASK_UPDATE_FIELD_SET.has(key)) updates[key] = value
+  }
+  return updates
+}
+
+function normalizeTaskAssignment(updates: Record<string, unknown>, current: Record<string, unknown>) {
+  const normalized = { ...updates }
+
+  if (
+    'department' in normalized &&
+    typeof normalized.department === 'string' &&
+    !(DEPARTMENTS as string[]).includes(normalized.department)
+  ) {
+    return { error: 'Invalid department' }
+  }
+
+  if ('category' in normalized && typeof normalized.category === 'string' && normalized.category) {
+    const categoryDepartment = getDepartmentForTaskCategory(normalized.category)
+    if (!categoryDepartment) return { error: 'Invalid category' }
+    if (normalized.department && normalized.department !== categoryDepartment) {
+      return { error: 'Category does not belong to selected department' }
+    }
+    normalized.department = categoryDepartment
+  }
+
+  if (
+    'department' in normalized &&
+    !('category' in normalized) &&
+    typeof current.category === 'string'
+  ) {
+    const currentCategoryDepartment = getDepartmentForTaskCategory(current.category)
+    if (normalized.department !== currentCategoryDepartment) normalized.category = null
+  }
+
+  return { updates: normalized }
+}
 
 // GET /api/crm/tasks/[id]
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -149,13 +210,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { id } = await params
   const body = await req.json()
-
-  const {
-    id: _id, created_at: _ca, created_by: _cb, updated_at: _ua,
-    assigned_user: _au, comments: _cm, history: _hi,
-    opportunity: _op, customer: _cu, vendor: _ve, contact: _co,
-    ...updates
-  } = body
+  const updates = pickTaskUpdates(body)
 
   const adminClient = createAdminClient()
 
@@ -168,15 +223,19 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   if (fetchErr || !current) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
+  const normalized = normalizeTaskAssignment(updates, current)
+  if ('error' in normalized) return NextResponse.json({ error: normalized.error }, { status: 400 })
+  const safeUpdates = normalized.updates
+
   // Insert history rows for each tracked field that changed
   const historyInserts = TRACKED_FIELDS
-    .filter((field) => field in updates && String(updates[field]) !== String(current[field]))
+    .filter((field) => field in safeUpdates && String(safeUpdates[field]) !== String(current[field]))
     .map((field) => ({
       task_id: id,
       user_id: appUser.id,
       field_changed: field,
       old_value: current[field] != null ? String(current[field]) : null,
-      new_value: updates[field] != null ? String(updates[field]) : null,
+      new_value: safeUpdates[field] != null ? String(safeUpdates[field]) : null,
       changed_at: new Date().toISOString(),
     }))
 
@@ -185,10 +244,10 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   }
 
   // Delegation tracking: when assigned_to changes, add the previous holder to delegators
-  const finalUpdates: Record<string, unknown> = { ...updates, updated_at: new Date().toISOString() }
+  const finalUpdates: Record<string, unknown> = { ...safeUpdates, updated_at: new Date().toISOString() }
   if (
-    'assigned_to' in updates &&
-    updates.assigned_to !== current.assigned_to &&
+    'assigned_to' in safeUpdates &&
+    safeUpdates.assigned_to !== current.assigned_to &&
     current.assigned_to
   ) {
     const existingDelegators: string[] = current.delegators ?? []

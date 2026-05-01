@@ -1,5 +1,6 @@
 'use client'
 
+import type { MouseEvent } from 'react'
 import { useRouter } from 'next/navigation'
 import type { KanbanTask } from './TaskKanbanView'
 
@@ -61,9 +62,10 @@ interface TaskTableViewProps {
   page: number
   search: string
   onPageChange: (p: number) => void
+  onRowContextMenu: (e: MouseEvent, taskId: string) => void
 }
 
-export function TaskTableView({ tasks, loading, total, page, search, onPageChange }: TaskTableViewProps) {
+export function TaskTableView({ tasks, loading, total, page, search, onPageChange, onRowContextMenu }: TaskTableViewProps) {
   const router = useRouter()
 
   const displayed = (() => {
@@ -121,6 +123,7 @@ export function TaskTableView({ tasks, loading, total, page, search, onPageChang
                 <tr
                   key={t.id}
                   onClick={() => router.push(`/tasks/${t.id}`)}
+                  onContextMenu={(e) => onRowContextMenu(e, t.id)}
                   className="hover:bg-slate-50 cursor-pointer transition-colors"
                 >
                   <td className="px-5 py-3.5">
@@ -132,7 +135,7 @@ export function TaskTableView({ tasks, loading, total, page, search, onPageChang
                     )}
                   </td>
                   <td className="px-5 py-3.5 hidden md:table-cell">
-                    <div className="flex flex-col gap-1">
+                    <div className="flex gap-1">
                       {t.department && (
                         <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded font-semibold w-fit">{t.department}</span>
                       )}

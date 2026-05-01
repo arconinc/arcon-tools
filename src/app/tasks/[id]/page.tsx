@@ -5,7 +5,13 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import { useAppUser } from '@/components/layout/AppShell'
 import EntitySearchPicker from '@/components/crm/EntitySearchPicker'
-import { DEPARTMENTS, DEPARTMENT_CATEGORIES } from '@/lib/task-constants'
+import {
+  DEPARTMENTS,
+  DEPARTMENT_CATEGORIES,
+  encodeTaskAssignmentValue,
+  getTaskCategoryLabel,
+  parseTaskAssignmentValue,
+} from '@/lib/task-constants'
 import type { CrmTaskDepartment } from '@/types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -37,7 +43,7 @@ type HistoryEntry = {
 
 type TaskDetail = {
   id: string; title: string; assigned_to: string | null; task_owner: string | null
-  category: string | null; priority: TaskPriority; due_date: string | null
+  department: string | null; category: string | null; priority: TaskPriority; due_date: string | null
   status: TaskStatus; progress: number; description: string | null
   opportunity_id: string | null; customer_id: string | null
   vendor_id: string | null; contact_id: string | null
@@ -88,16 +94,6 @@ const PRIORITY_BADGE: Record<TaskPriority, string> = {
   medium: 'bg-amber-100 text-amber-700',
   high: 'bg-red-100 text-red-700',
 }
-
-const CATEGORIES = [
-  'Art Order', 'Art Proactive Prospecting', 'Art Rush - Drop Everything',
-  'Art Rush - EOD', 'Art Store Mocks', 'Art Waiting on Approval',
-  'CSR Order', 'CSR Rush', 'CSR To Do', 'In Progress', 'Need Changes',
-  'Need Content', 'Store/Ecommerce Adds', 'Store/Ecommerce Refresh',
-  'Store/Ecommerce QDesign', 'Store/Ecommerce Update', 'To Do General',
-  'Waiting On Approval', 'Waiting On Client Approval',
-  'Warehouse Fulfillment', 'Warehouse Knitting', 'Warehouse Ship', 'Warehouse To Do',
-]
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -213,6 +209,41 @@ function FieldInput({
         ? <textarea rows={3} value={value} onChange={(e) => onChange(name, e.target.value)} className={cls + ' resize-none'} />
         : <input type={type} value={value} onChange={(e) => onChange(name, e.target.value)} className={cls} />}
     </div>
+  )
+}
+
+function formatTaskAssignment(department: string | null, category: string | null) {
+  if (department && category) return `${department} / ${getTaskCategoryLabel(category)}`
+  return department ?? category ?? null
+}
+
+function TaskAssignmentSelect({
+  department,
+  category,
+  onChange,
+}: {
+  department: string | null
+  category: string | null
+  onChange: (assignment: { department: CrmTaskDepartment | null; category: string | null }) => void
+}) {
+  return (
+    <select
+      value={encodeTaskAssignmentValue(department, category)}
+      onChange={(e) => onChange(parseTaskAssignmentValue(e.target.value))}
+      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
+    >
+      <option value="">— None —</option>
+      {DEPARTMENTS.map((departmentOption) => (
+        <optgroup key={departmentOption} label={departmentOption}>
+          <option value={`department:${departmentOption}`}>{departmentOption}</option>
+          {DEPARTMENT_CATEGORIES[departmentOption].map((categoryOption) => (
+            <option key={categoryOption} value={`category:${categoryOption}`}>
+              {getTaskCategoryLabel(categoryOption)}
+            </option>
+          ))}
+        </optgroup>
+      ))}
+    </select>
   )
 }
 
@@ -583,7 +614,6 @@ export default function TaskDetailPage() {
     setSaving(true)
     try {
       const payload = { ...editForm }
-      if (typeof payload.progress === 'string') payload.progress = Number(payload.progress) as any
       const res = await fetch(`/api/crm/tasks/${task.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -670,9 +700,6 @@ export default function TaskDetailPage() {
   // ── Create form ─────────────────────────────────────────────────────────────
   if (isNew) {
     const cf = createForm
-    const deptCategories = cf.department
-      ? DEPARTMENT_CATEGORIES[cf.department as CrmTaskDepartment] ?? []
-      : CATEGORIES
     return (
       <div className="max-w-2xl mx-auto px-6 py-8">
         <Link href="/crm/tasks" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-6">
@@ -696,25 +723,19 @@ export default function TaskDetailPage() {
               className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
           </div>
 
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Department</label>
-              <select value={cf.department}
-                onChange={(e) => setCreateForm((p) => ({ ...p, department: e.target.value, category: '' }))}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                <option value="">— None —</option>
-                {DEPARTMENTS.map((d) => <option key={d} value={d}>{d}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Category</label>
-              <select value={cf.category}
-                onChange={(e) => setCreateForm((p) => ({ ...p, category: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                <option value="">— Select —</option>
-                {deptCategories.map((c) => <option key={c}>{c}</option>)}
-              </select>
-            </div>
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Department / Category</label>
+            <TaskAssignmentSelect
+              department={cf.department || null}
+              category={cf.category || null}
+              onChange={(assignment) =>
+                setCreateForm((p) => ({
+                  ...p,
+                  department: assignment.department ?? '',
+                  category: assignment.category ?? '',
+                }))
+              }
+            />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
@@ -976,13 +997,18 @@ export default function TaskDetailPage() {
                     </select>
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Category</label>
-                    <select value={(ef.category as string) ?? ''}
-                      onChange={(e) => handleEditChange('category', e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                      <option value="">— None —</option>
-                      {CATEGORIES.map((c) => <option key={c}>{c}</option>)}
-                    </select>
+                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Department / Category</label>
+                    <TaskAssignmentSelect
+                      department={(ef.department as string | null) ?? null}
+                      category={(ef.category as string | null) ?? null}
+                      onChange={(assignment) =>
+                        setEditForm((p) => ({
+                          ...p,
+                          department: assignment.department,
+                          category: assignment.category,
+                        }))
+                      }
+                    />
                   </div>
                   <FieldInput label="Due Date" name="due_date" value={(ef.due_date as string)?.slice(0, 10) ?? ''} onChange={handleEditChange} type="date" />
                   <div>
@@ -1053,7 +1079,7 @@ export default function TaskDetailPage() {
                 <>
                   <Field label="Status" value={statusInfo?.label ?? task.status} />
                   <Field label="Priority" value={task.priority} />
-                  <Field label="Category" value={task.category} />
+                  <Field label="Department / Category" value={formatTaskAssignment(task.department, task.category)} />
                   <Field label="Due Date" value={fmtDate(task.due_date)} />
                   <Field label="Assigned To" value={task.assigned_user?.display_name ?? null} />
                   {task.description && (

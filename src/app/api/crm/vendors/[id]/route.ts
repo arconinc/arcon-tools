@@ -2,6 +2,15 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 
+const SENSITIVE_VENDOR_FIELDS = ['arcon_username', 'arcon_password'] as const
+
+function stripSensitiveVendorFields<T extends Record<string, unknown>>(vendor: T, isAdmin: boolean): T {
+  if (isAdmin) return vendor
+  const sanitized = { ...vendor }
+  for (const field of SENSITIVE_VENDOR_FIELDS) delete sanitized[field]
+  return sanitized
+}
+
 // GET /api/crm/vendors/[id]
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const appUser = await requireUser()
@@ -38,7 +47,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   }
 
   return NextResponse.json({
-    ...vendor,
+    ...stripSensitiveVendorFields(vendor, appUser.is_admin),
     contacts: contactsRes.data ?? [],
     files: filesRes.data ?? [],
     created_by_user: createdByUserRes.data ?? null,
@@ -57,6 +66,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id: _id, created_at: _ca, created_by: _cb, tag_ids, tags: _tags,
           contacts: _c, files: _f, created_by_user: _cbu, brand_data: _bd,
           ...updates } = body
+  if (!appUser.is_admin) {
+    for (const field of SENSITIVE_VENDOR_FIELDS) delete updates[field]
+  }
 
   const adminClient = createAdminClient()
 
@@ -78,7 +90,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data)
+  return NextResponse.json(stripSensitiveVendorFields(data, appUser.is_admin))
 }
 
 // DELETE /api/crm/vendors/[id] — admin only

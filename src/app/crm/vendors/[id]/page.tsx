@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import TagPicker from '@/components/crm/TagPicker'
+import { useAppUser } from '@/components/layout/AppShell'
 import { formatPhoneInput } from '@/lib/phone'
 import { CrmForm } from '@/types'
 import { recommendTaxForms, US_STATES } from '@/lib/forms-utils'
@@ -116,6 +117,12 @@ function buildCompanySummary(company: BrandDataLocal['company']): string | null 
   return parts.length ? parts.join(', ') + '.' : null
 }
 
+function cleanOptionalValue(value: string | null | undefined): string | null {
+  const trimmed = value?.trim()
+  if (!trimmed || trimmed.toLowerCase() === 'null') return null
+  return trimmed
+}
+
 function CopyButton({ value }: { value: string }) {
   const [copied, setCopied] = useState(false)
   const handleCopy = () => {
@@ -195,8 +202,10 @@ function FS({ label, name, value, onChange, options }: {
 export default function VendorDetailPage() {
   const router = useRouter()
   const params = useParams<{ id: string }>()
+  const { user } = useAppUser()
   const id = params.id
   const isNew = id === 'new'
+  const isAdmin = !!user?.is_admin
 
   const [vendor, setVendor] = useState<VendorDetail | null>(null)
   const [loading, setLoading] = useState(!isNew)
@@ -538,8 +547,18 @@ export default function VendorDetailPage() {
                       <FS label="Specialty" name="specialty" value={(ef.specialty as string) ?? ''} onChange={handleEditChange} options={SPECIALTY_OPTIONS} />
                       <FI label="Arcon Account #" name="arcon_account_number" value={(ef.arcon_account_number as string) ?? ''} onChange={handleEditChange} />
                       <FI label="Online Store" name="online_store" value={(ef.online_store as string) ?? ''} onChange={handleEditChange} type="url" />
-                      <FI label="Arcon Username" name="arcon_username" value={(ef.arcon_username as string) ?? ''} onChange={handleEditChange} />
-                      <FI label="Arcon Password" name="arcon_password" value={(ef.arcon_password as string) ?? ''} onChange={handleEditChange} />
+                      {isAdmin && (
+                        <>
+                          <div className="col-span-4 inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
+                            <svg className="h-3.5 w-3.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                              <path fillRule="evenodd" d="M10 1a4 4 0 00-4 4v2H5a2 2 0 00-2 2v7a2 2 0 002 2h10a2 2 0 002-2V9a2 2 0 00-2-2h-1V5a4 4 0 00-4-4zm2 6V5a2 2 0 10-4 0v2h4z" clipRule="evenodd" />
+                            </svg>
+                            ARCON credentials are visible to admins only.
+                          </div>
+                          <FI label="Arcon Username" name="arcon_username" value={(ef.arcon_username as string) ?? ''} onChange={handleEditChange} />
+                          <FI label="Arcon Password" name="arcon_password" value={(ef.arcon_password as string) ?? ''} onChange={handleEditChange} />
+                        </>
+                      )}
                     </>
                   ) : (
                     <>
@@ -547,8 +566,18 @@ export default function VendorDetailPage() {
                       <Field label="Specialty" value={vendor.specialty} />
                       <Field label="Arcon Account #" value={vendor.arcon_account_number} />
                       <Field label="Online Store" value={vendor.online_store} link />
-                      <Field label="Arcon Username" value={vendor.arcon_username} password />
-                      <Field label="Arcon Password" value={vendor.arcon_password} password />
+                      {isAdmin && (
+                        <>
+                          <div className="col-span-4 inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
+                            <svg className="h-3.5 w-3.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
+                              <path fillRule="evenodd" d="M10 1a4 4 0 00-4 4v2H5a2 2 0 00-2 2v7a2 2 0 002 2h10a2 2 0 002-2V9a2 2 0 00-2-2h-1V5a4 4 0 00-4-4zm2 6V5a2 2 0 10-4 0v2h4z" clipRule="evenodd" />
+                            </svg>
+                            ARCON credentials are visible to admins only.
+                          </div>
+                          <Field label="Arcon Username" value={vendor.arcon_username} password />
+                          <Field label="Arcon Password" value={vendor.arcon_password} password />
+                        </>
+                      )}
                     </>
                   )}
                 </div>
@@ -594,13 +623,17 @@ export default function VendorDetailPage() {
                           { label: 'Samples', email: vendor.samples_email, cutoff: null },
                           { label: 'Virtuals', email: vendor.virtuals_email, cutoff: null },
                           { label: 'Spec Sample', email: vendor.spec_sample_email, cutoff: null },
-                        ].map((row) => (
+                        ].map((row) => ({
+                          ...row,
+                          email: cleanOptionalValue(row.email),
+                          cutoff: cleanOptionalValue(row.cutoff),
+                        })).filter((row) => row.email || row.cutoff).map((row) => (
                           <tr key={row.label} className="group">
                             <td className="py-1.5 pr-4 text-xs font-semibold text-slate-400 uppercase tracking-wide whitespace-nowrap w-28">{row.label}</td>
                             <td className="py-1.5 pr-4 text-slate-700">
                               {row.email
                                 ? <a href={`mailto:${row.email}`} className="text-purple-700 hover:underline">{row.email}</a>
-                                : <span className="text-slate-300">—</span>}
+                                : null}
                             </td>
                             <td className="py-1.5 text-xs text-slate-500 whitespace-nowrap">
                               {row.cutoff ? <span className="px-1.5 py-0.5 bg-slate-100 rounded text-slate-600">{row.cutoff}</span> : null}
