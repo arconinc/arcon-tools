@@ -69,6 +69,12 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
       ],
     },
     {
+      label: 'Aturian',
+      items: [
+        { href: 'https://arcon.erp.network/', label: 'Login', icon: LoginIcon },
+      ],
+    },
+    {
       label: 'CRM',
       items: [
         { href: '/crm', label: 'Dashboard', icon: CrmDashIcon, adminMatch: true },
@@ -76,14 +82,13 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
         { href: '/crm/vendors', label: 'Vendors', icon: BuildingIcon, adminMatch: true },
         { href: '/crm/contacts', label: 'Contacts', icon: CrmContactsIcon, adminMatch: true },
         { href: '/crm/opportunities', label: 'Opportunities', icon: CrmOppsIcon, adminMatch: true },
-        { href: '/crm/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
+        { href: '/my-tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
       ],
     },
     {
       label: 'Tasks',
       items: [
         { href: '/my-tasks', label: 'Task Board', icon: BoardIcon },
-        { href: '#', label: 'Backlog', icon: ArchiveIcon, soon: true },
       ],
     },
     {
@@ -91,7 +96,6 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
       items: [
         { href: '/news', label: 'News & Announcements', icon: MegaphoneIcon, adminMatch: true },
         { href: '/releases', label: 'Release Notes', icon: ReleaseIcon, adminMatch: true },
-        { href: '/birthdays', label: 'Birthdays & Anniversaries', icon: CakeIcon },
         { href: '/employees', label: 'Employee Directory', icon: UsersIcon, adminMatch: true },
         { href: '/profile', label: 'My Profile', icon: UserAdminIcon },
       ],
@@ -100,16 +104,32 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
       label: 'E-Commerce',
       items: [
         { href: '/stores', label: 'Stores', icon: StoreIcon, adminMatch: true },
-        { href: '#', label: 'Customer Lookup', icon: SearchIcon, soon: true },
-        { href: '#', label: 'Order History', icon: ClipboardListIcon, soon: true },
-        { href: '#', label: 'Reporting', icon: ChartBarIcon, soon: true },
+        { href: '/my-tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
       ],
     },
     {
       label: 'HR',
       items: [
         { href: '/documents', label: 'Documents', icon: DocumentIcon, adminMatch: true },
-        { href: '#', label: 'PTO Request', icon: CalendarIcon, soon: true },
+        { href: '/my-tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
+      ],
+    },
+    {
+      label: 'Accounting',
+      items: [
+        { href: '/my-tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
+      ],
+    },
+    {
+      label: 'Sales',
+      items: [
+        { href: '/my-tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
+      ],
+    },
+    {
+      label: 'Warehouse',
+      items: [
+        { href: '/my-tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
       ],
     },
   ]
@@ -127,7 +147,6 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
         { href: '/admin/crm-tags', label: 'CRM Tags', icon: TagIcon, adminMatch: true },
         { href: '/admin/crm-import', label: 'CRM Import', icon: UploadIcon, adminMatch: true },
         { href: '/admin/stores', label: 'Stores', icon: StoreIcon, adminMatch: true },
-        { href: '/admin/employees', label: 'Employees', icon: UserAdminIcon, adminMatch: true },
         { href: '/admin/users', label: 'Manage Users', icon: UserAdminIcon, adminMatch: true },
         { href: '/admin/audit-log', label: 'Audit Log', icon: LogIcon, adminMatch: true },
       ],
@@ -356,7 +375,7 @@ export default function AppShell({ children, user }: AppShellProps) {
                             padding: '0 16px 6px', background: 'none', border: 'none', cursor: 'pointer',
                           }}
                         >
-                          <span style={{ color: '#666', fontSize: 10, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                          <span style={{ color: '#9333ea', fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
                             {section.label}
                           </span>
                           <svg
@@ -861,4 +880,8 @@ function TagIcon({ className }: { className?: string }) {
 
 function UploadIcon({ className }: { className?: string }) {
   return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
+}
+
+function LoginIcon({ className }: { className?: string }) {
+  return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7m0 0l-7 7m7-7H3" /></svg>
 }

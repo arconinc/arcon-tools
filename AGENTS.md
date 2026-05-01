@@ -25,6 +25,7 @@ npm run lint     # ESLint
 - **Touch only what you must.** — Avoid refactoring or cleaning code outside the scope of your current task. Limit changes to files directly related to the requirement.
 - **Clean up only your own mess.** — You are responsible for the quality of code you write, not for fixing unrelated technical debt.
 - **Define success criteria.** — Be explicit about what "done" means before starting. How will you know the change is working? What should be tested?
+- **Security first — never shortcut auth, validation, or permission checks.** — Even when a shortcut *seems* safe or convenient, always follow the documented auth patterns. Never skip environment verification, permission checks, or role validation. Never use flags like `--no-verify` or similar bypasses. Always verify intended behavior against security patterns (RLS, auth checks, admin gates).
 
 ## Project Structure
 ```
@@ -128,7 +129,16 @@ const { selectedStore } = useStore()  // current e-commerce store
 - Do not call `createAdminClient()` without first verifying the user is authenticated
 - Do not use the browser Supabase client in server components or route handlers
 - Do not add ClickUp config directly to DB — it lives in `ticker_config` table
+- Do not skip the admin `is_admin` check to "save time" on a "clearly admin-only" route
+- Do not skip validation at security boundaries (auth, role checks, data access)
+- Do not use `--force` flags with git, npm, or deployment tools without explicit reasoning and documentation
+- Do not disable security features (RLS, CORS, auth) "temporarily" — temporary bypasses often become permanent vulnerabilities
 
+## Security Considerations
+- **Convenience is not a reason to bypass security.** Shortcuts that skip auth checks, skip permission validation, or circumvent role-based access controls create vulnerabilities even if they work initially.
+- **Security shortcuts are tempting when:** you're late in a task, a check seems "obvious," you think "it's just this once," or you want a "quick fix." These are exactly when security shortcuts cause the most damage.
+- **Never trade security for speed.** If an auth pattern is documented, use it exactly as written. If a validation check exists, run it in full. If a permission gate is in place, verify it before every sensitive operation.
+- **Always follow the documented auth patterns for your project.** For this project: route handler auth pattern (lines 63–71), admin layout pattern (line 73), and client selection patterns (lines 58–61) are not suggestions — they are security boundaries.
 
 <claude-mem-context>
 # Memory Context
