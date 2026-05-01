@@ -16,20 +16,8 @@ import {
   CompanyCalendarEventType,
   CompanyCalendarEventTypeId,
   CompanyCalendarResponse,
-  CrmForm,
 } from '@/types'
-import { US_STATES } from '@/lib/forms-utils'
-import { countEventsThisWeek } from '@/lib/company-calendar-config'
 
-
-const QUICK_LINKS = [
-  { icon: '📦', bg: '#f3e8ff', label: 'Add Tracking', href: '/tasks/add-tracking' },
-  { icon: '✅', bg: '#f3e8ff', label: 'My Tasks', href: '#' },
-  { icon: '📁', bg: '#f5f5f5', label: 'HR Docs', href: '#' },
-  { icon: '🏢', bg: '#f5f5f5', label: 'Vendors', href: '#' },
-  { icon: '📝', bg: '#fff7ed', label: 'PTO Request', href: '#' },
-  { icon: '➕', bg: '#f3e8ff', label: 'Add Customer', href: '#' },
-]
 
 // Fallback slides shown when the DB has no published slides yet
 const FALLBACK_SLIDES: BannerSlide[] = [
@@ -39,36 +27,6 @@ const FALLBACK_SLIDES: BannerSlide[] = [
   { id: 'f4', pre_heading: '🎂 Birthday Today', headline: 'Happy Birthday, Brooke Bowlin!', emoji: '🎉', subhead: 'Wishing you a great day from the whole Arcon team', bg_type: 'gradient', bg_gradient: 'hs-4', bg_image_url: null },
   { id: 'f5', pre_heading: '5-Year Anniversary', headline: 'Congrats Cami Johnson — 5 Years!', emoji: '🥂', subhead: 'Thank you for five incredible years with Arcon', bg_type: 'gradient', bg_gradient: 'hs-5', bg_image_url: null },
 ]
-
-// ── CRM Task types ────────────────────────────────────────────────────────────
-
-type CrmTask = {
-  id: string; title: string; status: string; priority: string
-  due_date: string | null; category: string | null
-  progress: number
-  linked_to_name: string | null; linked_to_type: string | null
-}
-
-const CRM_PRIORITY_DOT: Record<string, string> = {
-  high: 'dot-high', medium: 'dot-med', low: 'dot-low',
-}
-
-const STATUS_CONFIG: Record<string, { label: string; color: string }> = {
-  not_started:                { label: 'Not Started',    color: '#94a3b8' },
-  in_progress:                { label: 'In Progress',    color: '#60a5fa' },
-  waiting_on_approval:        { label: 'Waiting Approval', color: '#fbbf24' },
-  waiting_on_client_approval: { label: 'Waiting Client', color: '#fb923c' },
-  need_changes:               { label: 'Need Changes',   color: '#f87171' },
-  completed:                  { label: 'Completed',      color: '#4ade80' },
-}
-const STATUS_ORDER = Object.keys(STATUS_CONFIG)
-const STATUS_NEXT: Record<string, string> = {
-  not_started: 'in_progress',
-  in_progress: 'waiting_on_approval',
-  waiting_on_approval: 'waiting_on_client_approval',
-  waiting_on_client_approval: 'completed',
-  need_changes: 'in_progress',
-}
 
 // ── Page ──────────────────────────────────────────────────────────────────────
 
@@ -84,12 +42,6 @@ export default function DashboardPage() {
   const [eventsError, setEventsError] = useState<string | null>(null)
   const [selectedEvent, setSelectedEvent] = useState<CompanyCalendarEvent | null>(null)
   const [bannerItems, setBannerItems] = useState<BannerStripItem[]>([])
-  const [myTasks, setMyTasks] = useState<CrmTask[]>([])
-  const [tasksLoading, setTasksLoading] = useState(true)
-  const [updatingTaskId, setUpdatingTaskId] = useState<string | null>(null)
-  const [forms, setForms] = useState<CrmForm[]>([])
-  const [formsSearch, setFormsSearch] = useState('')
-  const [formsState, setFormsState] = useState('')
 
   useEffect(() => {
     fetch('/api/banner-strip')
@@ -143,41 +95,6 @@ export default function DashboardPage() {
       .finally(() => setEventsLoading(false))
   }, [])
 
-  useEffect(() => {
-    fetch('/api/forms')
-      .then((r) => r.json())
-      .then((data) => { if (Array.isArray(data?.forms)) setForms(data.forms) })
-      .catch(() => {})
-  }, [])
-
-  useEffect(() => {
-    fetch('/api/crm/tasks?assigned_to=me&status=not_started,in_progress,waiting_on_approval,waiting_on_client_approval,need_changes')
-      .then((r) => r.json())
-      .then((data) => {
-        if (Array.isArray(data?.tasks)) setMyTasks(data.tasks.slice(0, 8))
-      })
-      .catch(() => {})
-      .finally(() => setTasksLoading(false))
-  }, [])
-
-  async function updateTaskStatus(taskId: string, newStatus: string) {
-    setUpdatingTaskId(taskId)
-    try {
-      await fetch(`/api/crm/tasks/${taskId}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: newStatus }),
-      })
-      setMyTasks((prev) =>
-        newStatus === 'completed'
-          ? prev.filter((t) => t.id !== taskId)
-          : prev.map((t) => t.id === taskId ? { ...t, status: newStatus } : t)
-      )
-    } finally {
-      setUpdatingTaskId(null)
-    }
-  }
-
   function goTo(i: number) {
     const next = ((i % slides.length) + slides.length) % slides.length
     setCurrent(next)
@@ -209,8 +126,6 @@ export default function DashboardPage() {
       }
     })
   }, [eventTypeMap, filteredCompanyEvents])
-
-  const eventsThisWeek = useMemo(() => countEventsThisWeek(companyEvents), [companyEvents])
 
   function toggleType(typeId: CompanyCalendarEventTypeId) {
     setActiveTypeIds((prev) =>
@@ -295,47 +210,12 @@ export default function DashboardPage() {
         .banner-edit { position: absolute; right: 12px; top: 50%; transform: translateY(-50%); z-index: 10; background: rgba(255,255,255,0.15); border: 1px solid rgba(255,255,255,0.3); border-radius: 4px; padding: 3px 9px; font-size: 10px; font-weight: 700; color: #fff; cursor: pointer; letter-spacing: 0.04em; text-decoration: none; }
         .banner-edit:hover { background: rgba(255,255,255,0.25); }
 
-        /* ── Widgets ── */
-        .widget { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 16px 18px; }
-        .widget-label { font-size: 11px; color: #999; font-weight: 600; text-transform: uppercase; letter-spacing: 0.07em; margin-bottom: 6px; }
-        .widget-value { font-size: 26px; font-weight: 800; color: #111; }
-        .widget-sub { font-size: 11px; color: #aaa; margin-top: 3px; }
-        .widget-icon { width: 36px; height: 36px; border-radius: 8px; display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .wi-purple { background: #f3e8ff; color: #6b1e98; }
-        .wi-green  { background: #f0fdf4; color: #15803d; }
-        .wi-orange { background: #fff7ed; color: #c2410c; }
-        .wi-gray   { background: #f5f5f5; color: #555; }
-
         /* ── Cards ── */
         .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
         .card-header { padding: 13px 16px; border-bottom: 1px solid #f3f4f6; display: flex; align-items: center; justify-content: space-between; }
         .card-title { font-size: 13px; font-weight: 700; color: #111; }
         .card-action { font-size: 12px; color: #6b1e98; cursor: pointer; font-weight: 600; }
         .card-body { padding: 12px 16px; }
-
-/* ── Tasks ── */
-        .task-item { padding: 9px 16px 10px; border-bottom: 1px solid #f5f5f5; }
-        .task-item:last-child { border-bottom: none; }
-        .task-item:hover { background: #faf5ff; }
-        .task-row { display: flex; align-items: center; gap: 8px; }
-        .task-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-        .dot-high { background: #dc2626; }
-        .dot-med  { background: #f59e0b; }
-        .dot-low  { background: #22c55e; }
-        .task-name { font-size: 13px; color: #111; font-weight: 500; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; text-decoration: none; }
-        .task-name:hover { color: #6b1e98; }
-        .task-meta { font-size: 11px; color: #aaa; margin-top: 2px; }
-        .prog-bar { display: flex; height: 7px; margin-top: 7px; border-radius: 3px; overflow: hidden; background: #fff; }
-        .prog-step { flex: 1; height: 100%; border: none; cursor: pointer; padding: 0; transition: filter 0.15s; clip-path: polygon(5px 0, calc(100% - 5px) 0, 100% 50%, calc(100% - 5px) 100%, 0 100%, 5px 50%); background: #f1f5f9; }
-        .prog-step:first-child { clip-path: polygon(0 0, calc(100% - 5px) 0, 100% 50%, calc(100% - 5px) 100%, 0 100%); }
-        .prog-step:last-child  { clip-path: polygon(5px 0, 100% 0, 100% 100%, 0 100%, 5px 50%); }
-        .prog-step.prog-past   { background: #ddd6fe; }
-        .prog-step.prog-future { background: #f1f5f9; }
-        .prog-step:hover:not(:disabled) { filter: brightness(0.88); }
-        .prog-step:disabled { cursor: default; }
-        .next-stage-btn { font-size: 10px; font-weight: 700; color: #6b1e98; background: #f3e8ff; border: none; border-radius: 4px; padding: 3px 8px; cursor: pointer; white-space: nowrap; flex-shrink: 0; line-height: 1.5; transition: background 0.12s; }
-        .next-stage-btn:hover { background: #e9d5ff; }
-        .next-stage-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
         /* ── Events Calendar ── */
         .events-card .card-body { padding: 0; }
@@ -370,26 +250,11 @@ export default function DashboardPage() {
         .event-type-pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 3px 8px; font-size: 10px; font-weight: 800; }
         .event-detail-desc { font-size: 12px; color: #555; margin-top: 8px; line-height: 1.45; white-space: pre-line; }
 
-        /* ── Quick Links ── */
-        .quick-link { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 8px 12px; text-align: center; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; text-decoration: none; display: block; }
-        .quick-link:hover { border-color: #6b1e98; box-shadow: 0 0 0 3px #f3e8ff; }
-        .ql-icon { width: 36px; height: 36px; border-radius: 10px; display: flex; align-items: center; justify-content: center; margin: 0 auto 7px; font-size: 17px; }
-        .ql-label { font-size: 11px; font-weight: 600; color: #555; }
-
-        /* ── Forms (dashboard) ── */
-        .form-dash-row:hover { color: #6b1e98 !important; }
-
         /* ── Responsive layout ── */
         .dash-content { padding: 22px 28px 28px; }
-        .stat-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 14px; margin-bottom: 22px; }
-        .quick-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; margin-bottom: 24px; }
-        .two-col { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 
         @media (max-width: 1023px) {
           .hero { height: 320px; }
-          .stat-grid { grid-template-columns: repeat(2, 1fr); }
-          .quick-grid { grid-template-columns: repeat(3, 1fr); }
-          .two-col { grid-template-columns: 1fr; }
           .dash-content { padding: 18px 20px 24px; }
         }
 
@@ -399,10 +264,6 @@ export default function DashboardPage() {
           .hero-sub { font-size: 12px; }
           .hero-caption { padding: 0 16px 14px; }
           .dash-content { padding: 14px 14px 20px; }
-          .stat-grid { gap: 10px; margin-bottom: 16px; }
-          .quick-grid { gap: 8px; margin-bottom: 18px; }
-          .two-col { gap: 12px; }
-          .widget { padding: 12px 14px; }
           .arc-calendar .fc .fc-toolbar.fc-header-toolbar { align-items: flex-start; flex-direction: column; }
           .arc-calendar .fc .fc-toolbar-chunk { display: flex; gap: 4px; max-width: 100%; flex-wrap: wrap; }
           .arc-calendar .fc .fc-daygrid-day-frame { min-height: 58px; }
@@ -509,219 +370,8 @@ export default function DashboardPage() {
           </div>
 
 
-          {/* Stat widgets */}
-        <div className="stat-grid">
-          <div className="widget">
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-              <div>
-                <div className="widget-label">My Open Tasks</div>
-                <div className="widget-value">{tasksLoading ? '—' : myTasks.length}</div>
-                <div className="widget-sub">{tasksLoading ? 'Loading…' : myTasks.length === 0 ? 'All caught up!' : `${myTasks.filter((t) => t.priority === 'high').length} high priority`}</div>
-              </div>
-              <div className="widget-icon wi-purple">
-                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" /></svg>
-              </div>
-            </div>
-          </div>
-
-          <div className="widget">
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-              <div>
-                <div className="widget-label">Team Tasks Open</div>
-                <div className="widget-value">17</div>
-                <div className="widget-sub">3 overdue</div>
-              </div>
-              <div className="widget-icon wi-orange">
-                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-              </div>
-            </div>
-          </div>
-
-          <div className="widget">
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-              <div>
-                <div className="widget-label">Orders Today</div>
-                <div className="widget-value">23</div>
-                <div className="widget-sub">↑ 4 from yesterday</div>
-              </div>
-              <div className="widget-icon wi-green">
-                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8 5-8-5m16 0v10a2 2 0 01-2 2H6a2 2 0 01-2-2V7m16 0l-8-5-8 5" /></svg>
-              </div>
-            </div>
-          </div>
-
-          <div className="widget">
-            <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
-              <div>
-                <div className="widget-label">Events This Week</div>
-                <div className="widget-value">{eventsLoading ? '—' : eventsThisWeek}</div>
-                <div className="widget-sub">{eventsLoading ? 'Loading…' : eventsThisWeek === 1 ? '1 event' : eventsThisWeek === 0 ? 'None this week' : `${eventsThisWeek} events`}</div>
-              </div>
-              <div className="widget-icon wi-gray">
-                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3M5 11h14M7 21h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
-              </div>
-            </div>
-          </div>
-        </div>
-
-        {/* Quick links — hidden for now */}
-
-        {/* Two-column section */}
-        <div className="two-col">
-
-          {/* Left column: My Tasks + Forms */}
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 16 }}>
-
-          {/* My Tasks */}
-          <div className="card">
-            <div className="card-header">
-              <div className="card-title">My Tasks</div>
-              <Link href="/my-tasks" className="card-action" style={{ textDecoration: 'none' }}>
-                View all →
-              </Link>
-            </div>
-            <div className="card-body" style={{ padding: '4px 0' }}>
-              {tasksLoading ? (
-                <div style={{ padding: '12px 16px' }}>
-                  {[...Array(3)].map((_, i) => (
-                    <div key={i} style={{ height: 12, background: '#f5f5f5', borderRadius: 4, marginBottom: 10, width: i === 0 ? '70%' : i === 1 ? '55%' : '60%' }} />
-                  ))}
-                </div>
-              ) : myTasks.length === 0 ? (
-                <div style={{ fontSize: 12, color: '#bbb', padding: '12px 16px' }}>
-                  No open tasks. <Link href="/crm/tasks/new" style={{ color: '#6b1e98', textDecoration: 'underline' }}>Create one →</Link>
-                </div>
-              ) : (
-                myTasks.map((t) => {
-                  const activeIdx = STATUS_ORDER.indexOf(t.status)
-                  const isUpdating = updatingTaskId === t.id
-                  return (
-                    <div key={t.id} className="task-item">
-                      <div className="task-row">
-                        <div className={`task-dot ${CRM_PRIORITY_DOT[t.priority] ?? 'dot-med'}`} />
-                        <Link href={`/crm/tasks/${t.id}`} className="task-name">{t.title}</Link>
-                        {STATUS_NEXT[t.status] && (
-                          <button
-                            className="next-stage-btn"
-                            disabled={isUpdating}
-                            onClick={() => updateTaskStatus(t.id, STATUS_NEXT[t.status])}
-                          >
-                            {isUpdating ? '…' : `→ ${STATUS_CONFIG[STATUS_NEXT[t.status]].label}`}
-                          </button>
-                        )}
-                      </div>
-                      {t.due_date && (
-                        <div className="task-meta">
-                          <span style={{ color: new Date(t.due_date) < new Date() ? '#dc2626' : '#aaa', fontWeight: new Date(t.due_date) < new Date() ? 600 : 400 }}>
-                            Due {new Date(t.due_date).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })}
-                            {new Date(t.due_date) < new Date() ? ' ⚠️' : ''}
-                            {t.linked_to_name ? ` · ${t.linked_to_name}` : ''}
-                          </span>
-                        </div>
-                      )}
-                      <div className="prog-bar" style={{ opacity: isUpdating ? 0.5 : 1 }}>
-                        {STATUS_ORDER.map((s, i) => {
-                          const pos = i < activeIdx ? 'past' : i === activeIdx ? 'active' : 'future'
-                          return (
-                            <button
-                              key={s}
-                              className={`prog-step prog-${pos}`}
-                              title={STATUS_CONFIG[s].label}
-                              disabled={isUpdating || s === t.status}
-                              onClick={() => updateTaskStatus(t.id, s)}
-                              style={pos === 'active' ? { background: STATUS_CONFIG[s].color } : undefined}
-                            />
-                          )
-                        })}
-                      </div>
-                    </div>
-                  )
-                })
-              )}
-            </div>
-          </div>
-
-          {/* Forms */}
-          {forms.length > 0 && (() => {
-            const CATEGORY_LABELS: Record<string, string> = { vendor: 'Vendor', customer: 'Customer', general: 'General' }
-            const allStates = [...new Set(forms.flatMap(f => f.states_covered))].sort()
-            const searchLower = formsSearch.toLowerCase()
-            const filtered = forms.filter(f => {
-              const matchesSearch = !formsSearch || f.name.toLowerCase().includes(searchLower)
-              const matchesState = !formsState || f.states_covered.length === 0 || f.states_covered.includes(formsState)
-              return matchesSearch && matchesState
-            })
-            const grouped = ['vendor', 'customer', 'general'].map(cat => ({
-              cat, label: CATEGORY_LABELS[cat],
-              items: filtered.filter(f => f.category === cat),
-            })).filter(g => g.items.length > 0)
-            return (
-              <div className="card">
-                <div className="card-header" style={{ padding: '9px 14px' }}>
-                  <div className="card-title" style={{ fontSize: 12 }}>Forms</div>
-                  {user?.is_admin && (
-                    <Link href="/admin/forms" className="card-action" style={{ textDecoration: 'none', fontSize: 11 }}>Manage →</Link>
-                  )}
-                </div>
-                <div style={{ padding: '6px 14px 4px', display: 'flex', gap: 6, borderBottom: '1px solid #f3f4f6' }}>
-                  <input
-                    type="text"
-                    placeholder="Search…"
-                    value={formsSearch}
-                    onChange={e => setFormsSearch(e.target.value)}
-                    style={{ flex: 1, fontSize: 11, padding: '3px 7px', border: '1px solid #e5e7eb', borderRadius: 5, outline: 'none', minWidth: 0 }}
-                  />
-                  {allStates.length > 0 && (
-                    <select
-                      value={formsState}
-                      onChange={e => setFormsState(e.target.value)}
-                      style={{ fontSize: 11, padding: '3px 5px', border: '1px solid #e5e7eb', borderRadius: 5, outline: 'none', color: formsState ? '#111' : '#9ca3af', maxWidth: 120 }}
-                    >
-                      <option value="">All states</option>
-                      {allStates.map(s => <option key={s} value={s}>{US_STATES[s] ?? s}</option>)}
-                    </select>
-                  )}
-                </div>
-                <div className="card-body" style={{ padding: '8px 14px' }}>
-                  {grouped.length === 0 ? (
-                    <div style={{ fontSize: 11, color: '#bbb' }}>No forms match.</div>
-                  ) : grouped.map(({ cat, label, items }) => (
-                    <div key={cat} style={{ marginBottom: 8 }}>
-                      <div style={{ fontSize: 9, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: '#bbb', marginBottom: 3 }}>{label}</div>
-                      {items.map(form => (
-                        <a
-                          key={form.id}
-                          href={form.file_url}
-                          target="_blank"
-                          rel="noopener noreferrer"
-                          style={{ display: 'flex', alignItems: 'flex-start', gap: 6, padding: '4px 0', textDecoration: 'none', color: '#374151' }}
-                          className="form-dash-row"
-                        >
-                          <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ flexShrink: 0, color: '#9ca3af', marginTop: 1 }}>
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                          </svg>
-                          <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ fontSize: 12, fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{form.name}</div>
-                            {form.description && (
-                              <div style={{ fontSize: 10, color: '#9ca3af', marginTop: 1 }}>{form.description}</div>
-                            )}
-                          </div>
-                          <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="currentColor" style={{ flexShrink: 0, opacity: 0.3, marginTop: 2 }}>
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                          </svg>
-                        </a>
-                      ))}
-                    </div>
-                  ))}
-                </div>
-              </div>
-            )
-          })()}
-
-          </div>{/* end left column */}
-
-          {/* Company Events */}
-          <div className="card events-card">
+        {/* Company Calendar — full width */}
+        <div className="card events-card">
             <div className="card-header">
               <div className="card-title">Company Calendar</div>
               <a
@@ -814,8 +464,6 @@ export default function DashboardPage() {
                 })()}
               </>
               )}
-          </div>
-
         </div>
 
       </div>
