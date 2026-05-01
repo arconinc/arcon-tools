@@ -364,12 +364,10 @@ export interface TickerConfig {
 
 // ─── Countdown ────────────────────────────────────────────────────────────────
 
-export interface CountdownConfig {
+export interface CalendarCountdownEvent {
   id: string
-  enabled: boolean
-  label: string
-  target_date: string   // ISO timestamp (TIMESTAMPTZ)
-  updated_at: string
+  title: string
+  start: string   // ISO datetime
 }
 
 // ─── Task Card ────────────────────────────────────────────────────────────────

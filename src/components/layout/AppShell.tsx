@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, createContext, useContext } from 'react'
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Store, CountdownConfig } from '@/types'
+import { Store, CalendarCountdownEvent } from '@/types'
 import { setGAUser, trackPageView } from '@/lib/analytics'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -120,7 +120,6 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
       items: [
         { href: '/admin/banner', label: 'Banner', icon: BannerIcon, adminMatch: true },
         { href: '/admin/banner-strip', label: 'Banner Strip', icon: TickerIcon, adminMatch: true },
-        { href: '/admin/countdown', label: 'Countdown', icon: CountdownIcon, adminMatch: true },
         { href: '/admin/news', label: 'News', icon: MegaphoneIcon, adminMatch: true },
         { href: '/admin/documents', label: 'Documents', icon: DocumentIcon, adminMatch: true },
         { href: '/admin/forms', label: 'Forms', icon: DocumentIcon, adminMatch: true },
@@ -149,8 +148,10 @@ export default function AppShell({ children, user }: AppShellProps) {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [tooltip, setTooltip] = useState<{ label: string; y: number } | null>(null)
-  const [countdown, setCountdown] = useState<CountdownConfig | null>(null)
+  const [countdownEvents, setCountdownEvents] = useState<CalendarCountdownEvent[]>([])
+  const [countdownIdx, setCountdownIdx] = useState(0)
   const [countdownDisplay, setCountdownDisplay] = useState('')
+  const [countdownFading, setCountdownFading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [profileOpen, setProfileOpen] = useState(false)
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
@@ -161,7 +162,8 @@ export default function AppShell({ children, user }: AppShellProps) {
       if (saved) setCollapsedSections(new Set(JSON.parse(saved)))
     } catch {}
   }, [])
-  const countdownRef = useRef<CountdownConfig | null>(null)
+  const countdownEventsRef = useRef<CalendarCountdownEvent[]>([])
+  const countdownIdxRef = useRef(0)
   const profileRef = useRef<HTMLDivElement | null>(null)
 
   function toggleSection(label: string) {
@@ -203,10 +205,10 @@ export default function AppShell({ children, user }: AppShellProps) {
   useEffect(() => {
     fetch('/api/countdown')
       .then(r => r.ok ? r.json() : null)
-      .then((data: CountdownConfig | null) => {
-        if (data?.enabled) {
-          setCountdown(data)
-          countdownRef.current = data
+      .then((data: { events: CalendarCountdownEvent[] } | null) => {
+        if (data?.events?.length) {
+          setCountdownEvents(data.events)
+          countdownEventsRef.current = data.events
         }
       })
       .catch(() => {})
@@ -214,9 +216,10 @@ export default function AppShell({ children, user }: AppShellProps) {
 
   useEffect(() => {
     const tick = () => {
-      const cfg = countdownRef.current
-      if (!cfg?.enabled) return
-      const diff = new Date(cfg.target_date).getTime() - Date.now()
+      const events = countdownEventsRef.current
+      const event = events[countdownIdxRef.current]
+      if (!event) return
+      const diff = new Date(event.start).getTime() - Date.now()
       if (diff <= 0) { setCountdownDisplay('Now!'); return }
       const d = Math.floor(diff / 86400000)
       const h = Math.floor((diff % 86400000) / 3600000)
@@ -230,8 +233,24 @@ export default function AppShell({ children, user }: AppShellProps) {
   }, [])
 
   useEffect(() => {
-    countdownRef.current = countdown
-  }, [countdown])
+    countdownEventsRef.current = countdownEvents
+  }, [countdownEvents])
+
+  useEffect(() => {
+    if (countdownEvents.length <= 1) return
+    const id = setInterval(() => {
+      setCountdownFading(true)
+      setTimeout(() => {
+        setCountdownIdx(i => {
+          const next = (i + 1) % countdownEventsRef.current.length
+          countdownIdxRef.current = next
+          return next
+        })
+        setCountdownFading(false)
+      }, 300)
+    }, 5000)
+    return () => clearInterval(id)
+  }, [countdownEvents.length])
 
   // ── Analytics ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -434,7 +453,7 @@ export default function AppShell({ children, user }: AppShellProps) {
               </button>
 
               {/* Countdown pill */}
-              {countdown?.enabled && countdownDisplay && (
+              {countdownEvents.length > 0 && countdownDisplay && (
                 <div style={{
                   display: 'flex',
                   alignItems: 'center',
@@ -447,13 +466,15 @@ export default function AppShell({ children, user }: AppShellProps) {
                   fontWeight: 600,
                   flexShrink: 0,
                   whiteSpace: 'nowrap',
+                  opacity: countdownFading ? 0 : 1,
+                  transition: 'opacity 0.3s ease',
                 }}>
                   <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ opacity: 0.75, flexShrink: 0 }}>
                     <circle cx="12" cy="12" r="10" strokeWidth={2} />
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" />
                   </svg>
                   <span style={{ opacity: 0.8, fontSize: 10, fontWeight: 500, textTransform: 'uppercase', letterSpacing: '0.05em' }}>
-                    {countdown.label}
+                    {countdownEvents[countdownIdx]?.title}
                   </span>
                   <span style={{ fontVariantNumeric: 'tabular-nums', fontSize: 13 }}>{countdownDisplay}</span>
                 </div>
@@ -813,9 +834,6 @@ function TickerIcon({ className }: { className?: string }) {
   return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 12h14M5 8h14M5 16h6" /></svg>
 }
 
-function CountdownIcon({ className }: { className?: string }) {
-  return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="10" strokeWidth={2} /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6l4 2" /></svg>
-}
 
 function CrmDashIcon({ className }: { className?: string }) {
   return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h10M4 18h6" /></svg>
