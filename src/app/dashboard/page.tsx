@@ -1,11 +1,25 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useMemo } from 'react'
 import Link from 'next/link'
+import FullCalendar from '@fullcalendar/react'
+import dayGridPlugin from '@fullcalendar/daygrid'
+import timeGridPlugin from '@fullcalendar/timegrid'
+import listPlugin from '@fullcalendar/list'
+import { EventClickArg, EventContentArg, EventInput } from '@fullcalendar/core'
 import { useAppUser } from '@/components/layout/AppShell'
 import { NewsFeed } from '@/components/news/NewsFeed'
-import { BannerSlide, BannerStripItem, BirthdayEvent, CrmForm } from '@/types'
+import {
+  BannerSlide,
+  BannerStripItem,
+  CompanyCalendarEvent,
+  CompanyCalendarEventType,
+  CompanyCalendarEventTypeId,
+  CompanyCalendarResponse,
+  CrmForm,
+} from '@/types'
 import { US_STATES } from '@/lib/forms-utils'
+import { countEventsThisWeek } from '@/lib/company-calendar-config'
 
 
 const QUICK_LINKS = [
@@ -63,8 +77,12 @@ export default function DashboardPage() {
   const [slides, setSlides] = useState<BannerSlide[]>([])
   const [current, setCurrent] = useState(0)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
-  const [bdayEvents, setBdayEvents] = useState<(BirthdayEvent & { color: string })[]>([])
-  const [bdayCount, setBdayCount] = useState(0)
+  const [companyEvents, setCompanyEvents] = useState<CompanyCalendarEvent[]>([])
+  const [eventTypes, setEventTypes] = useState<CompanyCalendarEventType[]>([])
+  const [activeTypeIds, setActiveTypeIds] = useState<CompanyCalendarEventTypeId[]>([])
+  const [eventsLoading, setEventsLoading] = useState(true)
+  const [eventsError, setEventsError] = useState<string | null>(null)
+  const [selectedEvent, setSelectedEvent] = useState<CompanyCalendarEvent | null>(null)
   const [bannerItems, setBannerItems] = useState<BannerStripItem[]>([])
   const [myTasks, setMyTasks] = useState<CrmTask[]>([])
   const [tasksLoading, setTasksLoading] = useState(true)
@@ -106,17 +124,23 @@ export default function DashboardPage() {
   }, [slides.length])
 
   useEffect(() => {
-    const localDate = new Date()
-    const dateParam = `${localDate.getFullYear()}-${String(localDate.getMonth() + 1).padStart(2, '0')}-${String(localDate.getDate()).padStart(2, '0')}`
-    fetch(`/api/dashboard/birthdays?date=${dateParam}&window=60&lookback=7`)
-      .then((r) => r.json())
-      .then((d) => {
-        if (d.events) {
-          setBdayEvents(d.events)
-          setBdayCount(d.birthdays_this_week ?? 0)
-        }
+    fetch('/api/dashboard/events')
+      .then(async (r) => {
+        const data = await r.json()
+        if (!r.ok) throw new Error(data.error ?? 'Unable to load calendar events')
+        return data as CompanyCalendarResponse
       })
-      .catch(() => {})
+      .then((data) => {
+        setEventTypes(data.eventTypes ?? [])
+        setActiveTypeIds((data.eventTypes ?? []).map((type) => type.id))
+        setCompanyEvents(data.events ?? [])
+        setSelectedEvent(data.events?.[0] ?? null)
+        setEventsError(null)
+      })
+      .catch((error) => {
+        setEventsError(error instanceof Error ? error.message : 'Unable to load calendar events')
+      })
+      .finally(() => setEventsLoading(false))
   }, [])
 
   useEffect(() => {
@@ -159,6 +183,79 @@ export default function DashboardPage() {
     setCurrent(next)
     if (timerRef.current) clearInterval(timerRef.current)
     timerRef.current = setInterval(() => setCurrent((c) => (c + 1) % slides.length), 4800)
+  }
+
+  const eventTypeMap = useMemo(() => {
+    return new Map(eventTypes.map((type) => [type.id, type]))
+  }, [eventTypes])
+
+  const filteredCompanyEvents = useMemo(() => {
+    return companyEvents.filter((event) => activeTypeIds.includes(event.type))
+  }, [activeTypeIds, companyEvents])
+
+  const fullCalendarEvents = useMemo<EventInput[]>(() => {
+    return filteredCompanyEvents.map((event) => {
+      const type = eventTypeMap.get(event.type)
+      return {
+        id: event.id,
+        title: event.title,
+        start: event.start,
+        end: event.end ?? undefined,
+        allDay: event.allDay,
+        backgroundColor: type?.color ?? '#6b1e98',
+        borderColor: type?.color ?? '#6b1e98',
+        textColor: '#fff',
+        extendedProps: { companyEvent: event },
+      }
+    })
+  }, [eventTypeMap, filteredCompanyEvents])
+
+  const eventsThisWeek = useMemo(() => countEventsThisWeek(companyEvents), [companyEvents])
+
+  function toggleType(typeId: CompanyCalendarEventTypeId) {
+    setActiveTypeIds((prev) =>
+      prev.includes(typeId)
+        ? prev.filter((id) => id !== typeId)
+        : [...prev, typeId]
+    )
+  }
+
+  function showAllTypes() {
+    setActiveTypeIds(eventTypes.map((type) => type.id))
+  }
+
+  function renderCalendarEvent(info: EventContentArg) {
+    const event = info.event.extendedProps.companyEvent as CompanyCalendarEvent | undefined
+    const type = event ? eventTypeMap.get(event.type) : null
+    return (
+      <div className="arc-cal-event" title={event?.title ?? info.event.title}>
+        <span className="arc-cal-dot" style={{ background: type?.accentColor ?? '#f3e8ff' }} />
+        {info.timeText && <span className="arc-cal-time">{info.timeText}</span>}
+        <span className="arc-cal-title">{info.event.title}</span>
+      </div>
+    )
+  }
+
+  function handleCalendarEventClick(info: EventClickArg) {
+    const event = info.event.extendedProps.companyEvent as CompanyCalendarEvent | undefined
+    if (event) setSelectedEvent(event)
+  }
+
+  function formatSelectedEventDate(event: CompanyCalendarEvent) {
+    if (event.allDay) {
+      return new Date(`${event.start}T00:00:00`).toLocaleDateString(undefined, {
+        weekday: 'short',
+        month: 'short',
+        day: 'numeric',
+      })
+    }
+
+    const start = new Date(event.start)
+    const end = event.end ? new Date(event.end) : null
+    const date = start.toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+    const startTime = start.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    const endTime = end?.toLocaleTimeString(undefined, { hour: 'numeric', minute: '2-digit' })
+    return endTime ? `${date} · ${startTime}-${endTime}` : `${date} · ${startTime}`
   }
 
   return (
@@ -240,27 +337,38 @@ export default function DashboardPage() {
         .next-stage-btn:hover { background: #e9d5ff; }
         .next-stage-btn:disabled { opacity: 0.45; cursor: not-allowed; }
 
-        /* ── Birthdays ── */
-        .bday-item { display: flex; align-items: center; gap: 9px; padding: 8px 0; border-bottom: 1px solid #f5f5f5; }
-        .bday-item:last-child { border-bottom: none; }
-        .bday-av { width: 32px; height: 32px; border-radius: 50%; display: flex; align-items: center; justify-content: center; font-size: 18px; flex-shrink: 0; }
-        .bday-name { font-size: 13px; font-weight: 600; color: #111; }
-        .bday-when { font-size: 11px; color: #aaa; }
-        .bday-date { font-size: 13px; font-weight: 700; color: #555; text-align: center; min-width: 50px; flex-shrink: 0; }
-        .bday-badge { font-size: 10px; padding: 2px 7px; border-radius: 3px; font-weight: 700; white-space: nowrap; }
-        .badge-today     { background: #f3e8ff; color: #6b1e98; }
-        .badge-soon      { background: #f0fdf4; color: #15803d; }
-        .badge-ann       { background: #fff7ed; color: #c2410c; }
-        .badge-past      { background: #f5f5f5; color: #999; }
-        .badge-milestone { background: #fef3c7; color: #92400e; }
-        .badge-legend    { background: #fde68a; color: #78350f; }
-        .badge-hof       { background: #ede9fe; color: #5b21b6; }
-        .bday-item.milestone-5  { background: #fffbeb; border-left: 3px solid #f59e0b; padding-left: 6px; border-radius: 4px; }
-        .bday-item.milestone-10 { background: #fef3c7; border-left: 3px solid #d97706; padding-left: 6px; border-radius: 4px; }
-        .bday-item.milestone-15 { background: #faf5ff; border-left: 3px solid #7c3aed; padding-left: 6px; border-radius: 4px; }
-        .bday-item.milestone-5  .bday-date { color: #92400e; }
-        .bday-item.milestone-10 .bday-date { color: #78350f; }
-        .bday-item.milestone-15 .bday-date { color: #6b21a8; }
+        /* ── Events Calendar ── */
+        .events-card .card-body { padding: 0; }
+        .events-tools { padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 7px; border-bottom: 1px solid #f3f4f6; }
+        .event-filter { border: 1px solid #e5e7eb; border-radius: 999px; padding: 5px 10px; background: #fff; color: #555; font-size: 11px; font-weight: 700; cursor: pointer; line-height: 1; }
+        .event-filter.active { border-color: #6b1e98; background: #f3e8ff; color: #6b1e98; }
+        .event-filter-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 6px; }
+        .calendar-shell { padding: 12px 14px 14px; }
+        .calendar-empty, .calendar-error { font-size: 12px; color: #999; padding: 20px 14px; text-align: center; }
+        .calendar-error { color: #b91c1c; background: #fef2f2; border-top: 1px solid #fee2e2; }
+        .calendar-skeleton { padding: 14px; }
+        .calendar-skeleton-row { height: 18px; background: #f5f5f5; border-radius: 5px; margin-bottom: 9px; }
+        .arc-calendar .fc { --fc-border-color: #f1f5f9; --fc-today-bg-color: #faf5ff; --fc-page-bg-color: #fff; font-family: inherit; }
+        .arc-calendar .fc .fc-toolbar.fc-header-toolbar { margin-bottom: 10px; gap: 8px; align-items: center; }
+        .arc-calendar .fc .fc-toolbar-title { font-size: 15px; font-weight: 800; color: #111; }
+        .arc-calendar .fc .fc-button { background: #fff; border: 1px solid #e5e7eb; color: #555; border-radius: 6px; padding: 4px 8px; font-size: 11px; font-weight: 700; text-transform: none; box-shadow: none; }
+        .arc-calendar .fc .fc-button:hover, .arc-calendar .fc .fc-button-primary:not(:disabled).fc-button-active { background: #6b1e98; border-color: #6b1e98; color: #fff; }
+        .arc-calendar .fc .fc-col-header-cell-cushion { color: #888; font-size: 10px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.06em; text-decoration: none; padding: 6px 0; }
+        .arc-calendar .fc .fc-daygrid-day-number { color: #555; font-size: 11px; font-weight: 700; text-decoration: none; padding: 5px 6px 2px; }
+        .arc-calendar .fc .fc-day-today .fc-daygrid-day-number { color: #6b1e98; }
+        .arc-calendar .fc .fc-daygrid-day-frame { min-height: 70px; }
+        .arc-calendar .fc .fc-event { border-radius: 5px; border: 0; padding: 1px 3px; cursor: pointer; }
+        .arc-calendar .fc .fc-daygrid-event { margin: 1px 4px; }
+        .arc-cal-event { display: flex; align-items: center; gap: 4px; min-width: 0; font-size: 10px; font-weight: 700; line-height: 1.4; }
+        .arc-cal-dot { width: 5px; height: 5px; border-radius: 50%; flex-shrink: 0; }
+        .arc-cal-time { opacity: 0.85; flex-shrink: 0; }
+        .arc-cal-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .event-detail { border-top: 1px solid #f3f4f6; padding: 12px 14px; background: #fafafa; }
+        .event-detail-label { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #aaa; margin-bottom: 5px; }
+        .event-detail-title { font-size: 14px; font-weight: 800; color: #111; margin-bottom: 4px; }
+        .event-detail-meta { font-size: 11px; color: #777; display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
+        .event-type-pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 3px 8px; font-size: 10px; font-weight: 800; }
+        .event-detail-desc { font-size: 12px; color: #555; margin-top: 8px; line-height: 1.45; white-space: pre-line; }
 
         /* ── Quick Links ── */
         .quick-link { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 14px 8px 12px; text-align: center; cursor: pointer; transition: border-color 0.15s, box-shadow 0.15s; text-decoration: none; display: block; }
@@ -295,6 +403,10 @@ export default function DashboardPage() {
           .quick-grid { gap: 8px; margin-bottom: 18px; }
           .two-col { gap: 12px; }
           .widget { padding: 12px 14px; }
+          .arc-calendar .fc .fc-toolbar.fc-header-toolbar { align-items: flex-start; flex-direction: column; }
+          .arc-calendar .fc .fc-toolbar-chunk { display: flex; gap: 4px; max-width: 100%; flex-wrap: wrap; }
+          .arc-calendar .fc .fc-daygrid-day-frame { min-height: 58px; }
+          .arc-cal-time { display: none; }
         }
       `}</style>
 
@@ -441,12 +553,12 @@ export default function DashboardPage() {
           <div className="widget">
             <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between' }}>
               <div>
-                <div className="widget-label">Birthdays This Week</div>
-                <div className="widget-value">{bdayCount}</div>
-                <div className="widget-sub">{bdayCount === 1 ? '1 birthday' : bdayCount === 0 ? 'None this week' : `${bdayCount} birthdays`}</div>
+                <div className="widget-label">Events This Week</div>
+                <div className="widget-value">{eventsLoading ? '—' : eventsThisWeek}</div>
+                <div className="widget-sub">{eventsLoading ? 'Loading…' : eventsThisWeek === 1 ? '1 event' : eventsThisWeek === 0 ? 'None this week' : `${eventsThisWeek} events`}</div>
               </div>
               <div className="widget-icon wi-gray">
-                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 15.546c-.523 0-1.046.151-1.5.454a2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.704 2.704 0 00-3 0 2.704 2.704 0 01-3 0 2.701 2.701 0 00-1.5-.454M9 6l3-3 3 3M9 6h6M9 6a3 3 0 01-3 3m12-3a3 3 0 01-3 3" /></svg>
+                <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3M5 11h14M7 21h10a2 2 0 002-2V7a2 2 0 00-2-2H7a2 2 0 00-2 2v12a2 2 0 002 2z" /></svg>
               </div>
             </div>
           </div>
@@ -608,44 +720,100 @@ export default function DashboardPage() {
 
           </div>{/* end left column */}
 
-          {/* Birthdays & Anniversaries */}
-          <div className="card">
+          {/* Company Events */}
+          <div className="card events-card">
             <div className="card-header">
-              <div className="card-title">Birthdays &amp; Anniversaries</div>
-              <Link href="/birthdays" className="card-action" style={{ textDecoration: 'none' }}>View all →</Link>
+              <div className="card-title">Company Calendar</div>
+              <a
+                href="https://calendar.google.com/calendar/u/0?cid=Y19lNDNlMDkyODZiMzM3MGZhNjQzZGE0OTExZjA2MWZhZDc1MmIzMzkwODMxNDg2MzVlM2M0ZTUzMzk2Yjk4ODk3QGdyb3VwLmNhbGVuZGFyLmdvb2dsZS5jb20"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="card-action"
+                style={{ textDecoration: 'none' }}
+              >
+                Open Google Calendar →
+              </a>
             </div>
-            <div className="card-body">
-              {bdayEvents.length === 0 ? (
-                <div style={{ fontSize: 12, color: '#bbb', padding: '8px 0' }}>No upcoming events</div>
-              ) : (
-                bdayEvents.map((b) => {
-                  const isBday = b.type === 'birthday'
-                  const eventType = isBday ? 'Birthday' : `${b.years}yr Anniversary`
-                  const sub = b.job_title ? `${eventType} · ${b.job_title}` : eventType
-                  const absDays = Math.abs(b.days_until)
-                  const badge = b.days_until === 0 ? 'Today!' : b.days_until === 1 ? 'Tomorrow' : b.days_until < 0 ? `${absDays} day${absDays === 1 ? '' : 's'} ago` : `${b.days_until} days`
-                  const tier = !isBday && b.years ? (b.years >= 15 ? 'hof' : b.years >= 10 ? 'legend' : b.years >= 5 ? 'milestone' : 'standard') : 'standard'
-                  const milestoneClass = tier === 'hof' ? 'milestone-15' : tier === 'legend' ? 'milestone-10' : tier === 'milestone' ? 'milestone-5' : ''
-                  const badgeClass = b.days_until === 0 ? 'badge-today' : b.days_until < 0 ? 'badge-past' : isBday ? 'badge-soon' : tier === 'hof' ? 'badge-hof' : tier === 'legend' ? 'badge-legend' : tier === 'milestone' ? 'badge-milestone' : 'badge-ann'
-                  const annIcon = tier === 'hof' ? '👑' : tier === 'legend' ? '🏆' : tier === 'milestone' ? '⭐' : '🥂'
+            <div className="events-tools">
+              <button
+                type="button"
+                className={`event-filter${activeTypeIds.length === eventTypes.length && eventTypes.length > 0 ? ' active' : ''}`}
+                onClick={showAllTypes}
+              >
+                All
+              </button>
+              {eventTypes.map((type) => (
+                <button
+                  key={type.id}
+                  type="button"
+                  className={`event-filter${activeTypeIds.includes(type.id) ? ' active' : ''}`}
+                  onClick={() => toggleType(type.id)}
+                >
+                  <span className="event-filter-dot" style={{ background: type.color }} />
+                  {type.label}
+                </button>
+              ))}
+            </div>
+            {eventsLoading ? (
+              <div className="calendar-skeleton">
+                <div className="calendar-skeleton-row" style={{ width: '42%' }} />
+                <div className="calendar-skeleton-row" style={{ width: '100%', height: 220 }} />
+              </div>
+            ) : eventsError ? (
+              <div className="calendar-error">{eventsError}</div>
+            ) : (
+              <>
+                <div className="calendar-shell arc-calendar">
+                  <FullCalendar
+                    plugins={[dayGridPlugin, timeGridPlugin, listPlugin]}
+                    initialView="dayGridMonth"
+                    headerToolbar={{
+                      left: 'prev,next today',
+                      center: 'title',
+                      right: 'dayGridMonth,timeGridWeek,listMonth',
+                    }}
+                    buttonText={{
+                      today: 'Today',
+                      month: 'Month',
+                      week: 'Week',
+                      list: 'List',
+                    }}
+                    events={fullCalendarEvents}
+                    eventContent={renderCalendarEvent}
+                    eventClick={handleCalendarEventClick}
+                    height="auto"
+                    dayMaxEvents={3}
+                    nowIndicator
+                  />
+                  {fullCalendarEvents.length === 0 && (
+                    <div className="calendar-empty">No events match the selected filters.</div>
+                  )}
+                </div>
+                {selectedEvent && activeTypeIds.includes(selectedEvent.type) && (() => {
+                  const type = eventTypeMap.get(selectedEvent.type)
                   return (
-                    <div key={b.id} className={`bday-item${milestoneClass ? ` ${milestoneClass}` : ''}`}>
-                      <div className="bday-av" style={b.avatar_url ? { background: 'transparent' } : { background: b.color }}>
-                        {b.avatar_url ? (
-                          <img src={b.avatar_url} alt={b.name} referrerPolicy="no-referrer" style={{ width: '100%', height: '100%', borderRadius: '50%', objectFit: 'cover' }} />
-                        ) : (isBday ? '🎂' : annIcon)}
+                    <div className="event-detail">
+                      <div className="event-detail-label">Selected Event</div>
+                      <div className="event-detail-title">{selectedEvent.title}</div>
+                      <div className="event-detail-meta">
+                        <span
+                          className="event-type-pill"
+                          style={{ background: type?.accentColor ?? '#f3e8ff', color: type?.color ?? '#6b1e98' }}
+                        >
+                          <span className="event-filter-dot" style={{ background: type?.color ?? '#6b1e98', marginRight: 0 }} />
+                          {selectedEvent.typeLabel}
+                        </span>
+                        <span>{formatSelectedEventDate(selectedEvent)}</span>
+                        {selectedEvent.location && <span>{selectedEvent.location}</span>}
                       </div>
-                      <div style={{ flex: 1 }}>
-                        <div className="bday-name">{b.name}</div>
-                        <div className="bday-when">{sub}</div>
-                      </div>
-                      <div className="bday-date">{b.date_label}</div>
-                      <span className={`bday-badge ${badgeClass}`}>{badge}</span>
+                      {selectedEvent.description && (
+                        <div className="event-detail-desc">{selectedEvent.description}</div>
+                      )}
                     </div>
                   )
-                })
+                })()}
+              </>
               )}
-            </div>
           </div>
 
         </div>

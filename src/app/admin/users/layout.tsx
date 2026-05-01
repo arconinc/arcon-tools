@@ -18,15 +18,6 @@ export default async function DashboardLayout({ children }: { children: React.Re
 
   if (!appUser) redirect('/login')
 
-  // Check if credentials are configured
-  const { data: creds } = await adminClient
-    .from('app_credentials')
-    .select('id')
-    .eq('user_id', appUser.id)
-    .single()
-
-  if (!creds) redirect('/setup-credentials')
-
   const avatarUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture || null
 
   return (

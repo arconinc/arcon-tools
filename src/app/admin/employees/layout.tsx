@@ -19,14 +19,6 @@ export default async function AdminEmployeesLayout({ children }: { children: Rea
   if (!appUser) redirect('/login')
   if (!appUser.is_admin) redirect('/dashboard')
 
-  const { data: creds } = await adminClient
-    .from('app_credentials')
-    .select('id')
-    .eq('user_id', appUser.id)
-    .single()
-
-  if (!creds) redirect('/setup-credentials')
-
   const avatarUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture || null
 
   return (

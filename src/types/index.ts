@@ -83,6 +83,39 @@ export interface BirthdayEvent {
   job_title?: string | null
 }
 
+// ─── Company Calendar ────────────────────────────────────────────────────────
+
+export type CompanyCalendarEventTypeId = 'birthday' | 'anniversary' | 'company'
+
+export interface CompanyCalendarEventType {
+  id: CompanyCalendarEventTypeId
+  label: string
+  color: string
+  accentColor: string
+  googleColorIds: string[]
+  titlePrefixes: string[]
+}
+
+export interface CompanyCalendarEvent {
+  id: string
+  title: string
+  type: CompanyCalendarEventTypeId
+  typeLabel: string
+  start: string
+  end: string | null
+  allDay: boolean
+  description: string | null
+  location: string | null
+  htmlLink: string | null
+  googleColorId: string | null
+}
+
+export interface CompanyCalendarResponse {
+  eventTypes: CompanyCalendarEventType[]
+  events: CompanyCalendarEvent[]
+  cachedAt: string
+}
+
 // ─── Store ───────────────────────────────────────────────────────────────────
 
 export type StoreStatus = 'Active' | 'Inactive'
