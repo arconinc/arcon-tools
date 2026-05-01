@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { AppUser } from '@/types'
+import { DEPARTMENTS } from '@/lib/task-constants'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -33,7 +34,7 @@ export default function AdminUsersPage() {
 
   // Inline edit per user
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState({ display_name: '', birth_date: '', start_date: '' })
+  const [editForm, setEditForm] = useState({ display_name: '', birth_date: '', start_date: '', department: '' })
   const [saving, setSaving] = useState(false)
 
   // Admin toggle
@@ -111,6 +112,7 @@ export default function AdminUsersPage() {
       display_name: user.display_name,
       birth_date: user.birth_date ?? '',
       start_date: user.start_date ?? '',
+      department: user.department ?? '',
     })
   }
 
@@ -124,6 +126,7 @@ export default function AdminUsersPage() {
         display_name: editForm.display_name,
         birth_date: editForm.birth_date || null,
         start_date: editForm.start_date || null,
+        department: editForm.department || null,
       }),
     })
     setSaving(false)
@@ -317,6 +320,19 @@ export default function AdminUsersPage() {
                         className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-purple-400"
                       />
                     </div>
+                    <div className="col-span-2">
+                      <label className="block text-xs text-slate-500 mb-1">Department</label>
+                      <select
+                        value={editForm.department}
+                        onChange={(e) => setEditForm((f) => ({ ...f, department: e.target.value }))}
+                        className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-purple-400 bg-white"
+                      >
+                        <option value="">No department</option>
+                        {DEPARTMENTS.map((d) => (
+                          <option key={d} value={d}>{d}</option>
+                        ))}
+                      </select>
+                    </div>
                   </div>
                   <div className="flex gap-2">
                     <button
@@ -360,6 +376,9 @@ export default function AdminUsersPage() {
                           <span className="text-xs font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Linked</span>
                         ) : (
                           <span className="text-xs font-medium bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">Pending</span>
+                        )}
+                        {user.department && (
+                          <span className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{user.department}</span>
                         )}
                       </div>
                       <p className="text-xs text-slate-400 mt-0.5">{user.email}</p>

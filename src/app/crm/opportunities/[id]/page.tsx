@@ -900,7 +900,7 @@ export default function OpportunityDetailPage() {
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50">
               <h2 className="text-sm font-semibold text-slate-700">Open Tasks ({opp.tasks.length})</h2>
-              <button onClick={() => router.push(`/crm/tasks/new?opportunity_id=${opp.id}`)}
+              <button onClick={() => router.push(`/tasks/new?opportunity_id=${opp.id}`)}
                 className="text-xs font-semibold text-purple-700 hover:text-purple-900">
                 + Add Task
               </button>
@@ -910,7 +910,7 @@ export default function OpportunityDetailPage() {
             ) : (
               <div className="divide-y divide-slate-100">
                 {opp.tasks.map((t) => (
-                  <div key={t.id} onClick={() => router.push(`/crm/tasks/${t.id}`)}
+                  <div key={t.id} onClick={() => router.push(`/tasks/${t.id}`)}
                     className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50 cursor-pointer transition-colors">
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-slate-800 truncate">{t.title}</div>
@@ -971,7 +971,7 @@ export default function OpportunityDetailPage() {
             {opp.tasks.length === 0 ? (
               <div className="text-center text-sm text-slate-400 py-4">
                 No tasks linked to this opportunity.{' '}
-                <button onClick={() => router.push(`/crm/tasks/new?opportunity_id=${opp.id}`)}
+                <button onClick={() => router.push(`/tasks/new?opportunity_id=${opp.id}`)}
                   className="text-purple-700 hover:underline">
                   Create one →
                 </button>
@@ -979,7 +979,7 @@ export default function OpportunityDetailPage() {
             ) : (
               <div className="space-y-2">
                 {opp.tasks.map((t) => (
-                  <div key={t.id} onClick={() => router.push(`/crm/tasks/${t.id}`)}
+                  <div key={t.id} onClick={() => router.push(`/tasks/${t.id}`)}
                     className="flex items-center gap-3 p-3 rounded-lg border border-slate-100 hover:border-purple-200 hover:bg-purple-50 cursor-pointer transition-colors">
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-slate-800">{t.title}</div>

@@ -390,7 +390,7 @@ export default function CrmDashboardPage() {
             {data.my_tasks.map((t) => (
               <div
                 key={t.id}
-                onClick={() => router.push(`/crm/tasks/${t.id}`)}
+                onClick={() => router.push(`/tasks/${t.id}`)}
                 className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50 cursor-pointer transition-colors"
               >
                 <div className="flex-1 min-w-0">

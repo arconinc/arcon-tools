@@ -5,6 +5,7 @@ import { useState, useRef } from 'react'
 type CreatedTask = {
   id: string
   title: string
+  department: string | null
   category: string | null
   priority: string
   status: string
@@ -13,10 +14,11 @@ type CreatedTask = {
 }
 
 interface QuickAddTaskProps {
+  defaultDepartment?: string
   onTaskCreated: (task: CreatedTask) => void
 }
 
-export default function QuickAddTask({ onTaskCreated }: QuickAddTaskProps) {
+export default function QuickAddTask({ defaultDepartment, onTaskCreated }: QuickAddTaskProps) {
   const [value, setValue] = useState('')
   const [adding, setAdding] = useState(false)
   const inputRef = useRef<HTMLInputElement>(null)
@@ -27,10 +29,12 @@ export default function QuickAddTask({ onTaskCreated }: QuickAddTaskProps) {
     if (!title || adding) return
     setAdding(true)
     try {
+      const body: Record<string, unknown> = { title, category: 'To Do General' }
+      if (defaultDepartment) body.department = defaultDepartment
       const res = await fetch('/api/crm/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ title, category: 'To Do General' }),
+        body: JSON.stringify(body),
       })
       if (!res.ok) throw new Error('Failed')
       const created = await res.json()

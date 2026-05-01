@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 
 // GET /api/crm/tasks
-// ?assigned_to=me|all|<uuid>|<uuid1>,<uuid2>  ?status=  ?category=  ?due_before=  ?opportunity_id=  ?customer_id=  ?vendor_id=  ?page=1&limit=50
+// ?assigned_to=me|all|<uuid>|<uuid1>,<uuid2>  ?status=  ?category=  ?department=  ?delegated_by_me=true  ?due_before=  ?opportunity_id=  ?customer_id=  ?vendor_id=  ?page=1&limit=50
 export async function GET(req: NextRequest) {
   const appUser = await requireUser()
   if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -12,6 +12,8 @@ export async function GET(req: NextRequest) {
   const assignedTo = searchParams.get('assigned_to')
   const status = searchParams.get('status')
   const category = searchParams.get('category')
+  const department = searchParams.get('department')
+  const delegatedByMe = searchParams.get('delegated_by_me') === 'true'
   const dueBefore = searchParams.get('due_before')
   const opportunityId = searchParams.get('opportunity_id')
   const customerId = searchParams.get('customer_id')
@@ -34,13 +36,25 @@ export async function GET(req: NextRequest) {
   }
 
   const applyFilters = (q: any) => {
-    if (assignedToIds) {
+    if (delegatedByMe) {
+      // Show tasks where current user created, owns, or delegated the task
+      q = q.or(`created_by.eq.${appUser.id},task_owner.eq.${appUser.id},delegators.cs.{${appUser.id}}`)
+      // Also apply assigned_to filter if specified
+      if (assignedToIds) {
+        if (assignedToIds.length === 1) {
+          q = q.eq('assigned_to', assignedToIds[0])
+        } else {
+          q = q.in('assigned_to', assignedToIds)
+        }
+      }
+    } else if (assignedToIds) {
       if (assignedToIds.length === 1) {
         q = q.eq('assigned_to', assignedToIds[0])
       } else {
         q = q.in('assigned_to', assignedToIds)
       }
     }
+    if (department) q = q.eq('department', department)
     if (status) {
       const statuses = status.split(',').map((s) => s.trim()).filter(Boolean)
       if (statuses.length === 1) {
@@ -62,7 +76,7 @@ export async function GET(req: NextRequest) {
     applyFilters(
       adminClient
         .from('crm_tasks')
-        .select('id, title, assigned_to, task_owner, category, priority, due_date, status, progress, opportunity_id, customer_id, vendor_id, contact_id, sort_order, created_at, updated_at')
+        .select('id, title, assigned_to, task_owner, department, category, priority, due_date, status, progress, delegators, opportunity_id, customer_id, vendor_id, contact_id, sort_order, created_by, created_at, updated_at')
         .order('sort_order', { ascending: true, nullsFirst: false })
         .order('due_date', { ascending: true, nullsFirst: false })
     ).range(from, to),

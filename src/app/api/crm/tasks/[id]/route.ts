@@ -21,7 +21,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (error || !task) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   // Fetch all related data in parallel
-  const [commentsRes, historyRes, oppRes, custRes, vendRes, contRes, assignedUserRes] = await Promise.all([
+  const [commentsRes, historyRes, attachmentsRes, oppRes, custRes, vendRes, contRes, assignedUserRes] = await Promise.all([
     adminClient
       .from('crm_task_comments')
       .select('*, crm_comment_attachments(*)')
@@ -32,6 +32,11 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       .select('*')
       .eq('task_id', id)
       .order('changed_at', { ascending: true }),
+    adminClient
+      .from('crm_task_attachments')
+      .select('*')
+      .eq('task_id', id)
+      .order('created_at', { ascending: true }),
     task.opportunity_id
       ? adminClient.from('crm_opportunities').select('id, name').eq('id', task.opportunity_id).single()
       : Promise.resolve({ data: null }),
@@ -48,6 +53,25 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       ? adminClient.from('users').select('id, display_name, email').eq('id', task.assigned_to).single()
       : Promise.resolve({ data: null }),
   ])
+
+  // Resolve created_by and delegators to display names
+  const peopleIds = [...new Set([
+    task.created_by,
+    ...(task.delegators ?? []),
+  ].filter(Boolean))]
+  let peopleMap: Record<string, { id: string; display_name: string }> = {}
+  if (peopleIds.length > 0) {
+    const { data: people } = await adminClient
+      .from('users')
+      .select('id, display_name')
+      .in('id', peopleIds)
+    for (const u of people ?? []) peopleMap[u.id] = u
+  }
+
+  const createdUser = task.created_by ? (peopleMap[task.created_by] ?? null) : null
+  const delegatorUsers = (task.delegators ?? [])
+    .map((uid: string) => peopleMap[uid])
+    .filter(Boolean)
 
   // Enrich comments with user info
   const commentRows = commentsRes.data ?? []
@@ -79,9 +103,27 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     for (const u of hUsers ?? []) histUsersMap[u.id] = u.display_name
   }
 
+  // Also collect user IDs from assigned_to field changes
+  const assignedToUserIds = [...new Set(
+    historyRows
+      .filter((h: any) => h.field_changed === 'assigned_to')
+      .flatMap((h: any) => [h.old_value, h.new_value])
+      .filter(Boolean)
+  )]
+  let assignedUsersMap: Record<string, string> = {}
+  if (assignedToUserIds.length > 0) {
+    const { data: aUsers } = await adminClient
+      .from('users')
+      .select('id, display_name')
+      .in('id', assignedToUserIds)
+    for (const u of aUsers ?? []) assignedUsersMap[u.id] = u.display_name
+  }
+
   const enrichedHistory = historyRows.map((h: any) => ({
     ...h,
     user: { id: h.user_id, display_name: histUsersMap[h.user_id] ?? 'Unknown' },
+    old_value: h.field_changed === 'assigned_to' && h.old_value ? (assignedUsersMap[h.old_value] ?? h.old_value) : h.old_value,
+    new_value: h.field_changed === 'assigned_to' && h.new_value ? (assignedUsersMap[h.new_value] ?? h.new_value) : h.new_value,
   }))
 
   const contact = contRes.data
@@ -89,11 +131,14 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     ...task,
     comments: enrichedComments,
     history: enrichedHistory,
+    attachments: attachmentsRes.data ?? [],
     opportunity: oppRes.data ?? null,
     customer: custRes.data ?? null,
     vendor: vendRes.data ?? null,
     contact: contact ? { id: contact.id, first_name: contact.first_name, last_name: contact.last_name } : null,
     assigned_user: assignedUserRes.data ?? null,
+    created_user: createdUser,
+    delegator_users: delegatorUsers,
   })
 }
 
@@ -139,9 +184,22 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     await adminClient.from('crm_task_history').insert(historyInserts)
   }
 
+  // Delegation tracking: when assigned_to changes, add the previous holder to delegators
+  const finalUpdates: Record<string, unknown> = { ...updates, updated_at: new Date().toISOString() }
+  if (
+    'assigned_to' in updates &&
+    updates.assigned_to !== current.assigned_to &&
+    current.assigned_to
+  ) {
+    const existingDelegators: string[] = current.delegators ?? []
+    if (!existingDelegators.includes(current.assigned_to)) {
+      finalUpdates.delegators = [...existingDelegators, current.assigned_to]
+    }
+  }
+
   const { data, error } = await adminClient
     .from('crm_tasks')
-    .update({ ...updates, updated_at: new Date().toISOString() })
+    .update(finalUpdates)
     .eq('id', id)
     .select()
     .single()

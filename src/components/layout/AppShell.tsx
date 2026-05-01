@@ -82,13 +82,13 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
         { href: '/crm/vendors', label: 'Vendors', icon: BuildingIcon, adminMatch: true },
         { href: '/crm/contacts', label: 'Contacts', icon: CrmContactsIcon, adminMatch: true },
         { href: '/crm/opportunities', label: 'Opportunities', icon: CrmOppsIcon, adminMatch: true },
-        { href: '/my-tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
+        { href: '/crm/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
       ],
     },
     {
       label: 'Tasks',
       items: [
-        { href: '/my-tasks', label: 'Task Board', icon: BoardIcon },
+        { href: '/my-tasks', label: 'My Tasks', icon: BoardIcon },
       ],
     },
     {
@@ -104,32 +104,32 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
       label: 'E-Commerce',
       items: [
         { href: '/stores', label: 'Stores', icon: StoreIcon, adminMatch: true },
-        { href: '/my-tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
+        { href: '/ecommerce/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
       ],
     },
     {
       label: 'HR',
       items: [
         { href: '/documents', label: 'Documents', icon: DocumentIcon, adminMatch: true },
-        { href: '/my-tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
+        { href: '/hr/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
       ],
     },
     {
       label: 'Accounting',
       items: [
-        { href: '/my-tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
+        { href: '/accounting/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
       ],
     },
     {
       label: 'Sales',
       items: [
-        { href: '/my-tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
+        { href: '/sales/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
       ],
     },
     {
       label: 'Warehouse',
       items: [
-        { href: '/my-tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
+        { href: '/warehouse/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
       ],
     },
   ]

@@ -17,7 +17,7 @@ export async function GET() {
   const adminClient = createAdminClient()
   const { data, error } = await adminClient
     .from('users')
-    .select('id, email, display_name, is_admin, avatar_url, created_at, last_login_at, birth_date, start_date, google_id, team')
+    .select('id, email, display_name, is_admin, avatar_url, created_at, last_login_at, birth_date, start_date, google_id, team, department')
     .order('created_at', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -57,12 +57,13 @@ export async function PATCH(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!(await requireAdmin(user.id))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { userId, is_admin, display_name, birth_date, start_date } = await request.json()
+  const { userId, is_admin, display_name, birth_date, start_date, department } = await request.json()
   const updates: Record<string, unknown> = {}
   if (is_admin !== undefined) updates.is_admin = is_admin
   if (display_name !== undefined) updates.display_name = display_name
   if (birth_date !== undefined) updates.birth_date = birth_date
   if (start_date !== undefined) updates.start_date = start_date
+  if (department !== undefined) updates.department = department || null
 
   const adminClient = createAdminClient()
   const { data, error } = await adminClient

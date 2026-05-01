@@ -14,7 +14,7 @@ function TaskRow({ task }: { task: CrmTask }) {
     waiting_on_approval: 'Pending Approval', waiting_on_client_approval: 'Client Approval', need_changes: 'Needs Changes',
   }
   return (
-    <Link href={`/crm/tasks/${task.id}`} className="flex items-center px-4 py-3 hover:bg-slate-50 gap-3 border-b border-slate-50 last:border-0 transition-colors">
+    <Link href={`/tasks/${task.id}`} className="flex items-center px-4 py-3 hover:bg-slate-50 gap-3 border-b border-slate-50 last:border-0 transition-colors">
       <div className="flex-1 min-w-0">
         <p className="text-sm font-medium text-slate-800 truncate">{task.title}</p>
         {task.due_date && <p className="text-xs text-slate-400 mt-0.5">Due {formatDate(task.due_date)}</p>}

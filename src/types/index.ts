@@ -23,6 +23,7 @@ export interface AppUser {
   zip: string | null
   phone: string | null
   clickup_user_id: string | null
+  department: string | null
   // Employee profile fields
   manager_id: string | null
   profile_image_url: string | null
@@ -449,6 +450,7 @@ export type CrmContactType = 'Customer' | 'Vendor' | 'Prospect' | 'Partner' | 'O
 export type CrmOpportunityStatus = 'open' | 'won' | 'lost' | 'stalled'
 export type CrmPipelineStage = 'Send Quote' | 'Follow Up on Quote' | 'Quote Accepted' | 'Send Thank You Email'
 export type CrmOpportunityCategory = 'Apparel' | 'Packaging Product' | 'Print Product' | 'Promotional Product' | 'Signage' | 'Store/Ecommerce Build'
+export type CrmTaskDepartment = 'CRM' | 'E-Commerce' | 'HR' | 'IT' | 'Accounting' | 'Sales' | 'Warehouse' | 'General'
 export type CrmTaskStatus = 'not_started' | 'in_progress' | 'completed' | 'waiting_on_approval' | 'waiting_on_client_approval' | 'need_changes'
 export type CrmTaskPriority = 'low' | 'medium' | 'high'
 export type CrmTaskCategory =
@@ -679,12 +681,14 @@ export interface CrmTask {
   title: string
   assigned_to: string | null
   task_owner: string | null
+  department: CrmTaskDepartment | null
   category: CrmTaskCategory | null
   priority: CrmTaskPriority
   due_date: string | null
   status: CrmTaskStatus
   progress: number
   description: string | null
+  delegators: string[]
   opportunity_id: string | null
   customer_id: string | null
   vendor_id: string | null
@@ -715,6 +719,18 @@ export interface CrmCommentAttachment {
   mime_type: string | null
   is_drive_link: boolean
   uploaded_by: string
+  created_at: string
+}
+
+export interface CrmTaskAttachment {
+  id: string
+  task_id: string
+  label: string | null
+  url: string
+  file_name: string
+  file_size: number | null
+  mime_type: string | null
+  uploaded_by: string | null
   created_at: string
 }
 
@@ -807,6 +823,7 @@ export interface CrmTaskDetail extends CrmTask {
     user: { id: string; display_name: string; avatar_url?: string | null }
   })[]
   history: (CrmTaskHistory & { user: { id: string; display_name: string } })[]
+  attachments: CrmTaskAttachment[]
   opportunity: { id: string; name: string } | null
   customer: { id: string; name: string } | null
   vendor: { id: string; name: string } | null
