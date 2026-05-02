@@ -3,16 +3,9 @@
 import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
-import { useAppUser } from '@/components/layout/AppShell'
 import EntitySearchPicker from '@/components/crm/EntitySearchPicker'
-import {
-  DEPARTMENTS,
-  DEPARTMENT_CATEGORIES,
-  encodeTaskAssignmentValue,
-  getTaskCategoryLabel,
-  parseTaskAssignmentValue,
-} from '@/lib/task-constants'
-import type { CrmTaskDepartment } from '@/types'
+import { TaskAssignmentSelect } from '@/components/crm/TaskAssignmentSelect'
+import { getTaskCategoryLabel } from '@/lib/task-constants'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -57,11 +50,6 @@ type TaskDetail = {
   assigned_user: { id: string; display_name: string; email: string } | null
   created_user: { id: string; display_name: string } | null
   delegator_users: { id: string; display_name: string }[]
-}
-
-type CreateForm = {
-  title: string; assigned_to: string; department: string; category: string; priority: string
-  due_date: string; status: string; description: string; progress: string
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -215,36 +203,6 @@ function FieldInput({
 function formatTaskAssignment(department: string | null, category: string | null) {
   if (department && category) return `${department} / ${getTaskCategoryLabel(category)}`
   return department ?? category ?? null
-}
-
-function TaskAssignmentSelect({
-  department,
-  category,
-  onChange,
-}: {
-  department: string | null
-  category: string | null
-  onChange: (assignment: { department: CrmTaskDepartment | null; category: string | null }) => void
-}) {
-  return (
-    <select
-      value={encodeTaskAssignmentValue(department, category)}
-      onChange={(e) => onChange(parseTaskAssignmentValue(e.target.value))}
-      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
-    >
-      <option value="">— None —</option>
-      {DEPARTMENTS.map((departmentOption) => (
-        <optgroup key={departmentOption} label={departmentOption}>
-          <option value={`department:${departmentOption}`}>{departmentOption}</option>
-          {DEPARTMENT_CATEGORIES[departmentOption].map((categoryOption) => (
-            <option key={categoryOption} value={`category:${categoryOption}`}>
-              {getTaskCategoryLabel(categoryOption)}
-            </option>
-          ))}
-        </optgroup>
-      ))}
-    </select>
-  )
 }
 
 function fmtFileSize(bytes: number | null) {
@@ -532,7 +490,6 @@ export default function TaskDetailPage() {
   const params = useParams<{ id: string }>()
   const id = params.id
   const isNew = id === 'new'
-  const { user: appUser } = useAppUser()
 
   const [task, setTask] = useState<TaskDetail | null>(null)
   const [loading, setLoading] = useState(!isNew)
@@ -546,40 +503,15 @@ export default function TaskDetailPage() {
   const [crmUsers, setCrmUsers] = useState<DropdownUser[]>([])
   const [contacts, setContacts] = useState<DropdownContact[]>([])
 
-  // Pending file uploads for new task creation
-  const [pendingFiles, setPendingFiles] = useState<File[]>([])
-
   useEffect(() => {
     Promise.all([
       fetch('/api/crm/users').then((r) => r.json()),
       fetch('/api/crm/contacts').then((r) => r.json()),
     ]).then(([users, conts]) => {
-      if (Array.isArray(users)) {
-        setCrmUsers(users)
-        // Pre-select the current user in the assigned_to field for new tasks
-        if (appUser?.email) {
-          const me = users.find((u: DropdownUser) => u.email === appUser.email)
-          if (me) setCreateForm((prev) => ({ ...prev, assigned_to: me.id }))
-        }
-      }
+      if (Array.isArray(users)) setCrmUsers(users)
       if (Array.isArray(conts)) setContacts(conts)
     })
   }, [])
-
-  // Create form
-  const [createForm, setCreateForm] = useState<CreateForm>({
-    title: '',
-    assigned_to: '',
-    department: '',
-    category: '',
-    priority: 'medium',
-    due_date: '',
-    status: 'not_started',
-    description: '',
-    progress: '0',
-  })
-  const [creating, setCreating] = useState(false)
-  const [createError, setCreateError] = useState<string | null>(null)
 
   async function loadTask() {
     const res = await fetch(`/api/crm/tasks/${id}`)
@@ -589,10 +521,13 @@ export default function TaskDetailPage() {
   }
 
   useEffect(() => {
-    if (isNew) return
+    if (isNew) {
+      router.replace('/crm/tasks')
+      return
+    }
     setLoading(true)
     loadTask().finally(() => setLoading(false))
-  }, [id, isNew])
+  }, [id, isNew, router])
 
   function startEdit() {
     if (!task) return
@@ -646,188 +581,8 @@ export default function TaskDetailPage() {
     }
   }
 
-  async function handleCreate(e: React.FormEvent) {
-    e.preventDefault()
-    if (!createForm.title.trim()) { setCreateError('Title is required'); return }
-    setCreating(true)
-    setCreateError(null)
-    try {
-      const res = await fetch('/api/crm/tasks', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          title: createForm.title.trim(),
-          assigned_to: createForm.assigned_to || null,
-          department: createForm.department || null,
-          category: createForm.category || null,
-          priority: createForm.priority || 'medium',
-          due_date: createForm.due_date || null,
-          status: createForm.status || 'not_started',
-          description: createForm.description || null,
-          progress: createForm.progress ? Number(createForm.progress) : 0,
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) { setCreateError(data.error ?? 'Create failed'); return }
-
-      // Upload any attached files
-      if (pendingFiles.length > 0) {
-        await Promise.all(pendingFiles.map(async (file) => {
-          const fd = new FormData()
-          fd.append('file', file)
-          const uploadRes = await fetch('/api/crm/upload', { method: 'POST', body: fd })
-          if (!uploadRes.ok) return
-          const uploaded = await uploadRes.json()
-          await fetch(`/api/crm/tasks/${data.id}/attachments`, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              url: uploaded.url,
-              file_name: uploaded.file_name,
-              file_size: uploaded.file_size,
-              mime_type: uploaded.mime_type,
-            }),
-          })
-        }))
-      }
-
-      router.push(`/tasks/${data.id}`)
-    } finally {
-      setCreating(false)
-    }
-  }
-
-  // ── Create form ─────────────────────────────────────────────────────────────
   if (isNew) {
-    const cf = createForm
-    return (
-      <div className="max-w-2xl mx-auto px-6 py-8">
-        <Link href="/crm/tasks" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-6">
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-          </svg>
-          Tasks
-        </Link>
-        <h1 className="text-2xl font-bold text-slate-900 mb-6">New Task</h1>
-        <form onSubmit={handleCreate} className="bg-white border border-slate-200 rounded-2xl p-6 space-y-4">
-          {createError && (
-            <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{createError}</div>
-          )}
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">
-              Task Title <span className="text-red-500">*</span>
-            </label>
-            <input type="text" value={cf.title} required
-              onChange={(e) => setCreateForm((p) => ({ ...p, title: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Department / Category</label>
-            <TaskAssignmentSelect
-              department={cf.department || null}
-              category={cf.category || null}
-              onChange={(assignment) =>
-                setCreateForm((p) => ({
-                  ...p,
-                  department: assignment.department ?? '',
-                  category: assignment.category ?? '',
-                }))
-              }
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Priority</label>
-              <select value={cf.priority}
-                onChange={(e) => setCreateForm((p) => ({ ...p, priority: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                <option value="low">Low</option>
-                <option value="medium">Medium</option>
-                <option value="high">High</option>
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Status</label>
-              <select value={cf.status}
-                onChange={(e) => setCreateForm((p) => ({ ...p, status: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                {STATUSES.map((s) => <option key={s.value} value={s.value}>{s.label}</option>)}
-              </select>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Assigned To</label>
-              <select value={cf.assigned_to}
-                onChange={(e) => setCreateForm((p) => ({ ...p, assigned_to: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                <option value="">— Unassigned —</option>
-                {crmUsers.map((u) => (
-                  <option key={u.id} value={u.id}>{u.display_name}</option>
-                ))}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Due Date</label>
-              <input type="date" value={cf.due_date}
-                onChange={(e) => setCreateForm((p) => ({ ...p, due_date: e.target.value }))}
-                className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
-            </div>
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Description</label>
-            <textarea rows={3} value={cf.description}
-              onChange={(e) => setCreateForm((p) => ({ ...p, description: e.target.value }))}
-              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none" />
-          </div>
-
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Attachments</label>
-            <input
-              type="file"
-              multiple
-              onChange={(e) => {
-                const files = Array.from(e.target.files ?? [])
-                setPendingFiles((prev) => [...prev, ...files])
-                e.target.value = ''
-              }}
-              className="block w-full text-sm text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
-            />
-            {pendingFiles.length > 0 && (
-              <div className="mt-2 flex flex-wrap gap-1.5">
-                {pendingFiles.map((f, i) => (
-                  <span key={i} className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded-full">
-                    {f.name}
-                    <button
-                      type="button"
-                      onClick={() => setPendingFiles((prev) => prev.filter((_, j) => j !== i))}
-                      className="text-slate-400 hover:text-red-500 leading-none"
-                    >
-                      ×
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <div className="flex gap-3 pt-2">
-            <button type="submit" disabled={creating}
-              className="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl disabled:opacity-60 transition-colors">
-              {creating ? 'Creating…' : 'Create Task'}
-            </button>
-            <Link href="/crm/tasks" className="px-5 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors">
-              Cancel
-            </Link>
-          </div>
-        </form>
-      </div>
-    )
+    return null
   }
 
   // ── Loading / error ─────────────────────────────────────────────────────────

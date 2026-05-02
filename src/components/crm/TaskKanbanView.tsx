@@ -615,6 +615,7 @@ export function TaskKanbanView({
       <div style={{
         flex: 1, overflowX: 'auto', overflowY: 'hidden',
         padding: '0 24px 24px', display: 'flex', gap: 12, alignItems: 'flex-start',
+        position: 'relative',
       }}>
         {loading ? (
           KANBAN_COLUMNS.map((col) => (
@@ -655,7 +656,18 @@ export function TaskKanbanView({
         )}
 
         {!loading && filtered.length === 0 && (
-          <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', color: '#aaa', paddingTop: 60 }}>
+          <div style={{
+            position: 'absolute',
+            left: 24,
+            right: 24,
+            top: 132,
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            color: '#aaa',
+            pointerEvents: 'none',
+          }}>
             <svg width="48" height="48" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ marginBottom: 12, opacity: 0.4 }}>
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
             </svg>

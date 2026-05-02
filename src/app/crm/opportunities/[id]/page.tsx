@@ -5,6 +5,9 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import TagPicker from '@/components/crm/TagPicker'
 import EntitySearchPicker from '@/components/crm/EntitySearchPicker'
+import { CreateTaskModal } from '@/components/crm/CreateTaskModal'
+import { CrmDetailActions } from '@/components/crm/CrmDetailActions'
+import { TaskCreatedToast } from '@/components/crm/TaskCreatedToast'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -321,6 +324,8 @@ export default function OpportunityDetailPage() {
   const [activeTab, setActiveTab] = useState<'details' | 'related' | 'activity'>('details')
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState<Partial<OppDetail>>({})
+  const [createTaskOpen, setCreateTaskOpen] = useState(false)
+  const [taskCreatedToastOpen, setTaskCreatedToastOpen] = useState(false)
   const [saving, setSaving] = useState(false)
   const [stageSaving, setStageSaving] = useState(false)
   const [closeModal, setCloseModal] = useState<'won' | 'lost' | null>(null)
@@ -678,6 +683,7 @@ export default function OpportunityDetailPage() {
               </div>
             )}
           </div>
+          <CrmDetailActions onCreateTask={() => setCreateTaskOpen(true)} />
         </div>
       </div>
 
@@ -900,7 +906,7 @@ export default function OpportunityDetailPage() {
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50">
               <h2 className="text-sm font-semibold text-slate-700">Open Tasks ({opp.tasks.length})</h2>
-              <button onClick={() => router.push(`/tasks/new?opportunity_id=${opp.id}`)}
+              <button onClick={() => setCreateTaskOpen(true)}
                 className="text-xs font-semibold text-purple-700 hover:text-purple-900">
                 + Add Task
               </button>
@@ -971,7 +977,7 @@ export default function OpportunityDetailPage() {
             {opp.tasks.length === 0 ? (
               <div className="text-center text-sm text-slate-400 py-4">
                 No tasks linked to this opportunity.{' '}
-                <button onClick={() => router.push(`/tasks/new?opportunity_id=${opp.id}`)}
+                <button onClick={() => setCreateTaskOpen(true)}
                   className="text-purple-700 hover:underline">
                   Create one →
                 </button>
@@ -994,6 +1000,34 @@ export default function OpportunityDetailPage() {
           </div>
         </div>
       )}
+      <CreateTaskModal
+        open={createTaskOpen}
+        onClose={() => setCreateTaskOpen(false)}
+        linkedEntity={{ type: 'opportunity', id: opp.id, name: opp.name }}
+        onCreated={(task) => {
+          setOpp((current) => current
+            ? {
+                ...current,
+                tasks: [
+                  ...current.tasks,
+                  {
+                    id: task.id,
+                    title: task.title,
+                    status: task.status,
+                    priority: task.priority,
+                    due_date: task.due_date,
+                    category: task.category,
+                  },
+                ],
+              }
+            : current)
+          setTaskCreatedToastOpen(true)
+        }}
+      />
+      <TaskCreatedToast
+        show={taskCreatedToastOpen}
+        onClose={() => setTaskCreatedToastOpen(false)}
+      />
     </div>
   )
 }

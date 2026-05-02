@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import TagPicker from '@/components/crm/TagPicker'
+import { CreateTaskModal } from '@/components/crm/CreateTaskModal'
+import { CrmDetailActions } from '@/components/crm/CrmDetailActions'
+import { TaskCreatedToast } from '@/components/crm/TaskCreatedToast'
 import { useAppUser } from '@/components/layout/AppShell'
 import { formatPhoneInput } from '@/lib/phone'
 import { CrmForm } from '@/types'
@@ -213,6 +216,8 @@ export default function VendorDetailPage() {
   const [activeTab, setActiveTab] = useState<'details' | 'related' | 'activity'>('details')
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState<Partial<VendorDetail>>({})
+  const [createTaskOpen, setCreateTaskOpen] = useState(false)
+  const [taskCreatedToastOpen, setTaskCreatedToastOpen] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const [tagIds, setTagIds] = useState<string[]>([])
@@ -469,6 +474,7 @@ export default function VendorDetailPage() {
               )}
             </div>
           </div>
+          <CrmDetailActions onCreateTask={() => setCreateTaskOpen(true)} />
         </div>
       </div>
 
@@ -967,6 +973,16 @@ export default function VendorDetailPage() {
           <button onClick={() => router.push(`/crm/tasks?vendor_id=${vendor.id}`)} className="text-purple-700 hover:underline">View tasks →</button>
         </div>
       )}
+      <CreateTaskModal
+        open={createTaskOpen}
+        onClose={() => setCreateTaskOpen(false)}
+        linkedEntity={{ type: 'vendor', id: vendor.id, name: vendor.name }}
+        onCreated={() => setTaskCreatedToastOpen(true)}
+      />
+      <TaskCreatedToast
+        show={taskCreatedToastOpen}
+        onClose={() => setTaskCreatedToastOpen(false)}
+      />
     </div>
   )
 }

@@ -7,6 +7,9 @@ import { TaskKanbanView, UserAvatar, PriorityIcon, type KanbanTask } from './Tas
 import { TaskTableView } from './TaskTableView'
 import { TaskQuickEditPanel } from './TaskQuickEditPanel'
 import QuickAddTask from './QuickAddTask'
+import { CreateTaskModal } from './CreateTaskModal'
+import { TaskCreatedToast } from './TaskCreatedToast'
+import { TaskDetailModal } from './TaskDetailModal'
 import { DEPARTMENTS, DEPARTMENT_CATEGORIES } from '@/lib/task-constants'
 import type { CrmTaskDepartment } from '@/types'
 
@@ -66,6 +69,10 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
   const [loading, setLoading] = useState(true)
   const [allUsers, setAllUsers] = useState<UserOption[]>([])
   const [initialized, setInitialized] = useState(false)
+  const [createTaskOpen, setCreateTaskOpen] = useState(false)
+  const [taskCreatedToastOpen, setTaskCreatedToastOpen] = useState(false)
+  const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
+  const [refreshKey, setRefreshKey] = useState(0)
 
   // Dropdown state
   const [deptDropdownOpen, setDeptDropdownOpen] = useState(false)
@@ -161,7 +168,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
       .catch(() => setTasks([]))
       .finally(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usersKey, department, category, showDelegated, initialized, view, page])
+  }, [usersKey, department, category, showDelegated, initialized, view, page, refreshKey])
 
   // ── Filter helpers ─────────────────────────────────────────────────────────
 
@@ -378,7 +385,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
               </button>
             </div>
             <button
-              onClick={() => router.push('/tasks/new')}
+              onClick={() => setCreateTaskOpen(true)}
               style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 16px', background: '#6b1e98', color: '#fff', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
               onMouseEnter={e => { e.currentTarget.style.background = '#581c87' }}
               onMouseLeave={e => { e.currentTarget.style.background = '#6b1e98' }}
@@ -635,7 +642,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
           showAssignee={!isMeOnly}
           showAssignToMe={!!defaultDepartment}
           userPhotoMap={userPhotoMap}
-          onCardClick={(id) => router.push(`/tasks/${id}`)}
+          onCardClick={(id) => setSelectedTaskId(id)}
           onCardContextMenu={handleTaskContextMenu}
           onReorder={handleReorder}
           onAssignToMe={handleAssignToMe}
@@ -648,6 +655,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
           page={page}
           search={search}
           onPageChange={setPage}
+          onRowClick={(id) => setSelectedTaskId(id)}
           onRowContextMenu={handleTaskContextMenu}
         />
       )}
@@ -665,6 +673,37 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
           />
         ) : null
       })()}
+      <CreateTaskModal
+        open={createTaskOpen}
+        onClose={() => setCreateTaskOpen(false)}
+        defaultDepartment={defaultDepartment}
+        onCreated={() => {
+          setRefreshKey((key) => key + 1)
+          setTaskCreatedToastOpen(true)
+        }}
+      />
+      <TaskCreatedToast
+        show={taskCreatedToastOpen}
+        onClose={() => setTaskCreatedToastOpen(false)}
+      />
+      <TaskDetailModal
+        taskId={selectedTaskId}
+        onClose={() => setSelectedTaskId(null)}
+        onTaskUpdated={(updated) => {
+          setTasks((prev) => prev.map((task) => task.id === updated.id ? {
+            ...task,
+            title: updated.title,
+            department: updated.department,
+            category: updated.category,
+            priority: updated.priority as KanbanTask['priority'],
+            status: updated.status as KanbanTask['status'],
+            due_date: updated.due_date,
+            progress: updated.progress,
+            assigned_to: updated.assigned_to,
+            assigned_user_name: updated.assigned_user?.display_name ?? null,
+          } : task))
+        }}
+      />
     </div>
   )
 }

@@ -5,6 +5,9 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import TagPicker from '@/components/crm/TagPicker'
 import EntitySearchPicker from '@/components/crm/EntitySearchPicker'
+import { CreateTaskModal } from '@/components/crm/CreateTaskModal'
+import { CrmDetailActions } from '@/components/crm/CrmDetailActions'
+import { TaskCreatedToast } from '@/components/crm/TaskCreatedToast'
 import { formatPhoneInput } from '@/lib/phone'
 
 type DropdownUser = { id: string; display_name: string; email: string }
@@ -88,6 +91,8 @@ export default function ContactDetailPage() {
   const [editForm, setEditForm] = useState<Partial<ContactDetail>>({})
   const [editCustomerName, setEditCustomerName] = useState<string | null>(null)
   const [editVendorName, setEditVendorName] = useState<string | null>(null)
+  const [createTaskOpen, setCreateTaskOpen] = useState(false)
+  const [taskCreatedToastOpen, setTaskCreatedToastOpen] = useState(false)
   const [saving, setSaving] = useState(false)
 
   // Tags — always-editable, saves immediately
@@ -326,6 +331,7 @@ export default function ContactDetailPage() {
               )}
             </div>
           </div>
+          <CrmDetailActions onCreateTask={() => setCreateTaskOpen(true)} />
         </div>
       </div>
 
@@ -654,6 +660,16 @@ export default function ContactDetailPage() {
           <button onClick={() => router.push(`/crm/tasks?contact_id=${contact.id}`)} className="text-purple-700 hover:underline">View tasks →</button>
         </div>
       )}
+      <CreateTaskModal
+        open={createTaskOpen}
+        onClose={() => setCreateTaskOpen(false)}
+        linkedEntity={{ type: 'contact', id: contact.id, name: `${contact.first_name} ${contact.last_name}` }}
+        onCreated={() => setTaskCreatedToastOpen(true)}
+      />
+      <TaskCreatedToast
+        show={taskCreatedToastOpen}
+        onClose={() => setTaskCreatedToastOpen(false)}
+      />
     </div>
   )
 }

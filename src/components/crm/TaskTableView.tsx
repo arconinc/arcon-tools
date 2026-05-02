@@ -1,7 +1,6 @@
 'use client'
 
 import type { MouseEvent } from 'react'
-import { useRouter } from 'next/navigation'
 import type { KanbanTask } from './TaskKanbanView'
 
 const PAGE_SIZE = 50
@@ -62,12 +61,11 @@ interface TaskTableViewProps {
   page: number
   search: string
   onPageChange: (p: number) => void
+  onRowClick: (taskId: string) => void
   onRowContextMenu: (e: MouseEvent, taskId: string) => void
 }
 
-export function TaskTableView({ tasks, loading, total, page, search, onPageChange, onRowContextMenu }: TaskTableViewProps) {
-  const router = useRouter()
-
+export function TaskTableView({ tasks, loading, total, page, search, onPageChange, onRowClick, onRowContextMenu }: TaskTableViewProps) {
   const displayed = (() => {
     if (!search) return tasks
     const q = search.toLowerCase()
@@ -122,7 +120,7 @@ export function TaskTableView({ tasks, loading, total, page, search, onPageChang
               return (
                 <tr
                   key={t.id}
-                  onClick={() => router.push(`/tasks/${t.id}`)}
+                  onClick={() => onRowClick(t.id)}
                   onContextMenu={(e) => onRowContextMenu(e, t.id)}
                   className="hover:bg-slate-50 cursor-pointer transition-colors"
                 >

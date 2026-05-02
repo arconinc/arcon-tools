@@ -4,6 +4,9 @@ import { useState, useEffect } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import TagPicker from '@/components/crm/TagPicker'
+import { CreateTaskModal } from '@/components/crm/CreateTaskModal'
+import { CrmDetailActions } from '@/components/crm/CrmDetailActions'
+import { TaskCreatedToast } from '@/components/crm/TaskCreatedToast'
 import { formatPhoneInput } from '@/lib/phone'
 import { useFormValidation, inputCls, selectCls, FieldError } from '@/lib/form-validation'
 import { CrmForm } from '@/types'
@@ -182,6 +185,8 @@ export default function CustomerDetailPage() {
   const [activeTab, setActiveTab] = useState<'details' | 'related' | 'activity' | 'artwork'>('details')
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState<Partial<CustomerDetail>>({})
+  const [createTaskOpen, setCreateTaskOpen] = useState(false)
+  const [taskCreatedToastOpen, setTaskCreatedToastOpen] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const [tagIds, setTagIds] = useState<string[]>([])
@@ -912,12 +917,15 @@ export default function CustomerDetailPage() {
               )}
             </div>
           </div>
-          <button
-            onClick={() => router.push(`/crm/opportunities/new?customer_id=${customer.id}&customer_name=${encodeURIComponent(customer.name)}`)}
-            className="flex-shrink-0 px-3 py-1.5 border border-purple-300 text-purple-700 text-sm font-medium rounded-lg hover:bg-purple-50 transition-colors"
-          >
-            + Opportunity
-          </button>
+          <div className="flex flex-shrink-0 items-center gap-2">
+            <button
+              onClick={() => router.push(`/crm/opportunities/new?customer_id=${customer.id}&customer_name=${encodeURIComponent(customer.name)}`)}
+              className="px-3 py-1.5 border border-purple-300 text-purple-700 text-sm font-medium rounded-lg hover:bg-purple-50 transition-colors"
+            >
+              + Opportunity
+            </button>
+            <CrmDetailActions onCreateTask={() => setCreateTaskOpen(true)} />
+          </div>
         </div>
       </div>
 
@@ -1788,6 +1796,16 @@ export default function CustomerDetailPage() {
           </div>
         </div>
       )}
+      <CreateTaskModal
+        open={createTaskOpen}
+        onClose={() => setCreateTaskOpen(false)}
+        linkedEntity={{ type: 'customer', id: customer.id, name: customer.name }}
+        onCreated={() => setTaskCreatedToastOpen(true)}
+      />
+      <TaskCreatedToast
+        show={taskCreatedToastOpen}
+        onClose={() => setTaskCreatedToastOpen(false)}
+      />
     </div>
   )
 }
