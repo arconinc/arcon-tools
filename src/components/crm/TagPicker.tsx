@@ -40,7 +40,7 @@ export default function TagPicker({ value, onChange, allTags: propTags, disabled
 
   useEffect(() => {
     if (propTags) { setAllTags(propTags); return }
-    fetch('/api/crm/tags').then((r) => r.json()).then((data) => {
+    fetch('/api/marketing/tags').then((r) => r.json()).then((data) => {
       if (Array.isArray(data)) setAllTags(data)
     })
   }, [propTags])
@@ -66,7 +66,7 @@ export default function TagPicker({ value, onChange, allTags: propTags, disabled
     if (!input.trim() || creating) return
     setCreating(true)
     try {
-      const res = await fetch('/api/crm/tags', {
+      const res = await fetch('/api/marketing/tags', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ name: input.trim(), color: nextColor() }),

@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { AppUser } from '@/types'
-import { DEPARTMENTS } from '@/lib/task-constants'
+import { DEPARTMENTS, DEPARTMENT_DISPLAY_NAMES } from '@/lib/task-constants'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -234,7 +234,7 @@ export default function AdminUsersPage() {
                         }}
                         className="accent-purple-600"
                       />
-                      {d}
+                      {DEPARTMENT_DISPLAY_NAMES[d]}
                     </label>
                   ))}
                 </div>
@@ -286,7 +286,7 @@ export default function AdminUsersPage() {
                     <span className="text-xs font-medium bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">Pending</span>
                   )}
                   {user.department?.map((d) => (
-                    <span key={d} className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{d}</span>
+                    <span key={d} className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{DEPARTMENT_DISPLAY_NAMES[d as keyof typeof DEPARTMENT_DISPLAY_NAMES] ?? d}</span>
                   ))}
                 </div>
                 <p className="text-xs text-slate-400 mt-0.5">{user.email}</p>

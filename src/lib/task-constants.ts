@@ -1,5 +1,16 @@
 import type { CrmTaskCategory, CrmTaskDepartment } from '@/types'
 
+export const DEPARTMENT_DISPLAY_NAMES: Record<CrmTaskDepartment, string> = {
+  CRM: 'Marketing',
+  'E-Commerce': 'E-Commerce',
+  HR: 'HR',
+  IT: 'IT',
+  Accounting: 'Accounting',
+  Sales: 'Sales',
+  Warehouse: 'Warehouse',
+  General: 'General',
+}
+
 export const DEPARTMENTS: CrmTaskDepartment[] = [
   'CRM',
   'E-Commerce',
@@ -49,7 +60,7 @@ export const DEPARTMENT_CATEGORIES: Record<CrmTaskDepartment, CrmTaskCategory[]>
 
 // Maps department → the route where its task board lives
 export const DEPARTMENT_ROUTES: Record<CrmTaskDepartment, string> = {
-  CRM: '/crm/tasks',
+  CRM: '/marketing/tasks',
   'E-Commerce': '/ecommerce/tasks',
   HR: '/hr/tasks',
   IT: '/it/tasks',
@@ -61,7 +72,7 @@ export const DEPARTMENT_ROUTES: Record<CrmTaskDepartment, string> = {
 
 // Reverse map: route pathname → department
 export const ROUTE_TO_DEPARTMENT: Record<string, CrmTaskDepartment> = {
-  '/crm/tasks': 'CRM',
+  '/marketing/tasks': 'CRM',
   '/ecommerce/tasks': 'E-Commerce',
   '/hr/tasks': 'HR',
   '/it/tasks': 'IT',

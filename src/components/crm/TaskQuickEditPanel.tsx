@@ -4,6 +4,7 @@ import { useState, useEffect, useRef } from 'react'
 import {
   DEPARTMENTS,
   DEPARTMENT_CATEGORIES,
+  DEPARTMENT_DISPLAY_NAMES,
   encodeTaskAssignmentValue,
   getTaskCategoryLabel,
   parseTaskAssignmentValue,
@@ -214,7 +215,7 @@ export function TaskQuickEditPanel({ task, position, onClose, onUpdate, allUsers
                     onMouseEnter={(e) => { if (activeAssignmentValue !== `department:${department}`) (e.currentTarget as HTMLButtonElement).style.background = '#f5f3ff' }}
                     onMouseLeave={(e) => { if (activeAssignmentValue !== `department:${department}`) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
                   >
-                    {department}
+                    {DEPARTMENT_DISPLAY_NAMES[department as CrmTaskDepartment] ?? department}
                   </button>
                   {categories.map((category) => (
                     <button

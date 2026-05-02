@@ -6,6 +6,7 @@ import Link from 'next/link'
 import EntitySearchPicker from '@/components/crm/EntitySearchPicker'
 import { TaskAssignmentSelect } from '@/components/crm/TaskAssignmentSelect'
 import { getTaskCategoryLabel } from '@/lib/task-constants'
+import { useAppUser } from '@/components/layout/AppShell'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -244,7 +245,7 @@ function CommentsTab({
     if (!text.trim()) return
     setSubmitting(true)
     try {
-      const res = await fetch(`/api/crm/tasks/${taskId}/comments`, {
+      const res = await fetch(`/api/marketing/tasks/${taskId}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ comment: text.trim() }),
@@ -260,13 +261,13 @@ function CommentsTab({
 
   async function deleteComment(cid: string) {
     if (!confirm('Delete this comment?')) return
-    await fetch(`/api/crm/tasks/${taskId}/comments/${cid}`, { method: 'DELETE' })
+    await fetch(`/api/marketing/tasks/${taskId}/comments/${cid}`, { method: 'DELETE' })
     onRefresh()
   }
 
   async function addDriveLink(cid: string) {
     if (!driveUrl.trim() || !driveLabel.trim()) return
-    await fetch(`/api/crm/tasks/${taskId}/comments/${cid}/attachments`, {
+    await fetch(`/api/marketing/tasks/${taskId}/comments/${cid}/attachments`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ url: driveUrl.trim(), label: driveLabel.trim(), is_drive_link: true }),
@@ -283,10 +284,10 @@ function CommentsTab({
     try {
       const fd = new FormData()
       fd.append('file', file)
-      const uploadRes = await fetch('/api/crm/upload', { method: 'POST', body: fd })
+      const uploadRes = await fetch('/api/marketing/upload', { method: 'POST', body: fd })
       if (!uploadRes.ok) { alert('Upload failed'); return }
       const uploaded = await uploadRes.json()
-      await fetch(`/api/crm/tasks/${taskId}/comments/${cid}/attachments`, {
+      await fetch(`/api/marketing/tasks/${taskId}/comments/${cid}/attachments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -306,7 +307,7 @@ function CommentsTab({
 
   async function deleteAttachment(cid: string, aid: string) {
     if (!confirm('Remove this attachment?')) return
-    await fetch(`/api/crm/tasks/${taskId}/comments/${cid}/attachments/${aid}`, { method: 'DELETE' })
+    await fetch(`/api/marketing/tasks/${taskId}/comments/${cid}/attachments/${aid}`, { method: 'DELETE' })
     onRefresh()
   }
 
@@ -490,6 +491,7 @@ export default function TaskDetailPage() {
   const params = useParams<{ id: string }>()
   const id = params.id
   const isNew = id === 'new'
+  const { user: appUser } = useAppUser()
 
   const [task, setTask] = useState<TaskDetail | null>(null)
   const [loading, setLoading] = useState(!isNew)
@@ -505,8 +507,8 @@ export default function TaskDetailPage() {
 
   useEffect(() => {
     Promise.all([
-      fetch('/api/crm/users').then((r) => r.json()),
-      fetch('/api/crm/contacts').then((r) => r.json()),
+      fetch('/api/marketing/users').then((r) => r.json()),
+      fetch('/api/marketing/contacts').then((r) => r.json()),
     ]).then(([users, conts]) => {
       if (Array.isArray(users)) setCrmUsers(users)
       if (Array.isArray(conts)) setContacts(conts)
@@ -514,7 +516,7 @@ export default function TaskDetailPage() {
   }, [])
 
   async function loadTask() {
-    const res = await fetch(`/api/crm/tasks/${id}`)
+    const res = await fetch(`/api/marketing/tasks/${id}`)
     const data = await res.json()
     if (data.error) { setError(data.error); return }
     setTask(data)
@@ -522,7 +524,7 @@ export default function TaskDetailPage() {
 
   useEffect(() => {
     if (isNew) {
-      router.replace('/crm/tasks')
+      router.replace('/marketing/tasks')
       return
     }
     setLoading(true)
@@ -549,7 +551,7 @@ export default function TaskDetailPage() {
     setSaving(true)
     try {
       const payload = { ...editForm }
-      const res = await fetch(`/api/crm/tasks/${task.id}`, {
+      const res = await fetch(`/api/marketing/tasks/${task.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
@@ -569,7 +571,7 @@ export default function TaskDetailPage() {
     const prev = task.status
     setTask((t) => t ? { ...t, status: newStatus as TaskStatus } : t)
     try {
-      const res = await fetch(`/api/crm/tasks/${task.id}`, {
+      const res = await fetch(`/api/marketing/tasks/${task.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
@@ -601,7 +603,7 @@ export default function TaskDetailPage() {
   if (error || !task) {
     return (
       <div className="max-w-4xl mx-auto px-6 py-8">
-        <Link href="/crm/tasks" className="text-sm text-slate-500 hover:text-slate-700">← Tasks</Link>
+        <Link href="/marketing/tasks" className="text-sm text-slate-500 hover:text-slate-700">← Tasks</Link>
         <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
           {error ?? 'Task not found'}
         </div>
@@ -615,19 +617,19 @@ export default function TaskDetailPage() {
 
   // Determine linked object
   const linkedObj = task.opportunity
-    ? { type: 'opportunity', label: 'Opportunity', href: `/crm/opportunities/${task.opportunity.id}`, name: task.opportunity.name, color: 'bg-purple-100 text-purple-700' }
+    ? { type: 'opportunity', label: 'Opportunity', href: `/marketing/opportunities/${task.opportunity.id}`, name: task.opportunity.name, color: 'bg-purple-100 text-purple-700' }
     : task.customer
-    ? { type: 'customer', label: 'Customer', href: `/crm/customers/${task.customer.id}`, name: task.customer.name, color: 'bg-blue-100 text-blue-700' }
+    ? { type: 'customer', label: 'Customer', href: `/marketing/customers/${task.customer.id}`, name: task.customer.name, color: 'bg-blue-100 text-blue-700' }
     : task.vendor
-    ? { type: 'vendor', label: 'Vendor', href: `/crm/vendors/${task.vendor.id}`, name: task.vendor.name, color: 'bg-orange-100 text-orange-700' }
+    ? { type: 'vendor', label: 'Vendor', href: `/marketing/vendors/${task.vendor.id}`, name: task.vendor.name, color: 'bg-orange-100 text-orange-700' }
     : task.contact
-    ? { type: 'contact', label: 'Contact', href: `/crm/contacts/${task.contact.id}`, name: `${task.contact.first_name} ${task.contact.last_name}`, color: 'bg-teal-100 text-teal-700' }
+    ? { type: 'contact', label: 'Contact', href: `/marketing/contacts/${task.contact.id}`, name: `${task.contact.first_name} ${task.contact.last_name}`, color: 'bg-teal-100 text-teal-700' }
     : null
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-8">
       {/* Back */}
-      <Link href="/crm/tasks" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-5">
+      <Link href="/marketing/tasks" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-5">
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
@@ -785,7 +787,7 @@ export default function TaskDetailPage() {
                     <div className="grid grid-cols-2 gap-4">
                       <EntitySearchPicker
                         label="Opportunity"
-                        apiPath="/api/crm/opportunities"
+                        apiPath="/api/marketing/opportunities"
                         resultsKey="items"
                         value={(ef.opportunity_id as string) ?? null}
                         displayName={(ef.opportunity as { name: string } | null)?.name ?? null}
@@ -796,7 +798,7 @@ export default function TaskDetailPage() {
                       />
                       <EntitySearchPicker
                         label="Customer"
-                        apiPath="/api/crm/customers"
+                        apiPath="/api/marketing/customers"
                         resultsKey="customers"
                         value={(ef.customer_id as string) ?? null}
                         displayName={(ef.customer as { name: string } | null)?.name ?? null}
@@ -807,7 +809,7 @@ export default function TaskDetailPage() {
                       />
                       <EntitySearchPicker
                         label="Vendor"
-                        apiPath="/api/crm/vendors"
+                        apiPath="/api/marketing/vendors"
                         resultsKey="vendors"
                         value={(ef.vendor_id as string) ?? null}
                         displayName={(ef.vendor as { name: string } | null)?.name ?? null}
@@ -937,7 +939,7 @@ export default function TaskDetailPage() {
           currentUserId={appUser.id}
           isAdmin={appUser.is_admin}
           onRefresh={async () => {
-            const data = await fetch(`/api/crm/tasks/${task.id}`).then((r) => r.json())
+            const data = await fetch(`/api/marketing/tasks/${task.id}`).then((r) => r.json())
             if (!data.error) setTask(data)
           }}
         />

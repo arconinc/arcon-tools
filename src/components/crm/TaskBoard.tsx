@@ -10,7 +10,7 @@ import QuickAddTask from './QuickAddTask'
 import { CreateTaskModal } from './CreateTaskModal'
 import { TaskCreatedToast } from './TaskCreatedToast'
 import { TaskDetailModal } from './TaskDetailModal'
-import { DEPARTMENTS, DEPARTMENT_CATEGORIES } from '@/lib/task-constants'
+import { DEPARTMENTS, DEPARTMENT_CATEGORIES, DEPARTMENT_DISPLAY_NAMES } from '@/lib/task-constants'
 import type { CrmTaskDepartment } from '@/types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -107,7 +107,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
 
   // Load all users
   useEffect(() => {
-    fetch('/api/crm/users')
+    fetch('/api/marketing/users')
       .then((r) => r.json())
       .then((data: UserOption[]) => setAllUsers(Array.isArray(data) ? data : []))
       .catch(() => {})
@@ -159,7 +159,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
     }
 
     setLoading(true)
-    fetch(`/api/crm/tasks?${params}`)
+    fetch(`/api/marketing/tasks?${params}`)
       .then((r) => { if (!r.ok) throw new Error('Failed'); return r.json() })
       .then((data) => {
         setTasks(Array.isArray(data.tasks) ? data.tasks : [])
@@ -272,7 +272,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
       if (!u) return t
       return { ...t, sort_order: u.sort_order, ...(u.status ? { status: u.status as KanbanTask['status'] } : {}) }
     }))
-    await fetch('/api/crm/tasks/reorder', {
+    await fetch('/api/marketing/tasks/reorder', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ updates }),
@@ -284,7 +284,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
   async function handleAssignToMe(taskId: string) {
     if (!currentUser) return
     setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, assigned_to: currentUser.id, assigned_user_name: currentUser.display_name } : t))
-    await fetch(`/api/crm/tasks/${taskId}`, {
+    await fetch(`/api/marketing/tasks/${taskId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ assigned_to: currentUser.id }),
@@ -307,7 +307,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
       : { [field]: value }
 
     setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, ...patch } : t))
-    const response = await fetch(`/api/crm/tasks/${taskId}`, {
+    const response = await fetch(`/api/marketing/tasks/${taskId}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(patch),
@@ -412,7 +412,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
                 <div className="tb-chips">
                   {!department
                     ? <span style={{ fontSize: 13, color: '#888', padding: '1px 2px' }}>All departments</span>
-                    : <span className="tb-chip"><span>{department}</span><button className="tb-chip-rm" onClick={(e) => { e.stopPropagation(); handleDeptChange('') }}>×</button></span>
+                    : <span className="tb-chip"><span>{DEPARTMENT_DISPLAY_NAMES[department as CrmTaskDepartment] ?? department}</span><button className="tb-chip-rm" onClick={(e) => { e.stopPropagation(); handleDeptChange('') }}>×</button></span>
                   }
                 </div>
                 <div className="tb-chevron">
@@ -438,7 +438,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
                       <span className={`tb-check${department === d ? ' on' : ''}`}>
                         {department === d && <svg width="10" height="10" fill="none" stroke="#fff" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
                       </span>
-                      {d}
+                      {DEPARTMENT_DISPLAY_NAMES[d]}
                       {DEPARTMENT_CATEGORIES[d].length > 0 && (
                         <span style={{ fontSize: 10, color: '#aaa', marginLeft: 'auto' }}>{DEPARTMENT_CATEGORIES[d].length}</span>
                       )}

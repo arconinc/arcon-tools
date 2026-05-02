@@ -123,7 +123,7 @@ export function TaskFormModal({
     setForm(task ? formFromTask(task) : emptyForm(defaultDepartment))
     setPendingFiles([])
     setError(null)
-    fetch('/api/crm/users')
+    fetch('/api/marketing/users')
       .then((r) => r.json())
       .then((users) => {
         if (!active || !Array.isArray(users)) return
@@ -144,10 +144,10 @@ export function TaskFormModal({
     await Promise.all(pendingFiles.map(async (file) => {
       const fd = new FormData()
       fd.append('file', file)
-      const uploadRes = await fetch('/api/crm/upload', { method: 'POST', body: fd })
+      const uploadRes = await fetch('/api/marketing/upload', { method: 'POST', body: fd })
       if (!uploadRes.ok) return
       const uploaded = await uploadRes.json()
-      await fetch(`/api/crm/tasks/${taskId}/attachments`, {
+      await fetch(`/api/marketing/tasks/${taskId}/attachments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -161,7 +161,7 @@ export function TaskFormModal({
   }
 
   async function fetchSavedTask(taskId: string, fallback: TaskFormTask) {
-    const detailRes = await fetch(`/api/crm/tasks/${taskId}`)
+    const detailRes = await fetch(`/api/marketing/tasks/${taskId}`)
     if (!detailRes.ok) return fallback
     const detail = await detailRes.json()
     return detail.error ? fallback : detail
@@ -195,7 +195,7 @@ export function TaskFormModal({
         ...linkedPayload,
       }
       const taskId = task?.id
-      const res = await fetch(mode === 'edit' && taskId ? `/api/crm/tasks/${taskId}` : '/api/crm/tasks', {
+      const res = await fetch(mode === 'edit' && taskId ? `/api/marketing/tasks/${taskId}` : '/api/marketing/tasks', {
         method: mode === 'edit' ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),

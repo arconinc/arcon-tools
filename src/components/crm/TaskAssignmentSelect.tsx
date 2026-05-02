@@ -3,6 +3,7 @@
 import {
   DEPARTMENTS,
   DEPARTMENT_CATEGORIES,
+  DEPARTMENT_DISPLAY_NAMES,
   encodeTaskAssignmentValue,
   getTaskCategoryLabel,
   parseTaskAssignmentValue,
@@ -26,8 +27,8 @@ export function TaskAssignmentSelect({
     >
       <option value="">- None -</option>
       {DEPARTMENTS.map((departmentOption) => (
-        <optgroup key={departmentOption} label={departmentOption}>
-          <option value={`department:${departmentOption}`}>{departmentOption}</option>
+        <optgroup key={departmentOption} label={DEPARTMENT_DISPLAY_NAMES[departmentOption]}>
+          <option value={`department:${departmentOption}`}>{DEPARTMENT_DISPLAY_NAMES[departmentOption]}</option>
           {DEPARTMENT_CATEGORIES[departmentOption].map((categoryOption) => (
             <option key={categoryOption} value={`category:${categoryOption}`}>
               {getTaskCategoryLabel(categoryOption)}

@@ -22,7 +22,7 @@ export function TaskDetailModal({
     setTask(null)
     setLoading(true)
     setError(null)
-    fetch(`/api/crm/tasks/${taskId}`)
+    fetch(`/api/marketing/tasks/${taskId}`)
       .then((r) => r.json())
       .then((data) => {
         if (!active) return

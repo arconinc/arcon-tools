@@ -37,7 +37,7 @@ export default function QuickAddTask({ defaultDepartment, onTaskCreated }: Quick
         body.department = 'General'
         body.category = 'To Do General'
       }
-      const res = await fetch('/api/crm/tasks', {
+      const res = await fetch('/api/marketing/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(body),

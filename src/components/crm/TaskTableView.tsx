@@ -2,6 +2,8 @@
 
 import type { MouseEvent } from 'react'
 import type { KanbanTask } from './TaskKanbanView'
+import { DEPARTMENT_DISPLAY_NAMES } from '@/lib/task-constants'
+import type { CrmTaskDepartment } from '@/types'
 
 const PAGE_SIZE = 50
 
@@ -47,10 +49,10 @@ function isOverdue(iso: string | null) {
 }
 
 function linkedToHref(t: KanbanTask): string | null {
-  if (t.opportunity_id) return `/crm/opportunities/${t.opportunity_id}`
-  if (t.customer_id) return `/crm/customers/${t.customer_id}`
-  if (t.vendor_id) return `/crm/vendors/${t.vendor_id}`
-  if (t.contact_id) return `/crm/contacts/${t.contact_id}`
+  if (t.opportunity_id) return `/marketing/opportunities/${t.opportunity_id}`
+  if (t.customer_id) return `/marketing/customers/${t.customer_id}`
+  if (t.vendor_id) return `/marketing/vendors/${t.vendor_id}`
+  if (t.contact_id) return `/marketing/contacts/${t.contact_id}`
   return null
 }
 
@@ -135,7 +137,7 @@ export function TaskTableView({ tasks, loading, total, page, search, onPageChang
                   <td className="px-5 py-3.5 hidden md:table-cell">
                     <div className="flex gap-1">
                       {t.department && (
-                        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded font-semibold w-fit">{t.department}</span>
+                        <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded font-semibold w-fit">{DEPARTMENT_DISPLAY_NAMES[t.department as CrmTaskDepartment] ?? t.department}</span>
                       )}
                       {t.category && (
                         <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium">{t.category}</span>

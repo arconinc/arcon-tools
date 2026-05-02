@@ -1,6 +1,8 @@
 'use client'
 
 import { useState, useRef } from 'react'
+import { DEPARTMENT_DISPLAY_NAMES } from '@/lib/task-constants'
+import type { CrmTaskDepartment } from '@/types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -71,10 +73,10 @@ export function isTaskOverdue(iso: string | null, status: KanbanStatus) {
 }
 
 function linkedHref(t: KanbanTask): string | null {
-  if (t.opportunity_id) return `/crm/opportunities/${t.opportunity_id}`
-  if (t.customer_id) return `/crm/customers/${t.customer_id}`
-  if (t.vendor_id) return `/crm/vendors/${t.vendor_id}`
-  if (t.contact_id) return `/crm/contacts/${t.contact_id}`
+  if (t.opportunity_id) return `/marketing/opportunities/${t.opportunity_id}`
+  if (t.customer_id) return `/marketing/customers/${t.customer_id}`
+  if (t.vendor_id) return `/marketing/vendors/${t.vendor_id}`
+  if (t.contact_id) return `/marketing/contacts/${t.contact_id}`
   return null
 }
 
@@ -209,7 +211,7 @@ function KanbanCard({
             padding: '1px 6px', borderRadius: 4,
             textTransform: 'uppercase', letterSpacing: '0.05em',
           }}>
-            {task.department}
+            {DEPARTMENT_DISPLAY_NAMES[task.department as CrmTaskDepartment] ?? task.department}
           </span>
         )}
 

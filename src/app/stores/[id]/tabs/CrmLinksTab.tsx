@@ -14,12 +14,12 @@ export function CrmLinksTab({ store, onSaved }: { store: StoreDetail; onSaved: (
   const [err, setErr] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/crm/customers?limit=200').then(r => r.json()).then(d => { if (d?.customers) setCustomers(d.customers) })
+    fetch('/api/marketing/customers?limit=200').then(r => r.json()).then(d => { if (d?.customers) setCustomers(d.customers) })
   }, [])
 
   useEffect(() => {
     if (!linkedCustomer) { setContacts([]); return }
-    fetch(`/api/crm/contacts?customer_id=${linkedCustomer.id}&limit=200`)
+    fetch(`/api/marketing/contacts?customer_id=${linkedCustomer.id}&limit=200`)
       .then(r => r.json())
       .then(d => { if (d?.contacts) setContacts(d.contacts) })
   }, [linkedCustomer?.id])
@@ -71,13 +71,13 @@ export function CrmLinksTab({ store, onSaved }: { store: StoreDetail; onSaved: (
 
       {/* Customer */}
       <div>
-        <h3 className="text-sm font-semibold text-slate-700 mb-3">CRM Customer</h3>
+        <h3 className="text-sm font-semibold text-slate-700 mb-3">Marketing Customer</h3>
         {linkedCustomer ? (
           <div className="flex items-center gap-3 p-3 bg-white border border-slate-200 rounded-xl">
             <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold text-sm shrink-0">
               {linkedCustomer.name[0]}
             </div>
-            <Link href={`/crm/customers/${linkedCustomer.id}`} className="flex-1 text-sm font-medium text-slate-800 hover:text-purple-700 transition-colors">
+            <Link href={`/marketing/customers/${linkedCustomer.id}`} className="flex-1 text-sm font-medium text-slate-800 hover:text-purple-700 transition-colors">
               {linkedCustomer.name}
             </Link>
             <button onClick={() => setCustomer(null)} disabled={saving}
