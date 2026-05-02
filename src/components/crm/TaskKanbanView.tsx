@@ -183,7 +183,7 @@ function KanbanCard({
       onDragLeave={onDragLeave}
       onClick={() => onClick(task.id)}
       onContextMenu={(e) => onContextMenu(e, task.id)}
-      className={`kanban-card${isDragging ? ' dragging' : ''}${isUpdating ? ' updating' : ''}${insertClass}`}
+      className={`kanban-card priority-${task.priority}${isDragging ? ' dragging' : ''}${isUpdating ? ' updating' : ''}${insertClass}`}
     >
       {/* Title row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7, marginBottom: 8 }}>
@@ -608,6 +608,8 @@ export function TaskKanbanView({
         .kanban-card:hover { box-shadow: 0 3px 10px rgba(0,0,0,0.09); border-color: #d1d5db; }
         .kanban-card.dragging { opacity: 0.35; transform: scale(0.97); }
         .kanban-card.updating { opacity: 0.6; }
+        .kanban-card.priority-high { border-left: 3px solid #fca5a5; background: #fffbfb; }
+        .kanban-card.priority-low { border-left: 3px solid #93c5fd; background: #f8fbff; }
         .insert-before::before { content: ''; display: block; position: absolute; top: -5px; left: 0; right: 0; height: 2px; background: #7c3aed; border-radius: 2px; pointer-events: none; }
         .insert-before::after { content: ''; display: block; position: absolute; top: -9px; left: 0; width: 8px; height: 8px; border-radius: 50%; background: #7c3aed; pointer-events: none; }
         .insert-after::before { content: ''; display: block; position: absolute; bottom: -5px; left: 0; right: 0; height: 2px; background: #7c3aed; border-radius: 2px; pointer-events: none; }

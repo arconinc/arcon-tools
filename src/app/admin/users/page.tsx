@@ -125,6 +125,7 @@ export default function AdminUsersPage() {
   }
 
   function startEdit(user: AppUser) {
+    const scrollPos = window.scrollY
     setEditingId(user.id)
     setEditForm({
       display_name: user.display_name,
@@ -132,6 +133,7 @@ export default function AdminUsersPage() {
       start_date: user.start_date ?? '',
       departments: user.department ?? [],
     })
+    window.scrollTo(0, scrollPos)
   }
 
   async function saveEdit(userId: string) {

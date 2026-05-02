@@ -16,7 +16,7 @@ export async function GET(
   const { data, error } = await adminClient
     .from('users')
     .select(`
-      id, email, display_name, job_title, team, office_location, employment_type,
+      id, email, display_name, job_title, department, office_location, employment_type,
       profile_image_url, avatar_url, start_date,
       phone, linkedin_url, timezone,
       bio_html, bio_json, skills, interests,
@@ -33,7 +33,7 @@ export async function GET(
       ? adminClient.from('users').select('id, display_name, job_title, profile_image_url, avatar_url').eq('id', data.manager_id).single()
       : Promise.resolve({ data: null }),
     adminClient.from('users')
-      .select('id, email, display_name, job_title, team, office_location, employment_type, profile_image_url, avatar_url, start_date')
+      .select('id, email, display_name, job_title, department, office_location, employment_type, profile_image_url, avatar_url, start_date')
       .eq('manager_id', id)
       .order('display_name'),
   ])

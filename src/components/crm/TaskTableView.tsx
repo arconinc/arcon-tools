@@ -124,7 +124,13 @@ export function TaskTableView({ tasks, loading, total, page, search, onPageChang
                   key={t.id}
                   onClick={() => onRowClick(t.id)}
                   onContextMenu={(e) => onRowContextMenu(e, t.id)}
-                  className="hover:bg-slate-50 cursor-pointer transition-colors"
+                  className="cursor-pointer transition-colors"
+                  style={{
+                    boxShadow: t.priority === 'high' ? 'inset 3px 0 0 #fca5a5' : t.priority === 'low' ? 'inset 3px 0 0 #93c5fd' : undefined,
+                    background: t.priority === 'high' ? '#fffbfb' : t.priority === 'low' ? '#f8fbff' : undefined,
+                  }}
+                  onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.filter = 'brightness(0.97)' }}
+                  onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.filter = '' }}
                 >
                   <td className="px-5 py-3.5">
                     <div className="font-medium text-slate-900 truncate max-w-[280px]">{t.title}</div>

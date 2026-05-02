@@ -18,8 +18,7 @@ import type { CrmTaskDepartment } from '@/types'
 type UserOption = {
   id: string
   display_name: string
-  team: string | null
-  department: string | null
+  department: string[] | null
   avatar_url: string | null
   profile_image_url: string | null
 }
@@ -546,7 +545,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
                         </span>
                         <UserAvatar name={u.display_name} avatarUrl={u.profile_image_url ?? u.avatar_url} size={22} />
                         <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.display_name}</span>
-                        {u.department && <span style={{ fontSize: 10, color: '#aaa', marginLeft: 'auto', paddingLeft: 8, flexShrink: 0 }}>{u.department}</span>}
+                        {u.department && u.department.length > 0 && <span style={{ fontSize: 10, color: '#aaa', marginLeft: 'auto', paddingLeft: 8, flexShrink: 0 }}>{u.department.join(', ')}</span>}
                       </button>
                     )
                   })}

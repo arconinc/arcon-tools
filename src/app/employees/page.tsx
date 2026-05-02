@@ -1,18 +1,19 @@
 'use client'
 
 import { useState, useEffect, useMemo } from 'react'
-import { EmployeeSummary, OfficeLocation, EmployeeTeam } from '@/types'
+import { EmployeeSummary, OfficeLocation } from '@/types'
 import EmployeeCard from '@/components/employees/EmployeeCard'
+import { DEPARTMENTS, DEPARTMENT_DISPLAY_NAMES } from '@/lib/task-constants'
+import type { CrmTaskDepartment } from '@/types'
 
 const OFFICE_LOCATIONS: OfficeLocation[] = ['Remote', 'Minnesota', 'Arizona', 'Colorado']
-const TEAMS: EmployeeTeam[] = ['Sales', 'Marketing', 'IT', 'Operations', 'Finance', 'HR']
 
 export default function EmployeeDirectoryPage() {
   const [employees, setEmployees] = useState<EmployeeSummary[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [locationFilter, setLocationFilter] = useState<OfficeLocation | 'All'>('All')
-  const [teamFilter, setTeamFilter] = useState<EmployeeTeam | 'All'>('All')
+  const [departmentFilter, setDepartmentFilter] = useState<CrmTaskDepartment | 'All'>('All')
 
   useEffect(() => {
     fetch('/api/employees')
@@ -24,18 +25,18 @@ export default function EmployeeDirectoryPage() {
   const filtered = useMemo(() => {
     return employees.filter((e) => {
       if (locationFilter !== 'All' && e.office_location !== locationFilter) return false
-      if (teamFilter !== 'All' && e.team !== teamFilter) return false
+      if (departmentFilter !== 'All' && !e.department?.includes(departmentFilter)) return false
       if (search.trim()) {
         const q = search.toLowerCase()
         return (
           e.display_name.toLowerCase().includes(q) ||
           (e.job_title?.toLowerCase().includes(q) ?? false) ||
-          (e.team?.toLowerCase().includes(q) ?? false)
+          (e.department?.some((d) => d.toLowerCase().includes(q) || DEPARTMENT_DISPLAY_NAMES[d as CrmTaskDepartment]?.toLowerCase().includes(q)) ?? false)
         )
       }
       return true
     })
-  }, [employees, locationFilter, teamFilter, search])
+  }, [employees, locationFilter, departmentFilter, search])
 
   return (
     <>
@@ -53,8 +54,8 @@ export default function EmployeeDirectoryPage() {
         .pill { padding: 0.375rem 0.875rem; border-radius: 9999px; font-size: 0.8125rem; font-weight: 500; border: 1px solid #e2e8f0; background: white; color: #64748b; cursor: pointer; transition: all 0.15s; }
         .pill:hover { border-color: #c084fc; color: #7c3aed; }
         .pill.active { background: #7c3aed; border-color: #7c3aed; color: white; }
-        .team-select { padding: 0.375rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; font-size: 0.8125rem; color: #374151; outline: none; }
-        .team-select:focus { border-color: #a855f7; }
+        .dept-select { padding: 0.375rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; font-size: 0.8125rem; color: #374151; outline: none; }
+        .dept-select:focus { border-color: #a855f7; }
         .dir-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
         @media (min-width: 768px) { .dir-grid { grid-template-columns: repeat(3, 1fr); } }
         @media (min-width: 1024px) { .dir-grid { grid-template-columns: repeat(4, 1fr); } }
@@ -76,7 +77,7 @@ export default function EmployeeDirectoryPage() {
             </svg>
             <input
               type="text"
-              placeholder="Search by name, title, or team…"
+              placeholder="Search by name, title, or department…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -95,12 +96,12 @@ export default function EmployeeDirectoryPage() {
           </div>
 
           <select
-            className="team-select"
-            value={teamFilter}
-            onChange={(e) => setTeamFilter(e.target.value as EmployeeTeam | 'All')}
+            className="dept-select"
+            value={departmentFilter}
+            onChange={(e) => setDepartmentFilter(e.target.value as CrmTaskDepartment | 'All')}
           >
-            <option value="All">All Teams</option>
-            {TEAMS.map((t) => <option key={t} value={t}>{t}</option>)}
+            <option value="All">All Departments</option>
+            {DEPARTMENTS.map((d) => <option key={d} value={d}>{DEPARTMENT_DISPLAY_NAMES[d]}</option>)}
           </select>
         </div>
 

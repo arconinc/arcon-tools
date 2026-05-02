@@ -2,8 +2,6 @@
 
 export type OfficeLocation = 'Remote' | 'Minnesota' | 'Arizona' | 'Colorado'
 export type EmploymentType = 'full-time' | 'part-time' | 'contractor'
-// Placeholder team list — update to match actual company teams
-export type EmployeeTeam = 'Sales' | 'Marketing' | 'IT' | 'Operations' | 'Finance' | 'HR'
 
 export interface AppUser {
   id: string
@@ -28,7 +26,6 @@ export interface AppUser {
   manager_id: string | null
   profile_image_url: string | null
   job_title: string | null
-  team: EmployeeTeam | null
   office_location: OfficeLocation | null
   employment_type: EmploymentType | null
   bio_json: Record<string, unknown>
@@ -47,7 +44,7 @@ export interface EmployeeSummary {
   display_name: string
   email: string
   job_title: string | null
-  team: EmployeeTeam | null
+  department: string[] | null
   office_location: OfficeLocation | null
   employment_type: EmploymentType | null
   profile_image_url: string | null

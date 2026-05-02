@@ -27,8 +27,7 @@ type TaskItem = {
 type UserOption = {
   id: string
   display_name: string
-  team: string | null
-  department: string | null
+  department: string[] | null
   avatar_url: string | null
   profile_image_url: string | null
 }
@@ -188,7 +187,7 @@ export function TaskQuickEditPanel({ task, position, onClose, onUpdate, allUsers
                   onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#f5f3ff' }}
                   onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}>
                   {user.display_name}
-                  {user.department && <span style={{ fontSize: 10, color: '#aaa', marginLeft: 6 }}>{user.department}</span>}
+                  {user.department && user.department.length > 0 && <span style={{ fontSize: 10, color: '#aaa', marginLeft: 6 }}>{user.department.join(', ')}</span>}
                 </button>
               ))}
             </div>

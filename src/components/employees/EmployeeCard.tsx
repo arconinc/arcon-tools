@@ -2,6 +2,8 @@ import Link from 'next/link'
 import { EmployeeSummary } from '@/types'
 import EmployeeAvatar from './EmployeeAvatar'
 import OfficeLocationBadge from './OfficeLocationBadge'
+import { DEPARTMENT_DISPLAY_NAMES } from '@/lib/task-constants'
+import type { CrmTaskDepartment } from '@/types'
 
 export default function EmployeeCard({ employee }: { employee: EmployeeSummary }) {
   return (
@@ -23,8 +25,10 @@ export default function EmployeeCard({ employee }: { employee: EmployeeSummary }
           {employee.job_title && (
             <p className="text-sm text-slate-500 truncate mt-0.5">{employee.job_title}</p>
           )}
-          {employee.team && (
-            <p className="text-xs text-slate-400 mt-0.5">{employee.team}</p>
+          {employee.department && employee.department.length > 0 && (
+            <p className="text-xs text-slate-400 mt-0.5">
+              {employee.department.map((d) => DEPARTMENT_DISPLAY_NAMES[d as CrmTaskDepartment] ?? d).join(', ')}
+            </p>
           )}
         </div>
       </div>

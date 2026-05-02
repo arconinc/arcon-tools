@@ -6,7 +6,7 @@ const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', '
 
 type GoalRow = { id?: string; user_id: string; year: number; month: number; goal_amount: number }
 
-type UserMeta = { id: string; display_name: string; email: string; team: string | null }
+type UserMeta = { id: string; display_name: string; email: string; department: string[] | null }
 
 function fmt$(val: number) {
   if (!val) return ''
@@ -29,7 +29,7 @@ export default function CrmGoalsPage() {
     fetch('/api/admin/users')
       .then((r) => r.json())
       .then((data: UserMeta[]) => {
-        if (Array.isArray(data)) setUsers(data.filter((u) => u.team === 'Sales'))
+        if (Array.isArray(data)) setUsers(data.filter((u) => Array.isArray(u.department) && u.department.includes('Sales')))
       })
       .catch(() => {})
   }, [])

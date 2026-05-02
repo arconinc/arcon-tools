@@ -13,12 +13,12 @@ export async function GET(request: Request) {
   const adminClient = createAdminClient()
   let query = adminClient
     .from('users')
-    .select('id, email, display_name, job_title, team, office_location, employment_type, profile_image_url, avatar_url, start_date')
+    .select('id, email, display_name, job_title, department, office_location, employment_type, profile_image_url, avatar_url, start_date')
     .is('deactivated_at', null)
     .order('display_name')
 
   if (q) {
-    query = query.or(`display_name.ilike.%${q}%,job_title.ilike.%${q}%,team.ilike.%${q}%`)
+    query = query.or(`display_name.ilike.%${q}%,job_title.ilike.%${q}%`)
   }
 
   const { data, error } = await query

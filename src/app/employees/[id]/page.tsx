@@ -3,6 +3,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { EmployeeProfile } from '@/types'
+import { DEPARTMENT_DISPLAY_NAMES } from '@/lib/task-constants'
+import type { CrmTaskDepartment } from '@/types'
 import EmployeeAvatar from '@/components/employees/EmployeeAvatar'
 import OfficeLocationBadge from '@/components/employees/OfficeLocationBadge'
 import { TiptapRenderer } from '@/components/news/TiptapRenderer'
@@ -61,7 +63,7 @@ export default async function EmployeeProfilePage({
   const { data: emp, error } = await adminClient
     .from('users')
     .select(`
-      id, email, display_name, job_title, team, office_location, employment_type,
+      id, email, display_name, job_title, department, office_location, employment_type,
       profile_image_url, avatar_url, start_date,
       phone, linkedin_url, timezone,
       bio_html, bio_json, skills, interests,
@@ -78,7 +80,7 @@ export default async function EmployeeProfilePage({
       ? adminClient.from('users').select('id, display_name, job_title, profile_image_url, avatar_url').eq('id', emp.manager_id).single()
       : Promise.resolve({ data: null }),
     adminClient.from('users')
-      .select('id, email, display_name, job_title, team, office_location, employment_type, profile_image_url, avatar_url, start_date')
+      .select('id, email, display_name, job_title, department, office_location, employment_type, profile_image_url, avatar_url, start_date')
       .eq('manager_id', id)
       .order('display_name'),
   ])
@@ -153,9 +155,11 @@ export default async function EmployeeProfilePage({
                 {profile.office_location && (
                   <span className="prof-badge-emp">{profile.office_location}</span>
                 )}
-                {profile.team && (
-                  <span className="prof-badge-emp">{profile.team}</span>
-                )}
+                {profile.department?.map((d) => (
+                  <span key={d} className="prof-badge-emp">
+                    {DEPARTMENT_DISPLAY_NAMES[d as CrmTaskDepartment] ?? d}
+                  </span>
+                ))}
                 {profile.employment_type && (
                   <span className="prof-badge-emp" style={{ textTransform: 'capitalize' }}>{profile.employment_type}</span>
                 )}

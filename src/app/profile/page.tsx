@@ -42,7 +42,7 @@ export default function MyProfilePage() {
 
   // Read-only display fields
   const [jobTitle, setJobTitle] = useState('')
-  const [team, setTeam] = useState('')
+  const [department, setDepartment] = useState<string[]>([])
   const [officeLocation, setOfficeLocation] = useState('')
 
   const fileInputRef = useRef<HTMLInputElement>(null)
@@ -52,12 +52,12 @@ export default function MyProfilePage() {
     if (!sessionUser) return
     fetch(`/api/employees`)
       .then((r) => r.json())
-      .then((data: Array<{ id: string; email: string; display_name: string; job_title: string | null; team: string | null; office_location: string | null }>) => {
+      .then((data: Array<{ id: string; email: string; display_name: string; job_title: string | null; department: string[] | null; office_location: string | null }>) => {
         const me = data.find((e) => e.email === sessionUser.email)
         if (!me) return
         setEmployeeId(me.id)
         setJobTitle(me.job_title ?? '')
-        setTeam(me.team ?? '')
+        setDepartment(me.department ?? [])
         setOfficeLocation(me.office_location ?? '')
         return fetch(`/api/employees/${me.id}`)
       })
@@ -182,8 +182,8 @@ export default function MyProfilePage() {
               <div className="my-prof-readonly">{jobTitle || '—'}</div>
             </div>
             <div>
-              <label className="my-prof-label">Team</label>
-              <div className="my-prof-readonly">{team || '—'}</div>
+              <label className="my-prof-label">Department</label>
+              <div className="my-prof-readonly">{department.length > 0 ? department.join(', ') : '—'}</div>
             </div>
             <div>
               <label className="my-prof-label">Office Location</label>

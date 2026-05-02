@@ -6,11 +6,11 @@ import { TiptapEditor } from '@/components/news/TiptapEditor'
 import TagInput from '@/components/employees/TagInput'
 import EmployeeAvatar from '@/components/employees/EmployeeAvatar'
 import { formatPhoneInput } from '@/lib/phone'
-import type { OfficeLocation, EmploymentType, EmployeeTeam, EmployeeSummary } from '@/types'
+import type { OfficeLocation, EmploymentType, EmployeeSummary } from '@/types'
+import { DEPARTMENTS, DEPARTMENT_DISPLAY_NAMES } from '@/lib/task-constants'
 
 const OFFICE_LOCATIONS: OfficeLocation[] = ['Remote', 'Minnesota', 'Arizona', 'Colorado']
 const EMPLOYMENT_TYPES: EmploymentType[] = ['full-time', 'part-time', 'contractor']
-const TEAMS: EmployeeTeam[] = ['Sales', 'Marketing', 'IT', 'Operations', 'Finance', 'HR']
 const US_TIMEZONES = [
   'America/New_York',
   'America/Chicago',
@@ -41,7 +41,7 @@ export default function AdminEmployeeEditPage({ params }: Props) {
   const [displayName, setDisplayName] = useState('')
   const [jobTitle, setJobTitle] = useState('')
   const [employmentType, setEmploymentType] = useState<EmploymentType | ''>('')
-  const [team, setTeam] = useState<EmployeeTeam | ''>('')
+  const [departments, setDepartments] = useState<string[]>([])
   const [officeLocation, setOfficeLocation] = useState<OfficeLocation | ''>('')
   const [timezone, setTimezone] = useState('')
   const [managerId, setManagerId] = useState('')
@@ -66,7 +66,7 @@ export default function AdminEmployeeEditPage({ params }: Props) {
         setDisplayName(data.display_name ?? '')
         setJobTitle(data.job_title ?? '')
         setEmploymentType(data.employment_type ?? '')
-        setTeam(data.team ?? '')
+        setDepartments(data.department ?? [])
         setOfficeLocation(data.office_location ?? '')
         setTimezone(data.timezone ?? '')
         setManagerId(data.manager_id ?? '')
@@ -117,7 +117,7 @@ export default function AdminEmployeeEditPage({ params }: Props) {
         display_name: displayName,
         job_title: jobTitle || null,
         employment_type: employmentType || null,
-        team: team || null,
+        department: departments.length > 0 ? departments : null,
         office_location: officeLocation || null,
         timezone: timezone || null,
         manager_id: managerId || null,
@@ -244,16 +244,28 @@ export default function AdminEmployeeEditPage({ params }: Props) {
           </div>
         </div>
 
-        {/* Section 2: Team & Location */}
+        {/* Section 2: Department & Location */}
         <div className="emp-section">
-          <div className="emp-section-title">Team &amp; Location</div>
+          <div className="emp-section-title">Department &amp; Location</div>
           <div className="emp-field-grid">
-            <div className="emp-field">
-              <label className="emp-label">Team</label>
-              <select className="emp-select" value={team} onChange={(e) => { setTeam(e.target.value as EmployeeTeam | ''); isDirty.current = true }}>
-                <option value="">— Select —</option>
-                {TEAMS.map((t) => <option key={t} value={t}>{t}</option>)}
-              </select>
+            <div className="emp-field emp-field-full">
+              <label className="emp-label">Department</label>
+              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem 1.25rem', paddingTop: '0.25rem' }}>
+                {DEPARTMENTS.map((d) => (
+                  <label key={d} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.9375rem', color: '#374151', cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={departments.includes(d)}
+                      onChange={(e) => {
+                        setDepartments((prev) => e.target.checked ? [...prev, d] : prev.filter((x) => x !== d))
+                        isDirty.current = true
+                      }}
+                      style={{ accentColor: '#7c3aed' }}
+                    />
+                    {DEPARTMENT_DISPLAY_NAMES[d]}
+                  </label>
+                ))}
+              </div>
             </div>
             <div className="emp-field">
               <label className="emp-label">Office Location</label>

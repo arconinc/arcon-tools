@@ -25,7 +25,7 @@ export async function GET(
     .select(`
       id, email, display_name, is_admin, google_id,
       birth_date, start_date, phone, address1, address2, city, state, zip,
-      job_title, team, office_location, employment_type, timezone,
+      job_title, department, office_location, employment_type, timezone,
       profile_image_url, avatar_url,
       linkedin_url, bio_json, bio_html, skills, interests,
       manager_id
@@ -50,7 +50,7 @@ export async function PATCH(
   const body = await request.json()
 
   const allowed = [
-    'display_name', 'job_title', 'team', 'office_location', 'employment_type',
+    'display_name', 'job_title', 'department', 'office_location', 'employment_type',
     'manager_id', 'birth_date', 'start_date', 'is_admin',
     'phone', 'linkedin_url', 'timezone',
     'bio_json', 'bio_html', 'skills', 'interests',
