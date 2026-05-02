@@ -25,6 +25,7 @@ export default function AdminUsersPage() {
   const [users, setUsers] = useState<AppUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showDeactivated, setShowDeactivated] = useState(false)
 
   // Add user form
   const [showAdd, setShowAdd] = useState(false)
@@ -34,11 +35,14 @@ export default function AdminUsersPage() {
 
   // Inline edit per user
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState({ display_name: '', birth_date: '', start_date: '', department: '' })
+  const [editForm, setEditForm] = useState({ display_name: '', birth_date: '', start_date: '', departments: [] as string[] })
   const [saving, setSaving] = useState(false)
 
   // Admin toggle
   const [togglingId, setTogglingId] = useState<string | null>(null)
+
+  // Deactivate/reactivate
+  const [deactivatingId, setDeactivatingId] = useState<string | null>(null)
 
   // Sync Google photos
   const [syncing, setSyncing] = useState(false)
@@ -86,7 +90,7 @@ export default function AdminUsersPage() {
 
   const loadUsers = useCallback(async () => {
     setLoading(true)
-    const res = await fetch('/api/admin/users')
+    const res = await fetch('/api/admin/users?include_deactivated=true')
     const data = await res.json()
     setLoading(false)
     if (Array.isArray(data)) setUsers(data)
@@ -94,6 +98,9 @@ export default function AdminUsersPage() {
   }, [])
 
   useEffect(() => { loadUsers() }, [loadUsers])
+
+  const activeUsers = users.filter(u => !u.deactivated_at)
+  const deactivatedUsers = users.filter(u => u.deactivated_at)
 
   async function toggleAdmin(user: AppUser) {
     setTogglingId(user.id)
@@ -106,13 +113,24 @@ export default function AdminUsersPage() {
     loadUsers()
   }
 
+  async function toggleDeactivate(user: AppUser) {
+    setDeactivatingId(user.id)
+    await fetch('/api/admin/users', {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId: user.id, deactivate: !user.deactivated_at }),
+    })
+    setDeactivatingId(null)
+    loadUsers()
+  }
+
   function startEdit(user: AppUser) {
     setEditingId(user.id)
     setEditForm({
       display_name: user.display_name,
       birth_date: user.birth_date ?? '',
       start_date: user.start_date ?? '',
-      department: user.department ?? '',
+      departments: user.department ?? [],
     })
   }
 
@@ -126,7 +144,7 @@ export default function AdminUsersPage() {
         display_name: editForm.display_name,
         birth_date: editForm.birth_date || null,
         start_date: editForm.start_date || null,
-        department: editForm.department || null,
+        department: editForm.departments.length > 0 ? editForm.departments : null,
       }),
     })
     setSaving(false)
@@ -158,6 +176,180 @@ export default function AdminUsersPage() {
       const d = await res.json()
       setAddError(d.error ?? 'Failed to add user')
     }
+  }
+
+  function UserRow({ user, isDeactivated = false }: { user: AppUser; isDeactivated?: boolean }) {
+    return (
+      <div key={user.id} className={`px-5 py-4 ${isDeactivated ? 'opacity-50' : ''}`}>
+        {editingId === user.id ? (
+          /* ── Inline edit mode ── */
+          <div>
+            <div className="grid grid-cols-2 gap-3 mb-3">
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Display name</label>
+                <input
+                  value={editForm.display_name}
+                  onChange={(e) => setEditForm((f) => ({ ...f, display_name: e.target.value }))}
+                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-purple-400"
+                />
+              </div>
+              <div className="text-xs text-slate-400 pt-5">{user.email}</div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Birth date</label>
+                <input
+                  type="text"
+                  value={editForm.birth_date}
+                  onChange={(e) => setEditForm((f) => ({ ...f, birth_date: e.target.value }))}
+                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-purple-400"
+                  placeholder="MM-DD"
+                  pattern="\d{2}-\d{2}"
+                />
+              </div>
+              <div>
+                <label className="block text-xs text-slate-500 mb-1">Start date</label>
+                <input
+                  type="date"
+                  value={editForm.start_date}
+                  onChange={(e) => setEditForm((f) => ({ ...f, start_date: e.target.value }))}
+                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-purple-400"
+                />
+              </div>
+              <div className="col-span-2">
+                <label className="block text-xs text-slate-500 mb-1">Departments</label>
+                <div className="flex flex-wrap gap-x-4 gap-y-1.5 pt-0.5">
+                  {DEPARTMENTS.map((d) => (
+                    <label key={d} className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+                      <input
+                        type="checkbox"
+                        checked={editForm.departments.includes(d)}
+                        onChange={(e) => {
+                          const scrollPos = window.scrollY
+                          setEditForm((f) => ({
+                            ...f,
+                            departments: e.target.checked
+                              ? [...f.departments, d]
+                              : f.departments.filter((x) => x !== d),
+                          }))
+                          window.scrollTo(0, scrollPos)
+                        }}
+                        className="accent-purple-600"
+                      />
+                      {d}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => saveEdit(user.id)}
+                disabled={saving}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 transition-colors"
+              >
+                {saving ? 'Saving…' : 'Save'}
+              </button>
+              <button
+                onClick={() => setEditingId(null)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+            </div>
+          </div>
+        ) : (
+          /* ── Read mode ── */
+          <div className="flex items-start justify-between gap-4">
+            <div className="flex items-start gap-3 min-w-0">
+              {user.avatar_url ? (
+                <img
+                  src={user.avatar_url}
+                  alt={user.display_name}
+                  referrerPolicy="no-referrer"
+                  style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, marginTop: 2 }}
+                />
+              ) : (
+                <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#6b1e98', flexShrink: 0, marginTop: 2 }}>
+                  {user.display_name.split(' ').filter(Boolean).slice(0, 2).map((w: string) => w[0]).join('').toUpperCase()}
+                </div>
+              )}
+              <div className="min-w-0">
+                <div className="flex items-center gap-2 flex-wrap">
+                  <p className="font-medium text-slate-800">{user.display_name}</p>
+                  {user.is_admin && (
+                    <span className="text-xs font-medium bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Admin</span>
+                  )}
+                  {isDeactivated ? (
+                    <span className="text-xs font-medium bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">Deactivated</span>
+                  ) : user.google_id ? (
+                    <span className="text-xs font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Linked</span>
+                  ) : (
+                    <span className="text-xs font-medium bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">Pending</span>
+                  )}
+                  {user.department?.map((d) => (
+                    <span key={d} className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{d}</span>
+                  ))}
+                </div>
+                <p className="text-xs text-slate-400 mt-0.5">{user.email}</p>
+                {isDeactivated && user.deactivated_at && (
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    Deactivated: {new Date(user.deactivated_at).toLocaleString()}
+                  </p>
+                )}
+                {!isDeactivated && (
+                  <div className="flex gap-4 mt-1">
+                    <p className="text-xs text-slate-300">🎂 {formatDate(user.birth_date)}</p>
+                    <p className="text-xs text-slate-300">🏢 Started {formatDate(user.start_date)}</p>
+                  </div>
+                )}
+                {!isDeactivated && user.last_login_at && (
+                  <p className="text-xs text-slate-300 mt-0.5">
+                    Last login: {new Date(user.last_login_at).toLocaleString()}
+                  </p>
+                )}
+              </div>
+            </div>
+            <div className="flex gap-2 flex-shrink-0">
+              {isDeactivated ? (
+                <button
+                  onClick={() => toggleDeactivate(user)}
+                  disabled={deactivatingId === user.id}
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg border border-green-200 text-green-700 hover:bg-green-50 disabled:opacity-50 transition-colors"
+                >
+                  {deactivatingId === user.id ? '…' : 'Reactivate'}
+                </button>
+              ) : (
+                <>
+                  <button
+                    onClick={() => startEdit(user)}
+                    className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
+                  >
+                    Edit
+                  </button>
+                  <button
+                    onClick={() => toggleAdmin(user)}
+                    disabled={togglingId === user.id}
+                    className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors disabled:opacity-50 ${
+                      user.is_admin
+                        ? 'border-slate-200 text-slate-600 hover:bg-slate-50'
+                        : 'border-purple-200 text-purple-600 hover:bg-purple-50'
+                    }`}
+                  >
+                    {togglingId === user.id ? '…' : user.is_admin ? 'Remove Admin' : 'Make Admin'}
+                  </button>
+                  <button
+                    onClick={() => toggleDeactivate(user)}
+                    disabled={deactivatingId === user.id}
+                    className="px-3 py-1.5 text-xs font-medium rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
+                  >
+                    {deactivatingId === user.id ? '…' : 'Deactivate'}
+                  </button>
+                </>
+              )}
+            </div>
+          </div>
+        )}
+      </div>
+    )
   }
 
   return (
@@ -284,139 +476,38 @@ export default function AdminUsersPage() {
       )}
 
       {!loading && !error && (
-        <div className="bg-white border border-slate-200 rounded-2xl divide-y divide-slate-100">
-          {users.map((user) => (
-            <div key={user.id} className="px-5 py-4">
-              {editingId === user.id ? (
-                /* ── Inline edit mode ── */
-                <div>
-                  <div className="grid grid-cols-2 gap-3 mb-3">
-                    <div>
-                      <label className="block text-xs text-slate-500 mb-1">Display name</label>
-                      <input
-                        value={editForm.display_name}
-                        onChange={(e) => setEditForm((f) => ({ ...f, display_name: e.target.value }))}
-                        className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-purple-400"
-                      />
-                    </div>
-                    <div className="text-xs text-slate-400 pt-5">{user.email}</div>
-                    <div>
-                      <label className="block text-xs text-slate-500 mb-1">Birth date</label>
-                      <input
-                        type="text"
-                        value={editForm.birth_date}
-                        onChange={(e) => setEditForm((f) => ({ ...f, birth_date: e.target.value }))}
-                        className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-purple-400"
-                        placeholder="MM-DD"
-                        pattern="\d{2}-\d{2}"
-                      />
-                    </div>
-                    <div>
-                      <label className="block text-xs text-slate-500 mb-1">Start date</label>
-                      <input
-                        type="date"
-                        value={editForm.start_date}
-                        onChange={(e) => setEditForm((f) => ({ ...f, start_date: e.target.value }))}
-                        className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-purple-400"
-                      />
-                    </div>
-                    <div className="col-span-2">
-                      <label className="block text-xs text-slate-500 mb-1">Department</label>
-                      <select
-                        value={editForm.department}
-                        onChange={(e) => setEditForm((f) => ({ ...f, department: e.target.value }))}
-                        className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-purple-400 bg-white"
-                      >
-                        <option value="">No department</option>
-                        {DEPARTMENTS.map((d) => (
-                          <option key={d} value={d}>{d}</option>
-                        ))}
-                      </select>
-                    </div>
-                  </div>
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => saveEdit(user.id)}
-                      disabled={saving}
-                      className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 transition-colors"
-                    >
-                      {saving ? 'Saving…' : 'Save'}
-                    </button>
-                    <button
-                      onClick={() => setEditingId(null)}
-                      className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"
-                    >
-                      Cancel
-                    </button>
-                  </div>
-                </div>
-              ) : (
-                /* ── Read mode ── */
-                <div className="flex items-start justify-between gap-4">
-                  <div className="flex items-start gap-3 min-w-0">
-                    {user.avatar_url ? (
-                      <img
-                        src={user.avatar_url}
-                        alt={user.display_name}
-                        referrerPolicy="no-referrer"
-                        style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, marginTop: 2 }}
-                      />
-                    ) : (
-                      <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#6b1e98', flexShrink: 0, marginTop: 2 }}>
-                        {user.display_name.split(' ').filter(Boolean).slice(0, 2).map((w: string) => w[0]).join('').toUpperCase()}
-                      </div>
-                    )}
-                    <div className="min-w-0">
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <p className="font-medium text-slate-800">{user.display_name}</p>
-                        {user.is_admin && (
-                          <span className="text-xs font-medium bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Admin</span>
-                        )}
-                        {user.google_id ? (
-                          <span className="text-xs font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Linked</span>
-                        ) : (
-                          <span className="text-xs font-medium bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">Pending</span>
-                        )}
-                        {user.department && (
-                          <span className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{user.department}</span>
-                        )}
-                      </div>
-                      <p className="text-xs text-slate-400 mt-0.5">{user.email}</p>
-                      <div className="flex gap-4 mt-1">
-                        <p className="text-xs text-slate-300">🎂 {formatDate(user.birth_date)}</p>
-                        <p className="text-xs text-slate-300">🏢 Started {formatDate(user.start_date)}</p>
-                      </div>
-                      {user.last_login_at && (
-                        <p className="text-xs text-slate-300 mt-0.5">
-                          Last login: {new Date(user.last_login_at).toLocaleString()}
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="flex gap-2 flex-shrink-0">
-                    <button
-                      onClick={() => startEdit(user)}
-                      className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
-                    >
-                      Edit
-                    </button>
-                    <button
-                      onClick={() => toggleAdmin(user)}
-                      disabled={togglingId === user.id}
-                      className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors disabled:opacity-50 ${
-                        user.is_admin
-                          ? 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                          : 'border-purple-200 text-purple-600 hover:bg-purple-50'
-                      }`}
-                    >
-                      {togglingId === user.id ? '…' : user.is_admin ? 'Remove Admin' : 'Make Admin'}
-                    </button>
-                  </div>
+        <>
+          <div className="bg-white border border-slate-200 rounded-2xl divide-y divide-slate-100">
+            {activeUsers.map((user) => (
+              <UserRow key={user.id} user={user} />
+            ))}
+          </div>
+
+          {deactivatedUsers.length > 0 && (
+            <div className="mt-4">
+              <button
+                onClick={() => setShowDeactivated((v) => !v)}
+                className="flex items-center gap-2 text-xs text-slate-400 hover:text-slate-600 transition-colors mb-2"
+              >
+                <svg
+                  width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                  strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"
+                  className={`transition-transform ${showDeactivated ? 'rotate-90' : ''}`}
+                >
+                  <path d="M9 18l6-6-6-6" />
+                </svg>
+                {showDeactivated ? 'Hide' : 'Show'} deactivated ({deactivatedUsers.length})
+              </button>
+              {showDeactivated && (
+                <div className="bg-white border border-slate-200 rounded-2xl divide-y divide-slate-100">
+                  {deactivatedUsers.map((user) => (
+                    <UserRow key={user.id} user={user} isDeactivated />
+                  ))}
                 </div>
               )}
             </div>
-          ))}
-        </div>
+          )}
+        </>
       )}
     </div>
   )

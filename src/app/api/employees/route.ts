@@ -14,6 +14,7 @@ export async function GET(request: Request) {
   let query = adminClient
     .from('users')
     .select('id, email, display_name, job_title, team, office_location, employment_type, profile_image_url, avatar_url, start_date')
+    .is('deactivated_at', null)
     .order('display_name')
 
   if (q) {

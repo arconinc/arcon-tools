@@ -114,12 +114,12 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
         { href: '/hr/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
       ],
     },
-    {
+    ...(isAdmin ? [{
       label: 'Accounting',
       items: [
         { href: '/accounting/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
       ],
-    },
+    }] : []),
     {
       label: 'Technology',
       items: [

@@ -44,6 +44,7 @@ export async function GET() {
     const { data: users } = await adminClient
       .from('users')
       .select('id, display_name, birth_date, start_date, avatar_url')
+      .is('deactivated_at', null)
       .or('birth_date.not.is.null,start_date.not.is.null')
 
     const userRows = users ?? []

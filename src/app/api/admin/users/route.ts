@@ -8,20 +8,35 @@ async function requireAdmin(googleId: string) {
   return data?.is_admin === true
 }
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!(await requireAdmin(user.id))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+  const { searchParams } = new URL(request.url)
+  const includeDeactivated = searchParams.get('include_deactivated') === 'true'
+
   const adminClient = createAdminClient()
-  const { data, error } = await adminClient
+  let query = adminClient
     .from('users')
-    .select('id, email, display_name, is_admin, avatar_url, created_at, last_login_at, birth_date, start_date, google_id, team, department')
+    .select('id, email, display_name, is_admin, avatar_url, created_at, last_login_at, birth_date, start_date, google_id, team, department, deactivated_at')
     .order('created_at', { ascending: false })
 
+  if (!includeDeactivated) {
+    query = query.is('deactivated_at', null)
+  }
+
+  const { data, error } = await query
+
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data)
+  const normalized = (data ?? []).map((u) => ({
+    ...u,
+    department: Array.isArray(u.department)
+      ? u.department
+      : u.department ? [u.department as string] : null,
+  }))
+  return NextResponse.json(normalized)
 }
 
 export async function POST(request: Request) {
@@ -57,13 +72,15 @@ export async function PATCH(request: Request) {
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   if (!(await requireAdmin(user.id))) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { userId, is_admin, display_name, birth_date, start_date, department } = await request.json()
+  const { userId, is_admin, display_name, birth_date, start_date, department, deactivate } = await request.json()
   const updates: Record<string, unknown> = {}
   if (is_admin !== undefined) updates.is_admin = is_admin
   if (display_name !== undefined) updates.display_name = display_name
   if (birth_date !== undefined) updates.birth_date = birth_date
   if (start_date !== undefined) updates.start_date = start_date
-  if (department !== undefined) updates.department = department || null
+  if (department !== undefined) updates.department = Array.isArray(department) && department.length > 0 ? department : null
+  if (deactivate === true) updates.deactivated_at = new Date().toISOString()
+  if (deactivate === false) updates.deactivated_at = null
 
   const adminClient = createAdminClient()
   const { data, error } = await adminClient

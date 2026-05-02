@@ -23,7 +23,7 @@ export interface AppUser {
   zip: string | null
   phone: string | null
   clickup_user_id: string | null
-  department: string | null
+  department: string[] | null
   // Employee profile fields
   manager_id: string | null
   profile_image_url: string | null
@@ -37,6 +37,7 @@ export interface AppUser {
   interests: string[]
   linkedin_url: string | null
   timezone: string | null
+  deactivated_at: string | null
 }
 
 // ─── Employee Directory ──────────────────────────────────────────────────────

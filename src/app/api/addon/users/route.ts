@@ -12,6 +12,7 @@ export async function GET(req: NextRequest) {
   const { data, error } = await adminClient
     .from('users')
     .select('id, display_name, email')
+    .is('deactivated_at', null)
     .order('display_name', { ascending: true })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
