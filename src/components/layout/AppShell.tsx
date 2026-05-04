@@ -13,6 +13,8 @@ import { NotificationBell } from './NotificationBell'
 interface AppShellProps {
   children: React.ReactNode
   user: { id: string; email: string; display_name: string; is_admin: boolean; avatar_url?: string | null }
+  isImpersonating?: boolean
+  impersonatedUserName?: string
 }
 
 type NavBadge = { text: string; variant: 'purple' | 'green' | 'muted' }
@@ -165,7 +167,7 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
 
 // ── AppShell ──────────────────────────────────────────────────────────────────
 
-export default function AppShell({ children, user }: AppShellProps) {
+export default function AppShell({ children, user, isImpersonating, impersonatedUserName }: AppShellProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
@@ -465,6 +467,20 @@ export default function AppShell({ children, user }: AppShellProps) {
 
             {/* Purple stripe */}
             <div style={{ height: 3, background: 'linear-gradient(90deg, #6b1e98, #9333ea)', flexShrink: 0 }} />
+
+            {/* Impersonation banner */}
+            {isImpersonating && impersonatedUserName && (
+              <div style={{ background: '#7c2d12', borderBottom: '2px solid #ea580c', padding: '7px 20px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexShrink: 0, gap: 12 }}>
+                <span style={{ color: '#fef3c7', fontSize: 13, fontWeight: 500 }}>
+                  Viewing as <strong style={{ color: '#fff' }}>{impersonatedUserName}</strong> — impersonation mode active
+                </span>
+                <form action="/api/admin/stop-impersonation" method="POST">
+                  <button type="submit" style={{ background: '#ea580c', color: '#fff', border: 'none', borderRadius: 6, padding: '4px 12px', fontSize: 12, fontWeight: 700, cursor: 'pointer', whiteSpace: 'nowrap' }}>
+                    Stop Impersonating
+                  </button>
+                </form>
+              </div>
+            )}
 
             {/* Topbar */}
             <header className="app-topbar" style={{ background: '#fff', borderBottom: '1px solid #e5e7eb', padding: '0 24px', height: 52, display: 'flex', alignItems: 'center', gap: 12, flexShrink: 0 }}>

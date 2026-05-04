@@ -44,6 +44,25 @@ export default function AdminUsersPage() {
   // Deactivate/reactivate
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null)
 
+  // Impersonation
+  const [impersonatingId, setImpersonatingId] = useState<string | null>(null)
+
+  async function handleImpersonate(user: AppUser) {
+    setImpersonatingId(user.id)
+    const res = await fetch('/api/admin/impersonate', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ targetUserId: user.id }),
+    })
+    setImpersonatingId(null)
+    if (res.ok) {
+      router.push('/dashboard')
+    } else {
+      const d = await res.json()
+      alert(d.error ?? 'Failed to start impersonation')
+    }
+  }
+
   // Sync Google photos
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<string | null>(null)
@@ -338,6 +357,15 @@ export default function AdminUsersPage() {
                   >
                     {togglingId === user.id ? '…' : user.is_admin ? 'Remove Admin' : 'Make Admin'}
                   </button>
+                  {!user.is_admin && (
+                    <button
+                      onClick={() => handleImpersonate(user)}
+                      disabled={impersonatingId === user.id}
+                      className="px-3 py-1.5 text-xs font-medium rounded-lg border border-amber-200 text-amber-700 hover:bg-amber-50 disabled:opacity-50 transition-colors"
+                    >
+                      {impersonatingId === user.id ? '…' : 'Impersonate'}
+                    </button>
+                  )}
                   <button
                     onClick={() => toggleDeactivate(user)}
                     disabled={deactivatingId === user.id}

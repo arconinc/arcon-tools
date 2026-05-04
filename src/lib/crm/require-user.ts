@@ -1,3 +1,4 @@
+import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
@@ -19,5 +20,22 @@ export async function requireUser(): Promise<CrmUser | null> {
     .single()
 
   if (!appUser) return null
+
+  if (appUser.is_admin) {
+    const cookieStore = await cookies()
+    const impersonateCookie = cookieStore.get('arcon_impersonate')
+    if (impersonateCookie?.value) {
+      const { data: target } = await adminClient
+        .from('users')
+        .select('id, is_admin')
+        .eq('id', impersonateCookie.value)
+        .is('deactivated_at', null)
+        .single()
+      if (target && !target.is_admin) {
+        return { id: target.id, is_admin: false }
+      }
+    }
+  }
+
   return appUser as CrmUser
 }
