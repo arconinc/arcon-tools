@@ -885,3 +885,36 @@ export interface Release {
   summary: string
   changes: ReleaseChange[]
 }
+
+// ─── Notifications ────────────────────────────────────────────────────────────
+
+export type NotificationEmailStatus = 'pending' | 'sent' | 'skipped' | 'failed' | 'disabled'
+
+export interface NotificationRow {
+  id: string
+  user_id: string
+  type: string
+  title: string
+  body: string
+  link_url: string | null
+  metadata: Record<string, unknown>
+  read_at: string | null
+  archived_at: string | null
+  email_status: NotificationEmailStatus
+  email_sent_at: string | null
+  created_at: string
+}
+
+export interface NotificationPreferenceRow {
+  user_id: string
+  type: string
+  email: boolean
+  updated_at: string
+}
+
+export interface NotificationPreferenceView {
+  type: string
+  label: string
+  description: string
+  email: boolean
+}

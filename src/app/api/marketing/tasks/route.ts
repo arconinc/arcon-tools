@@ -3,6 +3,8 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 import { DEPARTMENTS, DEPARTMENT_CATEGORIES, getDepartmentForTaskCategory } from '@/lib/task-constants'
 import type { CrmTaskDepartment } from '@/types'
+import { dispatchNotification, fetchActor } from '@/lib/notifications/dispatch'
+import { taskAssigned } from '@/lib/notifications/registry'
 
 function quotePostgrestValue(value: string) {
   return `"${value.replace(/"/g, '\\"')}"`
@@ -217,5 +219,37 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Fire task_assigned notification. Wrapped in try/catch so a notification
+  // failure (or missing migration) never blocks the task creation response.
+  try {
+    const isUserAssigned = !!data.assigned_to && data.assigned_to !== appUser.id
+    const isDeptOnly = !data.assigned_to && !!data.department
+    if (isUserAssigned || isDeptOnly) {
+      const actor = await fetchActor(appUser.id)
+      await dispatchNotification({
+        definition: taskAssigned,
+        payload: {
+          task_id: data.id,
+          task_title: data.title,
+          actor_id: appUser.id,
+          actor_name: actor.display_name,
+          department: isDeptOnly ? data.department : (data.department ?? null),
+          due_date: data.due_date ?? null,
+          priority: data.priority ?? null,
+          status: data.status ?? null,
+          description: data.description ?? null,
+          fanout_kind: isDeptOnly ? 'department' : 'user',
+        },
+        recipientSpec: isDeptOnly
+          ? { department: data.department }
+          : { userId: data.assigned_to },
+        suppressUserIds: [appUser.id],
+      })
+    }
+  } catch (err) {
+    console.error('[notifications] task POST dispatch failed:', err)
+  }
+
   return NextResponse.json(data, { status: 201 })
 }

@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 import { DEPARTMENTS, getDepartmentForTaskCategory } from '@/lib/task-constants'
+import { dispatchNotification, fetchActor } from '@/lib/notifications/dispatch'
+import { taskAssigned } from '@/lib/notifications/registry'
 
 const TRACKED_FIELDS = ['status', 'assigned_to', 'department', 'priority', 'category', 'due_date', 'progress'] as const
 const TASK_UPDATE_FIELDS = [
@@ -264,6 +266,58 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Fire task_assigned notification on assignment changes. Wrapped in try/catch
+  // so a notification failure never blocks the response.
+  try {
+    const newAssigneeChanged =
+      'assigned_to' in safeUpdates && data.assigned_to !== current.assigned_to
+    const deptChanged =
+      'department' in safeUpdates && data.department !== current.department
+
+    if (newAssigneeChanged && data.assigned_to && data.assigned_to !== appUser.id) {
+      const actor = await fetchActor(appUser.id)
+      await dispatchNotification({
+        definition: taskAssigned,
+        payload: {
+          task_id: data.id,
+          task_title: data.title,
+          actor_id: appUser.id,
+          actor_name: actor.display_name,
+          department: data.department ?? null,
+          due_date: data.due_date ?? null,
+          priority: data.priority ?? null,
+          status: data.status ?? null,
+          description: data.description ?? null,
+          fanout_kind: 'user',
+        },
+        recipientSpec: { userId: data.assigned_to },
+        suppressUserIds: [appUser.id],
+      })
+    } else if (deptChanged && !data.assigned_to && data.department) {
+      const actor = await fetchActor(appUser.id)
+      await dispatchNotification({
+        definition: taskAssigned,
+        payload: {
+          task_id: data.id,
+          task_title: data.title,
+          actor_id: appUser.id,
+          actor_name: actor.display_name,
+          department: data.department,
+          due_date: data.due_date ?? null,
+          priority: data.priority ?? null,
+          status: data.status ?? null,
+          description: data.description ?? null,
+          fanout_kind: 'department',
+        },
+        recipientSpec: { department: data.department },
+        suppressUserIds: [appUser.id],
+      })
+    }
+  } catch (err) {
+    console.error('[notifications] task PATCH dispatch failed:', err)
+  }
+
   return NextResponse.json(data)
 }
 
