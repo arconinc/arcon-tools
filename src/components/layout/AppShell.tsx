@@ -71,6 +71,14 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
         { href: '/dashboard', label: 'Home', icon: HomeIcon },
       ],
     },
+      {
+          label: 'Company',
+          items: [
+              { href: '/news', label: 'News & Announcements', icon: MegaphoneIcon, adminMatch: true },
+              { href: '/employees', label: 'Employee Directory', icon: UsersIcon, adminMatch: true },
+              { href: '/profile', label: 'My Profile', icon: UserAdminIcon },
+          ],
+      },
     {
       label: 'Aturian',
       items: [
@@ -92,15 +100,6 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
       label: 'Tasks',
       items: [
         { href: '/my-tasks', label: 'My Tasks', icon: BoardIcon },
-      ],
-    },
-    {
-      label: 'Company',
-      items: [
-        { href: '/news', label: 'News & Announcements', icon: MegaphoneIcon, adminMatch: true },
-        { href: '/releases', label: 'Release Notes', icon: ReleaseIcon, adminMatch: true },
-        { href: '/employees', label: 'Employee Directory', icon: UsersIcon, adminMatch: true },
-        { href: '/profile', label: 'My Profile', icon: UserAdminIcon },
       ],
     },
     {
@@ -157,6 +156,7 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
         { href: '/admin/marketing-import', label: 'Marketing Import', icon: UploadIcon, adminMatch: true },
         { href: '/admin/stores', label: 'Stores', icon: StoreIcon, adminMatch: true },
         { href: '/admin/users', label: 'Manage Users', icon: UserAdminIcon, adminMatch: true },
+        { href: '/releases', label: 'Release Notes', icon: ReleaseIcon, adminMatch: true },
         { href: '/admin/audit-log', label: 'Audit Log', icon: LogIcon, adminMatch: true },
       ],
     })

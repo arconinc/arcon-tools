@@ -21,11 +21,22 @@ function formatDate(val: string | null): string {
 
 const EMPTY_FORM = { display_name: '', email: '', birth_date: '', start_date: '', is_admin: false }
 
+function sortUsersByLastName(a: AppUser, b: AppUser) {
+  const getSortName = (user: AppUser) => {
+    const nameParts = user.display_name.trim().split(/\s+/).filter(Boolean)
+    const lastName = nameParts.at(-1) ?? user.email
+    return `${lastName} ${user.display_name} ${user.email}`.toLocaleLowerCase()
+  }
+
+  return getSortName(a).localeCompare(getSortName(b))
+}
+
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<AppUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [showDeactivated, setShowDeactivated] = useState(false)
+  const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null)
 
   // Add user form
   const [showAdd, setShowAdd] = useState(false)
@@ -118,10 +129,11 @@ export default function AdminUsersPage() {
 
   useEffect(() => { loadUsers() }, [loadUsers])
 
-  const activeUsers = users.filter(u => !u.deactivated_at)
-  const deactivatedUsers = users.filter(u => u.deactivated_at)
+  const activeUsers = users.filter(u => !u.deactivated_at).sort(sortUsersByLastName)
+  const deactivatedUsers = users.filter(u => u.deactivated_at).sort(sortUsersByLastName)
 
   async function toggleAdmin(user: AppUser) {
+    setOpenActionMenuId(null)
     setTogglingId(user.id)
     await fetch('/api/admin/users', {
       method: 'PATCH',
@@ -133,6 +145,7 @@ export default function AdminUsersPage() {
   }
 
   async function toggleDeactivate(user: AppUser) {
+    setOpenActionMenuId(null)
     setDeactivatingId(user.id)
     await fetch('/api/admin/users', {
       method: 'PATCH',
@@ -145,6 +158,7 @@ export default function AdminUsersPage() {
 
   function startEdit(user: AppUser) {
     const scrollPos = window.scrollY
+    setOpenActionMenuId(null)
     setEditingId(user.id)
     setEditForm({
       display_name: user.display_name,
@@ -200,6 +214,10 @@ export default function AdminUsersPage() {
   }
 
   function UserRow({ user, isDeactivated = false }: { user: AppUser; isDeactivated?: boolean }) {
+    const isMenuOpen = openActionMenuId === user.id
+    const departmentLabels = user.department?.map((d) => DEPARTMENT_DISPLAY_NAMES[d as keyof typeof DEPARTMENT_DISPLAY_NAMES] ?? d) ?? []
+    const imageUrl = user.profile_image_url || user.avatar_url
+
     return (
       <div key={user.id} className={`px-5 py-4 ${isDeactivated ? 'opacity-50' : ''}`}>
         {editingId === user.id ? (
@@ -281,9 +299,9 @@ export default function AdminUsersPage() {
           /* ── Read mode ── */
           <div className="flex items-start justify-between gap-4">
             <div className="flex items-start gap-3 min-w-0">
-              {user.avatar_url ? (
+              {imageUrl ? (
                 <img
-                  src={user.avatar_url}
+                  src={imageUrl}
                   alt={user.display_name}
                   referrerPolicy="no-referrer"
                   style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, marginTop: 2 }}
@@ -306,11 +324,18 @@ export default function AdminUsersPage() {
                   ) : (
                     <span className="text-xs font-medium bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">Pending</span>
                   )}
-                  {user.department?.map((d) => (
-                    <span key={d} className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{DEPARTMENT_DISPLAY_NAMES[d as keyof typeof DEPARTMENT_DISPLAY_NAMES] ?? d}</span>
-                  ))}
                 </div>
                 <p className="text-xs text-slate-400 mt-0.5">{user.email}</p>
+                <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                  <span className="text-xs font-medium text-slate-400">Departments:</span>
+                  {departmentLabels.length > 0 ? (
+                    departmentLabels.map((label) => (
+                      <span key={label} className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{label}</span>
+                    ))
+                  ) : (
+                    <span className="text-xs text-slate-300">None assigned</span>
+                  )}
+                </div>
                 {isDeactivated && user.deactivated_at && (
                   <p className="text-xs text-slate-300 mt-0.5">
                     Deactivated: {new Date(user.deactivated_at).toLocaleString()}
@@ -329,51 +354,76 @@ export default function AdminUsersPage() {
                 )}
               </div>
             </div>
-            <div className="flex gap-2 flex-shrink-0">
-              {isDeactivated ? (
-                <button
-                  onClick={() => toggleDeactivate(user)}
-                  disabled={deactivatingId === user.id}
-                  className="px-3 py-1.5 text-xs font-medium rounded-lg border border-green-200 text-green-700 hover:bg-green-50 disabled:opacity-50 transition-colors"
-                >
-                  {deactivatingId === user.id ? '…' : 'Reactivate'}
-                </button>
-              ) : (
-                <>
-                  <button
-                    onClick={() => startEdit(user)}
-                    className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    onClick={() => toggleAdmin(user)}
-                    disabled={togglingId === user.id}
-                    className={`px-3 py-1.5 text-xs font-medium rounded-lg border transition-colors disabled:opacity-50 ${
-                      user.is_admin
-                        ? 'border-slate-200 text-slate-600 hover:bg-slate-50'
-                        : 'border-purple-200 text-purple-600 hover:bg-purple-50'
-                    }`}
-                  >
-                    {togglingId === user.id ? '…' : user.is_admin ? 'Remove Admin' : 'Make Admin'}
-                  </button>
-                  {!user.is_admin && (
+            <div className="relative flex-shrink-0">
+              <button
+                type="button"
+                onClick={() => setOpenActionMenuId((id) => id === user.id ? null : user.id)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-1.5"
+                aria-haspopup="menu"
+                aria-expanded={isMenuOpen}
+              >
+                Actions
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                  <path d="M6 9l6 6 6-6" />
+                </svg>
+              </button>
+              {isMenuOpen && (
+                <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg" role="menu">
+                  {isDeactivated ? (
                     <button
-                      onClick={() => handleImpersonate(user)}
-                      disabled={impersonatingId === user.id}
-                      className="px-3 py-1.5 text-xs font-medium rounded-lg border border-amber-200 text-amber-700 hover:bg-amber-50 disabled:opacity-50 transition-colors"
+                      type="button"
+                      onClick={() => toggleDeactivate(user)}
+                      disabled={deactivatingId === user.id}
+                      className="block w-full px-3 py-2 text-left text-xs font-medium text-green-700 hover:bg-green-50 disabled:opacity-50"
+                      role="menuitem"
                     >
-                      {impersonatingId === user.id ? '…' : 'Impersonate'}
+                      {deactivatingId === user.id ? 'Reactivating…' : 'Reactivate'}
                     </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => startEdit(user)}
+                        className="block w-full px-3 py-2 text-left text-xs font-medium text-slate-600 hover:bg-slate-50"
+                        role="menuitem"
+                      >
+                        Edit
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => toggleAdmin(user)}
+                        disabled={togglingId === user.id}
+                        className="block w-full px-3 py-2 text-left text-xs font-medium text-purple-700 hover:bg-purple-50 disabled:opacity-50"
+                        role="menuitem"
+                      >
+                        {togglingId === user.id ? 'Updating…' : user.is_admin ? 'Remove Admin' : 'Make Admin'}
+                      </button>
+                      {!user.is_admin && (
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setOpenActionMenuId(null)
+                            handleImpersonate(user)
+                          }}
+                          disabled={impersonatingId === user.id}
+                          className="block w-full px-3 py-2 text-left text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                          role="menuitem"
+                        >
+                          {impersonatingId === user.id ? 'Starting…' : 'Impersonate'}
+                        </button>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => toggleDeactivate(user)}
+                        disabled={deactivatingId === user.id}
+                        className="block w-full px-3 py-2 text-left text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                        role="menuitem"
+                      >
+                        {deactivatingId === user.id ? 'Deactivating…' : 'Deactivate'}
+                      </button>
+                    </>
                   )}
-                  <button
-                    onClick={() => toggleDeactivate(user)}
-                    disabled={deactivatingId === user.id}
-                    className="px-3 py-1.5 text-xs font-medium rounded-lg border border-red-200 text-red-600 hover:bg-red-50 disabled:opacity-50 transition-colors"
-                  >
-                    {deactivatingId === user.id ? '…' : 'Deactivate'}
-                  </button>
-                </>
+                </div>
               )}
             </div>
           </div>

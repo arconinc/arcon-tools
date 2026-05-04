@@ -1,5 +1,97 @@
 [
   {
+    "version": "0.3.0",
+    "date": "2026-05-04",
+    "title": "Notifications",
+    "summary": "Add notifications",
+    "changes": [
+      {
+        "category": "feature",
+        "description": "Impersonate"
+      },
+      {
+        "category": "feature",
+        "description": "Notifications"
+      },
+      {
+        "category": "feature",
+        "description": "Use departments rather than team"
+      },
+      {
+        "category": "feature",
+        "description": "Change to Marketing instead of CRM"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Various Fixes"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Various Fixes"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Various Fixes"
+      },
+      {
+        "category": "feature",
+        "description": "Task updates"
+      },
+      {
+        "category": "feature",
+        "description": "Left nav"
+      },
+      {
+        "category": "feature",
+        "description": "Add countdown"
+      },
+      {
+        "category": "feature",
+        "description": "Add calendar"
+      },
+      {
+        "category": "feature",
+        "description": "Add calendar"
+      },
+      {
+        "category": "feature",
+        "description": "Add forms description"
+      },
+      {
+        "category": "feature",
+        "description": "Add forms"
+      },
+      {
+        "category": "feature",
+        "description": "Add Lure submission"
+      },
+      {
+        "category": "feature",
+        "description": "Right click for tasks"
+      },
+      {
+        "category": "feature",
+        "description": "My tasks"
+      },
+      {
+        "category": "feature",
+        "description": "Migrations"
+      },
+      {
+        "category": "feature",
+        "description": "Sort the tasks on the my tasks board"
+      },
+      {
+        "category": "feature",
+        "description": "Fix proxy to allow for gmail add-on calls"
+      },
+      {
+        "category": "feature",
+        "description": "Release v0.2.0"
+      }
+    ]
+  },
+  {
     "version": "0.2.0",
     "date": "2026-03-30",
     "title": "Gmail Add-On",
