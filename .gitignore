@@ -43,3 +43,5 @@ next-env.d.ts
 /design-preview.html
 /firebase-debug.log
 /data/
+/.playwright-mcp/
+/.claude/worktrees/
