@@ -1,5 +1,11 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
+import { RESTRICTED_RESOURCES } from '@/lib/permissions'
+
+// Pre-compute the set of restricted page prefixes for fast lookup in middleware
+const RESTRICTED_PAGE_PREFIXES: { prefix: string; role: string }[] = Object.entries(RESTRICTED_RESOURCES)
+  .filter(([key, role]) => key.startsWith('page:') && !!role)
+  .map(([key, role]) => ({ prefix: key.slice('page:'.length), role: role as string }))
 
 export async function proxy(request: NextRequest) {
   let supabaseResponse = NextResponse.next({ request })
@@ -47,6 +53,65 @@ export async function proxy(request: NextRequest) {
   // All other paths require authentication
   if (!user) {
     return NextResponse.redirect(new URL('/login', request.url))
+  }
+
+  // Role check — only fires for explicitly restricted pages
+  const restricted = RESTRICTED_PAGE_PREFIXES.find(
+    ({ prefix }) => pathname === prefix || pathname.startsWith(prefix + '/') || pathname.startsWith(prefix + '?')
+  )
+  if (restricted) {
+    // Use service-role key to bypass RLS for this check
+    const adminClient = createServerClient(
+      process.env.NEXT_PUBLIC_SUPABASE_URL!,
+      process.env.SUPABASE_SERVICE_ROLE_KEY!,
+      { cookies: { getAll: () => [], setAll: () => {} } }
+    )
+
+    // Resolve effective user (impersonation aware)
+    let effectiveUserId: string | null = null
+    let isAdmin = false
+
+    const { data: realUser } = await adminClient
+      .from('users')
+      .select('id, is_admin')
+      .eq('google_id', user.id)
+      .single()
+
+    if (realUser) {
+      isAdmin = realUser.is_admin
+      effectiveUserId = realUser.id
+
+      if (isAdmin) {
+        const impersonateCookie = request.cookies.get('arcon_impersonate')
+        if (impersonateCookie?.value) {
+          const { data: target } = await adminClient
+            .from('users')
+            .select('id, is_admin')
+            .eq('id', impersonateCookie.value)
+            .is('deactivated_at', null)
+            .single()
+          if (target && !target.is_admin) {
+            effectiveUserId = target.id
+            isAdmin = false
+          }
+        }
+      }
+    }
+
+    if (!isAdmin && effectiveUserId) {
+      const { data: userRoles } = await adminClient
+        .from('user_roles')
+        .select('roles(name)')
+        .eq('user_id', effectiveUserId)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const roleNames: string[] = (userRoles ?? []).map((r: any) => r.roles?.name).filter(Boolean)
+      if (!roleNames.includes(restricted.role)) {
+        const denied = new URL('/access-denied', request.url)
+        denied.searchParams.set('resource', pathname)
+        denied.searchParams.set('role', restricted.role)
+        return NextResponse.redirect(denied)
+      }
+    }
   }
 
   return supabaseResponse

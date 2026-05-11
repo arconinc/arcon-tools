@@ -58,6 +58,35 @@ export default function AdminUsersPage() {
   // Impersonation
   const [impersonatingId, setImpersonatingId] = useState<string | null>(null)
 
+  // Role management
+  const [allRoles, setAllRoles] = useState<{ id: string; name: string; label: string; color: string }[]>([])
+  const [roleManagingId, setRoleManagingId] = useState<string | null>(null)
+  const [pendingRoleIds, setPendingRoleIds] = useState<string[]>([])
+  const [savingRoles, setSavingRoles] = useState(false)
+  useEffect(() => {
+    fetch('/api/admin/roles').then(r => r.json()).then(data => setAllRoles(Array.isArray(data) ? data : []))
+  }, [])
+
+  async function openRoleManager(userId: string) {
+    setOpenActionMenuId(null)
+    const res = await fetch(`/api/admin/user-roles?userId=${userId}`)
+    const data = await res.json()
+    setPendingRoleIds(Array.isArray(data) ? data.map((r: { role_id: string }) => r.role_id) : [])
+    setRoleManagingId(userId)
+  }
+
+  async function saveRoles(userId: string) {
+    setSavingRoles(true)
+    await fetch('/api/admin/user-roles', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ userId, roleIds: pendingRoleIds }),
+    })
+    setSavingRoles(false)
+    setRoleManagingId(null)
+    loadUsers()
+  }
+
   async function handleImpersonate(user: AppUser) {
     setImpersonatingId(user.id)
     const res = await fetch('/api/admin/impersonate', {
@@ -352,6 +381,23 @@ export default function AdminUsersPage() {
                     Last login: {new Date(user.last_login_at).toLocaleString()}
                   </p>
                 )}
+                {/* Roles */}
+                <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
+                  <span className="text-xs font-medium text-slate-400">Roles:</span>
+                  {(user.roles ?? []).length > 0 ? (
+                    (user.roles ?? []).map((roleName: string) => {
+                      const role = allRoles.find(r => r.name === roleName)
+                      return (
+                        <span key={roleName} className="text-xs font-medium px-2 py-0.5 rounded-full"
+                          style={{ background: (role?.color ?? '#6b7280') + '22', color: role?.color ?? '#6b7280' }}>
+                          {role?.label ?? roleName}
+                        </span>
+                      )
+                    })
+                  ) : (
+                    <span className="text-xs text-slate-300">None assigned</span>
+                  )}
+                </div>
               </div>
             </div>
             <div className="relative flex-shrink-0">
@@ -391,6 +437,14 @@ export default function AdminUsersPage() {
                       </button>
                       <button
                         type="button"
+                        onClick={() => openRoleManager(user.id)}
+                        className="block w-full px-3 py-2 text-left text-xs font-medium text-indigo-700 hover:bg-indigo-50"
+                        role="menuitem"
+                      >
+                        Manage Roles
+                      </button>
+                      <button
+                        type="button"
                         onClick={() => toggleAdmin(user)}
                         disabled={togglingId === user.id}
                         className="block w-full px-3 py-2 text-left text-xs font-medium text-purple-700 hover:bg-purple-50 disabled:opacity-50"
@@ -425,6 +479,47 @@ export default function AdminUsersPage() {
                   )}
                 </div>
               )}
+            </div>
+          </div>
+        )}
+        {/* Inline role manager */}
+        {roleManagingId === user.id && (
+          <div style={{ borderTop: '1px solid #f1f5f9', marginTop: 12, paddingTop: 12 }}>
+            <p className="text-xs font-semibold text-slate-600 mb-2">Assign Roles</p>
+            <div className="flex flex-wrap gap-x-4 gap-y-1.5 mb-3">
+              {allRoles.map(role => (
+                <label key={role.id} className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={pendingRoleIds.includes(role.id)}
+                    onChange={e => {
+                      setPendingRoleIds(prev =>
+                        e.target.checked ? [...prev, role.id] : prev.filter(id => id !== role.id)
+                      )
+                    }}
+                    className="accent-purple-600"
+                  />
+                  <span className="font-medium px-2 py-0.5 rounded-full text-xs"
+                    style={{ background: role.color + '22', color: role.color }}>
+                    {role.label}
+                  </span>
+                </label>
+              ))}
+            </div>
+            <div className="flex gap-2">
+              <button
+                onClick={() => saveRoles(user.id)}
+                disabled={savingRoles}
+                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 transition-colors"
+              >
+                {savingRoles ? 'Saving…' : 'Save Roles'}
+              </button>
+              <button
+                onClick={() => setRoleManagingId(null)}
+                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
             </div>
           </div>
         )}

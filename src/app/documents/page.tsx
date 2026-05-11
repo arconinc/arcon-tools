@@ -15,9 +15,7 @@ export default function DocumentsPage() {
       .then(data => {
         const secs: DocSectionWithFolders[] = data.sections ?? []
         setSections(secs)
-        // Open all sections by default
         setOpenSections(new Set(secs.map(s => s.id)))
-        // Open all folders by default
         const folderIds = secs.flatMap(s => s.folders.map(f => f.id))
         setOpenFolders(new Set(folderIds))
       })
@@ -70,7 +68,7 @@ export default function DocumentsPage() {
         .folder-doc-count { margin-left: auto; font-size: 0.75rem; color: #9ca3af; }
 
         .folder-docs { padding: 0.25rem 0; }
-        .doc-link { display: flex; align-items: center; gap: 0.625rem; padding: 0.5rem 0.875rem 0.5rem 2.25rem; text-decoration: none; color: inherit; transition: background 0.15s; }
+        .doc-link { display: flex; align-items: center; gap: 0.625rem; padding: 0.5rem 0.875rem 0.5rem 2.25rem; text-decoration: none; color: inherit; transition: background 0.15s; cursor: pointer; background: none; border: none; width: 100%; text-align: left; font-family: inherit; }
         .doc-link:hover { background: #f5f3ff; }
         .doc-link:hover .doc-title { color: #7c3aed; }
         .doc-icon { flex-shrink: 0; width: 18px; height: 18px; color: #6b7280; }
@@ -78,6 +76,7 @@ export default function DocumentsPage() {
         .doc-title { font-size: 0.875rem; color: #374151; }
         .doc-description { font-size: 0.75rem; color: #9ca3af; margin-top: 1px; }
         .doc-ext-icon { margin-left: auto; flex-shrink: 0; width: 14px; height: 14px; color: #d1d5db; }
+        .doc-loading { opacity: 0.6; pointer-events: none; }
 
         .empty-state { text-align: center; padding: 4rem 2rem; color: #9ca3af; }
         .empty-state svg { width: 48px; height: 48px; margin: 0 auto 1rem; display: block; color: #e5e7eb; }
@@ -176,14 +175,42 @@ function FolderBlock({
 }
 
 function DocItem({ doc }: { doc: DriveDocument }) {
+  const [fetching, setFetching] = useState(false)
+
+  async function open() {
+    if (doc.storage_path) {
+      setFetching(true)
+      try {
+        const res = await fetch(`/api/documents/signed-url?docId=${doc.id}`)
+        if (res.ok) {
+          const { signedUrl } = await res.json()
+          window.open(signedUrl, '_blank', 'noopener,noreferrer')
+        } else {
+          const { error } = await res.json().catch(() => ({ error: 'Access denied' }))
+          alert(error ?? 'Could not open document.')
+        }
+      } finally {
+        setFetching(false)
+      }
+    } else if (doc.drive_url) {
+      window.open(doc.drive_url, '_blank', 'noopener,noreferrer')
+    }
+  }
+
+  const isUploaded = !!doc.storage_path
+
   return (
-    <a className="doc-link" href={doc.drive_url} target="_blank" rel="noopener noreferrer">
-      <svg className="doc-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+    <button className={`doc-link${fetching ? ' doc-loading' : ''}`} onClick={open} disabled={fetching}>
+      {isUploaded ? (
+        <svg className="doc-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" /></svg>
+      ) : (
+        <svg className="doc-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+      )}
       <div>
-        <div className="doc-title">{doc.title}</div>
+        <div className="doc-title">{doc.title}{fetching ? ' …' : ''}</div>
         {doc.description && <div className="doc-description">{doc.description}</div>}
       </div>
       <svg className="doc-ext-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-    </a>
+    </button>
   )
 }

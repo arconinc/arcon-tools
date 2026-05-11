@@ -89,6 +89,123 @@ export const taskAssigned: NotificationDefinition<TaskAssignedPayload> = {
   },
 }
 
+// ─── access_request.new ───────────────────────────────────────────────────────
+
+export interface AccessRequestNewPayload {
+  request_id: string
+  requester_name: string
+  role_label: string
+  resource_key: string | null
+  message: string | null
+}
+
+export const accessRequestNew: NotificationDefinition<AccessRequestNewPayload> = {
+  type: 'access_request.new',
+  label: 'New access request (admin)',
+  description: 'When an employee submits an access request.',
+  defaultEmail: true,
+  render: (p) => ({
+    title: `${p.requester_name} requested ${p.role_label} access`,
+    body: p.message ? `"${p.message}"` : 'No message provided.',
+    linkUrl: `/admin/access-requests`,
+  }),
+  email: (p, recipient) => {
+    const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
+    return {
+      subject: `Access request: ${p.requester_name} → ${p.role_label}`,
+      html: renderGenericEmail({
+        preheader: `${p.requester_name} is requesting ${p.role_label} access`,
+        heading: 'New Access Request',
+        greeting: `Hi ${firstName},`,
+        bodyLines: [
+          `<strong>${p.requester_name}</strong> has requested <strong>${p.role_label}</strong> access.`,
+          ...(p.message ? [`Their note: <em>${p.message}</em>`] : []),
+        ],
+        ctaText: 'Review Request',
+        ctaUrl: `${appUrl()}/admin/access-requests`,
+      }),
+    }
+  },
+}
+
+// ─── access_request.approved ─────────────────────────────────────────────────
+
+export interface AccessRequestApprovedPayload {
+  request_id: string
+  role_label: string
+  reviewer_name: string
+  review_note: string | null
+}
+
+export const accessRequestApproved: NotificationDefinition<AccessRequestApprovedPayload> = {
+  type: 'access_request.approved',
+  label: 'My access request was approved',
+  description: 'When an administrator approves your access request.',
+  defaultEmail: true,
+  render: (p) => ({
+    title: `Your ${p.role_label} access request was approved`,
+    body: p.review_note ?? `Approved by ${p.reviewer_name}.`,
+    linkUrl: `/dashboard`,
+  }),
+  email: (p, recipient) => {
+    const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
+    return {
+      subject: `Access approved: ${p.role_label}`,
+      html: renderGenericEmail({
+        preheader: `Your request for ${p.role_label} access has been approved`,
+        heading: 'Access Request Approved',
+        greeting: `Hi ${firstName},`,
+        bodyLines: [
+          `Your request for <strong>${p.role_label}</strong> access has been approved by <strong>${p.reviewer_name}</strong>.`,
+          ...(p.review_note ? [`Note: <em>${p.review_note}</em>`] : []),
+          `You now have access. Refresh the app to see the updated navigation.`,
+        ],
+        ctaText: 'Go to Dashboard',
+        ctaUrl: `${appUrl()}/dashboard`,
+      }),
+    }
+  },
+}
+
+// ─── access_request.denied ───────────────────────────────────────────────────
+
+export interface AccessRequestDeniedPayload {
+  request_id: string
+  role_label: string
+  reviewer_name: string
+  review_note: string | null
+}
+
+export const accessRequestDenied: NotificationDefinition<AccessRequestDeniedPayload> = {
+  type: 'access_request.denied',
+  label: 'My access request was denied',
+  description: 'When an administrator denies your access request.',
+  defaultEmail: true,
+  render: (p) => ({
+    title: `Your ${p.role_label} access request was not approved`,
+    body: p.review_note ?? `Reviewed by ${p.reviewer_name}.`,
+    linkUrl: `/dashboard`,
+  }),
+  email: (p, recipient) => {
+    const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
+    return {
+      subject: `Access request update: ${p.role_label}`,
+      html: renderGenericEmail({
+        preheader: `Your request for ${p.role_label} access was not approved`,
+        heading: 'Access Request Not Approved',
+        greeting: `Hi ${firstName},`,
+        bodyLines: [
+          `Your request for <strong>${p.role_label}</strong> access was reviewed by <strong>${p.reviewer_name}</strong> and was not approved at this time.`,
+          ...(p.review_note ? [`Note: <em>${p.review_note}</em>`] : []),
+          `If you have questions, please reach out to your administrator directly.`,
+        ],
+        ctaText: 'Go to Dashboard',
+        ctaUrl: `${appUrl()}/dashboard`,
+      }),
+    }
+  },
+}
+
 // ─── Registry ─────────────────────────────────────────────────────────────────
 //
 // To add a new notification type:
@@ -99,6 +216,9 @@ export const taskAssigned: NotificationDefinition<TaskAssignedPayload> = {
 
 export const NOTIFICATION_REGISTRY = {
   task_assigned: taskAssigned,
+  'access_request.new': accessRequestNew,
+  'access_request.approved': accessRequestApproved,
+  'access_request.denied': accessRequestDenied,
 } as const
 
 export type NotificationType = keyof typeof NOTIFICATION_REGISTRY

@@ -15,19 +15,35 @@ async function getAdminUser() {
   return appUser?.is_admin ? appUser : null
 }
 
+// GET /api/admin/documents/folders
+export async function GET() {
+  const admin = await getAdminUser()
+  if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const adminClient = createAdminClient()
+  const { data, error } = await adminClient
+    .from('doc_folders')
+    .select('*')
+    .order('sort_order')
+    .order('name')
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json({ folders: data })
+}
+
 // POST /api/admin/documents/folders
 export async function POST(request: Request) {
   const admin = await getAdminUser()
   if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { name, section_id, sort_order } = await request.json()
+  const { name, section_id, sort_order, required_role } = await request.json()
   if (!name?.trim()) return NextResponse.json({ error: 'Name is required' }, { status: 400 })
   if (!section_id) return NextResponse.json({ error: 'section_id is required' }, { status: 400 })
 
   const adminClient = createAdminClient()
   const { data, error } = await adminClient
     .from('doc_folders')
-    .insert({ name: name.trim(), section_id, sort_order: sort_order ?? 0 })
+    .insert({ name: name.trim(), section_id, sort_order: sort_order ?? 0, required_role: required_role ?? null })
     .select()
     .single()
 

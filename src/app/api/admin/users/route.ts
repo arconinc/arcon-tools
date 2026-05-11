@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   const adminClient = createAdminClient()
   let query = adminClient
     .from('users')
-    .select('id, email, display_name, is_admin, avatar_url, profile_image_url, created_at, last_login_at, birth_date, start_date, google_id, department, deactivated_at')
+    .select('id, email, display_name, is_admin, avatar_url, profile_image_url, created_at, last_login_at, birth_date, start_date, google_id, department, deactivated_at, user_roles!user_id(roles(name))')
     .order('created_at', { ascending: false })
 
   if (!includeDeactivated) {
@@ -30,12 +30,17 @@ export async function GET(request: Request) {
   const { data, error } = await query
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  const normalized = (data ?? []).map((u) => ({
+  const normalized = (data ?? []).map((u) => (({
     ...u,
     department: Array.isArray(u.department)
       ? u.department
       : u.department ? [u.department as string] : null,
-  }))
+    roles: Array.isArray(u.user_roles)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? u.user_roles.map((r: any) => r.roles?.name).filter(Boolean)
+      : [],
+    user_roles: undefined,
+  })))
   return NextResponse.json(normalized)
 }
 

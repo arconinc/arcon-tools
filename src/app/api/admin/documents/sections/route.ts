@@ -36,13 +36,13 @@ export async function POST(request: Request) {
   const admin = await getAdminUser()
   if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
-  const { name, sort_order } = await request.json()
+  const { name, sort_order, required_role } = await request.json()
   if (!name?.trim()) return NextResponse.json({ error: 'Name is required' }, { status: 400 })
 
   const adminClient = createAdminClient()
   const { data, error } = await adminClient
     .from('doc_sections')
-    .insert({ name: name.trim(), sort_order: sort_order ?? 0 })
+    .insert({ name: name.trim(), sort_order: sort_order ?? 0, required_role: required_role ?? null })
     .select()
     .single()
 

@@ -21,6 +21,7 @@ export interface AppUser {
   zip: string | null
   phone: string | null
   clickup_user_id: string | null
+  roles: string[]
   department: string[] | null
   // Employee profile fields
   manager_id: string | null
@@ -403,6 +404,7 @@ export interface DocSection {
   id: string
   name: string
   sort_order: number
+  required_role: string | null
   created_at: string
 }
 
@@ -411,6 +413,7 @@ export interface DocFolder {
   section_id: string
   name: string
   sort_order: number
+  required_role: string | null
   created_at: string
 }
 
@@ -418,9 +421,12 @@ export interface DriveDocument {
   id: string
   folder_id: string
   title: string
-  drive_url: string
+  drive_url: string | null
   drive_file_id: string | null
   description: string | null
+  storage_bucket: string | null
+  storage_path: string | null
+  required_role: string | null
   sort_order: number
   created_at: string
   updated_at: string

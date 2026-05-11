@@ -8,6 +8,7 @@ export interface EffectiveUser {
   display_name: string
   is_admin: boolean
   avatar_url: string | null
+  roles: string[]
 }
 
 export interface EffectiveUserResult {
@@ -42,6 +43,7 @@ export async function getEffectiveUser(): Promise<EffectiveUserResult | null> {
         .is('deactivated_at', null)
         .single()
       if (target && !target.is_admin) {
+        const targetRoles = await getUserRoleNames(adminClient, target.id)
         return {
           effectiveUser: {
             id: target.id,
@@ -49,6 +51,7 @@ export async function getEffectiveUser(): Promise<EffectiveUserResult | null> {
             display_name: target.display_name,
             is_admin: false,
             avatar_url: target.avatar_url,
+            roles: targetRoles,
           },
           isImpersonating: true,
           realUserIsAdmin: true,
@@ -57,9 +60,23 @@ export async function getEffectiveUser(): Promise<EffectiveUserResult | null> {
     }
   }
 
+  const roles = await getUserRoleNames(adminClient, realUser.id)
   return {
-    effectiveUser: { ...realUser, avatar_url: avatarUrl },
+    effectiveUser: { ...realUser, avatar_url: avatarUrl, roles },
     isImpersonating: false,
     realUserIsAdmin: realUser.is_admin,
   }
+}
+
+async function getUserRoleNames(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  adminClient: any,
+  userId: string
+): Promise<string[]> {
+  const { data } = await adminClient
+    .from('user_roles')
+    .select('roles(name)')
+    .eq('user_id', userId)
+  if (!data) return []
+  return data.map((r: { roles: { name: string } }) => r.roles.name)
 }

@@ -12,7 +12,7 @@ import { NotificationBell } from './NotificationBell'
 
 interface AppShellProps {
   children: React.ReactNode
-  user: { id: string; email: string; display_name: string; is_admin: boolean; avatar_url?: string | null }
+  user: { id: string; email: string; display_name: string; is_admin: boolean; avatar_url?: string | null; roles?: string[] }
   isImpersonating?: boolean
   impersonatedUserName?: string
 }
@@ -25,7 +25,8 @@ type NavItemDef = {
   icon: React.FC<{ className?: string }>
   badge?: NavBadge
   soon?: boolean
-  adminMatch?: boolean // use pathname.startsWith instead of ===
+  adminMatch?: boolean    // use pathname.startsWith instead of ===
+  requiredRole?: string   // if set, hidden unless user has this role (or is admin)
 }
 
 type NavSection = {
@@ -51,8 +52,13 @@ export function useStore() {
 
 interface UserContextValue {
   user: {
-      id: string;
-      email: string; display_name: string; is_admin: boolean; avatar_url?: string | null } | null
+    id: string;
+    email: string;
+    display_name: string;
+    is_admin: boolean;
+    avatar_url?: string | null;
+    roles?: string[];
+  } | null
 }
 
 export const UserContext = createContext<UserContextValue>({ user: null })
@@ -63,7 +69,9 @@ export function useAppUser() {
 
 // ── Nav structure ─────────────────────────────────────────────────────────────
 
-function buildNavSections(isAdmin: boolean): NavSection[] {
+function buildNavSections(isAdmin: boolean, roles: string[]): NavSection[] {
+  const filter = (items: NavItemDef[]) =>
+    items.filter(item => isAdmin || !item.requiredRole || roles.includes(item.requiredRole))
   const sections: NavSection[] = [
     {
       label: 'Home',
@@ -76,6 +84,7 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
           items: [
               { href: '/news', label: 'News & Announcements', icon: MegaphoneIcon, adminMatch: true },
               { href: '/employees', label: 'Employee Directory', icon: UsersIcon, adminMatch: true },
+              { href: '/documents', label: 'Documents', icon: DocumentIcon, adminMatch: true },
               { href: '/profile', label: 'My Profile', icon: UserAdminIcon },
           ],
       },
@@ -112,7 +121,6 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
     {
       label: 'HR',
       items: [
-        { href: '/documents', label: 'Documents', icon: DocumentIcon, adminMatch: true },
         { href: '/hr/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
       ],
     },
@@ -156,13 +164,17 @@ function buildNavSections(isAdmin: boolean): NavSection[] {
         { href: '/admin/marketing-import', label: 'Marketing Import', icon: UploadIcon, adminMatch: true },
         { href: '/admin/stores', label: 'Stores', icon: StoreIcon, adminMatch: true },
         { href: '/admin/users', label: 'Manage Users', icon: UserAdminIcon, adminMatch: true },
+        { href: '/admin/access-requests', label: 'Access Requests', icon: LockIcon, adminMatch: true },
         { href: '/releases', label: 'Release Notes', icon: ReleaseIcon, adminMatch: true },
         { href: '/admin/audit-log', label: 'Audit Log', icon: LogIcon, adminMatch: true },
       ],
     })
   }
 
+  // Filter each section's items by role, then drop sections that become empty
   return sections
+    .map(s => ({ ...s, items: filter(s.items) }))
+    .filter(s => s.items.length > 0)
 }
 
 // ── AppShell ──────────────────────────────────────────────────────────────────
@@ -318,7 +330,7 @@ export default function AppShell({ children, user, isImpersonating, impersonated
     .toUpperCase()
     .slice(0, 2)
 
-  const navSections = buildNavSections(user.is_admin)
+  const navSections = buildNavSections(user.is_admin, user.roles ?? [])
   const sidebarWidth = sidebarCollapsed ? 52 : 228
 
   return (
@@ -911,4 +923,7 @@ function UploadIcon({ className }: { className?: string }) {
 
 function LoginIcon({ className }: { className?: string }) {
   return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7m0 0l-7 7m7-7H3" /></svg>
+}
+function LockIcon({ className }: { className?: string }) {
+  return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
 }

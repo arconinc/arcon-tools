@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 export interface RecipientSpec {
   userId?: string | null
   department?: string | null
+  admins?: boolean   // send to all active admin users
 }
 
 export interface ResolvedRecipient {
@@ -28,6 +29,12 @@ export async function resolveRecipients(spec: RecipientSpec): Promise<ResolvedRe
       .from('users')
       .select('id, email, display_name, deactivated_at')
       .contains('department', [spec.department])
+    rows = data ?? []
+  } else if (spec.admins) {
+    const { data } = await adminClient
+      .from('users')
+      .select('id, email, display_name, deactivated_at')
+      .eq('is_admin', true)
     rows = data ?? []
   }
 

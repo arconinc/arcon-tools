@@ -13,12 +13,24 @@ declare global {
   }
 }
 
+type DocSource = 'drive' | 'upload'
+
 interface AddDocForm {
   folderId: string
+  source: DocSource
   title: string
   drive_url: string
   drive_file_id: string
   description: string
+  required_role: string
+  file: File | null
+}
+
+interface Role {
+  id: string
+  name: string
+  label: string
+  color: string
 }
 
 export default function DocumentsAdminPage() {
@@ -26,12 +38,17 @@ export default function DocumentsAdminPage() {
   const [loading, setLoading] = useState(true)
   const [gapiReady, setGapiReady] = useState(false)
   const [gisReady, setGisReady] = useState(false)
+  const [allRoles, setAllRoles] = useState<Role[]>([])
 
-  // Inline edit state
+  // Inline edit state — sections
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null)
   const [editingSectionName, setEditingSectionName] = useState('')
+  const [editingSectionRole, setEditingSectionRole] = useState<string>('')
+
+  // Inline edit state — folders
   const [editingFolderId, setEditingFolderId] = useState<string | null>(null)
   const [editingFolderName, setEditingFolderName] = useState('')
+  const [editingFolderRole, setEditingFolderRole] = useState<string>('')
 
   // Add section
   const [addSectionName, setAddSectionName] = useState('')
@@ -44,19 +61,46 @@ export default function DocumentsAdminPage() {
   // Add document state
   const [addDocForm, setAddDocForm] = useState<AddDocForm | null>(null)
   const [addDocLoading, setAddDocLoading] = useState(false)
+  const [addDocError, setAddDocError] = useState<string | null>(null)
+
+  // Edit document state
+  const [editDocModal, setEditDocModal] = useState<DriveDocument | null>(null)
+  const [editDocTitle, setEditDocTitle] = useState('')
+  const [editDocDescription, setEditDocDescription] = useState('')
+  const [editDocRole, setEditDocRole] = useState('')
+  const [editDocLoading, setEditDocLoading] = useState(false)
+  const [editDocError, setEditDocError] = useState<string | null>(null)
 
   // Collapsed state
   const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     loadTree()
+    fetch('/api/admin/roles').then(r => r.json()).then(data => setAllRoles(Array.isArray(data) ? data : []))
   }, [])
 
   async function loadTree() {
     setLoading(true)
-    const res = await fetch('/api/documents')
-    const data = await res.json()
-    setSections(data.sections ?? [])
+    // Admin uses the full tree (no role filtering) — fetch from admin endpoint
+    const [secRes, folRes, docRes] = await Promise.all([
+      fetch('/api/admin/documents/sections'),
+      fetch('/api/admin/documents/folders'),
+      fetch('/api/admin/documents/items'),
+    ])
+    const [secData, folData, docData] = await Promise.all([secRes.json(), folRes.json(), docRes.json()])
+    const secList = secData.sections ?? []
+    const folList = folData.folders ?? []
+    const docList = docData.documents ?? []
+    const tree: DocSectionWithFolders[] = secList.map((s: DocSectionWithFolders) => ({
+      ...s,
+      folders: folList
+        .filter((f: DocFolderWithDocuments) => f.section_id === s.id)
+        .map((f: DocFolderWithDocuments) => ({
+          ...f,
+          documents: docList.filter((d: DriveDocument) => d.folder_id === f.id),
+        })),
+    }))
+    setSections(tree)
     setLoading(false)
   }
 
@@ -69,13 +113,10 @@ export default function DocumentsAdminPage() {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
 
     if (!apiKey || !clientId || !gapiReady || !gisReady) {
-      // Fall back to manual entry if env vars or scripts aren't ready
-      setAddDocForm({ folderId, title: '', drive_url: '', drive_file_id: '', description: '' })
+      setAddDocForm({ folderId, source: 'drive', title: '', drive_url: '', drive_file_id: '', description: '', required_role: '', file: null })
       return
     }
 
-    // Use Google Identity Services to get a Drive-scoped token on demand.
-    // This prompts the user to grant Drive access only when needed (admin only).
     const tokenClient = window.google.accounts.oauth2.initTokenClient({
       client_id: clientId,
       scope: 'https://www.googleapis.com/auth/drive.readonly',
@@ -87,13 +128,12 @@ export default function DocumentsAdminPage() {
           .setCallback((data: { action: string; docs: Array<{ id: string; name: string; url: string }> }) => {
             if (data.action === window.google.picker.Action.PICKED) {
               const file = data.docs[0]
-              setAddDocForm({
-                folderId,
-                title: file.name,
-                drive_url: file.url,
-                drive_file_id: file.id,
-                description: '',
-              })
+              setAddDocForm(prev => ({
+                ...(prev ?? { folderId, source: 'drive', description: '', required_role: '', file: null }),
+                title: file.name ?? '',
+                drive_url: file.url ?? '',
+                drive_file_id: file.id ?? '',
+              }))
             }
           })
           .build()
@@ -123,7 +163,7 @@ export default function DocumentsAdminPage() {
     await fetch(`/api/admin/documents/sections/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: editingSectionName.trim() }),
+      body: JSON.stringify({ name: editingSectionName.trim(), required_role: editingSectionRole || null }),
     })
     setEditingSectionId(null)
     loadTree()
@@ -157,7 +197,7 @@ export default function DocumentsAdminPage() {
     await fetch(`/api/admin/documents/folders/${id}`, {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ name: editingFolderName.trim() }),
+      body: JSON.stringify({ name: editingFolderName.trim(), required_role: editingFolderRole || null }),
     })
     setEditingFolderId(null)
     loadTree()
@@ -172,21 +212,51 @@ export default function DocumentsAdminPage() {
   // ─── Document CRUD ───────────────────────────────────────────────────────────
 
   async function saveDoc() {
-    if (!addDocForm || !addDocForm.title.trim() || !addDocForm.drive_url.trim()) return
+    if (!addDocForm || !addDocForm.title.trim()) return
     setAddDocLoading(true)
-    const folder = sections.flatMap(s => s.folders).find(f => f.id === addDocForm.folderId)
-    await fetch('/api/admin/documents/items', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        title: addDocForm.title.trim(),
-        drive_url: addDocForm.drive_url.trim(),
-        drive_file_id: addDocForm.drive_file_id || null,
-        description: addDocForm.description.trim() || null,
-        folder_id: addDocForm.folderId,
-        sort_order: folder?.documents.length ?? 0,
-      }),
-    })
+    setAddDocError(null)
+
+    const roleValue = addDocForm.required_role || null
+
+    if (addDocForm.source === 'upload') {
+      if (!addDocForm.file) { setAddDocError('Please select a file.'); setAddDocLoading(false); return }
+      const form = new FormData()
+      form.append('file', addDocForm.file)
+      form.append('title', addDocForm.title.trim())
+      form.append('folder_id', addDocForm.folderId)
+      if (addDocForm.description.trim()) form.append('description', addDocForm.description.trim())
+      if (roleValue) form.append('required_role', roleValue)
+      const res = await fetch('/api/admin/documents/upload', { method: 'POST', body: form })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        setAddDocError(d.error ?? 'Upload failed.')
+        setAddDocLoading(false)
+        return
+      }
+    } else {
+      if (!addDocForm.drive_url.trim()) { setAddDocError('Drive URL is required.'); setAddDocLoading(false); return }
+      const folder = sections.flatMap(s => s.folders).find(f => f.id === addDocForm.folderId)
+      const res = await fetch('/api/admin/documents/items', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: addDocForm.title.trim(),
+          drive_url: addDocForm.drive_url.trim(),
+          drive_file_id: addDocForm.drive_file_id || null,
+          description: addDocForm.description.trim() || null,
+          folder_id: addDocForm.folderId,
+          sort_order: folder?.documents.length ?? 0,
+          required_role: roleValue,
+        }),
+      })
+      if (!res.ok) {
+        const d = await res.json().catch(() => ({}))
+        setAddDocError(d.error ?? 'Save failed.')
+        setAddDocLoading(false)
+        return
+      }
+    }
+
     setAddDocForm(null)
     setAddDocLoading(false)
     loadTree()
@@ -198,20 +268,49 @@ export default function DocumentsAdminPage() {
     loadTree()
   }
 
+  function openEditDoc(doc: DriveDocument) {
+    setEditDocModal(doc)
+    setEditDocTitle(doc.title)
+    setEditDocDescription(doc.description ?? '')
+    setEditDocRole(doc.required_role ?? '')
+    setEditDocError(null)
+  }
+
+  async function saveDocEdit() {
+    if (!editDocModal || !editDocTitle.trim()) return
+    setEditDocLoading(true)
+    setEditDocError(null)
+    const res = await fetch(`/api/admin/documents/items/${editDocModal.id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        title: editDocTitle.trim(),
+        description: editDocDescription.trim() || null,
+        required_role: editDocRole || null,
+        drive_url: editDocModal.drive_url,
+        drive_file_id: editDocModal.drive_file_id,
+        storage_bucket: editDocModal.storage_bucket,
+        storage_path: editDocModal.storage_path,
+        sort_order: editDocModal.sort_order,
+      }),
+    })
+    if (!res.ok) {
+      const d = await res.json().catch(() => ({}))
+      setEditDocError(d.error ?? 'Save failed.')
+      setEditDocLoading(false)
+      return
+    }
+    setEditDocModal(null)
+    setEditDocLoading(false)
+    loadTree()
+  }
+
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
     <>
-      <Script
-        src="https://apis.google.com/js/api.js"
-        strategy="lazyOnload"
-        onLoad={handleGapiLoad}
-      />
-      <Script
-        src="https://accounts.google.com/gsi/client"
-        strategy="lazyOnload"
-        onLoad={() => setGisReady(true)}
-      />
+      <Script src="https://apis.google.com/js/api.js" strategy="lazyOnload" onLoad={handleGapiLoad} />
+      <Script src="https://accounts.google.com/gsi/client" strategy="lazyOnload" onLoad={() => setGisReady(true)} />
       <style>{`
         .da-page { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
         .da-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.75rem; }
@@ -230,9 +329,10 @@ export default function DocumentsAdminPage() {
         .da-doc-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.45rem 0.875rem 0.45rem 1.5rem; }
         .da-doc-row:hover { background: #f9fafb; }
         .da-doc-title { font-size: 0.85rem; color: #374151; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .da-doc-url { font-size: 0.75rem; color: #9ca3af; max-width: 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .da-doc-url { font-size: 0.75rem; color: #9ca3af; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .da-doc-open { font-size: 0.75rem; color: #7c3aed; text-decoration: none; }
         .da-doc-open:hover { text-decoration: underline; }
+        .da-doc-badge { font-size: 0.65rem; font-weight: 600; background: #ede9fe; color: #6d28d9; padding: 1px 6px; border-radius: 99px; white-space: nowrap; }
 
         .da-btn { display: inline-flex; align-items: center; gap: 0.35rem; padding: 0.35rem 0.75rem; border-radius: 6px; font-size: 0.8rem; font-weight: 500; cursor: pointer; border: none; transition: background 0.15s; }
         .da-btn-primary { background: #7c3aed; color: #fff; }
@@ -246,7 +346,10 @@ export default function DocumentsAdminPage() {
 
         .da-inline-input { border: 1px solid #d1d5db; border-radius: 6px; padding: 0.3rem 0.6rem; font-size: 0.875rem; outline: none; }
         .da-inline-input:focus { border-color: #7c3aed; box-shadow: 0 0 0 2px rgba(124,58,237,0.15); }
+        .da-inline-select { border: 1px solid #d1d5db; border-radius: 6px; padding: 0.3rem 0.5rem; font-size: 0.78rem; outline: none; background: #fff; color: #374151; }
+        .da-inline-select:focus { border-color: #7c3aed; }
 
+        .da-role-badge { font-size: 0.7rem; font-weight: 600; padding: 2px 8px; border-radius: 99px; white-space: nowrap; }
         .da-add-section { display: flex; gap: 0.5rem; align-items: center; margin-top: 0.5rem; }
         .da-add-section input { flex: 1; }
         .da-add-folder-row { display: flex; gap: 0.5rem; align-items: center; padding: 0.5rem 0.875rem; background: #f9fafb; border-top: 1px dashed #e5e7eb; }
@@ -257,12 +360,18 @@ export default function DocumentsAdminPage() {
         .da-modal h2 { font-size: 1.1rem; font-weight: 700; margin: 0 0 1rem; }
         .da-field { margin-bottom: 1rem; }
         .da-field label { display: block; font-size: 0.8rem; font-weight: 600; color: #374151; margin-bottom: 0.3rem; }
-        .da-field input, .da-field textarea { width: 100%; border: 1px solid #d1d5db; border-radius: 6px; padding: 0.45rem 0.75rem; font-size: 0.875rem; outline: none; box-sizing: border-box; }
-        .da-field input:focus, .da-field textarea:focus { border-color: #7c3aed; box-shadow: 0 0 0 2px rgba(124,58,237,0.15); }
+        .da-field input, .da-field textarea, .da-field select { width: 100%; border: 1px solid #d1d5db; border-radius: 6px; padding: 0.45rem 0.75rem; font-size: 0.875rem; outline: none; box-sizing: border-box; background: #fff; color: #111; }
+        .da-field input:focus, .da-field textarea:focus, .da-field select:focus { border-color: #7c3aed; box-shadow: 0 0 0 2px rgba(124,58,237,0.15); }
+        .da-field input[type="file"] { padding: 0.3rem 0; border: none; background: none; }
         .da-modal-actions { display: flex; gap: 0.5rem; justify-content: flex-end; margin-top: 1.25rem; }
         .da-modal-cancel { padding: 0.5rem 1rem; border-radius: 6px; border: 1px solid #e5e7eb; background: #fff; cursor: pointer; font-size: 0.875rem; }
         .da-modal-cancel:hover { background: #f9fafb; }
         .da-picker-hint { font-size: 0.75rem; color: #9ca3af; margin-top: 0.25rem; }
+        .da-error { font-size: 0.8rem; color: #dc2626; margin-top: 0.5rem; }
+
+        .da-source-tabs { display: flex; gap: 0; margin-bottom: 1rem; border: 1px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
+        .da-source-tab { flex: 1; padding: 0.45rem 0; font-size: 0.8rem; font-weight: 500; cursor: pointer; border: none; background: #f9fafb; color: #6b7280; transition: background 0.15s; }
+        .da-source-tab.active { background: #7c3aed; color: #fff; }
 
         .da-collapse-btn { background: none; border: none; cursor: pointer; color: #9ca3af; padding: 0; display: flex; }
         .da-collapse-btn svg { transition: transform 0.2s; }
@@ -280,6 +389,7 @@ export default function DocumentsAdminPage() {
           <>
             {sections.map(section => {
               const isCollapsed = collapsedSections.has(section.id)
+              const sectionRoleObj = allRoles.find(r => r.name === section.required_role)
               return (
                 <div key={section.id} className="da-section">
                   <div className="da-section-header">
@@ -303,15 +413,28 @@ export default function DocumentsAdminPage() {
                           onKeyDown={e => { if (e.key === 'Enter') saveSection(section.id); if (e.key === 'Escape') setEditingSectionId(null) }}
                           autoFocus
                         />
+                        <select className="da-inline-select" value={editingSectionRole} onChange={e => setEditingSectionRole(e.target.value)} title="Required role">
+                          <option value="">Open to all</option>
+                          {allRoles.map(r => <option key={r.id} value={r.name}>{r.label}</option>)}
+                        </select>
                         <button className="da-btn da-btn-primary da-btn-sm" onClick={() => saveSection(section.id)}>Save</button>
                         <button className="da-btn da-btn-ghost da-btn-sm" onClick={() => setEditingSectionId(null)}>Cancel</button>
                       </>
                     ) : (
                       <>
                         <span className="da-section-title">{section.name}</span>
-                        <button className="da-btn da-btn-ghost da-btn-sm" onClick={() => { setEditingSectionId(section.id); setEditingSectionName(section.name) }}>
+                        {sectionRoleObj && (
+                          <span className="da-role-badge" style={{ background: sectionRoleObj.color + '22', color: sectionRoleObj.color }}>
+                            {sectionRoleObj.label} only
+                          </span>
+                        )}
+                        <button className="da-btn da-btn-ghost da-btn-sm" onClick={() => {
+                          setEditingSectionId(section.id)
+                          setEditingSectionName(section.name)
+                          setEditingSectionRole(section.required_role ?? '')
+                        }}>
                           <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                          Rename
+                          Edit
                         </button>
                         <button className="da-btn da-btn-danger da-btn-sm" onClick={() => deleteSection(section.id, section.name)}>
                           <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
@@ -327,14 +450,25 @@ export default function DocumentsAdminPage() {
                         <FolderEditor
                           key={folder.id}
                           folder={folder}
+                          allRoles={allRoles}
                           isEditingFolder={editingFolderId === folder.id}
                           editingFolderName={editingFolderName}
-                          onEditStart={() => { setEditingFolderId(folder.id); setEditingFolderName(folder.name) }}
+                          editingFolderRole={editingFolderRole}
+                          onEditStart={() => {
+                            setEditingFolderId(folder.id)
+                            setEditingFolderName(folder.name)
+                            setEditingFolderRole(folder.required_role ?? '')
+                          }}
                           onEditChange={setEditingFolderName}
+                          onRoleChange={setEditingFolderRole}
                           onEditSave={() => saveFolder(folder.id)}
                           onEditCancel={() => setEditingFolderId(null)}
                           onDelete={() => deleteFolder(folder.id, folder.name)}
-                          onAddDoc={() => openDrivePicker(folder.id)}
+                          onAddDoc={() => {
+                            setAddDocError(null)
+                            setAddDocForm({ folderId: folder.id, source: 'drive', title: '', drive_url: '', drive_file_id: '', description: '', required_role: '', file: null })
+                          }}
+                          onEditDoc={openEditDoc}
                           onDeleteDoc={deleteDoc}
                         />
                       ))}
@@ -349,11 +483,7 @@ export default function DocumentsAdminPage() {
                             onKeyDown={e => { if (e.key === 'Enter') addFolder(section.id); if (e.key === 'Escape') setShowAddFolderFor(null) }}
                             autoFocus
                           />
-                          <button
-                            className="da-btn da-btn-primary da-btn-sm"
-                            disabled={addFolderState[section.id]?.loading}
-                            onClick={() => addFolder(section.id)}
-                          >Add</button>
+                          <button className="da-btn da-btn-primary da-btn-sm" disabled={addFolderState[section.id]?.loading} onClick={() => addFolder(section.id)}>Add</button>
                           <button className="da-btn da-btn-ghost da-btn-sm" onClick={() => setShowAddFolderFor(null)}>Cancel</button>
                         </div>
                       ) : (
@@ -380,11 +510,7 @@ export default function DocumentsAdminPage() {
                 onChange={e => setAddSectionName(e.target.value)}
                 onKeyDown={e => { if (e.key === 'Enter') addSection() }}
               />
-              <button
-                className="da-btn da-btn-primary"
-                disabled={addingSectionLoading || !addSectionName.trim()}
-                onClick={addSection}
-              >
+              <button className="da-btn da-btn-primary" disabled={addingSectionLoading || !addSectionName.trim()} onClick={addSection}>
                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" /></svg>
                 Add Section
               </button>
@@ -393,49 +519,101 @@ export default function DocumentsAdminPage() {
         )}
       </div>
 
+      {/* Edit Document Modal */}
+      {editDocModal && (
+        <div className="da-modal-overlay" onClick={e => { if (e.target === e.currentTarget) setEditDocModal(null) }}>
+          <div className="da-modal">
+            <h2>Edit Document</h2>
+
+            <div className="da-field">
+              <label>Title</label>
+              <input value={editDocTitle} onChange={e => setEditDocTitle(e.target.value)} autoFocus />
+            </div>
+
+            <div className="da-field">
+              <label>Description <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional)</span></label>
+              <input value={editDocDescription} onChange={e => setEditDocDescription(e.target.value)} placeholder="Brief description" />
+            </div>
+
+            <div className="da-field">
+              <label>Access restriction <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional)</span></label>
+              <select value={editDocRole} onChange={e => setEditDocRole(e.target.value)}>
+                <option value="">Open to all</option>
+                {allRoles.map(r => <option key={r.id} value={r.name}>{r.label}</option>)}
+              </select>
+            </div>
+
+            {editDocError && <p className="da-error">{editDocError}</p>}
+
+            <div className="da-modal-actions">
+              <button className="da-modal-cancel" onClick={() => setEditDocModal(null)}>Cancel</button>
+              <button
+                className="da-btn da-btn-primary"
+                disabled={editDocLoading || !editDocTitle.trim()}
+                onClick={saveDocEdit}
+              >
+                {editDocLoading ? 'Saving…' : 'Save Changes'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Add Document Modal */}
       {addDocForm && (
         <div className="da-modal-overlay" onClick={e => { if (e.target === e.currentTarget) setAddDocForm(null) }}>
           <div className="da-modal">
             <h2>Add Document</h2>
+
+            <div className="da-source-tabs">
+              <button className={`da-source-tab${addDocForm.source === 'drive' ? ' active' : ''}`} onClick={() => setAddDocForm(prev => prev ? { ...prev, source: 'drive', file: null } : prev)}>
+                Google Drive Link
+              </button>
+              <button className={`da-source-tab${addDocForm.source === 'upload' ? ' active' : ''}`} onClick={() => setAddDocForm(prev => prev ? { ...prev, source: 'upload', drive_url: '', drive_file_id: '' } : prev)}>
+                Upload File
+              </button>
+            </div>
+
             <div className="da-field">
               <label>Title</label>
-              <input
-                value={addDocForm.title}
-                onChange={e => setAddDocForm(prev => prev ? { ...prev, title: e.target.value } : prev)}
-                placeholder="e.g. PTO Policy 2025"
-                autoFocus
-              />
+              <input value={addDocForm.title ?? ''} onChange={e => setAddDocForm(prev => prev ? { ...prev, title: e.target.value } : prev)} placeholder="e.g. PTO Policy 2025" autoFocus />
             </div>
+
+            {addDocForm.source === 'drive' ? (
+              <div className="da-field">
+                <label>Google Drive URL</label>
+                <input value={addDocForm.drive_url ?? ''} onChange={e => setAddDocForm(prev => prev ? { ...prev, drive_url: e.target.value } : prev)} placeholder="https://docs.google.com/..." />
+                {!addDocForm.drive_file_id && <p className="da-picker-hint">Paste a Google Drive share link, or use the Browse Drive button below.</p>}
+              </div>
+            ) : (
+              <div className="da-field">
+                <label>File</label>
+                <input type="file" onChange={e => {
+                  const f = e.target.files?.[0] ?? null
+                  setAddDocForm(prev => prev ? { ...prev, file: f, title: prev.title || (f?.name.replace(/\.[^.]+$/, '') ?? '') } : prev)
+                }} />
+                <p className="da-picker-hint">Max 50 MB. Stored in the private documents bucket.</p>
+              </div>
+            )}
+
             <div className="da-field">
-              <label>Google Drive URL</label>
-              <input
-                value={addDocForm.drive_url}
-                onChange={e => setAddDocForm(prev => prev ? { ...prev, drive_url: e.target.value } : prev)}
-                placeholder="https://docs.google.com/..."
-              />
-              {!addDocForm.drive_file_id && (
-                <p className="da-picker-hint">Paste a Google Drive share link, or use the Drive Picker button below.</p>
-              )}
+              <label>Description <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional)</span></label>
+              <input value={addDocForm.description ?? ''} onChange={e => setAddDocForm(prev => prev ? { ...prev, description: e.target.value } : prev)} placeholder="Brief description" />
             </div>
+
             <div className="da-field">
-              <label>Description (optional)</label>
-              <input
-                value={addDocForm.description}
-                onChange={e => setAddDocForm(prev => prev ? { ...prev, description: e.target.value } : prev)}
-                placeholder="Brief description"
-              />
+              <label>Access restriction <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional)</span></label>
+              <select value={addDocForm.required_role ?? ''} onChange={e => setAddDocForm(prev => prev ? { ...prev, required_role: e.target.value } : prev)}>
+                <option value="">Open to all</option>
+                {allRoles.map(r => <option key={r.id} value={r.name}>{r.label}</option>)}
+              </select>
             </div>
+
+            {addDocError && <p className="da-error">{addDocError}</p>}
+
             <div className="da-modal-actions">
-              {gapiReady && gisReady && process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID && (
-                <button
-                  className="da-btn da-btn-ghost"
-                  onClick={() => {
-                    const folderId = addDocForm.folderId
-                    setAddDocForm(null)
-                    setTimeout(() => openDrivePicker(folderId), 50)
-                  }}
-                >
+              {addDocForm.source === 'drive' && gapiReady && gisReady && process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID && (
+                <button className="da-btn da-btn-ghost" onClick={() => { const fid = addDocForm.folderId; setAddDocForm(null); setTimeout(() => openDrivePicker(fid), 50) }}>
                   <svg width="14" height="14" viewBox="0 0 24 24" fill="currentColor"><path d="M12.545 10.239v3.821h5.445c-.712 2.315-2.647 3.972-5.445 3.972a6.033 6.033 0 110-12.064c1.498 0 2.866.549 3.921 1.453l2.814-2.814A9.969 9.969 0 0012.545 2C7.021 2 2.543 6.477 2.543 12s4.478 10 10.002 10c8.396 0 10.249-7.85 9.426-11.748l-9.426-.013z"/></svg>
                   Browse Drive
                 </button>
@@ -443,10 +621,10 @@ export default function DocumentsAdminPage() {
               <button className="da-modal-cancel" onClick={() => setAddDocForm(null)}>Cancel</button>
               <button
                 className="da-btn da-btn-primary"
-                disabled={addDocLoading || !addDocForm.title.trim() || !addDocForm.drive_url.trim()}
+                disabled={addDocLoading || !addDocForm.title.trim() || (addDocForm.source === 'drive' && !addDocForm.drive_url.trim()) || (addDocForm.source === 'upload' && !addDocForm.file)}
                 onClick={saveDoc}
               >
-                {addDocLoading ? 'Saving...' : 'Save Document'}
+                {addDocLoading ? (addDocForm.source === 'upload' ? 'Uploading…' : 'Saving…') : 'Save Document'}
               </button>
             </div>
           </div>
@@ -456,29 +634,35 @@ export default function DocumentsAdminPage() {
   )
 }
 
+function RoleSelect({ value, onChange, allRoles }: { value: string; onChange: (v: string) => void; allRoles: Role[] }) {
+  return (
+    <select className="da-inline-select" value={value} onChange={e => onChange(e.target.value)} title="Required role to view this folder">
+      <option value="">Open to all</option>
+      {allRoles.map(r => <option key={r.id} value={r.name}>{r.label}</option>)}
+    </select>
+  )
+}
+
 function FolderEditor({
-  folder,
-  isEditingFolder,
-  editingFolderName,
-  onEditStart,
-  onEditChange,
-  onEditSave,
-  onEditCancel,
-  onDelete,
-  onAddDoc,
-  onDeleteDoc,
+  folder, allRoles, isEditingFolder, editingFolderName, editingFolderRole,
+  onEditStart, onEditChange, onRoleChange, onEditSave, onEditCancel, onDelete, onAddDoc, onEditDoc, onDeleteDoc,
 }: {
   folder: DocFolderWithDocuments
+  allRoles: Role[]
   isEditingFolder: boolean
   editingFolderName: string
+  editingFolderRole: string
   onEditStart: () => void
   onEditChange: (v: string) => void
+  onRoleChange: (v: string) => void
   onEditSave: () => void
   onEditCancel: () => void
   onDelete: () => void
   onAddDoc: () => void
+  onEditDoc: (doc: DriveDocument) => void
   onDeleteDoc: (id: string, title: string) => void
 }) {
+  const roleObj = allRoles.find(r => r.name === folder.required_role)
   return (
     <div className="da-folder">
       <div className="da-folder-header">
@@ -486,19 +670,20 @@ function FolderEditor({
 
         {isEditingFolder ? (
           <>
-            <input
-              className="da-inline-input"
-              value={editingFolderName}
-              onChange={e => onEditChange(e.target.value)}
-              onKeyDown={e => { if (e.key === 'Enter') onEditSave(); if (e.key === 'Escape') onEditCancel() }}
-              autoFocus
-            />
+            <input className="da-inline-input" value={editingFolderName} onChange={e => onEditChange(e.target.value)}
+              onKeyDown={e => { if (e.key === 'Enter') onEditSave(); if (e.key === 'Escape') onEditCancel() }} autoFocus />
+            <RoleSelect value={editingFolderRole} onChange={onRoleChange} allRoles={allRoles} />
             <button className="da-btn da-btn-primary da-btn-sm" onClick={onEditSave}>Save</button>
             <button className="da-btn da-btn-ghost da-btn-sm" onClick={onEditCancel}>Cancel</button>
           </>
         ) : (
           <>
             <span className="da-folder-title">{folder.name}</span>
+            {roleObj && (
+              <span className="da-role-badge" style={{ background: roleObj.color + '22', color: roleObj.color, fontSize: '0.65rem' }}>
+                {roleObj.label} only
+              </span>
+            )}
             <button className="da-btn da-btn-ghost da-btn-sm" onClick={onEditStart}>
               <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
             </button>
@@ -518,7 +703,7 @@ function FolderEditor({
           <p style={{ fontSize: '0.8rem', color: '#d1d5db', padding: '0.4rem 1.5rem', margin: 0 }}>No documents yet</p>
         ) : (
           folder.documents.map(doc => (
-            <DocRow key={doc.id} doc={doc} onDelete={() => onDeleteDoc(doc.id, doc.title)} />
+            <DocRow key={doc.id} doc={doc} allRoles={allRoles} onEdit={() => onEditDoc(doc)} onDelete={() => onDeleteDoc(doc.id, doc.title)} />
           ))
         )}
       </div>
@@ -526,13 +711,30 @@ function FolderEditor({
   )
 }
 
-function DocRow({ doc, onDelete }: { doc: DriveDocument; onDelete: () => void }) {
+function DocRow({ doc, allRoles, onEdit, onDelete }: { doc: DriveDocument; allRoles: Role[]; onEdit: () => void; onDelete: () => void }) {
+  const isUploaded = !!doc.storage_path
+  const roleObj = allRoles.find(r => r.name === doc.required_role)
   return (
     <div className="da-doc-row">
-      <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#9ca3af"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+      {isUploaded ? (
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#7c3aed"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+      ) : (
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#9ca3af"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+      )}
       <span className="da-doc-title">{doc.title}</span>
       {doc.description && <span className="da-doc-url">{doc.description}</span>}
-      <a className="da-doc-open" href={doc.drive_url} target="_blank" rel="noopener noreferrer">Open</a>
+      {roleObj && (
+        <span className="da-role-badge" style={{ background: roleObj.color + '22', color: roleObj.color, fontSize: '0.65rem' }}>
+          {roleObj.label}
+        </span>
+      )}
+      {isUploaded
+        ? <span className="da-doc-badge">uploaded</span>
+        : <a className="da-doc-open" href={doc.drive_url ?? '#'} target="_blank" rel="noopener noreferrer">Open</a>
+      }
+      <button className="da-btn da-btn-ghost da-btn-sm" onClick={onEdit} title="Edit document">
+        <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+      </button>
       <button className="da-btn da-btn-danger da-btn-sm" onClick={onDelete}>
         <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
       </button>
