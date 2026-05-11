@@ -59,6 +59,7 @@ export async function POST(request: Request) {
       storage_bucket: hasStoragePath ? storage_bucket.trim() : null,
       storage_path: hasStoragePath ? storage_path.trim() : null,
       required_role: required_role ?? null,
+      owner_id: admin.id,
     })
     .select()
     .single()

@@ -178,22 +178,18 @@ function DocItem({ doc }: { doc: DriveDocument }) {
   const [fetching, setFetching] = useState(false)
 
   async function open() {
-    if (doc.storage_path) {
-      setFetching(true)
-      try {
-        const res = await fetch(`/api/documents/signed-url?docId=${doc.id}`)
-        if (res.ok) {
-          const { signedUrl } = await res.json()
-          window.open(signedUrl, '_blank', 'noopener,noreferrer')
-        } else {
-          const { error } = await res.json().catch(() => ({ error: 'Access denied' }))
-          alert(error ?? 'Could not open document.')
-        }
-      } finally {
-        setFetching(false)
+    setFetching(true)
+    try {
+      const res = await fetch(`/api/documents/open?docId=${doc.id}`)
+      if (res.ok) {
+        const { url } = await res.json()
+        window.open(url, '_blank', 'noopener,noreferrer')
+      } else {
+        const { error } = await res.json().catch(() => ({ error: 'Access denied' }))
+        alert(error ?? 'Could not open document.')
       }
-    } else if (doc.drive_url) {
-      window.open(doc.drive_url, '_blank', 'noopener,noreferrer')
+    } finally {
+      setFetching(false)
     }
   }
 

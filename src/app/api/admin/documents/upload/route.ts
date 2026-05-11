@@ -68,6 +68,7 @@ export async function POST(req: NextRequest) {
       storage_path: storagePath,
       required_role: requiredRole,
       sort_order: count ?? 0,
+      owner_id: appUser.id,
     })
     .select()
     .single()

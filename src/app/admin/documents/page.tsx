@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Script from 'next/script'
-import type { DocSectionWithFolders, DocFolderWithDocuments, DriveDocument } from '@/types'
+import type { DocSectionWithFolders, DocFolderWithDocuments, DriveDocument, DocumentAccessSummary } from '@/types'
 
 declare global {
   interface Window {
@@ -33,12 +33,47 @@ interface Role {
   color: string
 }
 
+interface AdminUser {
+  id: string
+  display_name: string
+  email: string
+  avatar_url: string | null
+  department: string[] | null
+}
+
+interface PermSummaryEntry {
+  depts: string[]
+  userCount: number
+  ownerId: string | null
+}
+
+const ALL_DEPARTMENTS = ['CRM', 'E-Commerce', 'HR', 'IT', 'Accounting', 'Sales', 'Warehouse', 'General'] as const
+
 export default function DocumentsAdminPage() {
   const [sections, setSections] = useState<DocSectionWithFolders[]>([])
   const [loading, setLoading] = useState(true)
   const [gapiReady, setGapiReady] = useState(false)
   const [gisReady, setGisReady] = useState(false)
   const [allRoles, setAllRoles] = useState<Role[]>([])
+
+  // Permission summary: docId → { depts, userCount, ownerId }
+  const [permSummary, setPermSummary] = useState<Record<string, PermSummaryEntry>>({})
+
+  // All admin users (fetched once for the user picker)
+  const [allUsers, setAllUsers] = useState<AdminUser[]>([])
+
+  // Permission modal state
+  const [permModal, setPermModal] = useState<{ doc: DriveDocument; canEdit: boolean; owner: AdminUser | null } | null>(null)
+  const [permDeptGrants, setPermDeptGrants] = useState<string[]>([])
+  const [permUserGrants, setPermUserGrants] = useState<AdminUser[]>([])
+  const [permUserSearch, setPermUserSearch] = useState('')
+  const [permSaving, setPermSaving] = useState(false)
+  const [permLoading, setPermLoading] = useState(false)
+
+  // "Who has access" collapsible within the permission modal
+  const [accessSummaryOpen, setAccessSummaryOpen] = useState(false)
+  const [accessSummary, setAccessSummary] = useState<DocumentAccessSummary | null>(null)
+  const [accessSummaryLoading, setAccessSummaryLoading] = useState(false)
 
   // Inline edit state — sections
   const [editingSectionId, setEditingSectionId] = useState<string | null>(null)
@@ -77,17 +112,18 @@ export default function DocumentsAdminPage() {
   useEffect(() => {
     loadTree()
     fetch('/api/admin/roles').then(r => r.json()).then(data => setAllRoles(Array.isArray(data) ? data : []))
+    fetch('/api/admin/users').then(r => r.json()).then(data => setAllUsers(Array.isArray(data) ? data : []))
   }, [])
 
   async function loadTree() {
     setLoading(true)
-    // Admin uses the full tree (no role filtering) — fetch from admin endpoint
-    const [secRes, folRes, docRes] = await Promise.all([
+    const [secRes, folRes, docRes, permRes] = await Promise.all([
       fetch('/api/admin/documents/sections'),
       fetch('/api/admin/documents/folders'),
       fetch('/api/admin/documents/items'),
+      fetch('/api/admin/documents/permissions-summary'),
     ])
-    const [secData, folData, docData] = await Promise.all([secRes.json(), folRes.json(), docRes.json()])
+    const [secData, folData, docData, permData] = await Promise.all([secRes.json(), folRes.json(), docRes.json(), permRes.json()])
     const secList = secData.sections ?? []
     const folList = folData.folders ?? []
     const docList = docData.documents ?? []
@@ -101,6 +137,7 @@ export default function DocumentsAdminPage() {
         })),
     }))
     setSections(tree)
+    setPermSummary(permData ?? {})
     setLoading(false)
   }
 
@@ -141,6 +178,51 @@ export default function DocumentsAdminPage() {
       },
     })
     tokenClient.requestAccessToken()
+  }
+
+  // ─── Permissions modal ───────────────────────────────────────────────────────
+
+  async function openPermModal(doc: DriveDocument) {
+    setPermLoading(true)
+    setAccessSummaryOpen(false)
+    setAccessSummary(null)
+    setPermModal(null)
+
+    const res = await fetch(`/api/admin/documents/items/${doc.id}/permissions`)
+    if (!res.ok) { setPermLoading(false); return }
+    const { owner, permissions, canEdit } = await res.json()
+
+    setPermDeptGrants(permissions.filter((p: { department: string | null }) => p.department).map((p: { department: string }) => p.department))
+    setPermUserGrants(permissions.filter((p: { user_id: string | null; user: AdminUser | null }) => p.user_id && p.user).map((p: { user: AdminUser }) => p.user))
+    setPermUserSearch('')
+    setPermModal({ doc, canEdit, owner })
+    setPermLoading(false)
+  }
+
+  async function loadAccessSummary(docId: string) {
+    setAccessSummaryLoading(true)
+    const res = await fetch(`/api/admin/documents/items/${docId}/access-summary`)
+    if (res.ok) {
+      const data = await res.json()
+      setAccessSummary(data)
+    }
+    setAccessSummaryLoading(false)
+  }
+
+  async function savePermissions() {
+    if (!permModal) return
+    setPermSaving(true)
+    await fetch(`/api/admin/documents/items/${permModal.doc.id}/permissions`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        department_grants: permDeptGrants,
+        user_grants: permUserGrants.map(u => u.id),
+      }),
+    })
+    setPermModal(null)
+    setPermSaving(false)
+    loadTree()
   }
 
   // ─── Section CRUD ────────────────────────────────────────────────────────────
@@ -305,6 +387,16 @@ export default function DocumentsAdminPage() {
     loadTree()
   }
 
+  // ─── User picker filter for permission modal ─────────────────────────────────
+
+  const filteredUsers = useMemo(() => {
+    const q = permUserSearch.toLowerCase().trim()
+    const already = new Set(permUserGrants.map(u => u.id))
+    return allUsers.filter(u => !already.has(u.id) && (
+      !q || u.display_name.toLowerCase().includes(q) || u.email.toLowerCase().includes(q)
+    )).slice(0, 8)
+  }, [permUserSearch, permUserGrants, allUsers])
+
   // ─── Render ──────────────────────────────────────────────────────────────────
 
   return (
@@ -326,10 +418,14 @@ export default function DocumentsAdminPage() {
         .da-folder-title { font-size: 0.875rem; font-weight: 600; color: #374151; flex: 1; }
 
         .da-doc-list { padding: 0.25rem 0; }
-        .da-doc-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.45rem 0.875rem 0.45rem 1.5rem; }
+        .da-doc-row { display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.5rem 0.875rem 0.5rem 1.5rem; }
         .da-doc-row:hover { background: #f9fafb; }
-        .da-doc-title { font-size: 0.85rem; color: #374151; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-        .da-doc-url { font-size: 0.75rem; color: #9ca3af; max-width: 160px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .da-doc-main { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+        .da-doc-title { font-size: 0.85rem; color: #374151; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .da-doc-url { font-size: 0.75rem; color: #9ca3af; max-width: 260px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .da-doc-perm-badge { font-size: 0.68rem; color: #6b7280; }
+        .da-doc-perm-badge.owner-only { color: #9ca3af; font-style: italic; }
+        .da-doc-perm-badge.restricted { color: #7c3aed; font-weight: 500; }
         .da-doc-open { font-size: 0.75rem; color: #7c3aed; text-decoration: none; }
         .da-doc-open:hover { text-decoration: underline; }
         .da-doc-badge { font-size: 0.65rem; font-weight: 600; background: #ede9fe; color: #6d28d9; padding: 1px 6px; border-radius: 99px; white-space: nowrap; }
@@ -376,6 +472,36 @@ export default function DocumentsAdminPage() {
         .da-collapse-btn { background: none; border: none; cursor: pointer; color: #9ca3af; padding: 0; display: flex; }
         .da-collapse-btn svg { transition: transform 0.2s; }
         .da-collapse-btn.open svg { transform: rotate(90deg); }
+
+        /* Permission modal specific */
+        .da-perm-modal { max-width: 540px; max-height: 90vh; overflow-y: auto; }
+        .da-perm-owner { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 0.75rem; background: #f9fafb; border-radius: 8px; margin-bottom: 1rem; font-size: 0.85rem; color: #374151; }
+        .da-perm-owner strong { font-weight: 600; }
+        .da-dept-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 0.5rem 1.5rem; margin-top: 0.4rem; }
+        .da-dept-item { display: grid; grid-template-columns: 16px 1fr; align-items: center; gap: 0.5rem; font-size: 0.82rem; color: #374151; cursor: pointer; user-select: none; }
+        .da-dept-item input { accent-color: #7c3aed; cursor: pointer; width: 16px; height: 16px; margin: 0; }
+        .da-dept-item.disabled { opacity: 0.5; cursor: not-allowed; }
+        .da-user-chips { display: flex; flex-wrap: wrap; gap: 0.35rem; margin-top: 0.4rem; min-height: 1.5rem; }
+        .da-user-chip { display: inline-flex; align-items: center; gap: 0.3rem; background: #ede9fe; color: #6d28d9; font-size: 0.75rem; font-weight: 500; padding: 0.2rem 0.5rem 0.2rem 0.6rem; border-radius: 99px; }
+        .da-user-chip button { background: none; border: none; cursor: pointer; color: #7c3aed; padding: 0; line-height: 1; font-size: 0.9rem; display: flex; }
+        .da-user-chip button:hover { color: #6d28d9; }
+        .da-user-search { position: relative; }
+        .da-user-search input { width: 100%; border: 1px solid #d1d5db; border-radius: 6px; padding: 0.4rem 0.7rem; font-size: 0.82rem; outline: none; box-sizing: border-box; }
+        .da-user-search input:focus { border-color: #7c3aed; }
+        .da-user-dropdown { position: absolute; top: calc(100% + 4px); left: 0; right: 0; background: #fff; border: 1px solid #e5e7eb; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); z-index: 10; max-height: 200px; overflow-y: auto; }
+        .da-user-option { display: flex; align-items: center; gap: 0.5rem; padding: 0.45rem 0.75rem; cursor: pointer; font-size: 0.82rem; }
+        .da-user-option:hover { background: #f5f3ff; }
+        .da-user-option .name { font-weight: 500; color: #111; }
+        .da-user-option .email { color: #9ca3af; font-size: 0.75rem; }
+        .da-readonly-notice { font-size: 0.78rem; color: #9ca3af; background: #f9fafb; border: 1px solid #f3f4f6; border-radius: 6px; padding: 0.5rem 0.75rem; margin-bottom: 1rem; }
+        .da-access-summary { border-top: 1px solid #f3f4f6; margin-top: 1rem; padding-top: 0.75rem; }
+        .da-access-summary-toggle { display: flex; align-items: center; gap: 0.35rem; background: none; border: none; font-size: 0.8rem; font-weight: 600; color: #374151; cursor: pointer; padding: 0; }
+        .da-access-summary-toggle svg { transition: transform 0.2s; }
+        .da-access-summary-toggle.open svg { transform: rotate(90deg); }
+        .da-access-user-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; font-size: 0.8rem; }
+        .da-access-via { font-size: 0.68rem; color: #9ca3af; }
+        .da-access-via.owner { color: #7c3aed; font-weight: 600; }
+        .da-access-via.department { color: #059669; font-weight: 500; }
       `}</style>
 
       <div className="da-page">
@@ -451,6 +577,7 @@ export default function DocumentsAdminPage() {
                           key={folder.id}
                           folder={folder}
                           allRoles={allRoles}
+                          permSummary={permSummary}
                           isEditingFolder={editingFolderId === folder.id}
                           editingFolderName={editingFolderName}
                           editingFolderRole={editingFolderRole}
@@ -470,6 +597,7 @@ export default function DocumentsAdminPage() {
                           }}
                           onEditDoc={openEditDoc}
                           onDeleteDoc={deleteDoc}
+                          onPermissions={openPermModal}
                         />
                       ))}
 
@@ -536,7 +664,7 @@ export default function DocumentsAdminPage() {
             </div>
 
             <div className="da-field">
-              <label>Access restriction <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional)</span></label>
+              <label>Access restriction <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional, legacy)</span></label>
               <select value={editDocRole} onChange={e => setEditDocRole(e.target.value)}>
                 <option value="">Open to all</option>
                 {allRoles.map(r => <option key={r.id} value={r.name}>{r.label}</option>)}
@@ -580,13 +708,13 @@ export default function DocumentsAdminPage() {
             </div>
 
             {addDocForm.source === 'drive' ? (
-              <div className="da-field">
+              <div key="drive-source" className="da-field">
                 <label>Google Drive URL</label>
                 <input value={addDocForm.drive_url ?? ''} onChange={e => setAddDocForm(prev => prev ? { ...prev, drive_url: e.target.value } : prev)} placeholder="https://docs.google.com/..." />
                 {!addDocForm.drive_file_id && <p className="da-picker-hint">Paste a Google Drive share link, or use the Browse Drive button below.</p>}
               </div>
             ) : (
-              <div className="da-field">
+              <div key="upload-source" className="da-field">
                 <label>File</label>
                 <input type="file" onChange={e => {
                   const f = e.target.files?.[0] ?? null
@@ -601,15 +729,9 @@ export default function DocumentsAdminPage() {
               <input value={addDocForm.description ?? ''} onChange={e => setAddDocForm(prev => prev ? { ...prev, description: e.target.value } : prev)} placeholder="Brief description" />
             </div>
 
-            <div className="da-field">
-              <label>Access restriction <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional)</span></label>
-              <select value={addDocForm.required_role ?? ''} onChange={e => setAddDocForm(prev => prev ? { ...prev, required_role: e.target.value } : prev)}>
-                <option value="">Open to all</option>
-                {allRoles.map(r => <option key={r.id} value={r.name}>{r.label}</option>)}
-              </select>
-            </div>
-
             {addDocError && <p className="da-error">{addDocError}</p>}
+
+            <p className="da-picker-hint" style={{ margin: '0 0 0.5rem' }}>After saving, use the lock icon to set who can access this document.</p>
 
             <div className="da-modal-actions">
               {addDocForm.source === 'drive' && gapiReady && gisReady && process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID && (
@@ -630,6 +752,169 @@ export default function DocumentsAdminPage() {
           </div>
         </div>
       )}
+
+      {/* Permissions Modal */}
+      {permLoading && (
+        <div className="da-modal-overlay">
+          <div className="da-modal" style={{ textAlign: 'center', padding: '2rem' }}>
+            <p style={{ color: '#9ca3af', fontSize: '0.875rem' }}>Loading permissions…</p>
+          </div>
+        </div>
+      )}
+
+      {permModal && !permLoading && (
+        <div className="da-modal-overlay" onClick={e => { if (e.target === e.currentTarget) setPermModal(null) }}>
+          <div className="da-modal da-perm-modal">
+            <h2 style={{ display: 'flex', alignItems: 'center', gap: '0.4rem' }}>
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+              Document Permissions
+            </h2>
+            <p style={{ fontSize: '0.82rem', color: '#6b7280', marginTop: '-0.5rem', marginBottom: '1rem' }}>{permModal.doc.title}</p>
+
+            {!permModal.canEdit && (
+              <p className="da-readonly-notice">
+                Only the document owner can change permissions. You can view but not edit.
+              </p>
+            )}
+
+            {/* Owner */}
+            <div className="da-perm-owner">
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#7c3aed"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+              <span>
+                <strong>Owner:</strong>{' '}
+                {permModal.owner ? `${permModal.owner.display_name} (${permModal.owner.email})` : <em style={{ color: '#9ca3af' }}>Unassigned — this document was created before owner tracking</em>}
+              </span>
+            </div>
+
+            {/* Department grants */}
+            <div className="da-field">
+              <label>Department access</label>
+              <p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: '0 0 0.5rem' }}>All members of a checked department can access this document.</p>
+              <div className="da-dept-grid">
+                {ALL_DEPARTMENTS.map(dept => (
+                  <label key={dept} className={`da-dept-item${!permModal.canEdit ? ' disabled' : ''}`}>
+                    <input
+                      type="checkbox"
+                      checked={permDeptGrants.includes(dept)}
+                      style={{marginRight: 10, marginTop: 5}}
+                      disabled={!permModal.canEdit}
+                      onChange={e => {
+                        if (!permModal.canEdit) return
+                        setPermDeptGrants(prev => e.target.checked ? [...prev, dept] : prev.filter(d => d !== dept))
+                      }}
+                    />
+                    {dept}
+                  </label>
+                ))}
+              </div>
+            </div>
+
+            {/* Individual user grants */}
+            <div className="da-field">
+              <label>Individual users</label>
+              <p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: '0 0 0.5rem' }}>Grant access to specific people regardless of their department.</p>
+              <div className="da-user-chips">
+                {permUserGrants.map(u => (
+                  <span key={u.id} className="da-user-chip">
+                    {u.display_name}
+                    {permModal.canEdit && (
+                      <button onClick={() => setPermUserGrants(prev => prev.filter(x => x.id !== u.id))} title="Remove">×</button>
+                    )}
+                  </span>
+                ))}
+                {permUserGrants.length === 0 && <span style={{ fontSize: '0.78rem', color: '#d1d5db' }}>No individual grants</span>}
+              </div>
+
+              {permModal.canEdit && (
+                <div className="da-user-search" style={{ marginTop: '0.5rem' }}>
+                  <input
+                    placeholder="Search by name or email…"
+                    value={permUserSearch}
+                    onChange={e => setPermUserSearch(e.target.value)}
+                  />
+                  {permUserSearch.trim() && filteredUsers.length > 0 && (
+                    <div className="da-user-dropdown">
+                      {filteredUsers.map(u => (
+                        <div
+                          key={u.id}
+                          className="da-user-option"
+                          onClick={() => {
+                            setPermUserGrants(prev => [...prev, u])
+                            setPermUserSearch('')
+                          }}
+                        >
+                          <div>
+                            <div className="name">{u.display_name}</div>
+                            <div className="email">{u.email}</div>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  {permUserSearch.trim() && filteredUsers.length === 0 && (
+                    <div className="da-user-dropdown">
+                      <div className="da-user-option" style={{ color: '#9ca3af' }}>No matching users</div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Who has access collapsible */}
+            <div className="da-access-summary">
+              <button
+                className={`da-access-summary-toggle${accessSummaryOpen ? ' open' : ''}`}
+                onClick={() => {
+                  const next = !accessSummaryOpen
+                  setAccessSummaryOpen(next)
+                  if (next && !accessSummary) loadAccessSummary(permModal.doc.id)
+                }}
+              >
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
+                Who has access
+              </button>
+
+              {accessSummaryOpen && (
+                <div style={{ marginTop: '0.6rem', paddingLeft: '0.25rem' }}>
+                  {accessSummaryLoading ? (
+                    <p style={{ fontSize: '0.78rem', color: '#9ca3af' }}>Resolving access…</p>
+                  ) : accessSummary ? (
+                    accessSummary.resolved_users.length === 0 ? (
+                      <p style={{ fontSize: '0.78rem', color: '#9ca3af' }}>No one has access yet. Set an owner or add a grant above.</p>
+                    ) : (
+                      accessSummary.resolved_users.map(u => (
+                        <div key={u.id} className="da-access-user-row">
+                          <div style={{ width: 26, height: 26, borderRadius: '50%', background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '0.7rem', fontWeight: 700, color: '#7c3aed', flexShrink: 0 }}>
+                            {u.display_name.charAt(0).toUpperCase()}
+                          </div>
+                          <div style={{ flex: 1 }}>
+                            <div style={{ fontWeight: 500, fontSize: '0.82rem' }}>{u.display_name}</div>
+                            <div style={{ fontSize: '0.72rem', color: '#9ca3af' }}>{u.email}</div>
+                          </div>
+                          <span className={`da-access-via ${u.via}`}>
+                            {u.via === 'owner' ? 'Owner' : u.via === 'department' ? 'Department' : 'Individual'}
+                          </span>
+                        </div>
+                      ))
+                    )
+                  ) : null}
+                </div>
+              )}
+            </div>
+
+            <div className="da-modal-actions">
+              <button className="da-modal-cancel" onClick={() => setPermModal(null)}>
+                {permModal.canEdit ? 'Cancel' : 'Close'}
+              </button>
+              {permModal.canEdit && (
+                <button className="da-btn da-btn-primary" disabled={permSaving} onClick={savePermissions}>
+                  {permSaving ? 'Saving…' : 'Save Permissions'}
+                </button>
+              )}
+            </div>
+          </div>
+        </div>
+      )}
     </>
   )
 }
@@ -644,11 +929,12 @@ function RoleSelect({ value, onChange, allRoles }: { value: string; onChange: (v
 }
 
 function FolderEditor({
-  folder, allRoles, isEditingFolder, editingFolderName, editingFolderRole,
-  onEditStart, onEditChange, onRoleChange, onEditSave, onEditCancel, onDelete, onAddDoc, onEditDoc, onDeleteDoc,
+  folder, allRoles, permSummary, isEditingFolder, editingFolderName, editingFolderRole,
+  onEditStart, onEditChange, onRoleChange, onEditSave, onEditCancel, onDelete, onAddDoc, onEditDoc, onDeleteDoc, onPermissions,
 }: {
   folder: DocFolderWithDocuments
   allRoles: Role[]
+  permSummary: Record<string, PermSummaryEntry>
   isEditingFolder: boolean
   editingFolderName: string
   editingFolderRole: string
@@ -661,6 +947,7 @@ function FolderEditor({
   onAddDoc: () => void
   onEditDoc: (doc: DriveDocument) => void
   onDeleteDoc: (id: string, title: string) => void
+  onPermissions: (doc: DriveDocument) => void
 }) {
   const roleObj = allRoles.find(r => r.name === folder.required_role)
   return (
@@ -703,7 +990,15 @@ function FolderEditor({
           <p style={{ fontSize: '0.8rem', color: '#d1d5db', padding: '0.4rem 1.5rem', margin: 0 }}>No documents yet</p>
         ) : (
           folder.documents.map(doc => (
-            <DocRow key={doc.id} doc={doc} allRoles={allRoles} onEdit={() => onEditDoc(doc)} onDelete={() => onDeleteDoc(doc.id, doc.title)} />
+            <DocRow
+              key={doc.id}
+              doc={doc}
+              allRoles={allRoles}
+              permEntry={permSummary[doc.id]}
+              onEdit={() => onEditDoc(doc)}
+              onDelete={() => onDeleteDoc(doc.id, doc.title)}
+              onPermissions={() => onPermissions(doc)}
+            />
           ))
         )}
       </div>
@@ -711,18 +1006,42 @@ function FolderEditor({
   )
 }
 
-function DocRow({ doc, allRoles, onEdit, onDelete }: { doc: DriveDocument; allRoles: Role[]; onEdit: () => void; onDelete: () => void }) {
+function permBadgeText(entry: PermSummaryEntry | undefined): { text: string; cls: string } {
+  if (!entry) return { text: 'Open (legacy)', cls: '' }
+  const { depts, userCount, ownerId } = entry
+  const hasGrants = depts.length > 0 || userCount > 0
+  if (!hasGrants && !ownerId) return { text: 'Open (legacy)', cls: '' }
+  if (!hasGrants && ownerId) return { text: 'Owner only', cls: 'owner-only' }
+  const parts: string[] = []
+  if (depts.length > 0) parts.push(depts.join(', '))
+  if (userCount > 0) parts.push(`${userCount} user${userCount !== 1 ? 's' : ''}`)
+  return { text: parts.join(' · '), cls: 'restricted' }
+}
+
+function DocRow({ doc, allRoles, permEntry, onEdit, onDelete, onPermissions }: {
+  doc: DriveDocument
+  allRoles: Role[]
+  permEntry: PermSummaryEntry | undefined
+  onEdit: () => void
+  onDelete: () => void
+  onPermissions: () => void
+}) {
   const isUploaded = !!doc.storage_path
   const roleObj = allRoles.find(r => r.name === doc.required_role)
+  const badge = permBadgeText(permEntry)
+
   return (
     <div className="da-doc-row">
       {isUploaded ? (
-        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#7c3aed"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#7c3aed" style={{ flexShrink: 0, marginTop: 2 }}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
       ) : (
-        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#9ca3af"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+        <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="#9ca3af" style={{ flexShrink: 0, marginTop: 2 }}><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
       )}
-      <span className="da-doc-title">{doc.title}</span>
-      {doc.description && <span className="da-doc-url">{doc.description}</span>}
+      <div className="da-doc-main">
+        <span className="da-doc-title">{doc.title}</span>
+        {doc.description && <span className="da-doc-url">{doc.description}</span>}
+        <span className={`da-doc-perm-badge ${badge.cls}`}>{badge.text}</span>
+      </div>
       {roleObj && (
         <span className="da-role-badge" style={{ background: roleObj.color + '22', color: roleObj.color, fontSize: '0.65rem' }}>
           {roleObj.label}
@@ -730,8 +1049,11 @@ function DocRow({ doc, allRoles, onEdit, onDelete }: { doc: DriveDocument; allRo
       )}
       {isUploaded
         ? <span className="da-doc-badge">uploaded</span>
-        : <a className="da-doc-open" href={doc.drive_url ?? '#'} target="_blank" rel="noopener noreferrer">Open</a>
+        : <span className="da-doc-badge" style={{ background: '#dcfce7', color: '#15803d' }}>drive</span>
       }
+      <button className="da-btn da-btn-ghost da-btn-sm" onClick={onPermissions} title="Manage permissions" style={{ color: '#7c3aed' }}>
+        <svg width="13" height="13" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+      </button>
       <button className="da-btn da-btn-ghost da-btn-sm" onClick={onEdit} title="Edit document">
         <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
       </button>

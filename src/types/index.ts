@@ -427,9 +427,40 @@ export interface DriveDocument {
   storage_bucket: string | null
   storage_path: string | null
   required_role: string | null
+  owner_id: string | null
   sort_order: number
   created_at: string
   updated_at: string
+}
+
+export type PermissionDepartment =
+  | 'CRM' | 'E-Commerce' | 'HR' | 'IT'
+  | 'Accounting' | 'Sales' | 'Warehouse' | 'General'
+
+export interface DocumentPermission {
+  id: string
+  document_id: string
+  department: PermissionDepartment | null
+  user_id: string | null
+  granted_by: string | null
+  granted_at: string
+}
+
+export interface DocumentPermissionUser {
+  id: string
+  display_name: string
+  email: string
+  avatar_url: string | null
+}
+
+export interface DocumentAccessSummary {
+  owner: { id: string; display_name: string; email: string } | null
+  resolved_users: {
+    id: string
+    display_name: string
+    email: string
+    via: 'owner' | 'department' | 'individual'
+  }[]
 }
 
 export interface DocFolderWithDocuments extends DocFolder {

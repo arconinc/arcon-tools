@@ -1,5 +1,45 @@
 import { RESTRICTED_RESOURCES } from './permissions'
 
+// ─── Document fine-grained access ────────────────────────────────────────────
+
+export interface DocumentAccessContext {
+  ownerId: string | null
+  requiredRole: string | null  // legacy field — honored for backward compat
+  departmentGrants: string[]
+  userGrants: string[]         // user IDs explicitly granted
+}
+
+// Returns true if the given user may open/download the document.
+// Admins are NOT special-cased — they go through the same checks as everyone else.
+export function canAccessDocument(
+  ctx: DocumentAccessContext,
+  user: { id: string; roles: string[]; department: string[] | null }
+): boolean {
+  // Owner always has access
+  if (ctx.ownerId === user.id) return true
+
+  // If no explicit permissions have ever been configured, treat as open (backward compat)
+  const hasExplicit =
+    ctx.ownerId !== null ||
+    ctx.departmentGrants.length > 0 ||
+    ctx.userGrants.length > 0 ||
+    ctx.requiredRole !== null
+  if (!hasExplicit) return true
+
+  // Legacy required_role check (for documents created before this system)
+  if (ctx.requiredRole && user.roles.includes(ctx.requiredRole)) return true
+
+  // Individual user grant
+  if (ctx.userGrants.includes(user.id)) return true
+
+  // Department grant — user must belong to at least one granted department
+  if (ctx.departmentGrants.length > 0 && user.department) {
+    if (ctx.departmentGrants.some(d => (user.department as string[]).includes(d))) return true
+  }
+
+  return false
+}
+
 // Returns true if the user can access the given page (matched by route prefix).
 // Admins always pass. Resources not listed in RESTRICTED_RESOURCES always pass.
 export function hasPageAccess(roles: string[], isAdmin: boolean, pathname: string): boolean {

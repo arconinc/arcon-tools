@@ -4,8 +4,9 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { cookies } from 'next/headers'
 import { canAccessDocument } from '@/lib/access'
 
-// GET /api/documents/signed-url?docId=<id>
-// Issues a 1-hour signed URL for an uploaded document file.
+// GET /api/documents/open?docId=<id>
+// Unified gated entry point for opening any document — both uploaded files and Drive links.
+// Returns { type: 'signed', url } for uploaded files or { type: 'drive', url } for Drive links.
 // Admins are NOT exempt — all users go through canAccessDocument.
 export async function GET(req: NextRequest) {
   const supabase = await createClient()
@@ -45,11 +46,11 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Fetch document + permissions in parallel
+  // Fetch document + permissions + roles in parallel
   const [docResult, permsResult, rolesResult] = await Promise.all([
     adminClient
       .from('documents')
-      .select('id, storage_bucket, storage_path, required_role, owner_id')
+      .select('id, drive_url, storage_bucket, storage_path, required_role, owner_id')
       .eq('id', docId)
       .single(),
     adminClient
@@ -64,9 +65,6 @@ export async function GET(req: NextRequest) {
 
   const doc = docResult.data
   if (!doc) return NextResponse.json({ error: 'Document not found' }, { status: 404 })
-  if (!doc.storage_bucket || !doc.storage_path) {
-    return NextResponse.json({ error: 'Document has no stored file' }, { status: 400 })
-  }
 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const roleNames: string[] = (rolesResult.data ?? []).map((r: any) => r.roles?.name).filter(Boolean)
@@ -79,13 +77,22 @@ export async function GET(req: NextRequest) {
   )
   if (!allowed) return NextResponse.json({ error: 'Access denied' }, { status: 403 })
 
-  const { data, error } = await adminClient.storage
-    .from(doc.storage_bucket)
-    .createSignedUrl(doc.storage_path, 3600)
-
-  if (error || !data?.signedUrl) {
-    return NextResponse.json({ error: 'Could not generate signed URL' }, { status: 500 })
+  // Drive link
+  if (doc.drive_url) {
+    return NextResponse.json({ type: 'drive', url: doc.drive_url })
   }
 
-  return NextResponse.json({ signedUrl: data.signedUrl })
+  // Uploaded file — generate a 1-hour signed URL
+  if (doc.storage_bucket && doc.storage_path) {
+    const { data, error } = await adminClient.storage
+      .from(doc.storage_bucket)
+      .createSignedUrl(doc.storage_path, 3600)
+
+    if (error || !data?.signedUrl) {
+      return NextResponse.json({ error: 'Could not generate signed URL' }, { status: 500 })
+    }
+    return NextResponse.json({ type: 'signed', url: data.signedUrl })
+  }
+
+  return NextResponse.json({ error: 'Document has no associated file' }, { status: 400 })
 }
