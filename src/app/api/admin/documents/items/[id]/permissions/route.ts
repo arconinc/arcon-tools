@@ -33,7 +33,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       .single(),
     adminClient
       .from('document_permissions')
-      .select('id, document_id, department, user_id, granted_by, granted_at, users!document_permissions_user_id_fkey(id, display_name, email, avatar_url)')
+      .select('id, document_id, role_id, user_id, granted_by, granted_at, roles(id, name, label, color), users!document_permissions_user_id_fkey(id, display_name, email, avatar_url)')
       .eq('document_id', docId),
   ])
 
@@ -47,7 +47,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const permissions = (permsResult.data ?? []).map((p: any) => ({
     id: p.id,
     document_id: p.document_id,
-    department: p.department,
+    role_id: p.role_id,
+    role: p.roles ?? null,
     user_id: p.user_id,
     granted_by: p.granted_by,
     granted_at: p.granted_at,
@@ -64,7 +65,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 // PUT /api/admin/documents/items/[id]/permissions
 // Atomically replaces all permission grants for the document.
 // Only the document owner may call this.
-// Body: { department_grants: string[], user_grants: string[] }
+// Body: { role_grants: string[], user_grants: string[] }
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const admin = await getAdminUser()
   if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -84,9 +85,9 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ error: 'Only the document owner can change permissions' }, { status: 403 })
   }
 
-  const { department_grants, user_grants } = await req.json() as {
-    department_grants: string[]
-    user_grants: string[]
+  const { role_grants, user_grants } = await req.json() as {
+    role_grants: string[]   // role IDs
+    user_grants: string[]   // user IDs
   }
 
   // Atomic replace: delete all existing grants, then insert new set
@@ -98,8 +99,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 })
 
   const newGrants = [
-    ...(department_grants ?? []).map(d => ({ document_id: docId, department: d, user_id: null, granted_by: admin.id })),
-    ...(user_grants ?? []).map(u => ({ document_id: docId, department: null, user_id: u, granted_by: admin.id })),
+    ...(role_grants ?? []).map(r => ({ document_id: docId, role_id: r, user_id: null, granted_by: admin.id })),
+    ...(user_grants ?? []).map(u => ({ document_id: docId, role_id: null, user_id: u, granted_by: admin.id })),
   ]
 
   if (newGrants.length > 0) {

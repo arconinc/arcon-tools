@@ -4,39 +4,30 @@ import { RESTRICTED_RESOURCES } from './permissions'
 
 export interface DocumentAccessContext {
   ownerId: string | null
-  requiredRole: string | null  // legacy field — honored for backward compat
-  departmentGrants: string[]
-  userGrants: string[]         // user IDs explicitly granted
+  roleGrants: string[]   // role names that have been granted access
+  userGrants: string[]   // user IDs explicitly granted
 }
 
 // Returns true if the given user may open/download the document.
 // Admins are NOT special-cased — they go through the same checks as everyone else.
+// Roles in `user.roles` should already include any roles inferred from department
+// membership — see getUserRoleNames in lib/auth/get-effective-user.ts.
 export function canAccessDocument(
   ctx: DocumentAccessContext,
-  user: { id: string; roles: string[]; department: string[] | null }
+  user: { id: string; roles: string[] }
 ): boolean {
   // Owner always has access
   if (ctx.ownerId === user.id) return true
 
   // If no grants have been configured, treat as open to all authenticated users.
-  // Having an owner_id alone does not restrict access — the owner check above already
-  // handles owner access; we only restrict when explicit grants are present.
-  const hasExplicit =
-    ctx.departmentGrants.length > 0 ||
-    ctx.userGrants.length > 0 ||
-    ctx.requiredRole !== null
+  const hasExplicit = ctx.roleGrants.length > 0 || ctx.userGrants.length > 0
   if (!hasExplicit) return true
-
-  // Legacy required_role check (for documents created before this system)
-  if (ctx.requiredRole && user.roles.includes(ctx.requiredRole)) return true
 
   // Individual user grant
   if (ctx.userGrants.includes(user.id)) return true
 
-  // Department grant — user must belong to at least one granted department
-  if (ctx.departmentGrants.length > 0 && user.department) {
-    if (ctx.departmentGrants.some(d => (user.department as string[]).includes(d))) return true
-  }
+  // Role grant — user must have at least one of the granted roles
+  if (ctx.roleGrants.some(r => user.roles.includes(r))) return true
 
   return false
 }

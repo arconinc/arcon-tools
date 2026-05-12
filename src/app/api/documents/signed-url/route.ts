@@ -20,13 +20,12 @@ export async function GET(req: NextRequest) {
   // Resolve effective user (impersonation aware)
   const { data: realUser } = await adminClient
     .from('users')
-    .select('id, is_admin, department')
+    .select('id, is_admin')
     .eq('google_id', user.id)
     .single()
   if (!realUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   let effectiveUserId = realUser.id
-  let effectiveDepartment: string[] | null = realUser.department
 
   if (realUser.is_admin) {
     const cookieStore = await cookies()
@@ -34,19 +33,18 @@ export async function GET(req: NextRequest) {
     if (impersonateCookie?.value) {
       const { data: target } = await adminClient
         .from('users')
-        .select('id, is_admin, department')
+        .select('id, is_admin')
         .eq('id', impersonateCookie.value)
         .is('deactivated_at', null)
         .single()
       if (target && !target.is_admin) {
         effectiveUserId = target.id
-        effectiveDepartment = target.department
       }
     }
   }
 
-  // Fetch document + permissions in parallel
-  const [docResult, permsResult, rolesResult] = await Promise.all([
+  // Fetch document + permissions + user roles in parallel
+  const [docResult, permsResult, directRolesResult, deptRolesResult] = await Promise.all([
     adminClient
       .from('documents')
       .select('id, storage_bucket, storage_path, required_role, owner_id')
@@ -54,12 +52,10 @@ export async function GET(req: NextRequest) {
       .single(),
     adminClient
       .from('document_permissions')
-      .select('department, user_id')
+      .select('role_id, user_id, roles(name)')
       .eq('document_id', docId),
-    adminClient
-      .from('user_roles')
-      .select('roles(name)')
-      .eq('user_id', effectiveUserId),
+    adminClient.from('user_roles').select('roles(name)').eq('user_id', effectiveUserId),
+    adminClient.from('user_departments').select('department_roles(roles(name))').eq('user_id', effectiveUserId),
   ])
 
   const doc = docResult.data
@@ -68,14 +64,21 @@ export async function GET(req: NextRequest) {
     return NextResponse.json({ error: 'Document has no stored file' }, { status: 400 })
   }
 
+  // Build effective role set for this user
+  const userRoleNames = new Set<string>()
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  const roleNames: string[] = (rolesResult.data ?? []).map((r: any) => r.roles?.name).filter(Boolean)
-  const departmentGrants = (permsResult.data ?? []).map(p => p.department).filter((d): d is string => !!d)
+  for (const r of (directRolesResult.data ?? []) as any[]) if (r.roles?.name) userRoleNames.add(r.roles.name)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const ud of (deptRolesResult.data ?? []) as any[]) for (const dr of ud.department_roles ?? []) if (dr.roles?.name) userRoleNames.add(dr.roles.name)
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const roleGrants = (permsResult.data ?? []).map((p: any) => p.roles?.name).filter((n: unknown): n is string => !!n)
+  if (doc.required_role) roleGrants.push(doc.required_role)
   const userGrants = (permsResult.data ?? []).map(p => p.user_id).filter((u): u is string => !!u)
 
   const allowed = canAccessDocument(
-    { ownerId: doc.owner_id, requiredRole: doc.required_role, departmentGrants, userGrants },
-    { id: effectiveUserId, roles: roleNames, department: effectiveDepartment }
+    { ownerId: doc.owner_id, roleGrants, userGrants },
+    { id: effectiveUserId, roles: [...userRoleNames] }
   )
   if (!allowed) return NextResponse.json({ error: 'Access denied' }, { status: 403 })
 

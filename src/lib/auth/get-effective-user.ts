@@ -73,10 +73,28 @@ async function getUserRoleNames(
   adminClient: any,
   userId: string
 ): Promise<string[]> {
-  const { data } = await adminClient
+  // Direct role grants
+  const { data: directRoles } = await adminClient
     .from('user_roles')
     .select('roles(name)')
     .eq('user_id', userId)
-  if (!data) return []
-  return data.map((r: { roles: { name: string } }) => r.roles.name)
+
+  // Roles inferred via department membership (department_roles junction)
+  const { data: deptRoles } = await adminClient
+    .from('user_departments')
+    .select('department_roles(roles(name))')
+    .eq('user_id', userId)
+
+  const names = new Set<string>()
+
+  for (const r of directRoles ?? []) {
+    if (r.roles?.name) names.add(r.roles.name)
+  }
+  for (const ud of deptRoles ?? []) {
+    for (const dr of ud.department_roles ?? []) {
+      if (dr.roles?.name) names.add(dr.roles.name)
+    }
+  }
+
+  return [...names]
 }

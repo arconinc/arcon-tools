@@ -25,7 +25,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const { id: docId } = await params
   const adminClient = createAdminClient()
 
-  const [docResult, permsResult, allUsersResult] = await Promise.all([
+  const [docResult, permsResult] = await Promise.all([
     adminClient
       .from('documents')
       .select('owner_id, users!documents_owner_id_fkey(id, display_name, email)')
@@ -33,12 +33,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       .single(),
     adminClient
       .from('document_permissions')
-      .select('department, user_id')
+      .select('role_id, user_id')
       .eq('document_id', docId),
-    adminClient
-      .from('users')
-      .select('id, display_name, email, department')
-      .is('deactivated_at', null),
   ])
 
   if (!docResult.data) return NextResponse.json({ error: 'Document not found' }, { status: 404 })
@@ -48,46 +44,63 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const owner: { id: string; display_name: string; email: string } | null = (doc as any).users ?? null
 
   const perms = permsResult.data ?? []
-  const allUsers = allUsersResult.data ?? []
-
-  const departmentGrants = perms.map(p => p.department).filter((d): d is string => !!d)
+  const roleGrantIds = perms.map(p => p.role_id).filter((r): r is string => !!r)
   const userGrantIds = new Set(perms.map(p => p.user_id).filter((u): u is string => !!u))
 
-  const open_to_all = departmentGrants.length === 0 && userGrantIds.size === 0
+  const open_to_all = roleGrantIds.length === 0 && userGrantIds.size === 0
 
-  // When open to all, just return the owner — the UI will show an "all users" banner.
   if (open_to_all) {
     const resolved_users = owner ? [{ ...owner, via: 'owner' as const }] : []
     return NextResponse.json({ owner, open_to_all: true, resolved_users })
   }
 
-  // Deduplicate by user ID, tracking how access was granted
-  const seen = new Map<string, { id: string; display_name: string; email: string; via: 'owner' | 'department' | 'individual' }>()
+  // Find all users who have at least one of the granted roles (directly or via department)
+  // by querying user_roles and user_departments → department_roles.
+  const [directRoleUsersResult, deptRoleUsersResult, individualUsersResult] = await Promise.all([
+    // Users with a direct role grant
+    adminClient
+      .from('user_roles')
+      .select('user_id, users!user_roles_user_id_fkey(id, display_name, email)')
+      .in('role_id', roleGrantIds)
+      .is('users.deactivated_at', null),
+    // Users in departments that carry one of the granted roles
+    adminClient
+      .from('user_departments')
+      .select('user_id, users!user_departments_user_id_fkey(id, display_name, email), department_roles!inner(role_id)')
+      .in('department_roles.role_id', roleGrantIds)
+      .is('users.deactivated_at', null),
+    // Individually granted users
+    userGrantIds.size > 0
+      ? adminClient
+          .from('users')
+          .select('id, display_name, email')
+          .in('id', [...userGrantIds])
+          .is('deactivated_at', null)
+      : Promise.resolve({ data: [] }),
+  ])
 
-  if (owner) {
-    seen.set(owner.id, { ...owner, via: 'owner' })
+  const seen = new Map<string, { id: string; display_name: string; email: string; via: 'owner' | 'role' | 'individual' }>()
+
+  if (owner) seen.set(owner.id, { ...owner, via: 'owner' })
+
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const r of directRoleUsersResult.data ?? []) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const u = (r as any).users
+    if (u && !seen.has(u.id)) seen.set(u.id, { id: u.id, display_name: u.display_name, email: u.email, via: 'role' })
   }
-
-  for (const u of allUsers) {
-    if (seen.has(u.id)) continue
-
-    // Department grant
-    if (departmentGrants.length > 0 && u.department) {
-      const depts: string[] = Array.isArray(u.department) ? u.department : [u.department]
-      if (departmentGrants.some(d => depts.includes(d))) {
-        seen.set(u.id, { id: u.id, display_name: u.display_name, email: u.email, via: 'department' })
-        continue
-      }
-    }
-
-    // Individual grant
-    if (userGrantIds.has(u.id)) {
-      seen.set(u.id, { id: u.id, display_name: u.display_name, email: u.email, via: 'individual' })
-    }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const r of deptRoleUsersResult.data ?? []) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const u = (r as any).users
+    if (u && !seen.has(u.id)) seen.set(u.id, { id: u.id, display_name: u.display_name, email: u.email, via: 'role' })
+  }
+  for (const u of individualUsersResult.data ?? []) {
+    if (!seen.has(u.id)) seen.set(u.id, { id: u.id, display_name: u.display_name, email: u.email, via: 'individual' })
   }
 
   const resolved_users = [...seen.values()].sort((a, b) => {
-    const order = { owner: 0, department: 1, individual: 2 } as const
+    const order = { owner: 0, role: 1, individual: 2 } as const
     return order[a.via] - order[b.via] || a.display_name.localeCompare(b.display_name)
   })
 

@@ -117,6 +117,7 @@ function buildNavSections(isAdmin: boolean, roles: string[]): NavSection[] {
       label: 'E-Commerce',
       items: [
         { href: '/stores', label: 'Stores', icon: StoreIcon, adminMatch: true },
+        { href: '/documents/ecommerce', label: 'Documents', icon: DocumentIcon, adminMatch: true },
         { href: '/ecommerce/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
       ],
     },
@@ -137,18 +138,21 @@ function buildNavSections(isAdmin: boolean, roles: string[]): NavSection[] {
     {
       label: 'Technology',
       items: [
+        { href: '/documents/technology', label: 'Documents', icon: DocumentIcon, adminMatch: true },
         { href: '/it/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
       ],
     },
     {
       label: 'Sales',
       items: [
+        { href: '/documents/sales', label: 'Documents', icon: DocumentIcon, adminMatch: true },
         { href: '/sales/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
       ],
     },
     {
       label: 'Warehouse',
       items: [
+        { href: '/documents/warehouse', label: 'Documents', icon: DocumentIcon, adminMatch: true },
         { href: '/warehouse/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
       ],
     },

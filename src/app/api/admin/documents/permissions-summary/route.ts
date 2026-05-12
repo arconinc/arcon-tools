@@ -22,21 +22,22 @@ export async function GET() {
 
   const [docsResult, permsResult] = await Promise.all([
     adminClient.from('documents').select('id, owner_id'),
-    adminClient.from('document_permissions').select('document_id, department, user_id'),
+    adminClient.from('document_permissions').select('document_id, role_id, user_id, roles(name)'),
   ])
 
   const docs = docsResult.data ?? []
   const perms = permsResult.data ?? []
 
-  const summary: Record<string, { depts: string[]; userCount: number; ownerId: string | null }> = {}
+  const summary: Record<string, { roles: string[]; userCount: number; ownerId: string | null }> = {}
 
   for (const doc of docs) {
-    summary[doc.id] = { depts: [], userCount: 0, ownerId: doc.owner_id }
+    summary[doc.id] = { roles: [], userCount: 0, ownerId: doc.owner_id }
   }
 
   for (const p of perms) {
     if (!summary[p.document_id]) continue
-    if (p.department) summary[p.document_id].depts.push(p.department)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    if (p.role_id && (p as any).roles?.name) summary[p.document_id].roles.push((p as any).roles.name)
     if (p.user_id) summary[p.document_id].userCount++
   }
 

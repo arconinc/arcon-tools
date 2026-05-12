@@ -433,14 +433,19 @@ export interface DriveDocument {
   updated_at: string
 }
 
-export type PermissionDepartment =
-  | 'CRM' | 'E-Commerce' | 'HR' | 'IT'
-  | 'Accounting' | 'Sales' | 'Warehouse' | 'General'
+export interface Department {
+  id: string
+  name: string
+  label: string
+  color: string
+  sort_order: number
+  created_at: string
+}
 
 export interface DocumentPermission {
   id: string
   document_id: string
-  department: PermissionDepartment | null
+  role_id: string | null
   user_id: string | null
   granted_by: string | null
   granted_at: string
@@ -460,7 +465,7 @@ export interface DocumentAccessSummary {
     id: string
     display_name: string
     email: string
-    via: 'owner' | 'department' | 'individual'
+    via: 'owner' | 'role' | 'individual'
   }[]
 }
 

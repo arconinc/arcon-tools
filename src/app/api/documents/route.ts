@@ -18,14 +18,13 @@ export async function GET() {
   // Resolve effective user (impersonation aware)
   const { data: realUser } = await adminClient
     .from('users')
-    .select('id, is_admin, department')
+    .select('id, is_admin')
     .eq('google_id', user.id)
     .single()
   if (!realUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   let effectiveUserId = realUser.id
   let isAdmin = realUser.is_admin
-  let effectiveDepartment: string[] | null = realUser.department
 
   if (isAdmin) {
     const cookieStore = await cookies()
@@ -33,26 +32,29 @@ export async function GET() {
     if (impersonateCookie?.value) {
       const { data: target } = await adminClient
         .from('users')
-        .select('id, is_admin, department')
+        .select('id, is_admin')
         .eq('id', impersonateCookie.value)
         .is('deactivated_at', null)
         .single()
       if (target && !target.is_admin) {
         effectiveUserId = target.id
         isAdmin = false
-        effectiveDepartment = target.department
       }
     }
   }
 
   let roles: string[] = []
   if (!isAdmin) {
-    const { data: userRoles } = await adminClient
-      .from('user_roles')
-      .select('roles(name)')
-      .eq('user_id', effectiveUserId)
+    const [{ data: directRoles }, { data: deptRoles }] = await Promise.all([
+      adminClient.from('user_roles').select('roles(name)').eq('user_id', effectiveUserId),
+      adminClient.from('user_departments').select('department_roles(roles(name))').eq('user_id', effectiveUserId),
+    ])
+    const roleSet = new Set<string>()
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    roles = (userRoles ?? []).map((r: any) => r.roles?.name).filter(Boolean)
+    for (const r of (directRoles ?? []) as any[]) if (r.roles?.name) roleSet.add(r.roles.name)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    for (const ud of (deptRoles ?? []) as any[]) for (const dr of ud.department_roles ?? []) if (dr.roles?.name) roleSet.add(dr.roles.name)
+    roles = [...roleSet]
   }
 
   // Section/folder required_role gating (unchanged from previous behavior)
@@ -66,25 +68,40 @@ export async function GET() {
     adminClient.from('doc_sections').select('*').order('sort_order').order('name'),
     adminClient.from('doc_folders').select('*').order('sort_order').order('name'),
     adminClient.from('documents').select('*').order('sort_order').order('title'),
-    adminClient.from('document_permissions').select('document_id, department, user_id'),
+    adminClient.from('document_permissions').select('document_id, role_id, user_id'),
   ])
 
-  // Build permission map: docId → { depts, users }
-  const permMap = new Map<string, { depts: string[]; users: string[] }>()
+  // Build permission map: docId → { roles, users }
+  const permMap = new Map<string, { roles: string[]; users: string[] }>()
   for (const p of perms ?? []) {
-    const entry = permMap.get(p.document_id) ?? { depts: [], users: [] }
-    if (p.department) entry.depts.push(p.department)
+    const entry = permMap.get(p.document_id) ?? { roles: [], users: [] }
+    if (p.role_id) entry.roles.push(p.role_id)
     if (p.user_id) entry.users.push(p.user_id)
     permMap.set(p.document_id, entry)
+  }
+
+  // Role grants in document_permissions are stored as role IDs; resolve to names for the check.
+  // We fetch names lazily from a local map built from all roles used in permissions.
+  const allRoleIds = new Set([...permMap.values()].flatMap(e => e.roles))
+  const roleIdToName = new Map<string, string>()
+  if (allRoleIds.size > 0) {
+    const { data: roleRows } = await adminClient
+      .from('roles')
+      .select('id, name')
+      .in('id', [...allRoleIds])
+    for (const r of roleRows ?? []) roleIdToName.set(r.id, r.name)
   }
 
   function canSeeDoc(doc: { id: string; owner_id: string | null; required_role: string | null }): boolean {
     // Admins (non-impersonating) see all documents in the tree (metadata only; drive_url stripped below)
     if (isAdmin) return true
-    const p = permMap.get(doc.id) ?? { depts: [], users: [] }
+    const p = permMap.get(doc.id) ?? { roles: [], users: [] }
+    const roleGrants = p.roles.map(id => roleIdToName.get(id)).filter((n): n is string => !!n)
+    // Honor legacy required_role if set alongside new system
+    if (doc.required_role) roleGrants.push(doc.required_role)
     return canAccessDocument(
-      { ownerId: doc.owner_id, requiredRole: doc.required_role, departmentGrants: p.depts, userGrants: p.users },
-      { id: effectiveUserId, roles, department: effectiveDepartment }
+      { ownerId: doc.owner_id, roleGrants, userGrants: p.users },
+      { id: effectiveUserId, roles }
     )
   }
 

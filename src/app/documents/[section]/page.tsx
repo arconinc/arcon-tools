@@ -8,6 +8,10 @@ const SECTION_MAP: Record<string, string> = {
   'hr': 'HR',
   'marketing': 'Marketing',
   'accounting': 'Accounting',
+  'ecommerce': 'E-Commerce',
+  'technology': 'Technology',
+  'sales': 'Sales',
+  'warehouse': 'Warehouse',
 }
 
 export default function SectionDocumentsPage() {

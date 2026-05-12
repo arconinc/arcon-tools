@@ -41,12 +41,10 @@ interface AdminUser {
 }
 
 interface PermSummaryEntry {
-  depts: string[]
+  roles: string[]
   userCount: number
   ownerId: string | null
 }
-
-const ALL_DEPARTMENTS = ['CRM', 'E-Commerce', 'HR', 'IT', 'Accounting', 'Sales', 'Warehouse', 'General'] as const
 
 export default function DocumentsAdminPage() {
   const [sections, setSections] = useState<DocSectionWithFolders[]>([])
@@ -63,7 +61,7 @@ export default function DocumentsAdminPage() {
 
   // Permission modal state
   const [permModal, setPermModal] = useState<{ doc: DriveDocument; canEdit: boolean; owner: AdminUser | null } | null>(null)
-  const [permDeptGrants, setPermDeptGrants] = useState<string[]>([])
+  const [permRoleGrants, setPermRoleGrants] = useState<string[]>([])   // role IDs
   const [permUserGrants, setPermUserGrants] = useState<AdminUser[]>([])
   const [permUserSearch, setPermUserSearch] = useState('')
   const [permSaving, setPermSaving] = useState(false)
@@ -190,7 +188,7 @@ export default function DocumentsAdminPage() {
     if (!res.ok) { setPermLoading(false); return }
     const { owner, permissions, canEdit } = await res.json()
 
-    setPermDeptGrants(permissions.filter((p: { department: string | null }) => p.department).map((p: { department: string }) => p.department))
+    setPermRoleGrants(permissions.filter((p: { role_id: string | null }) => p.role_id).map((p: { role_id: string }) => p.role_id))
     setPermUserGrants(permissions.filter((p: { user_id: string | null; user: AdminUser | null }) => p.user_id && p.user).map((p: { user: AdminUser }) => p.user))
     setPermUserSearch('')
     setPermModal({ doc, canEdit, owner })
@@ -214,7 +212,7 @@ export default function DocumentsAdminPage() {
       method: 'PUT',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
-        department_grants: permDeptGrants,
+        role_grants: permRoleGrants,
         user_grants: permUserGrants.map(u => u.id),
       }),
     })
@@ -493,7 +491,7 @@ export default function DocumentsAdminPage() {
         .da-access-user-row { display: flex; align-items: center; gap: 0.5rem; padding: 0.35rem 0; font-size: 0.8rem; }
         .da-access-via { font-size: 0.68rem; color: #9ca3af; }
         .da-access-via.owner { color: #7c3aed; font-weight: 600; }
-        .da-access-via.department { color: #059669; font-weight: 500; }
+        .da-access-via.role { color: #059669; font-weight: 500; }
         .da-perm-state-banner { display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.55rem 0.75rem; border-radius: 8px; font-size: 0.8rem; margin-bottom: 1rem; }
         .da-perm-state-banner.open { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
         .da-perm-state-banner.restricted { background: #fef9ec; color: #92400e; border: 1px solid #fde68a; }
@@ -766,7 +764,7 @@ export default function DocumentsAdminPage() {
             )}
 
             {/* Access state banner */}
-            {permDeptGrants.length === 0 && permUserGrants.length === 0 ? (
+            {permRoleGrants.length === 0 && permUserGrants.length === 0 ? (
               <div className="da-perm-state-banner open">
                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064" /></svg>
                 <span><strong>Open to all</strong> — all authenticated users can access this document. Add grants below to restrict access.</span>
@@ -774,7 +772,7 @@ export default function DocumentsAdminPage() {
             ) : (
               <div className="da-perm-state-banner restricted">
                 <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-                <span><strong>Restricted</strong> — only the owner and users/departments below can access this document.</span>
+                <span><strong>Restricted</strong> — only the owner and users/roles below can access this document.</span>
               </div>
             )}
 
@@ -787,24 +785,27 @@ export default function DocumentsAdminPage() {
               </span>
             </div>
 
-            {/* Department grants */}
+            {/* Role grants */}
             <div className="da-field">
-              <label>Department access</label>
-              <p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: '0 0 0.5rem' }}>All members of a checked department can access this document.</p>
+              <label>Role access</label>
+              <p style={{ fontSize: '0.75rem', color: '#9ca3af', margin: '0 0 0.5rem' }}>All users with a checked role can access this document. Department membership auto-grants roles.</p>
               <div className="da-dept-grid">
-                {ALL_DEPARTMENTS.map(dept => (
-                  <label key={dept} className={`da-dept-item${!permModal.canEdit ? ' disabled' : ''}`}>
+                {allRoles.map(role => (
+                  <label key={role.id} className={`da-dept-item${!permModal.canEdit ? ' disabled' : ''}`}>
                     <input
                       type="checkbox"
-                      checked={permDeptGrants.includes(dept)}
-                      style={{marginRight: 10, marginTop: 5}}
+                      checked={permRoleGrants.includes(role.id)}
+                      style={{ marginRight: 10, marginTop: 5 }}
                       disabled={!permModal.canEdit}
                       onChange={e => {
                         if (!permModal.canEdit) return
-                        setPermDeptGrants(prev => e.target.checked ? [...prev, dept] : prev.filter(d => d !== dept))
+                        setPermRoleGrants(prev => e.target.checked ? [...prev, role.id] : prev.filter(r => r !== role.id))
                       }}
                     />
-                    {dept}
+                    <span style={{ display: 'inline-flex', alignItems: 'center', gap: '0.3rem' }}>
+                      <span style={{ width: 8, height: 8, borderRadius: '50%', background: role.color, flexShrink: 0 }} />
+                      {role.label}
+                    </span>
                   </label>
                 ))}
               </div>
@@ -895,7 +896,7 @@ export default function DocumentsAdminPage() {
                             <div style={{ fontSize: '0.72rem', color: '#9ca3af' }}>{u.email}</div>
                           </div>
                           <span className={`da-access-via ${u.via}`}>
-                            {u.via === 'owner' ? 'Owner' : u.via === 'department' ? 'Department' : 'Individual'}
+                            {u.via === 'owner' ? 'Owner' : u.via === 'role' ? 'Role' : 'Individual'}
                           </span>
                         </div>
                       ))
@@ -1011,11 +1012,11 @@ function FolderEditor({
 
 function permBadgeText(entry: PermSummaryEntry | undefined): { text: string; cls: string } {
   if (!entry) return { text: 'Open to all', cls: '' }
-  const { depts, userCount } = entry
-  const hasGrants = depts.length > 0 || userCount > 0
+  const { roles, userCount } = entry
+  const hasGrants = roles.length > 0 || userCount > 0
   if (!hasGrants) return { text: 'Open to all', cls: '' }
   const parts: string[] = []
-  if (depts.length > 0) parts.push(depts.join(', '))
+  if (roles.length > 0) parts.push(roles.join(', '))
   if (userCount > 0) parts.push(`${userCount} user${userCount !== 1 ? 's' : ''}`)
   return { text: parts.join(' · '), cls: 'restricted' }
 }
