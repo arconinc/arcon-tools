@@ -22,7 +22,6 @@ interface AddDocForm {
   drive_url: string
   drive_file_id: string
   description: string
-  required_role: string
   file: File | null
 }
 
@@ -102,7 +101,6 @@ export default function DocumentsAdminPage() {
   const [editDocModal, setEditDocModal] = useState<DriveDocument | null>(null)
   const [editDocTitle, setEditDocTitle] = useState('')
   const [editDocDescription, setEditDocDescription] = useState('')
-  const [editDocRole, setEditDocRole] = useState('')
   const [editDocLoading, setEditDocLoading] = useState(false)
   const [editDocError, setEditDocError] = useState<string | null>(null)
 
@@ -150,7 +148,7 @@ export default function DocumentsAdminPage() {
     const clientId = process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID
 
     if (!apiKey || !clientId || !gapiReady || !gisReady) {
-      setAddDocForm({ folderId, source: 'drive', title: '', drive_url: '', drive_file_id: '', description: '', required_role: '', file: null })
+      setAddDocForm({ folderId, source: 'drive', title: '', drive_url: '', drive_file_id: '', description: '', file: null })
       return
     }
 
@@ -166,7 +164,7 @@ export default function DocumentsAdminPage() {
             if (data.action === window.google.picker.Action.PICKED) {
               const file = data.docs[0]
               setAddDocForm(prev => ({
-                ...(prev ?? { folderId, source: 'drive', description: '', required_role: '', file: null }),
+                ...(prev ?? { folderId, source: 'drive', description: '', file: null }),
                 title: file.name ?? '',
                 drive_url: file.url ?? '',
                 drive_file_id: file.id ?? '',
@@ -298,8 +296,6 @@ export default function DocumentsAdminPage() {
     setAddDocLoading(true)
     setAddDocError(null)
 
-    const roleValue = addDocForm.required_role || null
-
     if (addDocForm.source === 'upload') {
       if (!addDocForm.file) { setAddDocError('Please select a file.'); setAddDocLoading(false); return }
       const form = new FormData()
@@ -307,7 +303,6 @@ export default function DocumentsAdminPage() {
       form.append('title', addDocForm.title.trim())
       form.append('folder_id', addDocForm.folderId)
       if (addDocForm.description.trim()) form.append('description', addDocForm.description.trim())
-      if (roleValue) form.append('required_role', roleValue)
       const res = await fetch('/api/admin/documents/upload', { method: 'POST', body: form })
       if (!res.ok) {
         const d = await res.json().catch(() => ({}))
@@ -328,7 +323,6 @@ export default function DocumentsAdminPage() {
           description: addDocForm.description.trim() || null,
           folder_id: addDocForm.folderId,
           sort_order: folder?.documents.length ?? 0,
-          required_role: roleValue,
         }),
       })
       if (!res.ok) {
@@ -354,7 +348,6 @@ export default function DocumentsAdminPage() {
     setEditDocModal(doc)
     setEditDocTitle(doc.title)
     setEditDocDescription(doc.description ?? '')
-    setEditDocRole(doc.required_role ?? '')
     setEditDocError(null)
   }
 
@@ -368,7 +361,6 @@ export default function DocumentsAdminPage() {
       body: JSON.stringify({
         title: editDocTitle.trim(),
         description: editDocDescription.trim() || null,
-        required_role: editDocRole || null,
         drive_url: editDocModal.drive_url,
         drive_file_id: editDocModal.drive_file_id,
         storage_bucket: editDocModal.storage_bucket,
@@ -502,6 +494,10 @@ export default function DocumentsAdminPage() {
         .da-access-via { font-size: 0.68rem; color: #9ca3af; }
         .da-access-via.owner { color: #7c3aed; font-weight: 600; }
         .da-access-via.department { color: #059669; font-weight: 500; }
+        .da-perm-state-banner { display: flex; align-items: flex-start; gap: 0.5rem; padding: 0.55rem 0.75rem; border-radius: 8px; font-size: 0.8rem; margin-bottom: 1rem; }
+        .da-perm-state-banner.open { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
+        .da-perm-state-banner.restricted { background: #fef9ec; color: #92400e; border: 1px solid #fde68a; }
+        .da-perm-state-banner strong { font-weight: 600; }
       `}</style>
 
       <div className="da-page">
@@ -593,7 +589,7 @@ export default function DocumentsAdminPage() {
                           onDelete={() => deleteFolder(folder.id, folder.name)}
                           onAddDoc={() => {
                             setAddDocError(null)
-                            setAddDocForm({ folderId: folder.id, source: 'drive', title: '', drive_url: '', drive_file_id: '', description: '', required_role: '', file: null })
+                            setAddDocForm({ folderId: folder.id, source: 'drive', title: '', drive_url: '', drive_file_id: '', description: '', file: null })
                           }}
                           onEditDoc={openEditDoc}
                           onDeleteDoc={deleteDoc}
@@ -663,14 +659,6 @@ export default function DocumentsAdminPage() {
               <input value={editDocDescription} onChange={e => setEditDocDescription(e.target.value)} placeholder="Brief description" />
             </div>
 
-            <div className="da-field">
-              <label>Access restriction <span style={{ color: '#9ca3af', fontWeight: 400 }}>(optional, legacy)</span></label>
-              <select value={editDocRole} onChange={e => setEditDocRole(e.target.value)}>
-                <option value="">Open to all</option>
-                {allRoles.map(r => <option key={r.id} value={r.name}>{r.label}</option>)}
-              </select>
-            </div>
-
             {editDocError && <p className="da-error">{editDocError}</p>}
 
             <div className="da-modal-actions">
@@ -731,7 +719,7 @@ export default function DocumentsAdminPage() {
 
             {addDocError && <p className="da-error">{addDocError}</p>}
 
-            <p className="da-picker-hint" style={{ margin: '0 0 0.5rem' }}>After saving, use the lock icon to set who can access this document.</p>
+            <p className="da-picker-hint" style={{ margin: '0 0 0.5rem' }}>Documents are open to all users by default. Use the lock icon to restrict access.</p>
 
             <div className="da-modal-actions">
               {addDocForm.source === 'drive' && gapiReady && gisReady && process.env.NEXT_PUBLIC_GOOGLE_CLIENT_ID && (
@@ -775,6 +763,19 @@ export default function DocumentsAdminPage() {
               <p className="da-readonly-notice">
                 Only the document owner can change permissions. You can view but not edit.
               </p>
+            )}
+
+            {/* Access state banner */}
+            {permDeptGrants.length === 0 && permUserGrants.length === 0 ? (
+              <div className="da-perm-state-banner open">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3.055 11H5a2 2 0 012 2v1a2 2 0 002 2 2 2 0 012 2v2.945M8 3.935V5.5A2.5 2.5 0 0010.5 8h.5a2 2 0 012 2 2 2 0 104 0 2 2 0 012-2h1.064M15 20.488V18a2 2 0 012-2h3.064" /></svg>
+                <span><strong>Open to all</strong> — all authenticated users can access this document. Add grants below to restrict access.</span>
+              </div>
+            ) : (
+              <div className="da-perm-state-banner restricted">
+                <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                <span><strong>Restricted</strong> — only the owner and users/departments below can access this document.</span>
+              </div>
             )}
 
             {/* Owner */}
@@ -879,8 +880,10 @@ export default function DocumentsAdminPage() {
                   {accessSummaryLoading ? (
                     <p style={{ fontSize: '0.78rem', color: '#9ca3af' }}>Resolving access…</p>
                   ) : accessSummary ? (
-                    accessSummary.resolved_users.length === 0 ? (
-                      <p style={{ fontSize: '0.78rem', color: '#9ca3af' }}>No one has access yet. Set an owner or add a grant above.</p>
+                    accessSummary.open_to_all ? (
+                      <p style={{ fontSize: '0.78rem', color: '#059669' }}>All authenticated users can access this document (no restrictions set).</p>
+                    ) : accessSummary.resolved_users.length === 0 ? (
+                      <p style={{ fontSize: '0.78rem', color: '#9ca3af' }}>No one has access yet.</p>
                     ) : (
                       accessSummary.resolved_users.map(u => (
                         <div key={u.id} className="da-access-user-row">
@@ -1007,11 +1010,10 @@ function FolderEditor({
 }
 
 function permBadgeText(entry: PermSummaryEntry | undefined): { text: string; cls: string } {
-  if (!entry) return { text: 'Open (legacy)', cls: '' }
-  const { depts, userCount, ownerId } = entry
+  if (!entry) return { text: 'Open to all', cls: '' }
+  const { depts, userCount } = entry
   const hasGrants = depts.length > 0 || userCount > 0
-  if (!hasGrants && !ownerId) return { text: 'Open (legacy)', cls: '' }
-  if (!hasGrants && ownerId) return { text: 'Owner only', cls: 'owner-only' }
+  if (!hasGrants) return { text: 'Open to all', cls: '' }
   const parts: string[] = []
   if (depts.length > 0) parts.push(depts.join(', '))
   if (userCount > 0) parts.push(`${userCount} user${userCount !== 1 ? 's' : ''}`)

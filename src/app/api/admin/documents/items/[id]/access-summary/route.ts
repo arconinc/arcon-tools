@@ -53,6 +53,14 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const departmentGrants = perms.map(p => p.department).filter((d): d is string => !!d)
   const userGrantIds = new Set(perms.map(p => p.user_id).filter((u): u is string => !!u))
 
+  const open_to_all = departmentGrants.length === 0 && userGrantIds.size === 0
+
+  // When open to all, just return the owner — the UI will show an "all users" banner.
+  if (open_to_all) {
+    const resolved_users = owner ? [{ ...owner, via: 'owner' as const }] : []
+    return NextResponse.json({ owner, open_to_all: true, resolved_users })
+  }
+
   // Deduplicate by user ID, tracking how access was granted
   const seen = new Map<string, { id: string; display_name: string; email: string; via: 'owner' | 'department' | 'individual' }>()
 
@@ -83,5 +91,5 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return order[a.via] - order[b.via] || a.display_name.localeCompare(b.display_name)
   })
 
-  return NextResponse.json({ owner, resolved_users })
+  return NextResponse.json({ owner, open_to_all: false, resolved_users })
 }

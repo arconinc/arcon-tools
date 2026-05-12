@@ -92,6 +92,7 @@ function buildNavSections(isAdmin: boolean, roles: string[]): NavSection[] {
       label: 'Aturian',
       items: [
         { href: 'https://arcon.erp.network/', label: 'Login', icon: LoginIcon },
+        { href: '/marketing/customers/new', label: 'Add Customer', icon: CrmCustomersIcon },
       ],
     },
     {
@@ -102,6 +103,7 @@ function buildNavSections(isAdmin: boolean, roles: string[]): NavSection[] {
         { href: '/marketing/vendors', label: 'Vendors', icon: BuildingIcon, adminMatch: true },
         { href: '/marketing/contacts', label: 'Contacts', icon: CrmContactsIcon, adminMatch: true },
         { href: '/marketing/opportunities', label: 'Opportunities', icon: CrmOppsIcon, adminMatch: true },
+        { href: '/documents/marketing', label: 'Documents', icon: DocumentIcon, adminMatch: true },
         { href: '/marketing/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
       ],
     },
@@ -121,15 +123,17 @@ function buildNavSections(isAdmin: boolean, roles: string[]): NavSection[] {
     {
       label: 'HR',
       items: [
+        { href: '/documents/hr', label: 'Documents', icon: DocumentIcon, adminMatch: true },
         { href: '/hr/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
       ],
     },
-    ...(isAdmin ? [{
+    {
       label: 'Accounting',
       items: [
+        { href: '/documents/accounting', label: 'Documents', icon: DocumentIcon, adminMatch: true },
         { href: '/accounting/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
       ],
-    }] : []),
+    },
     {
       label: 'Technology',
       items: [

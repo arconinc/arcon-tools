@@ -18,9 +18,10 @@ export function canAccessDocument(
   // Owner always has access
   if (ctx.ownerId === user.id) return true
 
-  // If no explicit permissions have ever been configured, treat as open (backward compat)
+  // If no grants have been configured, treat as open to all authenticated users.
+  // Having an owner_id alone does not restrict access — the owner check above already
+  // handles owner access; we only restrict when explicit grants are present.
   const hasExplicit =
-    ctx.ownerId !== null ||
     ctx.departmentGrants.length > 0 ||
     ctx.userGrants.length > 0 ||
     ctx.requiredRole !== null

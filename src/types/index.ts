@@ -455,6 +455,7 @@ export interface DocumentPermissionUser {
 
 export interface DocumentAccessSummary {
   owner: { id: string; display_name: string; email: string } | null
+  open_to_all: boolean
   resolved_users: {
     id: string
     display_name: string
