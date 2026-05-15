@@ -29,17 +29,40 @@ function promoHeaders(authHeader: string): HeadersInit {
 
 // ─── Orders ──────────────────────────────────────────────────────────────────
 
-export async function listOrders(
+async function fetchOrdersPage(
   storeId: string,
   authHeader: string,
-  page = 0
+  page: number,
+  createdFrom?: string
 ): Promise<PromoOrdersResponse> {
-  const url = `${BASE_URL}/admin/rest2/1/stores/${storeId}/orders?meta[pageSize]=100&meta[page]=${page}`
+  let url = `${BASE_URL}/admin/rest2/1/stores/${storeId}/orders?meta[pageSize]=100&meta[page]=${page}`
+  if (createdFrom) url += `&createdFrom=${createdFrom}`
   const res = await fetchWithTimeout(url, { headers: promoHeaders(authHeader) })
   if (!res.ok) {
     throw new Error(`PromoBullit API error ${res.status}: ${await res.text()}`)
   }
   return res.json()
+}
+
+export async function listOrders(
+  storeId: string,
+  authHeader: string,
+  opts: { createdFrom?: string } = {}
+): Promise<import('@/types').PromoOrder[]> {
+  const first = await fetchOrdersPage(storeId, authHeader, 0, opts.createdFrom)
+  const total = parseInt(first.meta.recordsFound, 10)
+  const pageSize = parseInt(first.meta.pageSize, 10)
+  const all = [...first.records]
+
+  if (total > pageSize) {
+    const pageCount = Math.ceil(total / pageSize)
+    for (let p = 1; p < pageCount; p++) {
+      const page = await fetchOrdersPage(storeId, authHeader, p, opts.createdFrom)
+      all.push(...page.records)
+    }
+  }
+
+  return all
 }
 
 export async function getOrderDetail(
@@ -105,6 +128,58 @@ export async function sendNotificationEmail(
   if (!res.ok) {
     throw new Error(`PromoBullit API error ${res.status}: ${await res.text()}`)
   }
+}
+
+// ─── Stores ──────────────────────────────────────────────────────────────────
+
+export interface UducatStore {
+  id: string
+  name: string
+  domain: string | null
+  startDate: string | null
+  endDate: string | null
+  isActive: boolean
+  isInProduction: boolean
+  created: string | null
+  lastOrder: string | null
+}
+
+interface StoresPage {
+  records: UducatStore[]
+  meta: { recordsFound: string; page: string; pageSize: string }
+}
+
+function storesHeaders(authHeader: string): HeadersInit {
+  return {
+    'Authorization': `Basic ${authHeader}`,
+    'Accept': 'application/json',
+  }
+}
+
+async function fetchStoresPage(authHeader: string, page: number): Promise<StoresPage> {
+  const url = `${BASE_URL}/admin/rest2/1/stores?storeStatus=all&meta%5BpageSize%5D=100&meta%5Bpage%5D=${page}`
+  const res = await fetchWithTimeout(url, { headers: storesHeaders(authHeader) })
+  if (!res.ok) {
+    throw new Error(`PromoBullit API error ${res.status}: ${await res.text()}`)
+  }
+  return res.json()
+}
+
+export async function listStores(authHeader: string): Promise<UducatStore[]> {
+  const first = await fetchStoresPage(authHeader, 0)
+  const total = parseInt(first.meta.recordsFound, 10)
+  const pageSize = parseInt(first.meta.pageSize, 10)
+  const all = [...first.records]
+
+  if (total > pageSize) {
+    const pageCount = Math.ceil(total / pageSize)
+    for (let p = 1; p < pageCount; p++) {
+      const page = await fetchStoresPage(authHeader, p)
+      all.push(...page.records)
+    }
+  }
+
+  return all
 }
 
 // ─── Credential Validation ────────────────────────────────────────────────────

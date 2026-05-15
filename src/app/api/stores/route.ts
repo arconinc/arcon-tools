@@ -2,17 +2,23 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 
-export async function GET() {
+export async function GET(request: Request) {
   const supabase = await createClient()
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
+  const { searchParams } = new URL(request.url)
+  const showAll = searchParams.get('all') === 'true'
+
   const adminClient = createAdminClient()
-  const { data, error } = await adminClient
+  let query = adminClient
     .from('stores')
     .select('*, store_assignments(role, user:users(display_name))')
-    .eq('is_active', true)
     .order('store_name')
+
+  if (!showAll) query = query.eq('is_active', true)
+
+  const { data, error } = await query
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 

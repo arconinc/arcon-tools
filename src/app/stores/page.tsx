@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Store } from '@/types'
+import { useAppUser } from '@/components/layout/AppShell'
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
@@ -757,22 +758,49 @@ function StoreTable({
 // ── Main page ─────────────────────────────────────────────────────────────────
 
 export default function StoresDashboardPage() {
+  const { user } = useAppUser()
   const [stores, setStores]   = useState<Store[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError]     = useState<string | null>(null)
   const [search, setSearch]   = useState('')
   const [filter, setFilter]   = useState<'all' | 'production' | 'launching' | 'closing'>('all')
+  const [syncing, setSyncing] = useState(false)
+  const [syncMsg, setSyncMsg] = useState<{ text: string; ok: boolean } | null>(null)
+  const [showAll, setShowAll] = useState(false)
 
-  const load = useCallback(async () => {
+  const load = useCallback(async (all = false) => {
     setLoading(true)
-    const res  = await fetch('/api/stores')
+    const res  = await fetch(all ? '/api/stores?all=true' : '/api/stores')
     const data = await res.json()
     setLoading(false)
     if (Array.isArray(data)) setStores(data)
     else setError(data.error ?? 'Failed to load stores')
   }, [])
 
-  useEffect(() => { load() }, [load])
+  useEffect(() => { load(showAll) }, [load, showAll])
+
+  async function handleSync() {
+    setSyncing(true)
+    setSyncMsg(null)
+    try {
+      const res = await fetch('/api/admin/stores/sync', { method: 'POST' })
+      const data = await res.json()
+      if (!res.ok) {
+        setSyncMsg({ text: data.error ?? 'Sync failed', ok: false })
+      } else {
+        const parts: string[] = []
+        if (data.added > 0) parts.push(`${data.added} added`)
+        if (data.updated > 0) parts.push(`${data.updated} updated`)
+        const msg = parts.length === 0 ? 'Already up to date.' : parts.join(', ') + '.'
+        setSyncMsg({ text: msg, ok: true })
+        if (data.added > 0 || data.updated > 0) load(showAll)
+      }
+    } catch {
+      setSyncMsg({ text: 'Network error during sync.', ok: false })
+    } finally {
+      setSyncing(false)
+    }
+  }
 
   const stats = useMemo(() => ({
     active:    stores.filter(s => s.is_active).length,
@@ -797,6 +825,42 @@ export default function StoresDashboardPage() {
           <div>
             <h1 className="text-2xl font-bold text-slate-900">Stores</h1>
             <p className="text-sm text-slate-500 mt-0.5">{stores.length} stores</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              onClick={() => setShowAll(v => !v)}
+              className={`flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium border rounded-xl transition-colors ${
+                showAll
+                  ? 'bg-purple-600 border-purple-600 text-white hover:bg-purple-700'
+                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
+              }`}
+            >
+              {showAll ? 'All stores' : 'Active only'}
+            </button>
+          {user?.is_admin && (
+            <div className="flex items-center gap-3">
+              {syncMsg && (
+                <span className={`text-xs font-medium px-3 py-1.5 rounded-full ${syncMsg.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                  {syncMsg.text}
+                </span>
+              )}
+              <button
+                onClick={handleSync}
+                disabled={syncing}
+                className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium border border-slate-200 rounded-xl text-slate-600 bg-white hover:bg-slate-50 hover:border-slate-300 transition-colors disabled:opacity-50"
+                title="Sync stores from Uducat"
+              >
+                <svg
+                  className={`w-4 h-4 ${syncing ? 'animate-spin' : ''}`}
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                </svg>
+                {syncing ? 'Syncing…' : 'Refresh'}
+              </button>
+            </div>
+          )}
           </div>
         </div>
 
