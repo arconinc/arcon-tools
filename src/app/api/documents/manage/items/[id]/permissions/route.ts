@@ -1,30 +1,17 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getSectionContextForItem } from '@/lib/auth/section-manager'
 
-async function getAdminUser() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-  const adminClient = createAdminClient()
-  const { data: appUser } = await adminClient
-    .from('users')
-    .select('id, is_admin')
-    .eq('google_id', user.id)
-    .single()
-  return appUser?.is_admin ? appUser : null
-}
-
-// GET /api/admin/documents/items/[id]/permissions
-// Returns the owner, all permission grants (with resolved user info), and whether
-// the current admin is the owner (canEdit).
+// GET /api/documents/manage/items/[id]/permissions
+// Returns owner, all grants, and canEdit flag.
+// Section managers can always edit permissions (not restricted to owner).
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const admin = await getAdminUser()
-  if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
   const { id: docId } = await params
-  const adminClient = createAdminClient()
+  const ctx = await getSectionContextForItem(docId)
+  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!ctx.canManage) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
+  const adminClient = createAdminClient()
   const [docResult, permsResult] = await Promise.all([
     adminClient
       .from('documents')
@@ -55,42 +42,33 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     user: p.users ?? null,
   }))
 
-  return NextResponse.json({
-    owner,
-    permissions,
-    canEdit: doc.owner_id === admin.id,
-  })
+  // Section managers can always edit — not restricted to document owner
+  return NextResponse.json({ owner, permissions, canEdit: true })
 }
 
-// PUT /api/admin/documents/items/[id]/permissions
-// Atomically replaces all permission grants for the document.
-// Only the document owner may call this.
-// Body: { role_grants: string[], user_grants: string[] }
+// PUT /api/documents/manage/items/[id]/permissions
+// Atomically replaces all grants. Any section manager can do this.
 export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const admin = await getAdminUser()
-  if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
   const { id: docId } = await params
+  const ctx = await getSectionContextForItem(docId)
+  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!ctx.canManage) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
+  const { role_grants, user_grants } = await req.json() as {
+    role_grants: string[]
+    user_grants: string[]
+  }
+
   const adminClient = createAdminClient()
 
-  // Verify ownership
   const { data: doc } = await adminClient
     .from('documents')
-    .select('owner_id')
+    .select('id')
     .eq('id', docId)
     .single()
 
   if (!doc) return NextResponse.json({ error: 'Document not found' }, { status: 404 })
-  if (doc.owner_id !== admin.id) {
-    return NextResponse.json({ error: 'Only the document owner can change permissions' }, { status: 403 })
-  }
 
-  const { role_grants, user_grants } = await req.json() as {
-    role_grants: string[]   // role IDs
-    user_grants: string[]   // user IDs
-  }
-
-  // Atomic replace: delete all existing grants, then insert new set
   const { error: deleteError } = await adminClient
     .from('document_permissions')
     .delete()
@@ -99,15 +77,12 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 })
 
   const newGrants = [
-    ...(role_grants ?? []).map(r => ({ document_id: docId, role_id: r, user_id: null, granted_by: admin.id })),
-    ...(user_grants ?? []).map(u => ({ document_id: docId, role_id: null, user_id: u, granted_by: admin.id })),
+    ...(role_grants ?? []).map(r => ({ document_id: docId, role_id: r, user_id: null, granted_by: ctx.user.id })),
+    ...(user_grants ?? []).map(u => ({ document_id: docId, role_id: null, user_id: u, granted_by: ctx.user.id })),
   ]
 
   if (newGrants.length > 0) {
-    const { error: insertError } = await adminClient
-      .from('document_permissions')
-      .insert(newGrants)
-
+    const { error: insertError } = await adminClient.from('document_permissions').insert(newGrants)
     if (insertError) return NextResponse.json({ error: insertError.message }, { status: 500 })
   }
 

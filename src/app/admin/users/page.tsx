@@ -8,7 +8,6 @@ import { DEPARTMENTS, DEPARTMENT_DISPLAY_NAMES } from '@/lib/task-constants'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
-// Handles both MM-DD (birth_date) and YYYY-MM-DD (start_date)
 function formatDate(val: string | null): string {
   if (!val) return '—'
   const parts = val.split('-')
@@ -19,6 +18,11 @@ function formatDate(val: string | null): string {
   return `${MONTHS[m - 1]} ${d}`
 }
 
+function formatLastLogin(val: string | null): string {
+  if (!val) return '—'
+  return new Date(val).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
+}
+
 const EMPTY_FORM = { display_name: '', email: '', birth_date: '', start_date: '', is_admin: false }
 
 function sortUsersByLastName(a: AppUser, b: AppUser) {
@@ -27,9 +31,10 @@ function sortUsersByLastName(a: AppUser, b: AppUser) {
     const lastName = nameParts.at(-1) ?? user.email
     return `${lastName} ${user.display_name} ${user.email}`.toLocaleLowerCase()
   }
-
   return getSortName(a).localeCompare(getSortName(b))
 }
+
+const COL_COUNT = 8
 
 export default function AdminUsersPage() {
   const [users, setUsers] = useState<AppUser[]>([])
@@ -38,31 +43,24 @@ export default function AdminUsersPage() {
   const [showDeactivated, setShowDeactivated] = useState(false)
   const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null)
 
-  // Add user form
   const [showAdd, setShowAdd] = useState(false)
   const [addForm, setAddForm] = useState(EMPTY_FORM)
   const [adding, setAdding] = useState(false)
   const [addError, setAddError] = useState<string | null>(null)
 
-  // Inline edit per user
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editForm, setEditForm] = useState({ display_name: '', birth_date: '', start_date: '', departments: [] as string[] })
   const [saving, setSaving] = useState(false)
 
-  // Admin toggle
   const [togglingId, setTogglingId] = useState<string | null>(null)
-
-  // Deactivate/reactivate
   const [deactivatingId, setDeactivatingId] = useState<string | null>(null)
-
-  // Impersonation
   const [impersonatingId, setImpersonatingId] = useState<string | null>(null)
 
-  // Role management
   const [allRoles, setAllRoles] = useState<{ id: string; name: string; label: string; color: string }[]>([])
   const [roleManagingId, setRoleManagingId] = useState<string | null>(null)
   const [pendingRoleIds, setPendingRoleIds] = useState<string[]>([])
   const [savingRoles, setSavingRoles] = useState(false)
+
   useEffect(() => {
     fetch('/api/admin/roles').then(r => r.json()).then(data => setAllRoles(Array.isArray(data) ? data : []))
   }, [])
@@ -103,20 +101,17 @@ export default function AdminUsersPage() {
     }
   }
 
-  // Sync Google photos
   const [syncing, setSyncing] = useState(false)
   const [syncResult, setSyncResult] = useState<string | null>(null)
   const syncRan = useRef(false)
   const router = useRouter()
   const supabase = createClient()
 
-  // After returning from Google OAuth re-auth, auto-trigger the Directory sync
   useEffect(() => {
     const params = new URLSearchParams(window.location.search)
     if (params.get('google_sync') !== '1') return
     if (syncRan.current) return
     syncRan.current = true
-    // Remove the query param from the URL without re-render
     router.replace('/admin/users', { scroll: false })
     syncFromGoogle()
   // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -132,7 +127,6 @@ export default function AdminUsersPage() {
       setSyncResult(data.message ?? 'Done')
       loadUsers()
     } else if (res.status === 400 || res.status === 401) {
-      // No valid directory token — trigger Google re-auth with the required scope
       setSyncResult(null)
       await supabase.auth.signInWithOAuth({
         provider: 'google',
@@ -186,7 +180,6 @@ export default function AdminUsersPage() {
   }
 
   function startEdit(user: AppUser) {
-    const scrollPos = window.scrollY
     setOpenActionMenuId(null)
     setEditingId(user.id)
     setEditForm({
@@ -195,7 +188,6 @@ export default function AdminUsersPage() {
       start_date: user.start_date ?? '',
       departments: user.department ?? [],
     })
-    window.scrollTo(0, scrollPos)
   }
 
   async function saveEdit(userId: string) {
@@ -242,293 +234,336 @@ export default function AdminUsersPage() {
     }
   }
 
-  function UserRow({ user, isDeactivated = false }: { user: AppUser; isDeactivated?: boolean }) {
+  function UserRows({ user, isDeactivated = false }: { user: AppUser; isDeactivated?: boolean }) {
     const isMenuOpen = openActionMenuId === user.id
     const departmentLabels = user.department?.map((d) => DEPARTMENT_DISPLAY_NAMES[d as keyof typeof DEPARTMENT_DISPLAY_NAMES] ?? d) ?? []
     const imageUrl = user.profile_image_url || user.avatar_url
+    const isEditing = editingId === user.id
+    const isManagingRoles = roleManagingId === user.id
+
+    const avatar = imageUrl ? (
+      <img
+        src={imageUrl}
+        alt={user.display_name}
+        referrerPolicy="no-referrer"
+        className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+      />
+    ) : (
+      <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-xs font-bold text-purple-800 flex-shrink-0">
+        {user.display_name.split(' ').filter(Boolean).slice(0, 2).map((w: string) => w[0]).join('').toUpperCase()}
+      </div>
+    )
 
     return (
-      <div key={user.id} className={`px-5 py-4 ${isDeactivated ? 'opacity-50' : ''}`}>
-        {editingId === user.id ? (
-          /* ── Inline edit mode ── */
-          <div>
-            <div className="grid grid-cols-2 gap-3 mb-3">
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Display name</label>
-                <input
-                  value={editForm.display_name}
-                  onChange={(e) => setEditForm((f) => ({ ...f, display_name: e.target.value }))}
-                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-purple-400"
-                />
+      <>
+        {isEditing ? (
+          <tr className="bg-purple-50">
+            <td colSpan={COL_COUNT} className="px-4 py-4">
+              <div className="flex items-center gap-2 mb-3">
+                {avatar}
+                <span className="text-sm font-medium text-slate-700">{user.display_name}</span>
+                <span className="text-xs text-slate-400">{user.email}</span>
               </div>
-              <div className="text-xs text-slate-400 pt-5">{user.email}</div>
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Birth date</label>
-                <input
-                  type="text"
-                  value={editForm.birth_date}
-                  onChange={(e) => setEditForm((f) => ({ ...f, birth_date: e.target.value }))}
-                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-purple-400"
-                  placeholder="MM-DD"
-                  pattern="\d{2}-\d{2}"
-                />
-              </div>
-              <div>
-                <label className="block text-xs text-slate-500 mb-1">Start date</label>
-                <input
-                  type="date"
-                  value={editForm.start_date}
-                  onChange={(e) => setEditForm((f) => ({ ...f, start_date: e.target.value }))}
-                  className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-purple-400"
-                />
-              </div>
-              <div className="col-span-2">
-                <label className="block text-xs text-slate-500 mb-1">Departments</label>
-                <div className="flex flex-wrap gap-x-4 gap-y-1.5 pt-0.5">
-                  {DEPARTMENTS.map((d) => (
-                    <label key={d} className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
-                      <input
-                        type="checkbox"
-                        checked={editForm.departments.includes(d)}
-                        onChange={(e) => {
-                          const scrollPos = window.scrollY
-                          setEditForm((f) => ({
-                            ...f,
-                            departments: e.target.checked
-                              ? [...f.departments, d]
-                              : f.departments.filter((x) => x !== d),
-                          }))
-                          window.scrollTo(0, scrollPos)
-                        }}
-                        className="accent-purple-600"
-                      />
-                      {DEPARTMENT_DISPLAY_NAMES[d]}
-                    </label>
-                  ))}
+              <div className="grid grid-cols-2 gap-3 mb-3 max-w-2xl">
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Display name</label>
+                  <input
+                    value={editForm.display_name}
+                    onChange={(e) => setEditForm((f) => ({ ...f, display_name: e.target.value }))}
+                    className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-purple-400 bg-white"
+                  />
                 </div>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => saveEdit(user.id)}
-                disabled={saving}
-                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 transition-colors"
-              >
-                {saving ? 'Saving…' : 'Save'}
-              </button>
-              <button
-                onClick={() => setEditingId(null)}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
-        ) : (
-          /* ── Read mode ── */
-          <div className="flex items-start justify-between gap-4">
-            <div className="flex items-start gap-3 min-w-0">
-              {imageUrl ? (
-                <img
-                  src={imageUrl}
-                  alt={user.display_name}
-                  referrerPolicy="no-referrer"
-                  style={{ width: 36, height: 36, borderRadius: '50%', objectFit: 'cover', flexShrink: 0, marginTop: 2 }}
-                />
-              ) : (
-                <div style={{ width: 36, height: 36, borderRadius: '50%', background: '#ede9fe', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 13, fontWeight: 700, color: '#6b1e98', flexShrink: 0, marginTop: 2 }}>
-                  {user.display_name.split(' ').filter(Boolean).slice(0, 2).map((w: string) => w[0]).join('').toUpperCase()}
+                <div />
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Birth date</label>
+                  <input
+                    type="text"
+                    value={editForm.birth_date}
+                    onChange={(e) => setEditForm((f) => ({ ...f, birth_date: e.target.value }))}
+                    className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-purple-400 bg-white"
+                    placeholder="MM-DD"
+                    pattern="\d{2}-\d{2}"
+                  />
                 </div>
-              )}
-              <div className="min-w-0">
-                <div className="flex items-center gap-2 flex-wrap">
-                  <p className="font-medium text-slate-800">{user.display_name}</p>
-                  {user.is_admin && (
-                    <span className="text-xs font-medium bg-purple-100 text-purple-700 px-2 py-0.5 rounded-full">Admin</span>
-                  )}
-                  {isDeactivated ? (
-                    <span className="text-xs font-medium bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">Deactivated</span>
-                  ) : user.google_id ? (
-                    <span className="text-xs font-medium bg-green-100 text-green-700 px-2 py-0.5 rounded-full">Linked</span>
-                  ) : (
-                    <span className="text-xs font-medium bg-slate-100 text-slate-500 px-2 py-0.5 rounded-full">Pending</span>
-                  )}
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Start date</label>
+                  <input
+                    type="date"
+                    value={editForm.start_date}
+                    onChange={(e) => setEditForm((f) => ({ ...f, start_date: e.target.value }))}
+                    className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-purple-400 bg-white"
+                  />
                 </div>
-                <p className="text-xs text-slate-400 mt-0.5">{user.email}</p>
-                <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-                  <span className="text-xs font-medium text-slate-400">Departments:</span>
-                  {departmentLabels.length > 0 ? (
-                    departmentLabels.map((label) => (
-                      <span key={label} className="text-xs font-medium bg-blue-100 text-blue-700 px-2 py-0.5 rounded-full">{label}</span>
-                    ))
-                  ) : (
-                    <span className="text-xs text-slate-300">None assigned</span>
-                  )}
-                </div>
-                {isDeactivated && user.deactivated_at && (
-                  <p className="text-xs text-slate-300 mt-0.5">
-                    Deactivated: {new Date(user.deactivated_at).toLocaleString()}
-                  </p>
-                )}
-                {!isDeactivated && (
-                  <div className="flex gap-4 mt-1">
-                    <p className="text-xs text-slate-300">🎂 {formatDate(user.birth_date)}</p>
-                    <p className="text-xs text-slate-300">🏢 Started {formatDate(user.start_date)}</p>
-                  </div>
-                )}
-                {!isDeactivated && user.last_login_at && (
-                  <p className="text-xs text-slate-300 mt-0.5">
-                    Last login: {new Date(user.last_login_at).toLocaleString()}
-                  </p>
-                )}
-                {/* Roles */}
-                <div className="mt-1.5 flex items-center gap-1.5 flex-wrap">
-                  <span className="text-xs font-medium text-slate-400">Roles:</span>
-                  {(user.roles ?? []).length > 0 ? (
-                    (user.roles ?? []).map((roleName: string) => {
-                      const role = allRoles.find(r => r.name === roleName)
-                      return (
-                        <span key={roleName} className="text-xs font-medium px-2 py-0.5 rounded-full"
-                          style={{ background: (role?.color ?? '#6b7280') + '22', color: role?.color ?? '#6b7280' }}>
-                          {role?.label ?? roleName}
-                        </span>
-                      )
-                    })
-                  ) : (
-                    <span className="text-xs text-slate-300">None assigned</span>
-                  )}
-                </div>
-              </div>
-            </div>
-            <div className="relative flex-shrink-0">
-              <button
-                type="button"
-                onClick={() => setOpenActionMenuId((id) => id === user.id ? null : user.id)}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 transition-colors flex items-center gap-1.5"
-                aria-haspopup="menu"
-                aria-expanded={isMenuOpen}
-              >
-                Actions
-                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                  <path d="M6 9l6 6 6-6" />
-                </svg>
-              </button>
-              {isMenuOpen && (
-                <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg" role="menu">
-                  {isDeactivated ? (
-                    <button
-                      type="button"
-                      onClick={() => toggleDeactivate(user)}
-                      disabled={deactivatingId === user.id}
-                      className="block w-full px-3 py-2 text-left text-xs font-medium text-green-700 hover:bg-green-50 disabled:opacity-50"
-                      role="menuitem"
-                    >
-                      {deactivatingId === user.id ? 'Reactivating…' : 'Reactivate'}
-                    </button>
-                  ) : (
-                    <>
-                      <button
-                        type="button"
-                        onClick={() => startEdit(user)}
-                        className="block w-full px-3 py-2 text-left text-xs font-medium text-slate-600 hover:bg-slate-50"
-                        role="menuitem"
-                      >
-                        Edit
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => openRoleManager(user.id)}
-                        className="block w-full px-3 py-2 text-left text-xs font-medium text-indigo-700 hover:bg-indigo-50"
-                        role="menuitem"
-                      >
-                        Manage Roles
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => toggleAdmin(user)}
-                        disabled={togglingId === user.id}
-                        className="block w-full px-3 py-2 text-left text-xs font-medium text-purple-700 hover:bg-purple-50 disabled:opacity-50"
-                        role="menuitem"
-                      >
-                        {togglingId === user.id ? 'Updating…' : user.is_admin ? 'Remove Admin' : 'Make Admin'}
-                      </button>
-                      {!user.is_admin && (
-                        <button
-                          type="button"
-                          onClick={() => {
-                            setOpenActionMenuId(null)
-                            handleImpersonate(user)
+                <div className="col-span-2">
+                  <label className="block text-xs text-slate-500 mb-1">Departments</label>
+                  <div className="flex flex-wrap gap-x-4 gap-y-1.5 pt-0.5">
+                    {DEPARTMENTS.map((d) => (
+                      <label key={d} className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+                        <input
+                          type="checkbox"
+                          checked={editForm.departments.includes(d)}
+                          onChange={(e) => {
+                            setEditForm((f) => ({
+                              ...f,
+                              departments: e.target.checked
+                                ? [...f.departments, d]
+                                : f.departments.filter((x) => x !== d),
+                            }))
                           }}
-                          disabled={impersonatingId === user.id}
-                          className="block w-full px-3 py-2 text-left text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50"
-                          role="menuitem"
-                        >
-                          {impersonatingId === user.id ? 'Starting…' : 'Impersonate'}
-                        </button>
-                      )}
+                          className="accent-purple-600"
+                        />
+                        {DEPARTMENT_DISPLAY_NAMES[d]}
+                      </label>
+                    ))}
+                  </div>
+                </div>
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => saveEdit(user.id)}
+                  disabled={saving}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 transition-colors"
+                >
+                  {saving ? 'Saving…' : 'Save'}
+                </button>
+                <button
+                  onClick={() => setEditingId(null)}
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors bg-white"
+                >
+                  Cancel
+                </button>
+              </div>
+            </td>
+          </tr>
+        ) : (
+          <tr className={`border-b border-slate-100 last:border-0 hover:bg-slate-50 transition-colors ${isDeactivated ? 'opacity-50' : ''}`}>
+            {/* Name */}
+            <td className="px-4 py-3">
+              <div className="flex items-center gap-2.5">
+                {avatar}
+                <div className="min-w-0">
+                  <p className="text-sm font-medium text-slate-800 leading-tight">{user.display_name}</p>
+                  <div className="flex items-center gap-1 mt-1 flex-wrap">
+                    {user.is_admin && (
+                      <span className="text-xs font-medium bg-purple-100 text-purple-700 px-1.5 py-0.5 rounded-full leading-none">Admin</span>
+                    )}
+                    {isDeactivated ? (
+                      <span className="text-xs font-medium bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full leading-none">Deactivated</span>
+                    ) : user.google_id ? (
+                      <span className="text-xs font-medium bg-green-100 text-green-700 px-1.5 py-0.5 rounded-full leading-none">Linked</span>
+                    ) : (
+                      <span className="text-xs font-medium bg-slate-100 text-slate-500 px-1.5 py-0.5 rounded-full leading-none">Pending</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </td>
+
+            {/* Email */}
+            <td className="px-4 py-3">
+              <span className="text-xs text-slate-500">{user.email}</span>
+            </td>
+
+            {/* Departments */}
+            <td className="px-4 py-3">
+              <div className="flex flex-wrap gap-1">
+                {departmentLabels.length > 0 ? (
+                  departmentLabels.map((label) => (
+                    <span key={label} className="text-xs font-medium bg-blue-100 text-blue-700 px-1.5 py-0.5 rounded-full leading-none">{label}</span>
+                  ))
+                ) : (
+                  <span className="text-xs text-slate-300">—</span>
+                )}
+              </div>
+            </td>
+
+            {/* Roles */}
+            <td className="px-4 py-3">
+              <div className="flex flex-wrap gap-1">
+                {(user.roles ?? []).length > 0 ? (
+                  (user.roles ?? []).map((roleName: string) => {
+                    const role = allRoles.find(r => r.name === roleName)
+                    return (
+                      <span
+                        key={roleName}
+                        className="text-xs font-medium px-1.5 py-0.5 rounded-full leading-none"
+                        style={{ background: (role?.color ?? '#6b7280') + '22', color: role?.color ?? '#6b7280' }}
+                      >
+                        {role?.label ?? roleName}
+                      </span>
+                    )
+                  })
+                ) : (
+                  <span className="text-xs text-slate-300">—</span>
+                )}
+              </div>
+            </td>
+
+            {/* Birthdate */}
+            <td className="px-4 py-3">
+              <span className="text-xs text-slate-500">{formatDate(user.birth_date)}</span>
+            </td>
+
+            {/* Anniversary */}
+            <td className="px-4 py-3">
+              <span className="text-xs text-slate-500">{formatDate(user.start_date)}</span>
+            </td>
+
+            {/* Last Login */}
+            <td className="px-4 py-3">
+              <span className="text-xs text-slate-500">{formatLastLogin(user.last_login_at ?? null)}</span>
+            </td>
+
+            {/* Actions */}
+            <td className="px-4 py-3">
+              <div className="relative flex justify-end">
+                <button
+                  type="button"
+                  onClick={() => setOpenActionMenuId((id) => id === user.id ? null : user.id)}
+                  className="px-2.5 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-100 transition-colors flex items-center gap-1"
+                  aria-haspopup="menu"
+                  aria-expanded={isMenuOpen}
+                >
+                  Actions
+                  <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                    <path d="M6 9l6 6 6-6" />
+                  </svg>
+                </button>
+                {isMenuOpen && (
+                  <div className="absolute right-0 top-full z-20 mt-1 w-44 overflow-hidden rounded-xl border border-slate-200 bg-white shadow-lg" role="menu">
+                    {isDeactivated ? (
                       <button
                         type="button"
                         onClick={() => toggleDeactivate(user)}
                         disabled={deactivatingId === user.id}
-                        className="block w-full px-3 py-2 text-left text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                        className="block w-full px-3 py-2 text-left text-xs font-medium text-green-700 hover:bg-green-50 disabled:opacity-50"
                         role="menuitem"
                       >
-                        {deactivatingId === user.id ? 'Deactivating…' : 'Deactivate'}
+                        {deactivatingId === user.id ? 'Reactivating…' : 'Reactivate'}
                       </button>
-                    </>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
+                    ) : (
+                      <>
+                        <button
+                          type="button"
+                          onClick={() => startEdit(user)}
+                          className="block w-full px-3 py-2 text-left text-xs font-medium text-slate-600 hover:bg-slate-50"
+                          role="menuitem"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => openRoleManager(user.id)}
+                          className="block w-full px-3 py-2 text-left text-xs font-medium text-indigo-700 hover:bg-indigo-50"
+                          role="menuitem"
+                        >
+                          Manage Roles
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => toggleAdmin(user)}
+                          disabled={togglingId === user.id}
+                          className="block w-full px-3 py-2 text-left text-xs font-medium text-purple-700 hover:bg-purple-50 disabled:opacity-50"
+                          role="menuitem"
+                        >
+                          {togglingId === user.id ? 'Updating…' : user.is_admin ? 'Remove Admin' : 'Make Admin'}
+                        </button>
+                        {!user.is_admin && (
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setOpenActionMenuId(null)
+                              handleImpersonate(user)
+                            }}
+                            disabled={impersonatingId === user.id}
+                            className="block w-full px-3 py-2 text-left text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                            role="menuitem"
+                          >
+                            {impersonatingId === user.id ? 'Starting…' : 'Impersonate'}
+                          </button>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => toggleDeactivate(user)}
+                          disabled={deactivatingId === user.id}
+                          className="block w-full px-3 py-2 text-left text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                          role="menuitem"
+                        >
+                          {deactivatingId === user.id ? 'Deactivating…' : 'Deactivate'}
+                        </button>
+                      </>
+                    )}
+                  </div>
+                )}
+              </div>
+            </td>
+          </tr>
         )}
-        {/* Inline role manager */}
-        {roleManagingId === user.id && (
-          <div style={{ borderTop: '1px solid #f1f5f9', marginTop: 12, paddingTop: 12 }}>
-            <p className="text-xs font-semibold text-slate-600 mb-2">Assign Roles</p>
-            <div className="flex flex-wrap gap-x-4 gap-y-1.5 mb-3">
-              {allRoles.map(role => (
-                <label key={role.id} className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
-                  <input
-                    type="checkbox"
-                    checked={pendingRoleIds.includes(role.id)}
-                    onChange={e => {
-                      setPendingRoleIds(prev =>
-                        e.target.checked ? [...prev, role.id] : prev.filter(id => id !== role.id)
-                      )
-                    }}
-                    className="accent-purple-600"
-                  />
-                  <span className="font-medium px-2 py-0.5 rounded-full text-xs"
-                    style={{ background: role.color + '22', color: role.color }}>
-                    {role.label}
-                  </span>
-                </label>
-              ))}
-            </div>
-            <div className="flex gap-2">
-              <button
-                onClick={() => saveRoles(user.id)}
-                disabled={savingRoles}
-                className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 transition-colors"
-              >
-                {savingRoles ? 'Saving…' : 'Save Roles'}
-              </button>
-              <button
-                onClick={() => setRoleManagingId(null)}
-                className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors"
-              >
-                Cancel
-              </button>
-            </div>
-          </div>
+
+        {/* Inline role manager row */}
+        {isManagingRoles && (
+          <tr className="bg-indigo-50">
+            <td colSpan={COL_COUNT} className="px-4 py-3 border-b border-slate-100">
+              <p className="text-xs font-semibold text-slate-600 mb-2">Assign Roles — {user.display_name}</p>
+              <div className="flex flex-wrap gap-x-4 gap-y-1.5 mb-3">
+                {allRoles.map(role => (
+                  <label key={role.id} className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={pendingRoleIds.includes(role.id)}
+                      onChange={e => {
+                        setPendingRoleIds(prev =>
+                          e.target.checked ? [...prev, role.id] : prev.filter(id => id !== role.id)
+                        )
+                      }}
+                      className="accent-purple-600"
+                    />
+                    <span className="font-medium px-2 py-0.5 rounded-full text-xs"
+                      style={{ background: role.color + '22', color: role.color }}>
+                      {role.label}
+                    </span>
+                  </label>
+                ))}
+              </div>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => saveRoles(user.id)}
+                  disabled={savingRoles}
+                  className="px-3 py-1.5 text-xs font-semibold rounded-lg bg-purple-600 text-white hover:bg-purple-700 disabled:opacity-50 transition-colors"
+                >
+                  {savingRoles ? 'Saving…' : 'Save Roles'}
+                </button>
+                <button
+                  onClick={() => setRoleManagingId(null)}
+                  className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 transition-colors bg-white"
+                >
+                  Cancel
+                </button>
+              </div>
+            </td>
+          </tr>
         )}
-      </div>
+      </>
     )
   }
 
+  const TableHeader = () => (
+    <thead>
+      <tr className="border-b border-slate-200 bg-slate-50">
+        <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
+        <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Email</th>
+        <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Departments</th>
+        <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Roles</th>
+        <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Birthdate</th>
+        <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Anniversary</th>
+        <th className="px-4 py-2.5 text-left text-xs font-semibold text-slate-500 uppercase tracking-wide">Last Login</th>
+        <th className="px-4 py-2.5 text-right text-xs font-semibold text-slate-500 uppercase tracking-wide">Actions</th>
+      </tr>
+    </thead>
+  )
+
   return (
-    <div className="max-w-3xl mx-auto">
+    <div className="max-w-screen-xl mx-auto">
       <div className="mb-6 flex items-start justify-between">
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Employees</h1>
@@ -563,7 +598,6 @@ export default function AdminUsersPage() {
         </div>
       )}
 
-      {/* Add user form */}
       {showAdd && (
         <form onSubmit={addUser} className="bg-white border border-purple-200 rounded-2xl p-5 mb-4">
           <p className="text-sm font-semibold text-slate-700 mb-3">Pre-load a user</p>
@@ -633,16 +667,29 @@ export default function AdminUsersPage() {
       )}
 
       {loading && (
-        <div className="bg-white border border-slate-200 rounded-2xl divide-y divide-slate-100">
-          {[1, 2, 3].map((n) => (
-            <div key={n} className="px-5 py-4 animate-pulse flex justify-between">
-              <div>
-                <div className="h-4 bg-slate-100 rounded w-40 mb-1.5" />
-                <div className="h-3 bg-slate-100 rounded w-56" />
-              </div>
-              <div className="h-8 bg-slate-100 rounded-lg w-20" />
-            </div>
-          ))}
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <table className="w-full">
+            <TableHeader />
+            <tbody>
+              {[1, 2, 3].map((n) => (
+                <tr key={n} className="border-b border-slate-100 last:border-0 animate-pulse">
+                  <td className="px-4 py-3">
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-8 h-8 bg-slate-100 rounded-full flex-shrink-0" />
+                      <div className="h-3.5 bg-slate-100 rounded w-32" />
+                    </div>
+                  </td>
+                  <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded w-44" /></td>
+                  <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded w-20" /></td>
+                  <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded w-16" /></td>
+                  <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded w-12" /></td>
+                  <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded w-12" /></td>
+                  <td className="px-4 py-3"><div className="h-3 bg-slate-100 rounded w-20" /></td>
+                  <td className="px-4 py-3"><div className="h-6 bg-slate-100 rounded-lg w-16 ml-auto" /></td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
         </div>
       )}
 
@@ -652,10 +699,15 @@ export default function AdminUsersPage() {
 
       {!loading && !error && (
         <>
-          <div className="bg-white border border-slate-200 rounded-2xl divide-y divide-slate-100">
-            {activeUsers.map((user) => (
-              <UserRow key={user.id} user={user} />
-            ))}
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden overflow-x-auto">
+            <table className="w-full min-w-[900px]">
+              <TableHeader />
+              <tbody>
+                {activeUsers.map((user) => (
+                  <UserRows key={user.id} user={user} />
+                ))}
+              </tbody>
+            </table>
           </div>
 
           {deactivatedUsers.length > 0 && (
@@ -674,10 +726,15 @@ export default function AdminUsersPage() {
                 {showDeactivated ? 'Hide' : 'Show'} deactivated ({deactivatedUsers.length})
               </button>
               {showDeactivated && (
-                <div className="bg-white border border-slate-200 rounded-2xl divide-y divide-slate-100">
-                  {deactivatedUsers.map((user) => (
-                    <UserRow key={user.id} user={user} isDeactivated />
-                  ))}
+                <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden overflow-x-auto">
+                  <table className="w-full min-w-[900px]">
+                    <TableHeader />
+                    <tbody>
+                      {deactivatedUsers.map((user) => (
+                        <UserRows key={user.id} user={user} isDeactivated />
+                      ))}
+                    </tbody>
+                  </table>
                 </div>
               )}
             </div>

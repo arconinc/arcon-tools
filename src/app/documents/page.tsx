@@ -1,13 +1,15 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import type { DocSectionWithFolders, DocFolderWithDocuments, DriveDocument } from '@/types'
+import Link from 'next/link'
+import type { DocSectionWithFolders, DriveDocument } from '@/types'
 
 export default function DocumentsPage() {
   const [sections, setSections] = useState<DocSectionWithFolders[]>([])
   const [loading, setLoading] = useState(true)
-  const [openSections, setOpenSections] = useState<Set<string>>(new Set())
-  const [openFolders, setOpenFolders] = useState<Set<string>>(new Set())
+  // Track selected folder per section: { [sectionId]: folderId }
+  const [selectedFolders, setSelectedFolders] = useState<Record<string, string>>({})
+  const [toastMsg, setToastMsg] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/documents')
@@ -15,77 +17,73 @@ export default function DocumentsPage() {
       .then(data => {
         const secs: DocSectionWithFolders[] = data.sections ?? []
         setSections(secs)
-        setOpenSections(new Set(secs.map(s => s.id)))
-        const folderIds = secs.flatMap(s => s.folders.map(f => f.id))
-        setOpenFolders(new Set(folderIds))
+        // Default to first folder in each section
+        const defaults: Record<string, string> = {}
+        for (const s of secs) {
+          if (s.folders.length > 0) defaults[s.id] = s.folders[0].id
+        }
+        setSelectedFolders(defaults)
       })
       .finally(() => setLoading(false))
   }, [])
 
-  function toggleSection(id: string) {
-    setOpenSections(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
-  }
-
-  function toggleFolder(id: string) {
-    setOpenFolders(prev => {
-      const next = new Set(prev)
-      next.has(id) ? next.delete(id) : next.add(id)
-      return next
-    })
+  function showToast(msg: string) {
+    setToastMsg(msg)
+    setTimeout(() => setToastMsg(null), 2500)
   }
 
   return (
     <>
       <style>{`
-        .docs-page { max-width: 860px; margin: 0 auto; padding: 2rem 1.5rem; }
+        .docs-page { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem; }
         .docs-header { margin-bottom: 2rem; }
         .docs-header h1 { font-size: 1.75rem; font-weight: 700; color: #111; margin: 0 0 0.25rem; }
         .docs-header p { color: #666; margin: 0; font-size: 0.9rem; }
 
-        .section-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 1.25rem; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.06); }
-        .section-header { display: flex; align-items: center; gap: 0.75rem; padding: 1rem 1.25rem; cursor: pointer; user-select: none; background: #fafafa; border-bottom: 1px solid #e5e7eb; }
-        .section-header:hover { background: #f3f4f6; }
-        .section-chevron { width: 18px; height: 18px; color: #9ca3af; transition: transform 0.2s; flex-shrink: 0; }
-        .section-chevron.open { transform: rotate(90deg); }
-        .section-icon { width: 32px; height: 32px; border-radius: 8px; background: linear-gradient(135deg, #7c3aed, #6d28d9); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
-        .section-icon svg { width: 16px; height: 16px; color: #fff; }
-        .section-name { font-weight: 600; font-size: 1rem; color: #111; }
-        .section-count { margin-left: auto; font-size: 0.8rem; color: #9ca3af; }
+        .section-block { margin-bottom: 2.5rem; }
+        .section-title { font-size: 1.2rem; font-weight: 700; color: #111; margin: 0 0 1rem; padding-bottom: 0.5rem; border-bottom: 2px solid #f3f4f6; display: flex; align-items: center; gap: 0.5rem; }
+        .section-title-link { display: flex; align-items: center; gap: 0.5rem; text-decoration: none; color: inherit; cursor: pointer; transition: color 0.15s; }
+        .section-title-link:hover { color: #7c3aed; }
+        .section-icon { width: 28px; height: 28px; border-radius: 7px; background: linear-gradient(135deg, #7c3aed, #6d28d9); display: flex; align-items: center; justify-content: center; flex-shrink: 0; }
+        .section-icon svg { width: 14px; height: 14px; color: #fff; }
 
-        .section-body { padding: 0.75rem 1.25rem 1rem; display: flex; flex-direction: column; gap: 0.5rem; }
+        .tabs-row { display: flex; align-items: center; gap: 0.25rem; border-bottom: 2px solid #e5e7eb; margin-bottom: 1.25rem; flex-wrap: wrap; }
+        .tab { padding: 0.625rem 0.875rem; cursor: pointer; font-size: 0.9rem; font-weight: 500; color: #666; border-bottom: 3px solid transparent; margin-bottom: -2px; transition: all 0.15s; white-space: nowrap; background: none; border-top: none; border-left: none; border-right: none; }
+        .tab:hover { color: #7c3aed; }
+        .tab.active { color: #7c3aed; border-bottom-color: #7c3aed; }
 
-        .folder-block { border: 1px solid #f3f4f6; border-radius: 8px; overflow: hidden; }
-        .folder-header { display: flex; align-items: center; gap: 0.5rem; padding: 0.6rem 0.875rem; cursor: pointer; user-select: none; background: #f9fafb; }
-        .folder-header:hover { background: #f3f4f6; }
-        .folder-chevron { width: 14px; height: 14px; color: #d1d5db; transition: transform 0.2s; flex-shrink: 0; }
-        .folder-chevron.open { transform: rotate(90deg); }
-        .folder-icon { color: #f59e0b; flex-shrink: 0; }
-        .folder-name { font-size: 0.875rem; font-weight: 600; color: #374151; }
-        .folder-doc-count { margin-left: auto; font-size: 0.75rem; color: #9ca3af; }
+        .table-container { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+        .table { width: 100%; border-collapse: collapse; }
+        .table th { padding: 0.75rem 1.125rem; text-align: left; font-weight: 600; font-size: 0.775rem; color: #6b7280; background: #fafafa; border-bottom: 1px solid #e5e7eb; text-transform: uppercase; letter-spacing: 0.04em; }
+        .table td { padding: 0.75rem 1.125rem; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+        .table tr:last-child td { border-bottom: none; }
+        .table tbody tr:hover { background: #fafafa; }
 
-        .folder-docs { padding: 0.25rem 0; }
-        .doc-link { display: flex; align-items: center; gap: 0.625rem; padding: 0.5rem 0.875rem 0.5rem 2.25rem; text-decoration: none; color: inherit; transition: background 0.15s; cursor: pointer; background: none; border: none; width: 100%; text-align: left; font-family: inherit; }
-        .doc-link:hover { background: #f5f3ff; }
-        .doc-link:hover .doc-title { color: #7c3aed; }
-        .doc-icon { flex-shrink: 0; width: 18px; height: 18px; color: #6b7280; }
-        .doc-link:hover .doc-icon { color: #7c3aed; }
-        .doc-title { font-size: 0.875rem; color: #374151; }
-        .doc-description { font-size: 0.75rem; color: #9ca3af; margin-top: 1px; }
-        .doc-ext-icon { margin-left: auto; flex-shrink: 0; width: 14px; height: 14px; color: #d1d5db; }
-        .doc-loading { opacity: 0.6; pointer-events: none; }
+        .doc-name-cell { display: flex; align-items: center; gap: 0.5rem; cursor: pointer; }
+        .doc-icon { width: 14px; height: 14px; color: #9ca3af; flex-shrink: 0; }
+        .doc-name-cell:hover .doc-title { color: #7c3aed; }
+        .doc-name-cell:hover .doc-icon { color: #7c3aed; }
+        .doc-title { font-size: 0.875rem; font-weight: 500; color: #111; }
+        .doc-description { font-size: 0.8rem; color: #9ca3af; }
 
-        .empty-state { text-align: center; padding: 4rem 2rem; color: #9ca3af; }
-        .empty-state svg { width: 48px; height: 48px; margin: 0 auto 1rem; display: block; color: #e5e7eb; }
+        .actions { display: flex; gap: 0.375rem; }
+        .action-btn { padding: 0.35rem 0.75rem; font-size: 0.775rem; border: 1px solid #e5e7eb; border-radius: 6px; cursor: pointer; transition: all 0.15s; white-space: nowrap; background: #fff; }
+        .share-btn { color: #6b7280; }
+        .share-btn:hover { background: #f3f4f6; }
+        .open-btn { background: #7c3aed; color: #fff; border-color: #7c3aed; }
+        .open-btn:hover { background: #6d28d9; }
+        .action-btn:disabled { opacity: 0.6; cursor: not-allowed; }
+
+        .empty-state { text-align: center; padding: 2rem; color: #9ca3af; font-size: 0.875rem; }
 
         .loading-dots { display: flex; gap: 0.4rem; justify-content: center; padding: 4rem; }
         .loading-dots span { width: 8px; height: 8px; border-radius: 50%; background: #7c3aed; animation: bounce 0.8s infinite; }
         .loading-dots span:nth-child(2) { animation-delay: 0.15s; }
         .loading-dots span:nth-child(3) { animation-delay: 0.3s; }
         @keyframes bounce { 0%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-8px); } }
+
+        .toast { position: fixed; bottom: 2rem; right: 2rem; background: #10b981; color: #fff; padding: 0.875rem 1.25rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); animation: slideIn 0.3s ease-out; z-index: 2000; font-size: 0.875rem; }
+        @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
       `}</style>
 
       <div className="docs-page">
@@ -95,89 +93,93 @@ export default function DocumentsPage() {
         </div>
 
         {loading ? (
-          <div className="loading-dots">
-            <span /><span /><span />
-          </div>
+          <div className="loading-dots"><span /><span /><span /></div>
         ) : sections.length === 0 ? (
-          <div className="empty-state">
-            <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" /></svg>
-            <p>No documents have been added yet.</p>
-          </div>
+          <div className="empty-state">No documents have been added yet.</div>
         ) : (
           sections.map(section => {
-            const sectionOpen = openSections.has(section.id)
+            const selectedFolderId = selectedFolders[section.id]
+            const selectedFolder = section.folders.find(f => f.id === selectedFolderId)
             const totalDocs = section.folders.reduce((n, f) => n + f.documents.length, 0)
+
             return (
-              <div key={section.id} className="section-card">
-                <div className="section-header" onClick={() => toggleSection(section.id)}>
-                  <svg className={`section-chevron${sectionOpen ? ' open' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
-                  <div className="section-icon">
-                    <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" /></svg>
-                  </div>
-                  <span className="section-name">{section.name}</span>
-                  <span className="section-count">{totalDocs} doc{totalDocs !== 1 ? 's' : ''}</span>
+              <div key={section.id} className="section-block">
+                <div className="section-title">
+                  <Link href={`/documents/${section.name.toLowerCase().replace(/[\s-]+/g, '')}`} className="section-title-link">
+                    <div className="section-icon">
+                      <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" /></svg>
+                    </div>
+                    {section.name}
+                  </Link>
+                  <span style={{ marginLeft: 'auto', fontSize: '0.8rem', fontWeight: 400, color: '#9ca3af' }}>
+                    {totalDocs} doc{totalDocs !== 1 ? 's' : ''}
+                  </span>
                 </div>
 
-                {sectionOpen && (
-                  <div className="section-body">
-                    {section.folders.length === 0 ? (
-                      <p style={{ fontSize: '0.85rem', color: '#9ca3af', margin: '0.5rem 0' }}>No folders yet.</p>
-                    ) : (
-                      section.folders.map(folder => (
-                        <FolderBlock
+                {section.folders.length === 0 ? (
+                  <div className="empty-state">No folders in this section.</div>
+                ) : (
+                  <>
+                    <div className="tabs-row">
+                      {section.folders.map(folder => (
+                        <button
                           key={folder.id}
-                          folder={folder}
-                          isOpen={openFolders.has(folder.id)}
-                          onToggle={() => toggleFolder(folder.id)}
-                        />
-                      ))
+                          className={`tab${selectedFolderId === folder.id ? ' active' : ''}`}
+                          onClick={() => setSelectedFolders(prev => ({ ...prev, [section.id]: folder.id }))}
+                        >
+                          {folder.name}
+                          {folder.documents.length > 0 && (
+                            <span style={{ marginLeft: '0.375rem', fontSize: '0.7rem', color: 'inherit', opacity: 0.65 }}>
+                              ({folder.documents.length})
+                            </span>
+                          )}
+                        </button>
+                      ))}
+                    </div>
+
+                    {selectedFolder && (
+                      selectedFolder.documents.length > 0 ? (
+                        <div className="table-container">
+                          <table className="table">
+                            <thead>
+                              <tr>
+                                <th style={{ width: '40%' }}>Name</th>
+                                <th style={{ width: '40%' }}>Description</th>
+                                <th style={{ width: '20%' }}>Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody>
+                              {selectedFolder.documents.map(doc => (
+                                <DocRow
+                                  key={doc.id}
+                                  doc={doc}
+                                  onShareCopied={() => showToast('Link copied to clipboard')}
+                                />
+                              ))}
+                            </tbody>
+                          </table>
+                        </div>
+                      ) : (
+                        <div className="empty-state">No documents in this folder.</div>
+                      )
                     )}
-                  </div>
+                  </>
                 )}
               </div>
             )
           })
         )}
       </div>
+
+      {toastMsg && <div className="toast">{toastMsg}</div>}
     </>
   )
 }
 
-function FolderBlock({
-  folder,
-  isOpen,
-  onToggle,
-}: {
-  folder: DocFolderWithDocuments
-  isOpen: boolean
-  onToggle: () => void
-}) {
-  return (
-    <div className="folder-block">
-      <div className="folder-header" onClick={onToggle}>
-        <svg className={`folder-chevron${isOpen ? ' open' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" /></svg>
-        <svg className="folder-icon" width="16" height="16" fill="currentColor" viewBox="0 0 20 20"><path d="M2 6a2 2 0 012-2h5l2 2h5a2 2 0 012 2v6a2 2 0 01-2 2H4a2 2 0 01-2-2V6z" /></svg>
-        <span className="folder-name">{folder.name}</span>
-        <span className="folder-doc-count">{folder.documents.length}</span>
-      </div>
-
-      {isOpen && (
-        <div className="folder-docs">
-          {folder.documents.length === 0 ? (
-            <p style={{ fontSize: '0.8rem', color: '#9ca3af', padding: '0.5rem 2.25rem' }}>No documents.</p>
-          ) : (
-            folder.documents.map(doc => <DocItem key={doc.id} doc={doc} />)
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function DocItem({ doc }: { doc: DriveDocument }) {
+function DocRow({ doc, onShareCopied }: { doc: DriveDocument; onShareCopied: () => void }) {
   const [fetching, setFetching] = useState(false)
 
-  async function open() {
+  async function handleOpen() {
     setFetching(true)
     try {
       const res = await fetch(`/api/documents/open?docId=${doc.id}`)
@@ -193,20 +195,41 @@ function DocItem({ doc }: { doc: DriveDocument }) {
     }
   }
 
+  // Share link: try to derive section slug from folder path — use generic /documents link as fallback
+  async function handleShare() {
+    // The /documents page doesn't have section-based deep links, so we just copy the open URL approach
+    // Users can navigate to the section page for a shareable deep link
+    const shareUrl = `${window.location.origin}/documents`
+    await navigator.clipboard.writeText(shareUrl)
+    onShareCopied()
+  }
+
   const isUploaded = !!doc.storage_path
 
   return (
-    <button className={`doc-link${fetching ? ' doc-loading' : ''}`} onClick={open} disabled={fetching}>
-      {isUploaded ? (
-        <svg className="doc-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" /></svg>
-      ) : (
-        <svg className="doc-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-      )}
-      <div>
-        <div className="doc-title">{doc.title}{fetching ? ' …' : ''}</div>
-        {doc.description && <div className="doc-description">{doc.description}</div>}
-      </div>
-      <svg className="doc-ext-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" /></svg>
-    </button>
+    <tr>
+      <td>
+        <div className="doc-name-cell" onClick={handleOpen}>
+          {isUploaded ? (
+            <svg className="doc-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" /></svg>
+          ) : (
+            <svg className="doc-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+          )}
+          <div>
+            <div className="doc-title">{doc.title}{fetching ? ' …' : ''}</div>
+            {doc.description && <div className="doc-description">{doc.description}</div>}
+          </div>
+        </div>
+      </td>
+      <td className="doc-description">{doc.description || '—'}</td>
+      <td>
+        <div className="actions">
+          <button className="action-btn share-btn" onClick={handleShare} title="Copy link">Share</button>
+          <button className="action-btn open-btn" onClick={handleOpen} disabled={fetching}>
+            {fetching ? '…' : 'Open'}
+          </button>
+        </div>
+      </td>
+    </tr>
   )
 }

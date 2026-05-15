@@ -405,6 +405,7 @@ export interface DocSection {
   name: string
   sort_order: number
   required_role: string | null
+  department: string | null
   created_at: string
 }
 

@@ -165,7 +165,6 @@ function buildNavSections(isAdmin: boolean, roles: string[]): NavSection[] {
         { href: '/admin/banner', label: 'Banner', icon: BannerIcon, adminMatch: true },
         { href: '/admin/banner-strip', label: 'Banner Strip', icon: TickerIcon, adminMatch: true },
         { href: '/admin/news', label: 'News', icon: MegaphoneIcon, adminMatch: true },
-        { href: '/admin/documents', label: 'Documents', icon: DocumentIcon, adminMatch: true },
         { href: '/admin/forms', label: 'Forms', icon: DocumentIcon, adminMatch: true },
         { href: '/admin/marketing-goals', label: 'Sales Goals', icon: GoalIcon, adminMatch: true },
         { href: '/admin/marketing-tags', label: 'Marketing Tags', icon: TagIcon, adminMatch: true },

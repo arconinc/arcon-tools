@@ -1,28 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getSectionContextForItem } from '@/lib/auth/section-manager'
 
-async function getAdminUser() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return null
-  const adminClient = createAdminClient()
-  const { data: appUser } = await adminClient
-    .from('users')
-    .select('id, is_admin')
-    .eq('google_id', user.id)
-    .single()
-  return appUser?.is_admin ? appUser : null
-}
-
-// GET /api/admin/documents/items/[id]/access-summary
-// Resolves who currently has access: owner + all users matching department grants + individual grants.
-// Called lazily when an admin expands the "Who has access" panel in the UI.
+// GET /api/documents/manage/items/[id]/access-summary
+// Lazily resolves who has access. Mirrors admin route but uses section-manager auth.
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
-  const admin = await getAdminUser()
-  if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
-
   const { id: docId } = await params
+  const ctx = await getSectionContextForItem(docId)
+  if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!ctx.canManage) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+
   const adminClient = createAdminClient()
 
   const [docResult, permsResult] = await Promise.all([
@@ -54,22 +41,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
     return NextResponse.json({ owner, open_to_all: true, resolved_users })
   }
 
-  // Find all users who have at least one of the granted roles (directly or via department)
-  // by querying user_roles and user_departments → department_roles.
   const [directRoleUsersResult, deptRoleUsersResult, individualUsersResult] = await Promise.all([
-    // Users with a direct role grant
     adminClient
       .from('user_roles')
       .select('user_id, users!user_roles_user_id_fkey(id, display_name, email)')
       .in('role_id', roleGrantIds)
       .is('users.deactivated_at', null),
-    // Users in departments that carry one of the granted roles
     adminClient
       .from('user_departments')
       .select('user_id, users!user_departments_user_id_fkey(id, display_name, email), department_roles!inner(role_id)')
       .in('department_roles.role_id', roleGrantIds)
       .is('users.deactivated_at', null),
-    // Individually granted users
     userGrantIds.size > 0
       ? adminClient
           .from('users')
