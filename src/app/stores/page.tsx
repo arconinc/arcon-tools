@@ -9,15 +9,9 @@ import { CredentialPrompt } from '@/components/stores/CredentialPrompt'
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
-const GANTT_MONTHS = 16   // total window width in months
-const GANTT_PRE   = 3    // months before today at window start
-const NAME_W      = 220  // px, sticky store name column
-
-// Row heights (px)
-const DATE_AXIS_H  = 32  // date ticks header
-const COL_HDR_H    = 34  // column name header
-const DATA_ROW_H   = 40  // data cells row
-const BAR_ROW_H    = 6   // timeline bar strip
+const NAME_W     = 220  // px, sticky store name column
+const COL_HDR_H  = 34   // column name header
+const DATA_ROW_H = 54   // data cells row
 
 // ── helpers ───────────────────────────────────────────────────────────────────
 
@@ -56,15 +50,6 @@ function storeUrgency(store: Store): 'ended' | 'closing-soon' | 'launching-soon'
   return 'active'
 }
 
-const URGENCY_COLOR: Record<string, string> = {
-  active:           '#ddd6fe',   // very faded purple — unobtrusive for normal active stores
-  'launching-soon': '#f59e0b',
-  'closing-soon':   '#f97316',
-  ended:            '#94a3b8',
-  future:           '#60a5fa',
-  inactive:         '#e2e8f0',
-}
-
 const URGENCY_LABEL: Record<string, { label: string; cls: string }> = {
   active:           { label: 'Active',          cls: 'bg-purple-100 text-purple-700' },
   'launching-soon': { label: 'Launching Soon',  cls: 'bg-amber-100 text-amber-700' },
@@ -76,7 +61,7 @@ const URGENCY_LABEL: Record<string, { label: string; cls: string }> = {
 
 // ── column definitions ────────────────────────────────────────────────────────
 
-type ColKey = 'status' | 'domain' | 'manager' | 'sales_rep' | 'in_production' | 'store_types' | 'who_pays'
+type ColKey = 'status' | 'launch_status' | 'domain' | 'manager' | 'sales_rep' | 'in_production' | 'store_types' | 'who_pays'
             | 'payment_methods' | 'freight' | 'product_types'
             | 'launch_date' | 'takedown_date' | 'last_order_at'
             | 'orders' | 'total_sales'
@@ -126,6 +111,79 @@ const COLUMNS: ColDef[] = [
       const u = storeUrgency(s)
       const { label, cls } = URGENCY_LABEL[u]
       return <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${cls}`}>{label}</span>
+    },
+  },
+  {
+    key: 'launch_status', label: 'Launch Status', width: 180,
+    render: s => {
+      const u = storeUrgency(s)
+      const launch   = parseDate(s.launch_date)
+      const takedown = parseDate(s.takedown_date)
+      const today    = new Date(); today.setHours(0, 0, 0, 0)
+
+      const daysToLaunch   = s.launch_date   ? daysUntil(s.launch_date)   : null
+      const daysToTakedown = s.takedown_date ? daysUntil(s.takedown_date) : null
+
+      const configs: Record<string, { icon: React.ReactNode; bar: string; sub: string }> = {
+        active: {
+          icon: <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#22c55e', display: 'inline-block', boxShadow: '0 0 0 2px #bbf7d0' }} />,
+          bar: 'bg-green-500',
+          sub: daysToTakedown !== null ? `${daysToTakedown}d left` : 'No end date',
+        },
+        'launching-soon': {
+          icon: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#d97706" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>,
+          bar: 'bg-amber-400',
+          sub: daysToLaunch !== null ? `Launches in ${daysToLaunch}d` : '',
+        },
+        'closing-soon': {
+          icon: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#ea580c" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><path d="M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/><line x1="12" y1="9" x2="12" y2="13"/><line x1="12" y1="17" x2="12.01" y2="17"/></svg>,
+          bar: 'bg-orange-500',
+          sub: daysToTakedown !== null ? `Closes in ${daysToTakedown}d` : '',
+        },
+        ended: {
+          icon: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#94a3b8" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>,
+          bar: 'bg-slate-300',
+          sub: takedown ? `Ended ${Math.abs(daysToTakedown ?? 0)}d ago` : 'Ended',
+        },
+        future: {
+          icon: <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="#3b82f6" strokeWidth={2.5} strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>,
+          bar: 'bg-blue-400',
+          sub: daysToLaunch !== null ? `Launches in ${daysToLaunch}d` : 'No launch date',
+        },
+        inactive: {
+          icon: <span style={{ width: 8, height: 8, borderRadius: '50%', background: '#cbd5e1', display: 'inline-block' }} />,
+          bar: 'bg-slate-200',
+          sub: 'Not active',
+        },
+      }
+
+      const { label, cls } = URGENCY_LABEL[u]
+      const cfg = configs[u]
+
+      // Lifecycle progress bar (only when both dates known and store is active/closing-soon)
+      let progress: number | null = null
+      if (launch && takedown && (u === 'active' || u === 'closing-soon')) {
+        const total = takedown.getTime() - launch.getTime()
+        const elapsed = today.getTime() - launch.getTime()
+        progress = Math.max(0, Math.min(100, (elapsed / total) * 100))
+      }
+
+      return (
+        <div style={{ display: 'flex', flexDirection: 'column', gap: 3, width: '100%' }}>
+          <div style={{ display: 'flex', alignItems: 'center', gap: 5 }}>
+            {cfg.icon}
+            <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-semibold ${cls}`}>{label}</span>
+          </div>
+          {progress !== null && (
+            <div style={{ height: 3, background: '#f1f5f9', borderRadius: 2, overflow: 'hidden' }}>
+              <div className={cfg.bar} style={{ height: '100%', width: `${progress}%`, borderRadius: 2 }} />
+            </div>
+          )}
+          {cfg.sub && (
+            <span style={{ fontSize: 10, color: '#94a3b8', lineHeight: 1 }}>{cfg.sub}</span>
+          )}
+        </div>
+      )
     },
   },
   {
@@ -202,7 +260,7 @@ const COLUMNS: ColDef[] = [
   },
 ]
 
-const DEFAULT_VISIBLE = new Set<ColKey>(['status', 'domain', 'manager', 'sales_rep', 'store_types', 'who_pays', 'payment_methods', 'freight', 'product_types', 'launch_date', 'takedown_date', 'orders', 'total_sales'])
+const DEFAULT_VISIBLE = new Set<ColKey>(['orders', 'total_sales', 'status', 'launch_status', 'domain', 'manager', 'sales_rep', 'store_types', 'who_pays', 'payment_methods', 'freight', 'product_types', 'launch_date', 'takedown_date'])
 
 // ── Column picker ─────────────────────────────────────────────────────────────
 
@@ -263,71 +321,7 @@ function ColPicker({
   )
 }
 
-// ── Gantt helpers ─────────────────────────────────────────────────────────────
-
-function useTimeline() {
-  const today = useMemo(() => { const d = new Date(); d.setHours(0, 0, 0, 0); return d }, [])
-
-  const windowStart = useMemo(() => {
-    const d = new Date(today)
-    d.setMonth(d.getMonth() - GANTT_PRE)
-    d.setDate(1)
-    return d
-  }, [today])
-
-  const windowEnd = useMemo(() => {
-    const d = new Date(windowStart)
-    d.setMonth(d.getMonth() + GANTT_MONTHS)
-    return d
-  }, [windowStart])
-
-  const windowMs = windowEnd.getTime() - windowStart.getTime()
-
-  const pct = useCallback((date: Date) =>
-    Math.max(0, Math.min(100, ((date.getTime() - windowStart.getTime()) / windowMs) * 100)),
-    [windowStart, windowMs])
-
-  const todayPct = pct(today)
-
-  const ticks = useMemo(() => {
-    const arr: { label: string; pct: number; isCurrentMonth: boolean }[] = []
-    const d = new Date(windowStart)
-    const now = new Date()
-    while (d < windowEnd) {
-      arr.push({
-        label: d.toLocaleDateString('en-US', { month: 'short', year: '2-digit' }),
-        pct: ((d.getTime() - windowStart.getTime()) / windowMs) * 100,
-        isCurrentMonth: d.getMonth() === now.getMonth() && d.getFullYear() === now.getFullYear(),
-      })
-      d.setMonth(d.getMonth() + 1)
-    }
-    return arr
-  }, [windowStart, windowEnd, windowMs])
-
-  return { today, windowStart, windowEnd, pct, todayPct, ticks }
-}
-
-function barGeometry(store: Store, pct: (d: Date) => number, windowStart: Date, windowEnd: Date) {
-  const launch   = parseDate(store.launch_date)
-  const takedown = parseDate(store.takedown_date)
-
-  if (!launch && !takedown) return null
-
-  const start = launch   ?? windowStart
-  const end   = takedown ?? new Date(windowEnd.getTime() + 30 * 86400000 * 6)
-
-  const left  = pct(start)
-  const right = pct(end)
-  const width = Math.max(right - left, 0.4)
-  if (right < 0 || left > 100) return null
-
-  const color = URGENCY_COLOR[storeUrgency(store)] ?? '#7c3aed'
-  const openRight = !takedown
-
-  return { left, width, color, openRight }
-}
-
-// ── Unified table: combined data + full-width timeline ────────────────────────
+// ── Store table ───────────────────────────────────────────────────────────────
 
 function StoreTable({
   stores,
@@ -344,7 +338,6 @@ function StoreTable({
   const [visibleCols, setVisibleCols] = useState<Set<ColKey>>(DEFAULT_VISIBLE)
   const [sortKey, setSortKey] = useState<SortKey>('name')
   const [sortDir, setSortDir] = useState<'asc' | 'desc'>('asc')
-  const { pct, todayPct, ticks, windowStart, windowEnd } = useTimeline()
 
   function handleSort(key: SortKey) {
     if (key === sortKey) setSortDir(d => d === 'asc' ? 'desc' : 'asc')
@@ -381,7 +374,8 @@ function StoreTable({
       switch (sortKey) {
         case 'name':
           return a.store_name.localeCompare(b.store_name) * dir
-        case 'status': {
+        case 'status':
+        case 'launch_status': {
           const pa = URGENCY_PRIORITY[storeUrgency(a)] ?? 99
           const pb = URGENCY_PRIORITY[storeUrgency(b)] ?? 99
           return (pa - pb) * dir
@@ -424,16 +418,8 @@ function StoreTable({
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-      {/* Toolbar: legend + column picker */}
-      <div className="flex items-center justify-between px-4 py-2.5 border-b border-slate-100 bg-slate-50/60">
-        <div className="flex items-center gap-4 text-[10px] text-slate-400 font-medium flex-wrap">
-          {Object.entries(URGENCY_COLOR).map(([key, color]) => (
-            <span key={key} className="flex items-center gap-1">
-              <span className="w-6 h-1.5 rounded-full inline-block" style={{ background: color }} />
-              {URGENCY_LABEL[key].label}
-            </span>
-          ))}
-        </div>
+      {/* Toolbar */}
+      <div className="flex items-center justify-end px-4 py-2.5 border-b border-slate-100 bg-slate-50/60">
         <ColPicker visible={visibleCols} onChange={setVisibleCols} />
       </div>
 
@@ -442,87 +428,11 @@ function StoreTable({
       ) : (
         <div className="overflow-x-auto">
 
-          {/*
-           * ── DATE AXIS ROW ──
-           * Sticky to the top. Spans the full table width.
-           * Month tick labels + vertical grid lines + today marker.
-           */}
+          {/* Column header row */}
           <div
             style={{
               position: 'sticky',
               top: 0,
-              zIndex: 22,
-              height: DATE_AXIS_H,
-              minWidth,
-              background: '#f0eff7',
-              borderBottom: '2px solid #e2e8f0',
-            }}
-          >
-            {/* Tick marks */}
-            {ticks.map((t, i) => (
-              <div
-                key={i}
-                style={{
-                  position: 'absolute',
-                  left: `${t.pct}%`,
-                  top: 0,
-                  bottom: 0,
-                  pointerEvents: 'none',
-                }}
-              >
-                <div style={{ position: 'absolute', top: 0, bottom: 0, width: 1, background: '#ddd6fe' }} />
-                <span style={{
-                  position: 'absolute',
-                  bottom: 5,
-                  left: 5,
-                  fontSize: 10,
-                  fontWeight: t.isCurrentMonth ? 700 : 500,
-                  color: t.isCurrentMonth ? '#7c3aed' : '#94a3b8',
-                  whiteSpace: 'nowrap',
-                  letterSpacing: '0.02em',
-                  userSelect: 'none',
-                }}>
-                  {t.label}
-                </span>
-              </div>
-            ))}
-
-            {/* Today marker */}
-            <div
-              style={{
-                position: 'absolute',
-                left: `${todayPct}%`,
-                top: 0,
-                bottom: 0,
-                width: 2,
-                background: '#7c3aed',
-                zIndex: 2,
-              }}
-            >
-              <span style={{
-                position: 'absolute',
-                top: 3,
-                left: 4,
-                fontSize: 9,
-                fontWeight: 700,
-                color: '#7c3aed',
-                whiteSpace: 'nowrap',
-                userSelect: 'none',
-                letterSpacing: '0.04em',
-              }}>
-                TODAY
-              </span>
-            </div>
-          </div>
-
-          {/*
-           * ── COLUMN HEADER ROW ──
-           * Sticky below the date axis. Shows column names for the data cells.
-           */}
-          <div
-            style={{
-              position: 'sticky',
-              top: DATE_AXIS_H,
               zIndex: 21,
               minWidth,
               display: 'flex',
@@ -585,14 +495,8 @@ function StoreTable({
             <div style={{ flex: 1 }} />
           </div>
 
-          {/*
-           * ── STORE ROWS ──
-           * Each store = two visual lines:
-           *   1. Data row  — name + column cells
-           *   2. Bar row   — thin full-width timeline strip
-           */}
+          {/* Store rows */}
           {filtered.map((store, idx) => {
-            const bar = barGeometry(store, pct, windowStart, windowEnd)
             const isEven = idx % 2 === 0
             const rowBg  = isEven ? '#ffffff' : '#fafafa'
 
@@ -603,7 +507,6 @@ function StoreTable({
                 style={{ cursor: 'pointer' }}
                 className="group"
               >
-                {/* — Data row — */}
                 <div
                   style={{
                     display: 'flex',
@@ -700,79 +603,6 @@ function StoreTable({
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M9 5l7 7-7 7" />
                     </svg>
                   </div>
-                </div>
-
-                {/* — Timeline bar row — full table width — */}
-                <div
-                  style={{
-                    position: 'relative',
-                    height: BAR_ROW_H,
-                    minWidth,
-                    background: rowBg,
-                    borderBottom: idx < filtered.length - 1 ? '1px solid #f1f5f9' : 'none',
-                  }}
-                >
-                  {/* Month grid lines */}
-                  {ticks.map((t, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        position: 'absolute',
-                        left: `${t.pct}%`,
-                        top: 0,
-                        bottom: 0,
-                        width: 1,
-                        background: '#ede9fe',
-                        pointerEvents: 'none',
-                      }}
-                    />
-                  ))}
-
-                  {/* Today line */}
-                  <div
-                    style={{
-                      position: 'absolute',
-                      left: `${todayPct}%`,
-                      top: 0,
-                      bottom: 0,
-                      width: 2,
-                      background: '#c4b5fd',
-                      zIndex: 2,
-                      pointerEvents: 'none',
-                    }}
-                  />
-
-                  {/* Store's timeline bar */}
-                  {bar ? (
-                    <div
-                      style={{
-                        position: 'absolute',
-                        left: `${bar.left}%`,
-                        width: `${bar.width}%`,
-                        top: 2,
-                        height: 2,
-                        background: bar.color,
-                        borderRadius: bar.openRight ? '3px 0 0 3px' : 3,
-                        opacity: 0.85,
-                        zIndex: 3,
-                        pointerEvents: 'none',
-                      }}
-                      title={`${store.store_name}: ${formatDate(store.launch_date)} → ${formatDate(store.takedown_date)}`}
-                    />
-                  ) : (
-                    /* No dates: faint dotted line */
-                    <div
-                      style={{
-                        position: 'absolute',
-                        left: '3%',
-                        right: '3%',
-                        top: '50%',
-                        height: 1,
-                        borderTop: '1px dashed #e2e8f0',
-                        pointerEvents: 'none',
-                      }}
-                    />
-                  )}
                 </div>
               </div>
             )
