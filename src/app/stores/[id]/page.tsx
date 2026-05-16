@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { StoreDetail, Store } from '@/types'
 import { formatDate } from './tabs/shared'
+import { CredentialPrompt } from '@/components/stores/CredentialPrompt'
 import { OverviewTab } from './tabs/OverviewTab'
 import { TasksTab } from './tabs/TasksTab'
 import { TeamTab } from './tabs/TeamTab'
@@ -70,6 +71,9 @@ export default function StoreDetailPage({ params }: { params: Promise<{ id: stri
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [tab, setTab] = useState<TabKey>('overview')
+  const [syncingOrders, setSyncingOrders] = useState(false)
+  const [orderSyncMsg, setOrderSyncMsg] = useState<{ text: string; ok: boolean } | null>(null)
+  const [showCredentialPrompt, setShowCredentialPrompt] = useState(false)
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/stores/${id}`)
@@ -78,6 +82,33 @@ export default function StoreDetailPage({ params }: { params: Promise<{ id: stri
     setStore(d)
     setLoading(false)
   }, [id])
+
+  async function handleSyncOrders() {
+    if (!store) return
+    setSyncingOrders(true)
+    setOrderSyncMsg(null)
+    try {
+      const res = await fetch('/api/stores/sync-orders', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ store_id: store.id }),
+      })
+      const data = await res.json()
+      if (!res.ok) {
+        if (res.status === 400 && data.error?.toLowerCase().includes('credential')) {
+          setShowCredentialPrompt(true)
+        } else {
+          setOrderSyncMsg({ text: data.error ?? 'Sync failed', ok: false })
+        }
+      } else {
+        setOrderSyncMsg({ text: `${data.synced} order${data.synced !== 1 ? 's' : ''} synced.`, ok: true })
+      }
+    } catch {
+      setOrderSyncMsg({ text: 'Network error during sync.', ok: false })
+    } finally {
+      setSyncingOrders(false)
+    }
+  }
 
   useEffect(() => { load() }, [load])
 
@@ -219,9 +250,43 @@ export default function StoreDetailPage({ params }: { params: Promise<{ id: stri
             })()}
           </div>
 
-          {/* Store selector */}
-          <StoreSelector currentStoreId={store.id} />
+          {/* Right-side controls */}
+          <div className="flex flex-col items-end gap-2 shrink-0">
+            <StoreSelector currentStoreId={store.id} />
+            <div className="flex items-center gap-2">
+              {orderSyncMsg && (
+                <span className={`text-xs font-medium px-3 py-1 rounded-full ${orderSyncMsg.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                  {orderSyncMsg.text}
+                </span>
+              )}
+              <button
+                onClick={handleSyncOrders}
+                disabled={syncingOrders}
+                className="flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium border border-slate-200 rounded-xl text-slate-600 bg-white hover:bg-slate-50 hover:border-slate-300 transition-colors disabled:opacity-50"
+                title="Sync orders for this store from Uducat"
+              >
+                <svg
+                  className={`w-3.5 h-3.5 ${syncingOrders ? 'animate-spin' : ''}`}
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                {syncingOrders ? 'Syncing…' : 'Sync Orders'}
+              </button>
+            </div>
+          </div>
         </div>
+
+        {/* Credential prompt */}
+        {showCredentialPrompt && (
+          <div className="mb-5">
+            <CredentialPrompt
+              onSaved={() => { setShowCredentialPrompt(false); handleSyncOrders() }}
+              onDismiss={() => setShowCredentialPrompt(false)}
+            />
+          </div>
+        )}
 
         {/* Tab bar */}
         <div className="tab-bar">

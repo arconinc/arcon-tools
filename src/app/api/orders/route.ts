@@ -2,7 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getAuthHeader } from '@/lib/credentials'
-import { listOrders } from '@/lib/promobuillit/api'
+import { fetchOrdersPage } from '@/lib/promobuillit/api'
 
 export async function GET(request: Request) {
   const supabase = await createClient()
@@ -24,7 +24,7 @@ export async function GET(request: Request) {
   if (!authHeader) return NextResponse.json({ error: 'PromoBullit credentials not configured' }, { status: 400 })
 
   try {
-    const result = await listOrders(storeId, authHeader, page)
+    const result = await fetchOrdersPage(storeId, authHeader, page)
 
     // Filter client-side by query (order ID, customer name, or email)
     let records = result.records

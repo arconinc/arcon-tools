@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { Store } from '@/types'
 import { useAppUser } from '@/components/layout/AppShell'
+import { CredentialPrompt } from '@/components/stores/CredentialPrompt'
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
@@ -78,6 +79,7 @@ const URGENCY_LABEL: Record<string, { label: string; cls: string }> = {
 type ColKey = 'status' | 'domain' | 'manager' | 'sales_rep' | 'in_production' | 'store_types' | 'who_pays'
             | 'payment_methods' | 'freight' | 'product_types'
             | 'launch_date' | 'takedown_date' | 'last_order_at'
+            | 'orders' | 'total_sales'
 
 type SortKey = 'name' | ColKey
 
@@ -95,9 +97,29 @@ function SortIcon({ active, dir }: { active: boolean; dir: 'asc' | 'desc' }) {
   return <span style={{ fontSize: 9, color: '#7c3aed', marginLeft: 3 }}>{dir === 'asc' ? '↑' : '↓'}</span>
 }
 
-interface ColDef { key: ColKey; label: string; width: number; render: (s: Store) => React.ReactNode }
+type OrderStats = Record<string, { count: number; total: number }>
+
+interface ColDef { key: ColKey; label: string; width: number; render: (s: Store, orderStats?: OrderStats) => React.ReactNode }
 
 const COLUMNS: ColDef[] = [
+  {
+    key: 'orders', label: 'Orders', width: 80,
+    render: (s, stats) => {
+      const c = stats?.[s.id]?.count
+      return c !== undefined
+        ? <span className="text-xs font-semibold text-slate-700">{c.toLocaleString()}</span>
+        : <span className="text-slate-300">—</span>
+    },
+  },
+  {
+    key: 'total_sales', label: 'Total Sales', width: 110,
+    render: (s, stats) => {
+      const t = stats?.[s.id]?.total
+      return t !== undefined
+        ? <span className="text-xs font-semibold text-slate-700">${t.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+        : <span className="text-slate-300">—</span>
+    },
+  },
   {
     key: 'status', label: 'Status', width: 116,
     render: s => {
@@ -180,7 +202,7 @@ const COLUMNS: ColDef[] = [
   },
 ]
 
-const DEFAULT_VISIBLE = new Set<ColKey>(['status', 'domain', 'manager', 'sales_rep', 'store_types', 'who_pays', 'payment_methods', 'freight', 'product_types', 'launch_date', 'takedown_date'])
+const DEFAULT_VISIBLE = new Set<ColKey>(['status', 'domain', 'manager', 'sales_rep', 'store_types', 'who_pays', 'payment_methods', 'freight', 'product_types', 'launch_date', 'takedown_date', 'orders', 'total_sales'])
 
 // ── Column picker ─────────────────────────────────────────────────────────────
 
@@ -311,10 +333,12 @@ function StoreTable({
   stores,
   search,
   filter,
+  orderStats,
 }: {
   stores: Store[]
   search: string
   filter: string
+  orderStats: OrderStats
 }) {
   const router = useRouter()
   const [visibleCols, setVisibleCols] = useState<Set<ColKey>>(DEFAULT_VISIBLE)
@@ -382,11 +406,15 @@ function StoreTable({
           return nullsLast(parseDate(a.takedown_date)?.getTime() ?? null, parseDate(b.takedown_date)?.getTime() ?? null)
         case 'last_order_at':
           return nullsLast(parseDate(a.last_order_at)?.getTime() ?? null, parseDate(b.last_order_at)?.getTime() ?? null)
+        case 'orders':
+          return nullsLast(orderStats[a.id]?.count ?? null, orderStats[b.id]?.count ?? null)
+        case 'total_sales':
+          return nullsLast(orderStats[a.id]?.total ?? null, orderStats[b.id]?.total ?? null)
         default:
           return a.store_name.localeCompare(b.store_name) * dir
       }
     })
-  }, [stores, search, filter, sortKey, sortDir])
+  }, [stores, search, filter, sortKey, sortDir, orderStats])
 
   const activeCols = COLUMNS.filter(c => visibleCols.has(c.key))
 
@@ -659,7 +687,7 @@ function StoreTable({
                         overflow: 'hidden',
                       }}
                     >
-                      {col.render(store)}
+                      {col.render(store, orderStats)}
                     </div>
                   ))}
 
@@ -768,6 +796,15 @@ export default function StoresDashboardPage() {
   const [syncMsg, setSyncMsg] = useState<{ text: string; ok: boolean } | null>(null)
   const [showAll, setShowAll] = useState(false)
 
+  const [dateFrom, setDateFrom] = useState<string>(() => {
+    const d = new Date(); d.setDate(1); return d.toISOString().slice(0, 10)
+  })
+  const [dateTo, setDateTo] = useState<string>(() => new Date().toISOString().slice(0, 10))
+  const [orderStats, setOrderStats] = useState<OrderStats>({})
+  const [syncingOrders, setSyncingOrders] = useState(false)
+  const [orderSyncMsg, setOrderSyncMsg] = useState<{ text: string; ok: boolean } | null>(null)
+  const [showCredentialPrompt, setShowCredentialPrompt] = useState(false)
+
   const load = useCallback(async (all = false) => {
     setLoading(true)
     const res  = await fetch(all ? '/api/stores?all=true' : '/api/stores')
@@ -778,6 +815,16 @@ export default function StoresDashboardPage() {
   }, [])
 
   useEffect(() => { load(showAll) }, [load, showAll])
+
+  const loadOrderStats = useCallback(async (from: string, to: string) => {
+    const res = await fetch(`/api/stores/order-stats?dateFrom=${from}&dateTo=${to}`)
+    if (res.ok) {
+      const data = await res.json()
+      setOrderStats(data)
+    }
+  }, [])
+
+  useEffect(() => { loadOrderStats(dateFrom, dateTo) }, [loadOrderStats, dateFrom, dateTo])
 
   async function handleSync() {
     setSyncing(true)
@@ -799,6 +846,30 @@ export default function StoresDashboardPage() {
       setSyncMsg({ text: 'Network error during sync.', ok: false })
     } finally {
       setSyncing(false)
+    }
+  }
+
+  async function handleSyncOrders() {
+    setSyncingOrders(true)
+    setOrderSyncMsg(null)
+    setShowCredentialPrompt(false)
+    try {
+      const res = await fetch('/api/stores/sync-orders', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({}) })
+      const data = await res.json()
+      if (!res.ok) {
+        if (res.status === 400 && data.error?.toLowerCase().includes('credential')) {
+          setShowCredentialPrompt(true)
+        } else {
+          setOrderSyncMsg({ text: data.error ?? 'Sync failed', ok: false })
+        }
+      } else {
+        setOrderSyncMsg({ text: `${data.synced} order${data.synced !== 1 ? 's' : ''} synced across ${data.stores} store${data.stores !== 1 ? 's' : ''}.`, ok: true })
+        loadOrderStats(dateFrom, dateTo)
+      }
+    } catch {
+      setOrderSyncMsg({ text: 'Network error during order sync.', ok: false })
+    } finally {
+      setSyncingOrders(false)
     }
   }
 
@@ -826,17 +897,40 @@ export default function StoresDashboardPage() {
             <h1 className="text-2xl font-bold text-slate-900">Stores</h1>
             <p className="text-sm text-slate-500 mt-0.5">{stores.length} stores</p>
           </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setShowAll(v => !v)}
-              className={`flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium border rounded-xl transition-colors ${
-                showAll
-                  ? 'bg-purple-600 border-purple-600 text-white hover:bg-purple-700'
-                  : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50 hover:border-slate-300'
-              }`}
+          <div className="flex items-center gap-2 flex-wrap">
+            <select
+              value={showAll ? 'all' : 'active'}
+              onChange={e => setShowAll(e.target.value === 'all')}
+              className="px-3.5 py-2 text-sm font-medium border border-slate-200 rounded-xl bg-white text-slate-600 hover:bg-slate-50 hover:border-slate-300 transition-colors focus:outline-none focus:ring-2 focus:ring-purple-500"
             >
-              {showAll ? 'All stores' : 'Active only'}
-            </button>
+              <option value="active">Active only</option>
+              <option value="all">All stores</option>
+            </select>
+
+            {/* Sync Orders — available to all authenticated users */}
+            <div className="flex items-center gap-2">
+              {orderSyncMsg && (
+                <span className={`text-xs font-medium px-3 py-1.5 rounded-full ${orderSyncMsg.ok ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+                  {orderSyncMsg.text}
+                </span>
+              )}
+              <button
+                onClick={handleSyncOrders}
+                disabled={syncingOrders}
+                className="flex items-center gap-1.5 px-3.5 py-2 text-sm font-medium border border-slate-200 rounded-xl text-slate-600 bg-white hover:bg-slate-50 hover:border-slate-300 transition-colors disabled:opacity-50"
+                title="Sync orders from Uducat"
+              >
+                <svg
+                  className={`w-4 h-4 ${syncingOrders ? 'animate-spin' : ''}`}
+                  fill="none" stroke="currentColor" viewBox="0 0 24 24"
+                >
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
+                    d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2" />
+                </svg>
+                {syncingOrders ? 'Syncing…' : 'Sync Orders'}
+              </button>
+            </div>
+
           {user?.is_admin && (
             <div className="flex items-center gap-3">
               {syncMsg && (
@@ -897,10 +991,38 @@ export default function StoresDashboardPage() {
           />
         </div>
 
+        {/* Date range for order stats */}
+        <div className="flex items-center gap-3 mb-4">
+          <span className="text-xs font-semibold text-slate-500 uppercase tracking-wide whitespace-nowrap">Order Date Range</span>
+          <input
+            type="date"
+            value={dateFrom}
+            onChange={e => setDateFrom(e.target.value)}
+            className="px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+          />
+          <span className="text-slate-400 text-sm">→</span>
+          <input
+            type="date"
+            value={dateTo}
+            onChange={e => setDateTo(e.target.value)}
+            className="px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-500 bg-white"
+          />
+        </div>
+
+        {/* Credential prompt */}
+        {showCredentialPrompt && (
+          <div className="mb-4">
+            <CredentialPrompt
+              onSaved={() => { setShowCredentialPrompt(false); handleSyncOrders() }}
+              onDismiss={() => setShowCredentialPrompt(false)}
+            />
+          </div>
+        )}
+
         {/* Table */}
         {loading && <LoadingSkeleton />}
         {error && <div className="p-4 bg-red-50 border border-red-200 rounded-2xl text-sm text-red-700">{error}</div>}
-        {!loading && !error && <StoreTable stores={stores} search={search} filter={filter} />}
+        {!loading && !error && <StoreTable stores={stores} search={search} filter={filter} orderStats={orderStats} />}
       </div>
     </>
   )

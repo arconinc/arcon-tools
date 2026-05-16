@@ -29,7 +29,7 @@ function promoHeaders(authHeader: string): HeadersInit {
 
 // ─── Orders ──────────────────────────────────────────────────────────────────
 
-async function fetchOrdersPage(
+export async function fetchOrdersPage(
   storeId: string,
   authHeader: string,
   page: number,

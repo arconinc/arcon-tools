@@ -132,6 +132,7 @@ export interface Store {
   launch_date: string | null
   takedown_date: string | null
   last_order_at: string | null
+  last_order_sync_at: string | null
   store_types: string[]
   who_pays: string[]
   payment_methods: string[]
@@ -235,6 +236,29 @@ export interface PromoOrdersResponse {
     page: string
     pageSize: string
   }
+}
+
+export interface StoreOrderSummary {
+  id: string
+  store_id: string
+  order_id: string
+  created_at: string
+  modified_at: string | null
+  customer_name: string | null
+  company_name: string | null
+  salesrep_name: string | null
+  parent_id: string | null
+  language_id: string | null
+  currency_id: string | null
+  on_ship_station: boolean
+  issue_count: number
+  attachment_count: number
+  status: string | null
+  amount: number
+  amount_str: string | null
+  internal_notes: string | null
+  details: string | null
+  synced_at: string
 }
 
 export interface ShipmentPayload {
