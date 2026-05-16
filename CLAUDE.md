@@ -16,6 +16,7 @@
 npm run dev      # start dev server (port 3000)
 npm run build    # production build
 npm run lint     # ESLint
+npm run release  # interactive release script (creates tag, updates releases.json)
 ```
 
 ## Principles
@@ -242,6 +243,52 @@ Admin-managed form definitions with submissions and delivery logging.
 - `GET /api/admin/forms/[id]/public-link` — shareable link
 - `POST /api/admin/forms/[id]/upload` — file upload for form
 - `POST /api/forms` — public form submission
+
+## Release Notes
+
+Release notes are managed via an interactive script and stored as JSON.
+
+**Data:** [`src/data/releases.json`](src/data/releases.json)
+
+**Pages:**
+- `/releases` — list of all releases with version badges and change counts
+- `/releases/[version]` — detailed release page with changes grouped by category
+
+**Release format:**
+```json
+{
+  "version": "0.4.0",           // semantic version
+  "date": "2026-05-16",         // YYYY-MM-DD
+  "title": "Release Title",     // headline
+  "summary": "Brief overview.", // one-line summary
+  "changes": [
+    {
+      "category": "feature",                  // or: improvement, bug_fix, breaking_change
+      "description": "What changed"
+    }
+  ]
+}
+```
+
+**Creating a release:**
+```bash
+npm run release
+```
+
+The interactive script will:
+1. Show commits since the last git tag
+2. Prompt for version bump type (patch / minor / major / custom)
+3. Ask for release title and summary
+4. Let you categorize each commit (feature / improvement / bug_fix / breaking_change / skip)
+5. Update `src/data/releases.json` and `package.json`
+6. Create a git tag `v{newVersion}`
+7. Print instructions for commit and push
+
+**Valid change categories:**
+- `feature` — new functionality (shown with ✨)
+- `improvement` — enhancements to existing features (shown with ⚡)
+- `bug_fix` — bug fixes (shown with 🐛)
+- `breaking_change` — breaking changes (shown with ⚠️)
 
 ## Context Hooks (client components only)
 ```ts

@@ -1,36 +1,97 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# The Arc — Arcon's Internal Tools Platform
+
+A Next.js + React web app for internal operations across Sales, Marketing, Accounting, Warehouse, IT, and HR departments. Features include CRM, e-commerce store management, employee directory, document library, task management, and more.
 
 ## Getting Started
 
-First, run the development server:
+### Prerequisites
+- Node.js 18+
+- Supabase account with OAuth configured
+
+### Installation
 
 ```bash
+# Install dependencies
+npm install
+
+# Start development server (http://localhost:3000)
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+### Build & Deployment
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+```bash
+# Production build
+npm run build
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+# Run production build locally
+npm start
 
-## Learn More
+# Lint code
+npm run lint
+```
 
-To learn more about Next.js, take a look at the following resources:
+## Release Process
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+Release notes are documented in [`src/data/releases.json`](src/data/releases.json) and displayed at `/releases`.
 
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+### Creating a Release
 
-## Deploy on Vercel
+Run the interactive release script:
 
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+```bash
+npm run release
+```
 
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+The script will:
+1. Show recent commits since the last git tag
+2. Prompt for version bump type (patch / minor / major / custom)
+3. Ask for a release title and summary
+4. Let you categorize each commit as feature / improvement / bug fix / breaking change / skip
+5. Update `src/data/releases.json`, `package.json`, and create a git tag
+6. Print next-step instructions for commit and push
+
+**Example workflow:**
+
+```bash
+npm run release
+# Choose version bump
+# Enter release title (e.g., "Notifications System")
+# Enter summary (1-2 sentences)
+# Categorize each commit interactively
+# Confirm changes
+# Follow printed instructions to commit and push
+```
+
+After the script completes, commit and push as instructed:
+
+```bash
+git add package.json src/data/releases.json
+git commit -m "Release v0.4.0"
+git push && git push --tags
+```
+
+## Documentation
+
+See [`CLAUDE.md`](CLAUDE.md) for:
+- Stack and project structure
+- Supabase patterns and security
+- API endpoints and database tables
+- Feature documentation (Notifications, Employee Directory, CRM, Documents, etc.)
+- Styling conventions
+
+## Key Features
+
+- **CRM & Marketing** — Customers, contacts, opportunities, tasks, tags, artwork
+- **E-Commerce** — Store management with Gantt timelines and order tracking
+- **Employee Directory** — Searchable profiles with org chart, skills, and interests
+- **Document Library** — Hierarchical Google Drive integration
+- **News & Announcements** — Rich-text editor with Tiptap
+- **Task Management** — Cross-department task boards with priority and comments
+- **Admin Panel** — User management, impersonation, content editors, audit logs
+- **Notifications** — In-app + email with per-user preferences
+- **Gmail Add-On** — Create tasks directly from Gmail
+
+## Support
+
+For issues, feature requests, or questions, check the project documentation or reach out to the core team.

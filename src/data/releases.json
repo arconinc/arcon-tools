@@ -1,5 +1,57 @@
 [
   {
+    "version": "0.4.0",
+    "date": "2026-05-16",
+    "title": "v0.4.0 Release",
+    "summary": "eCommerce enhancements. Documents. Permissions.",
+    "changes": [
+      {
+        "category": "feature",
+        "description": "Stores sales"
+      },
+      {
+        "category": "feature",
+        "description": "Stores sales"
+      },
+      {
+        "category": "feature",
+        "description": "Sync stores"
+      },
+      {
+        "category": "feature",
+        "description": "Move documents to different sections"
+      },
+      {
+        "category": "feature",
+        "description": "UPdate Claude"
+      },
+      {
+        "category": "feature",
+        "description": "Documents"
+      },
+      {
+        "category": "feature",
+        "description": "Allow all left nav"
+      },
+      {
+        "category": "feature",
+        "description": "Add document permissions"
+      },
+      {
+        "category": "feature",
+        "description": "Add document permissions"
+      },
+      {
+        "category": "feature",
+        "description": "Update claude instructions"
+      },
+      {
+        "category": "feature",
+        "description": "Impersonate"
+      }
+    ]
+  },
+  {
     "version": "0.3.0",
     "date": "2026-05-04",
     "title": "Notifications",
