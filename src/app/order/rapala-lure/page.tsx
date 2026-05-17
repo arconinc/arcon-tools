@@ -243,14 +243,6 @@ export default function RapalaLureOrderPage() {
 
       <div style={{ minHeight: '100vh', background: '#f4f4f5', padding: '40px 16px' }}>
         {/* Branding */}
-        <div style={{ textAlign: 'center', marginBottom: 28 }}>
-          <div style={{ display: 'inline-flex', alignItems: 'center', border: '2.5px solid #111', padding: '4px 14px', marginBottom: 8 }}>
-            <span style={{ color: '#111', fontSize: 20, fontWeight: 800, letterSpacing: '0.08em', textTransform: 'uppercase' }}>Arcon Inc</span>
-            <span style={{ color: '#6b1e98', fontSize: 26, fontWeight: 900, lineHeight: 1, marginLeft: 2 }}>.</span>
-          </div>
-          <p style={{ margin: 0, fontSize: 15, color: '#6b7280' }}>Rapala Logo Lure Order Form</p>
-        </div>
-
         <div style={{ maxWidth: 760, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 280px', gap: 24, alignItems: 'start' }}>
 
           {/* ---- Main form card ---- */}
@@ -302,35 +294,6 @@ export default function RapalaLureOrderPage() {
                       </button>
                     )
                   })}
-                </div>
-              </div>
-
-              {/* Contact */}
-              <div style={{ padding: '28px 32px', borderBottom: '1px solid #f3f4f6' }}>
-                <p style={sectionHeadStyle}>Contact Information</p>
-                <div className="two-col" style={{ ...rowStyle, marginBottom: 16 }}>
-                  <div>
-                    <label style={labelStyle}>First Name <span style={{ color: '#6b1e98' }}>*</span></label>
-                    <input style={inputStyle} value={form.firstName} onChange={(e) => set('firstName', e.target.value)} required autoComplete="given-name" />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Last Name <span style={{ color: '#6b1e98' }}>*</span></label>
-                    <input style={inputStyle} value={form.lastName} onChange={(e) => set('lastName', e.target.value)} required autoComplete="family-name" />
-                  </div>
-                </div>
-                <div style={{ marginBottom: 16 }}>
-                  <label style={labelStyle}>Company <span style={{ color: '#6b1e98' }}>*</span></label>
-                  <input style={inputStyle} value={form.company} onChange={(e) => set('company', e.target.value)} required autoComplete="organization" />
-                </div>
-                <div className="two-col" style={rowStyle}>
-                  <div>
-                    <label style={labelStyle}>Email <span style={{ color: '#6b1e98' }}>*</span></label>
-                    <input style={inputStyle} type="email" value={form.email} onChange={(e) => set('email', e.target.value)} required autoComplete="email" />
-                  </div>
-                  <div>
-                    <label style={labelStyle}>Phone</label>
-                    <input style={inputStyle} type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} autoComplete="tel" placeholder="(555) 000-0000" />
-                  </div>
                 </div>
               </div>
 
@@ -427,6 +390,35 @@ export default function RapalaLureOrderPage() {
                     onChange={setBackFile}
                   />
                 )}
+              </div>
+
+              {/* Contact */}
+              <div style={{ padding: '28px 32px', borderBottom: '1px solid #f3f4f6' }}>
+                <p style={sectionHeadStyle}>Contact Information</p>
+                <div className="two-col" style={{ ...rowStyle, marginBottom: 16 }}>
+                  <div>
+                    <label style={labelStyle}>First Name <span style={{ color: '#6b1e98' }}>*</span></label>
+                    <input style={inputStyle} value={form.firstName} onChange={(e) => set('firstName', e.target.value)} required autoComplete="given-name" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Last Name <span style={{ color: '#6b1e98' }}>*</span></label>
+                    <input style={inputStyle} value={form.lastName} onChange={(e) => set('lastName', e.target.value)} required autoComplete="family-name" />
+                  </div>
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={labelStyle}>Company <span style={{ color: '#6b1e98' }}>*</span></label>
+                  <input style={inputStyle} value={form.company} onChange={(e) => set('company', e.target.value)} required autoComplete="organization" />
+                </div>
+                <div className="two-col" style={rowStyle}>
+                  <div>
+                    <label style={labelStyle}>Email <span style={{ color: '#6b1e98' }}>*</span></label>
+                    <input style={inputStyle} type="email" value={form.email} onChange={(e) => set('email', e.target.value)} required autoComplete="email" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Phone</label>
+                    <input style={inputStyle} type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} autoComplete="tel" placeholder="(555) 000-0000" />
+                  </div>
+                </div>
               </div>
 
               {/* Notes */}
