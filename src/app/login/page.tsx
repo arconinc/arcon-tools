@@ -36,7 +36,7 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center" style={{ backgroundImage: 'url(/backgound.jpg)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
+    <div className="min-h-screen flex items-center justify-center" style={{ backgroundImage: 'url(/login-bg.webp)', backgroundSize: 'cover', backgroundPosition: 'center' }}>
       <div className="w-full max-w-sm bg-white rounded-2xl shadow-sm border border-slate-200 p-8 opacity-95">
         {/* Logo / Brand */}
         <div className="text-center mb-8">
