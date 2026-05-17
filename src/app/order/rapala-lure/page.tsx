@@ -197,7 +197,7 @@ export default function RapalaLureOrderPage() {
   // ------------------------------------------------------------------
   if (submitted) {
     return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#f4f4f5', padding: '40px 16px' }}>
+      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: '#fff', padding: '40px 16px' }}>
         <div style={{ background: '#fff', borderRadius: 16, padding: '56px 48px', maxWidth: 520, width: '100%', textAlign: 'center', boxShadow: '0 4px 24px rgba(0,0,0,.08)' }}>
           <div style={{ width: 56, height: 56, borderRadius: '50%', background: '#f0fdf4', border: '2px solid #86efac', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 24px' }}>
             <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="#16a34a" strokeWidth="2.5"><polyline points="20 6 9 17 4 12"/></svg>
@@ -247,7 +247,7 @@ export default function RapalaLureOrderPage() {
         @media (max-width: 600px) { .two-col { grid-template-columns: 1fr !important; } }
       `}</style>
 
-      <div style={{ minHeight: '100vh', background: '#f4f4f5', padding: '40px 16px' }}>
+      <div style={{ minHeight: '100vh', background: '#fff', padding: '40px 16px' }}>
         {/* Branding */}
         <div style={{ maxWidth: 760, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 280px', gap: 24, alignItems: 'start' }}>
 
