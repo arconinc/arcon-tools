@@ -1,7 +1,10 @@
 import { createClient } from '@supabase/supabase-js'
+import { throwIfInvalidEnv } from '@/lib/env'
 
 // Service role client — server-side only, never expose to client
 export function createAdminClient() {
+  throwIfInvalidEnv()
+
   return createClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
