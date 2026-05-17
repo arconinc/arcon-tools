@@ -1,6 +1,6 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useRef, useState, useEffect } from 'react'
 
 export const dynamic = 'force-dynamic'
 
@@ -152,6 +152,12 @@ export default function RapalaLureOrderPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (typeof window !== 'undefined' && process.env.NODE_ENV === 'production' && window.self === window.top) {
+      window.location.href = 'https://www.arconinc.com/rapala-logo-lure-order-form/'
+    }
+  }, [])
 
   const qty = parseInt(form.quantity, 10) || 0
   const colors = Math.max(1, parseInt(form.artColors, 10) || 1)
