@@ -8,6 +8,16 @@ import { Store, CalendarCountdownEvent } from '@/types'
 import { setGAUser, trackPageView } from '@/lib/analytics'
 import { NotificationBell } from './NotificationBell'
 
+// ── Module-level fetch cache ──────────────────────────────────────────────────
+// Survives React remounts within the same page session; cleared on full refresh.
+
+const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+
+const _fetchCache: {
+  stores?: { data: Store[]; at: number }
+  countdown?: { data: CalendarCountdownEvent[]; at: number }
+} = {}
+
 // ── Types ─────────────────────────────────────────────────────────────────────
 
 interface AppShellProps {
@@ -234,11 +244,21 @@ export default function AppShell({ children, user, isImpersonating, impersonated
   }, [profileOpen])
 
   useEffect(() => {
+    const cached = _fetchCache.stores
+    if (cached && Date.now() - cached.at < CACHE_TTL) {
+      const savedId = sessionStorage.getItem('selectedStoreId')
+      if (savedId) {
+        const found = cached.data.find((s: Store) => s.id === savedId)
+        if (found) setSelectedStore(found)
+      }
+      return
+    }
     fetch('/api/stores')
       .then(async (r) => {
         if (!r.ok) return
         const data = await r.json()
         if (Array.isArray(data)) {
+          _fetchCache.stores = { data, at: Date.now() }
           const savedId = sessionStorage.getItem('selectedStoreId')
           if (savedId) {
             const found = data.find((s: Store) => s.id === savedId)
@@ -250,10 +270,19 @@ export default function AppShell({ children, user, isImpersonating, impersonated
   }, [])
 
   useEffect(() => {
+    const cached = _fetchCache.countdown
+    if (cached && Date.now() - cached.at < CACHE_TTL) {
+      if (cached.data.length) {
+        setCountdownEvents(cached.data)
+        countdownEventsRef.current = cached.data
+      }
+      return
+    }
     fetch('/api/countdown')
       .then(r => r.ok ? r.json() : null)
       .then((data: { events: CalendarCountdownEvent[] } | null) => {
         if (data?.events?.length) {
+          _fetchCache.countdown = { data: data.events, at: Date.now() }
           setCountdownEvents(data.events)
           countdownEventsRef.current = data.events
         }
