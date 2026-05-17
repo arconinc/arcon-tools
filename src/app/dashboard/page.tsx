@@ -52,16 +52,11 @@ export default function DashboardPage() {
 
 
   useEffect(() => {
-    fetch('/api/admin/banner')
+    fetch('/api/banner')
       .then((r) => r.json())
-      .then((data: Array<{ status: string; slides_json: BannerSlide[] }>) => {
-        if (Array.isArray(data)) {
-          const pub = data.find((c) => c.status === 'published')
-          const live = pub?.slides_json ?? []
-          setSlides(live.length > 0 ? live : FALLBACK_SLIDES)
-        } else {
-          setSlides(FALLBACK_SLIDES)
-        }
+      .then((data: { slides: BannerSlide[] }) => {
+        const live = data.slides ?? []
+        setSlides(live.length > 0 ? live : FALLBACK_SLIDES)
       })
       .catch(() => setSlides(FALLBACK_SLIDES))
   }, [])

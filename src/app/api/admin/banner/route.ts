@@ -17,11 +17,10 @@ async function getAdminUser() {
   return appUser?.is_admin ? appUser : null
 }
 
-// GET — return draft and published configs
+// GET — return draft and published configs (admin only)
 export async function GET() {
-  const supabase = await createClient()
-  const { data: { user } } = await supabase.auth.getUser()
-  if (!user) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  const admin = await getAdminUser()
+  if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const adminClient = createAdminClient()
   const { data, error } = await adminClient
