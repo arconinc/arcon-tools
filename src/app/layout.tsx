@@ -7,6 +7,9 @@ const GA_ID = 'G-6FMMVL6CVF'
 export const metadata: Metadata = {
   title: 'The Arc',
   description: 'Arcon Solutions Intranet',
+  icons: {
+    icon: '/favicon.png',
+  },
 }
 
 export default function RootLayout({
