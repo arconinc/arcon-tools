@@ -553,18 +553,8 @@ export default function VendorDetailPage() {
                       <FS label="Specialty" name="specialty" value={(ef.specialty as string) ?? ''} onChange={handleEditChange} options={SPECIALTY_OPTIONS} />
                       <FI label="Arcon Account #" name="arcon_account_number" value={(ef.arcon_account_number as string) ?? ''} onChange={handleEditChange} />
                       <FI label="Online Store" name="online_store" value={(ef.online_store as string) ?? ''} onChange={handleEditChange} type="url" />
-                      {isAdmin && (
-                        <>
-                          <div className="col-span-4 inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
-                            <svg className="h-3.5 w-3.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                              <path fillRule="evenodd" d="M10 1a4 4 0 00-4 4v2H5a2 2 0 00-2 2v7a2 2 0 002 2h10a2 2 0 002-2V9a2 2 0 00-2-2h-1V5a4 4 0 00-4-4zm2 6V5a2 2 0 10-4 0v2h4z" clipRule="evenodd" />
-                            </svg>
-                            ARCON credentials are visible to admins only.
-                          </div>
-                          <FI label="Arcon Username" name="arcon_username" value={(ef.arcon_username as string) ?? ''} onChange={handleEditChange} />
-                          <FI label="Arcon Password" name="arcon_password" value={(ef.arcon_password as string) ?? ''} onChange={handleEditChange} />
-                        </>
-                      )}
+                      <FI label="Arcon Username" name="arcon_username" value={(ef.arcon_username as string) ?? ''} onChange={handleEditChange} />
+                      <FI label="Arcon Password" name="arcon_password" value={(ef.arcon_password as string) ?? ''} onChange={handleEditChange} />
                     </>
                   ) : (
                     <>
@@ -572,18 +562,8 @@ export default function VendorDetailPage() {
                       <Field label="Specialty" value={vendor.specialty} />
                       <Field label="Arcon Account #" value={vendor.arcon_account_number} />
                       <Field label="Online Store" value={vendor.online_store} link />
-                      {isAdmin && (
-                        <>
-                          <div className="col-span-4 inline-flex items-center gap-1.5 rounded-lg border border-amber-200 bg-amber-50 px-2.5 py-1 text-xs font-medium text-amber-800">
-                            <svg className="h-3.5 w-3.5 flex-shrink-0" viewBox="0 0 20 20" fill="currentColor" aria-hidden="true">
-                              <path fillRule="evenodd" d="M10 1a4 4 0 00-4 4v2H5a2 2 0 00-2 2v7a2 2 0 002 2h10a2 2 0 002-2V9a2 2 0 00-2-2h-1V5a4 4 0 00-4-4zm2 6V5a2 2 0 10-4 0v2h4z" clipRule="evenodd" />
-                            </svg>
-                            ARCON credentials are visible to admins only.
-                          </div>
-                          <Field label="Arcon Username" value={vendor.arcon_username} password />
-                          <Field label="Arcon Password" value={vendor.arcon_password} password />
-                        </>
-                      )}
+                      <Field label="Arcon Username" value={vendor.arcon_username} password />
+                      <Field label="Arcon Password" value={vendor.arcon_password} password />
                     </>
                   )}
                 </div>
