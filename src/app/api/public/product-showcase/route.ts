@@ -1,130 +1,12 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendProductShowcaseConfirmation } from '@/lib/email-product-showcase'
+import { ensureTag, applyEntityTag, upsertCustomer, upsertContact } from '@/lib/crm/tags'
 
 export const runtime = 'nodejs'
 
 const TAG_NAME = 'ProductShowcase2026'
 const TAG_COLOR = '#8b5cf6'
-
-// ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-async function ensureTag(adminClient: ReturnType<typeof createAdminClient>): Promise<string> {
-  const { data: existing } = await adminClient
-    .from('crm_tags')
-    .select('id')
-    .eq('name', TAG_NAME)
-    .maybeSingle()
-  if (existing?.id) return existing.id as string
-
-  const { data: created, error } = await adminClient
-    .from('crm_tags')
-    .insert({ name: TAG_NAME, color: TAG_COLOR })
-    .select('id')
-    .single()
-  if (error) throw new Error(`Tag creation failed: ${error.message}`)
-  return created.id as string
-}
-
-async function applyEntityTag(
-  adminClient: ReturnType<typeof createAdminClient>,
-  tagId: string,
-  entityId: string,
-  entityType: 'contact' | 'customer'
-): Promise<void> {
-  const { data: existing } = await adminClient
-    .from('crm_entity_tags')
-    .select('tag_id')
-    .eq('tag_id', tagId)
-    .eq('entity_type', entityType)
-    .eq('entity_id', entityId)
-    .maybeSingle()
-  if (!existing) {
-    await adminClient
-      .from('crm_entity_tags')
-      .insert({ tag_id: tagId, entity_type: entityType, entity_id: entityId })
-  }
-}
-
-// Find or create a CRM customer by company name (case-insensitive).
-async function upsertCustomer(
-  adminClient: ReturnType<typeof createAdminClient>,
-  company: string,
-  salespersonId: string
-): Promise<string> {
-  const { data: existing } = await adminClient
-    .from('crm_customers')
-    .select('id')
-    .ilike('name', company.trim())
-    .limit(1)
-    .maybeSingle()
-  if (existing?.id) return existing.id as string
-
-  const { data: created, error } = await adminClient
-    .from('crm_customers')
-    .insert({
-      name: company.trim(),
-      client_status: 'Prospective',
-      assigned_to: salespersonId,
-      created_by: salespersonId,
-    })
-    .select('id')
-    .single()
-  if (error) throw new Error(`Customer creation failed: ${error.message}`)
-  return created.id as string
-}
-
-// Find or create a CRM contact by email. Links to the given customer.
-async function upsertContact(
-  adminClient: ReturnType<typeof createAdminClient>,
-  contact: {
-    first_name: string
-    last_name: string
-    email: string
-    phone?: string
-    job_title?: string
-    customer_id: string
-    salesperson_id: string
-  }
-): Promise<string> {
-  const normalizedEmail = contact.email.toLowerCase().trim()
-
-  const { data: existing } = await adminClient
-    .from('crm_contacts')
-    .select('id, customer_id')
-    .eq('email', normalizedEmail)
-    .maybeSingle()
-
-  if (existing) {
-    const updates: Record<string, unknown> = {
-      product_showcase_invite: '2026',
-    }
-    if (!existing.customer_id) updates.customer_id = contact.customer_id
-    await adminClient.from('crm_contacts').update(updates).eq('id', existing.id)
-    return existing.id as string
-  }
-
-  const { data: created, error } = await adminClient
-    .from('crm_contacts')
-    .insert({
-      first_name: contact.first_name.trim(),
-      last_name: contact.last_name.trim(),
-      email: normalizedEmail,
-      phone: contact.phone ?? null,
-      title: contact.job_title ?? null,
-      type_of_contact: 'Customer',
-      customer_id: contact.customer_id,
-      arcon_salesperson: contact.salesperson_id,
-      product_showcase_invite: '2026',
-      created_by: contact.salesperson_id,
-    })
-    .select('id')
-    .single()
-  if (error) throw new Error(`Contact creation failed: ${error.message}`)
-  return created.id as string
-}
 
 function isValidEmail(email: string): boolean {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)
@@ -191,7 +73,7 @@ export async function POST(request: Request) {
     const salesPersonName = salesperson.display_name as string
 
     // 2. Ensure tag exists
-    const tagId = await ensureTag(adminClient)
+    const tagId = await ensureTag(adminClient, TAG_NAME, TAG_COLOR)
 
     // 3. Find or create customer
     const customerId = await upsertCustomer(adminClient, company, arconSalespersonId)
@@ -206,6 +88,7 @@ export async function POST(request: Request) {
       job_title: jobTitle,
       customer_id: customerId,
       salesperson_id: arconSalespersonId,
+      product_showcase_invite: '2026',
     })
     await applyEntityTag(adminClient, tagId, primaryContactId, 'contact')
 
@@ -219,6 +102,7 @@ export async function POST(request: Request) {
         email: attendee.email,
         customer_id: customerId,
         salesperson_id: arconSalespersonId,
+        product_showcase_invite: '2026',
       })
       await applyEntityTag(adminClient, tagId, contactId, 'contact')
       additionalContactIds.push(contactId)
