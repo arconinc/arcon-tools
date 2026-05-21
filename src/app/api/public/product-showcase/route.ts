@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendProductShowcaseConfirmation } from '@/lib/email-product-showcase'
 import { ensureTag, applyEntityTag, upsertCustomer, upsertContact } from '@/lib/crm/tags'
+import { appendProductShowcaseRows } from '@/lib/google-sheets'
 
 export const runtime = 'nodejs'
 
@@ -219,6 +220,24 @@ export async function POST(request: Request) {
       user_id: arconSalespersonId,
       comment: `Confirmation emails (${new Date().toISOString()}):\n${emailLog}`,
     })
+
+    // 10. Log to Google Sheet (non-blocking — failure must not fail the registration)
+    try {
+      await appendProductShowcaseRows({
+        submittedAt: new Date(),
+        firstName,
+        lastName,
+        email,
+        company,
+        jobTitle,
+        phone,
+        salesPersonName,
+        categories,
+        additionalAttendees,
+      })
+    } catch (sheetsErr) {
+      console.error('[ProductShowcase] Google Sheets logging failed:', sheetsErr)
+    }
 
     return NextResponse.json({ success: true }, { status: 201 })
   } catch (err) {
