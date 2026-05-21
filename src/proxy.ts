@@ -41,7 +41,8 @@ export async function proxy(request: NextRequest) {
     pathname.startsWith('/auth/') ||
     pathname.startsWith('/api/addon/') ||
     pathname.startsWith('/order/') ||
-    pathname.startsWith('/api/public/')
+    pathname.startsWith('/api/public/') ||
+    pathname.startsWith('/product_showcase_checkin')
   ) {
     // If already logged in and going to /login, redirect to dashboard
     if (user && pathname === '/login') {
