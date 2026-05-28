@@ -6,11 +6,14 @@ import { ArticleCard } from './ArticleCard'
 import { ARTICLE_TYPES, ARTICLE_TYPE_BADGE } from '@/lib/news-utils'
 import type { NewsArticleSummary, ArticleType } from '@/types'
 
-const PAGE_SIZE = 6
+const PAGE_SIZE = 30
 
 function SkeletonCard() {
   return (
-    <div className="bg-white rounded-2xl border border-slate-200 p-4 animate-pulse">
+    <div
+      className="bg-white rounded-2xl border border-slate-200 p-4 animate-pulse flex-shrink-0"
+      style={{ width: 'calc(33.333% - 11px)', minWidth: 240 }}
+    >
       <div className="flex gap-2 mb-3">
         <div className="h-5 w-16 bg-slate-100 rounded-full" />
       </div>
@@ -23,27 +26,21 @@ function SkeletonCard() {
 
 export function NewsFeed() {
   const [articles, setArticles] = useState<NewsArticleSummary[]>([])
-  const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
-  const [loadingMore, setLoadingMore] = useState(false)
   const [activeType, setActiveType] = useState<ArticleType | 'all'>('all')
   const [availableTypes, setAvailableTypes] = useState<ArticleType[]>([])
-  const [offset, setOffset] = useState(0)
 
-  async function fetchArticles(typeFilter: ArticleType | 'all', currentOffset: number, append = false) {
-    const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: String(currentOffset) })
+  async function fetchArticles(typeFilter: ArticleType | 'all') {
+    const params = new URLSearchParams({ limit: String(PAGE_SIZE), offset: '0' })
     if (typeFilter !== 'all') params.set('type', typeFilter)
 
     const res = await fetch(`/api/news?${params}`)
     const data = await res.json()
     if (res.ok) {
-      setTotal(data.total)
-      if (append) {
-        setArticles((prev) => [...prev, ...(data.articles ?? [])])
-      } else {
-        setArticles(data.articles ?? [])
-        // Compute which types are present
-        const types = [...new Set((data.articles ?? []).map((a: NewsArticleSummary) => a.type))] as ArticleType[]
+      const fetched: NewsArticleSummary[] = data.articles ?? []
+      setArticles(fetched)
+      if (typeFilter === 'all') {
+        const types = [...new Set(fetched.map((a) => a.type))] as ArticleType[]
         setAvailableTypes(types)
       }
     }
@@ -51,26 +48,15 @@ export function NewsFeed() {
 
   useEffect(() => {
     setLoading(true)
-    fetchArticles('all', 0).finally(() => setLoading(false))
+    fetchArticles('all').finally(() => setLoading(false))
   }, [])
 
   async function handleTypeChange(type: ArticleType | 'all') {
     setActiveType(type)
-    setOffset(0)
     setLoading(true)
-    await fetchArticles(type, 0)
+    await fetchArticles(type)
     setLoading(false)
   }
-
-  async function loadMore() {
-    const nextOffset = offset + PAGE_SIZE
-    setOffset(nextOffset)
-    setLoadingMore(true)
-    await fetchArticles(activeType, nextOffset, true)
-    setLoadingMore(false)
-  }
-
-  const hasMore = articles.length < total
 
   if (loading) {
     return (
@@ -78,14 +64,14 @@ export function NewsFeed() {
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">News & Announcements</h2>
         </div>
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <div className="flex gap-4 overflow-hidden">
           {[1, 2, 3].map((n) => <SkeletonCard key={n} />)}
         </div>
       </div>
     )
   }
 
-  if (!loading && articles.length === 0) {
+  if (articles.length === 0) {
     return (
       <div>
         <div className="flex items-center justify-between mb-4">
@@ -136,25 +122,21 @@ export function NewsFeed() {
         </div>
       )}
 
-      {/* Article grid */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+      {/* Horizontally scrollable article row — shows 3 at a time */}
+      <div
+        className="flex gap-4 overflow-x-auto pb-2"
+        style={{ scrollSnapType: 'x mandatory', WebkitOverflowScrolling: 'touch' }}
+      >
         {articles.map((article) => (
-          <ArticleCard key={article.id} article={article} />
+          <div
+            key={article.id}
+            className="flex-shrink-0"
+            style={{ width: 'calc(33.333% - 11px)', minWidth: 240, scrollSnapAlign: 'start' }}
+          >
+            <ArticleCard article={article} />
+          </div>
         ))}
       </div>
-
-      {/* Load more */}
-      {hasMore && (
-        <div className="mt-4 text-center">
-          <button
-            onClick={loadMore}
-            disabled={loadingMore}
-            className="px-4 py-2 text-sm text-slate-600 border border-slate-300 rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50"
-          >
-            {loadingMore ? 'Loading...' : 'Load More'}
-          </button>
-        </div>
-      )}
     </div>
   )
 }

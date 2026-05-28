@@ -99,6 +99,12 @@ function buildNavSections(isAdmin: boolean, roles: string[]): NavSection[] {
           ],
       },
     {
+      label: 'Tasks',
+      items: [
+        { href: '/my-tasks', label: 'My Tasks', icon: BoardIcon },
+      ],
+    },
+    {
       label: 'Aturian',
       items: [
         { href: 'https://arcon.erp.network/', label: 'Login', icon: LoginIcon },
@@ -115,12 +121,6 @@ function buildNavSections(isAdmin: boolean, roles: string[]): NavSection[] {
         { href: '/marketing/opportunities', label: 'Opportunities', icon: CrmOppsIcon, adminMatch: true },
         { href: '/documents/marketing', label: 'Documents', icon: DocumentIcon, adminMatch: true },
         { href: '/marketing/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
-      ],
-    },
-    {
-      label: 'Tasks',
-      items: [
-        { href: '/my-tasks', label: 'My Tasks', icon: BoardIcon },
       ],
     },
     {
