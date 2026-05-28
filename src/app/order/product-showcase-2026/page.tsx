@@ -164,15 +164,12 @@ export default function ProductShowcasePage() {
     }))
   }, [])
 
-  // Fetch Sales employees
+  // Fetch Sales employees (public endpoint — no auth required)
   useEffect(() => {
-    fetch('/api/employees')
+    fetch('/api/public/sales-employees')
       .then((r) => r.json())
-      .then((data: { id: string; display_name: string; department?: string[] | null }[]) => {
-        const sales = data
-          .filter((e) => e.department?.includes('Sales'))
-          .sort((a, b) => a.display_name.localeCompare(b.display_name))
-        setSalesPeople(sales)
+      .then((data: { id: string; display_name: string }[]) => {
+        setSalesPeople(data)
       })
       .catch(() => {})
   }, [])

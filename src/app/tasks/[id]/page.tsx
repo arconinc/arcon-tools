@@ -217,6 +217,69 @@ function isImageMime(mime: string | null) {
   return mime?.startsWith('image/') ?? false
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const min = Math.floor(diff / 60000)
+  if (min < 1) return 'just now'
+  if (min < 60) return `${min}m ago`
+  const hr = Math.floor(min / 60)
+  if (hr < 24) return `${hr}h ago`
+  const days = Math.floor(hr / 24)
+  if (days === 1) return 'yesterday'
+  if (days < 7) return `${days}d ago`
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
+
+// ── Notes Preview (Details tab) ───────────────────────────────────────────────
+
+function NotesPreview({
+  comments,
+  onViewAll,
+}: {
+  comments: Comment[]
+  onViewAll: () => void
+}) {
+  const latest = comments[comments.length - 1] ?? null
+  const extraCount = comments.length - 1
+
+  return (
+    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
+        <h2 className="text-sm font-semibold text-slate-700">Notes</h2>
+        {comments.length > 0 && (
+          <button
+            onClick={onViewAll}
+            className="text-xs font-semibold text-purple-700 hover:underline"
+          >
+            View all ({comments.length})
+          </button>
+        )}
+      </div>
+      {!latest ? (
+        <div className="px-6 py-4 text-sm text-slate-400">No notes yet.</div>
+      ) : (
+        <div className="px-6 py-4">
+          <div className="flex items-center gap-1.5 mb-1">
+            <span className="text-xs font-semibold text-slate-700">{latest.user.display_name}</span>
+            <span className="text-xs text-slate-400">{relativeTime(latest.created_at)}</span>
+          </div>
+          <p className="text-sm text-slate-700 line-clamp-3 whitespace-pre-wrap">{latest.comment}</p>
+          {extraCount > 0 && (
+            <button
+              onClick={onViewAll}
+              className="mt-2 text-xs font-semibold text-purple-700 hover:underline"
+            >
+              {extraCount} more note{extraCount !== 1 ? 's' : ''} →
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ── Comments Tab ──────────────────────────────────────────────────────────────
 
 function CommentsTab({
@@ -696,7 +759,7 @@ export default function TaskDetailPage() {
               activeTab === tab ? 'bg-purple-700 text-white' : 'text-slate-600 hover:bg-slate-100'
             }`}
           >
-            {tab}
+            {tab === 'comments' ? 'Notes' : tab}
             {tab === 'comments' && task.comments.length > 0 && (
               <span className="ml-1.5 text-xs opacity-70">{task.comments.length}</span>
             )}
@@ -865,6 +928,11 @@ export default function TaskDetailPage() {
               <span>Updated {fmtDate(task.updated_at)}</span>
             </div>
           </div>
+
+          <NotesPreview
+            comments={task.comments}
+            onViewAll={() => setActiveTab('comments')}
+          />
 
           {/* History timeline */}
           {task.history.length > 0 && (

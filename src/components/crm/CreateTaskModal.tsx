@@ -1,11 +1,32 @@
 'use client'
 
-import { useEffect, useState, type FormEvent } from 'react'
+import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useAppUser } from '@/components/layout/AppShell'
 import { TaskAssignmentSelect } from '@/components/crm/TaskAssignmentSelect'
 import type { CrmTask, CrmTaskDepartment } from '@/types'
 
 type DropdownUser = { id: string; display_name: string; email: string }
+
+type TaskNote = {
+  id: string
+  user_id: string
+  comment: string
+  created_at: string
+  user: { display_name: string }
+}
+
+function relativeTime(iso: string): string {
+  const diff = Date.now() - new Date(iso).getTime()
+  const min = Math.floor(diff / 60000)
+  if (min < 1) return 'just now'
+  if (min < 60) return `${min}m ago`
+  const hr = Math.floor(min / 60)
+  if (hr < 24) return `${hr}h ago`
+  const days = Math.floor(hr / 24)
+  if (days === 1) return 'yesterday'
+  if (days < 7) return `${days}d ago`
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+}
 
 type TaskForm = {
   title: string
@@ -41,6 +62,7 @@ export type TaskFormTask = CrmTask & {
   vendor?: { id: string; name: string } | null
   contact?: { id: string; first_name: string; last_name: string } | null
   assigned_user?: { id: string; display_name: string; email: string } | null
+  comments?: TaskNote[]
 }
 
 const STATUSES = [
@@ -116,6 +138,10 @@ export function TaskFormModal({
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [notes, setNotes] = useState<TaskNote[]>(() => task?.comments ?? [])
+  const [noteText, setNoteText] = useState('')
+  const [submittingNote, setSubmittingNote] = useState(false)
+  const notesEndRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -138,6 +164,33 @@ export function TaskFormModal({
   }, [open, mode, task?.id, appUser?.email, defaultDepartment])
 
   if (!open) return null
+
+  async function refreshNotes(taskId: string) {
+    const res = await fetch(`/api/marketing/tasks/${taskId}/comments`)
+    if (!res.ok) return
+    const data = await res.json()
+    if (Array.isArray(data)) setNotes(data)
+    else if (Array.isArray(data.comments)) setNotes(data.comments)
+    setTimeout(() => notesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+  }
+
+  async function submitNote() {
+    if (!noteText.trim() || !task?.id) return
+    setSubmittingNote(true)
+    try {
+      const res = await fetch(`/api/marketing/tasks/${task.id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ comment: noteText.trim() }),
+      })
+      if (res.ok) {
+        setNoteText('')
+        await refreshNotes(task.id)
+      }
+    } finally {
+      setSubmittingNote(false)
+    }
+  }
 
   async function uploadAttachments(taskId: string) {
     if (pendingFiles.length === 0) return
@@ -366,6 +419,48 @@ export function TaskFormModal({
               </div>
             )}
           </div>
+
+          {mode === 'edit' && task?.id && (
+            <div className="border-t border-slate-100 pt-4">
+              <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Notes</div>
+              <div className="flex gap-2 items-start mb-3">
+                <textarea
+                  rows={2}
+                  value={noteText}
+                  onChange={(e) => setNoteText(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submitNote()
+                  }}
+                  placeholder="Add a note…"
+                  className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none"
+                />
+                <button
+                  type="button"
+                  onClick={submitNote}
+                  disabled={submittingNote || !noteText.trim()}
+                  className="px-3 py-2 bg-purple-700 text-white text-xs font-semibold rounded-lg hover:bg-purple-800 disabled:opacity-50 transition-colors whitespace-nowrap"
+                >
+                  {submittingNote ? 'Saving…' : 'Add Note'}
+                </button>
+              </div>
+              {notes.length === 0 ? (
+                <p className="text-xs text-slate-400">No notes yet.</p>
+              ) : (
+                <div className="max-h-40 overflow-y-auto space-y-2.5 pr-1">
+                  {[...notes].reverse().map((n) => (
+                    <div key={n.id} className="bg-slate-50 rounded-lg px-3 py-2">
+                      <div className="flex items-center gap-1.5 mb-0.5">
+                        <span className="text-xs font-semibold text-slate-700">{n.user.display_name}</span>
+                        <span className="text-xs text-slate-400">{relativeTime(n.created_at)}</span>
+                      </div>
+                      <p className="text-xs text-slate-600 whitespace-pre-wrap">{n.comment}</p>
+                    </div>
+                  ))}
+                  <div ref={notesEndRef} />
+                </div>
+              )}
+            </div>
+          )}
 
           <div className="flex justify-end gap-3 pt-2">
             <button
