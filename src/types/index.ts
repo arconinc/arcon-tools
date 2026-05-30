@@ -986,3 +986,37 @@ export interface NotificationPreferenceView {
   description: string
   email: boolean
 }
+
+// ─── Expense Reports ─────────────────────────────────────────────────────────
+
+export type ExpenseReportStatus =
+  | 'draft'
+  | 'submitted'
+  | 'needs_changes'
+  | 'approved'
+  | 'submitted_to_payroll'
+
+export interface ExpenseReportConfig {
+  id: string
+  reviewer_user_id: string | null
+  template_drive_file_id: string | null
+  template_drive_url: string | null
+  expense_folder_id: string | null
+  template_instructions: string | null
+  updated_at: string
+  updated_by: string | null
+  reviewer?: { id: string; display_name: string; email: string } | null
+}
+
+export interface ExpenseReport {
+  id: string
+  created_by: string
+  period_month: string          // YYYY-MM
+  status: ExpenseReportStatus
+  drive_file_id: string | null
+  drive_url: string | null
+  reviewer_comment: string | null
+  created_at: string
+  updated_at: string
+  submitter?: { id: string; display_name: string; email: string } | null
+}

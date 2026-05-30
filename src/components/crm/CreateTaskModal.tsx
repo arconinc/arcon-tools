@@ -62,6 +62,7 @@ export type TaskFormTask = CrmTask & {
   vendor?: { id: string; name: string } | null
   contact?: { id: string; first_name: string; last_name: string } | null
   assigned_user?: { id: string; display_name: string; email: string } | null
+  created_user?: { id: string; display_name: string } | null
   comments?: TaskNote[]
 }
 
@@ -379,6 +380,15 @@ export function TaskFormModal({
               />
             </div>
           </div>
+
+          {mode === 'edit' && task?.created_user && (
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Assigned By</label>
+              <div className="px-3 py-2 text-sm text-slate-700 bg-slate-50 border border-slate-200 rounded-lg">
+                {task.created_user.display_name}
+              </div>
+            </div>
+          )}
 
           <div>
             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Description</label>

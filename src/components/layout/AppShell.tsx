@@ -37,6 +37,7 @@ type NavItemDef = {
   soon?: boolean
   adminMatch?: boolean    // use pathname.startsWith instead of ===
   requiredRole?: string   // if set, hidden unless user has this role (or is admin)
+  adminOnly?: boolean     // if set, hidden unless user is admin
 }
 
 type NavSection = {
@@ -81,7 +82,10 @@ export function useAppUser() {
 
 function buildNavSections(isAdmin: boolean, roles: string[]): NavSection[] {
   const filter = (items: NavItemDef[]) =>
-    items.filter(item => isAdmin || !item.requiredRole || roles.includes(item.requiredRole))
+    items.filter(item => {
+      if (item.adminOnly && !isAdmin) return false
+      return isAdmin || !item.requiredRole || roles.includes(item.requiredRole)
+    })
   const sections: NavSection[] = [
     {
       label: 'Home',
@@ -142,6 +146,8 @@ function buildNavSections(isAdmin: boolean, roles: string[]): NavSection[] {
       label: 'Accounting',
       items: [
         { href: '/documents/accounting', label: 'Documents', icon: DocumentIcon, adminMatch: true },
+        { href: '/expense-reports', label: 'Expense Reports', icon: ClipboardListIcon, adminMatch: true },
+        { href: '/admin/expense-reports', label: 'Expense Report Approvals', icon: ClipboardListIcon, adminMatch: true, adminOnly: true },
         { href: '/accounting/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
       ],
     },

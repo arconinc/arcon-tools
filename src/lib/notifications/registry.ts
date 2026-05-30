@@ -206,6 +206,198 @@ export const accessRequestDenied: NotificationDefinition<AccessRequestDeniedPayl
   },
 }
 
+// ─── expense_report.submitted ────────────────────────────────────────────────
+
+export interface ExpenseReportSubmittedPayload {
+  report_id: string
+  period_month: string    // e.g. "2026-05"
+  submitter_name: string
+  drive_url: string
+}
+
+export const expenseReportSubmitted: NotificationDefinition<ExpenseReportSubmittedPayload> = {
+  type: 'expense_report.submitted',
+  label: 'Expense report submitted (reviewer)',
+  description: 'When an employee submits or re-submits an expense report for review.',
+  defaultEmail: true,
+  render: (p) => ({
+    title: `${p.submitter_name} submitted an expense report for ${p.period_month}`,
+    body: 'Ready for your review in Google Sheets.',
+    linkUrl: `/admin/expense-reports/${p.report_id}`,
+  }),
+  email: (p, recipient) => {
+    const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
+    return {
+      subject: `Expense report submitted: ${p.submitter_name} — ${p.period_month}`,
+      html: renderGenericEmail({
+        preheader: `${p.submitter_name} submitted their ${p.period_month} expense report`,
+        heading: 'Expense Report Submitted',
+        greeting: `Hi ${firstName},`,
+        bodyLines: [
+          `<strong>${p.submitter_name}</strong> has submitted their expense report for <strong>${p.period_month}</strong> and it is ready for your review.`,
+          `Open the sheet, review the details, and use the <strong>Arc Expense Report</strong> menu to approve, request changes, or submit to payroll.`,
+        ],
+        ctaText: 'Open in Google Sheets',
+        ctaUrl: p.drive_url,
+      }),
+    }
+  },
+}
+
+// ─── expense_report.needs_changes ────────────────────────────────────────────
+
+export interface ExpenseReportNeedsChangesPayload {
+  report_id: string
+  period_month: string
+  reviewer_name: string
+  comment: string | null
+  drive_url: string
+}
+
+export const expenseReportNeedsChanges: NotificationDefinition<ExpenseReportNeedsChangesPayload> = {
+  type: 'expense_report.needs_changes',
+  label: 'My expense report needs changes',
+  description: 'When the reviewer flags your expense report as needing corrections.',
+  defaultEmail: true,
+  render: (p) => ({
+    title: `Your ${p.period_month} expense report needs changes`,
+    body: p.comment ?? `Reviewed by ${p.reviewer_name}.`,
+    linkUrl: `/expense-reports/${p.report_id}`,
+  }),
+  email: (p, recipient) => {
+    const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
+    return {
+      subject: `Your expense report needs changes — ${p.period_month}`,
+      html: renderGenericEmail({
+        preheader: `${p.reviewer_name} has requested changes to your ${p.period_month} expense report`,
+        heading: 'Expense Report Needs Changes',
+        greeting: `Hi ${firstName},`,
+        bodyLines: [
+          `<strong>${p.reviewer_name}</strong> has reviewed your expense report for <strong>${p.period_month}</strong> and has requested some changes.`,
+          ...(p.comment ? [`Their note: <em>${p.comment}</em>`] : []),
+          `Please open the report in Google Sheets, make the necessary corrections, and re-submit using the <strong>Arc Expense Report</strong> menu.`,
+        ],
+        ctaText: 'Open in Google Sheets',
+        ctaUrl: p.drive_url,
+      }),
+    }
+  },
+}
+
+// ─── expense_report.approved ─────────────────────────────────────────────────
+
+export interface ExpenseReportApprovedPayload {
+  report_id: string
+  period_month: string
+  reviewer_name: string
+}
+
+export const expenseReportApproved: NotificationDefinition<ExpenseReportApprovedPayload> = {
+  type: 'expense_report.approved',
+  label: 'My expense report was approved',
+  description: 'When the reviewer approves your expense report.',
+  defaultEmail: true,
+  render: (p) => ({
+    title: `Your ${p.period_month} expense report has been approved`,
+    body: `Approved by ${p.reviewer_name}.`,
+    linkUrl: `/expense-reports/${p.report_id}`,
+  }),
+  email: (p, recipient) => {
+    const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
+    return {
+      subject: `Expense report approved — ${p.period_month}`,
+      html: renderGenericEmail({
+        preheader: `Your ${p.period_month} expense report has been approved`,
+        heading: 'Expense Report Approved',
+        greeting: `Hi ${firstName},`,
+        bodyLines: [
+          `Your expense report for <strong>${p.period_month}</strong> has been approved by <strong>${p.reviewer_name}</strong>.`,
+          `No further action is required on your part.`,
+        ],
+        ctaText: 'View in The Arc',
+        ctaUrl: `${appUrl()}/expense-reports/${p.report_id}`,
+      }),
+    }
+  },
+}
+
+// ─── expense_report.submitted_to_payroll ─────────────────────────────────────
+
+export interface ExpenseReportSubmittedToPayrollPayload {
+  report_id: string
+  period_month: string
+  reviewer_name: string
+}
+
+export const expenseReportSubmittedToPayroll: NotificationDefinition<ExpenseReportSubmittedToPayrollPayload> = {
+  type: 'expense_report.submitted_to_payroll',
+  label: 'My expense report was submitted to payroll',
+  description: 'When the reviewer submits your approved expense report to payroll.',
+  defaultEmail: true,
+  render: (p) => ({
+    title: `Your ${p.period_month} expense report has been submitted to payroll`,
+    body: `Submitted by ${p.reviewer_name}.`,
+    linkUrl: `/expense-reports/${p.report_id}`,
+  }),
+  email: (p, recipient) => {
+    const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
+    return {
+      subject: `Expense report submitted to payroll — ${p.period_month}`,
+      html: renderGenericEmail({
+        preheader: `Your ${p.period_month} expense report has been submitted to payroll`,
+        heading: 'Submitted to Payroll',
+        greeting: `Hi ${firstName},`,
+        bodyLines: [
+          `Your expense report for <strong>${p.period_month}</strong> has been submitted to payroll by <strong>${p.reviewer_name}</strong>.`,
+          `You should expect reimbursement on your next eligible pay cycle.`,
+        ],
+        ctaText: 'View in The Arc',
+        ctaUrl: `${appUrl()}/expense-reports/${p.report_id}`,
+      }),
+    }
+  },
+}
+
+// ─── task_completed ───────────────────────────────────────────────────────────
+
+export interface TaskCompletedPayload {
+  task_id: string
+  task_title: string
+  actor_id: string
+  actor_name: string
+  department: string | null
+}
+
+export const taskCompleted: NotificationDefinition<TaskCompletedPayload> = {
+  type: 'task_completed',
+  label: 'My task was completed by someone else',
+  description: 'When a task you created is marked complete by another person.',
+  defaultEmail: false,
+  render: (p) => ({
+    title: `${p.actor_name} completed: ${p.task_title}`,
+    body: p.department ? `${p.department} task marked complete` : 'Task marked complete',
+    linkUrl: `/marketing/tasks/${p.task_id}`,
+  }),
+  email: (p, recipient) => {
+    const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
+    return {
+      subject: `Task completed: ${p.task_title}`,
+      html: renderGenericEmail({
+        preheader: `${p.actor_name} marked your task complete`,
+        heading: 'Task Completed',
+        greeting: `Hi ${firstName},`,
+        bodyLines: [
+          `<strong>${p.actor_name}</strong> marked the following task as complete:`,
+          `<strong style="font-size:16px;color:#1e293b">${p.task_title}</strong>`,
+          ...(p.department ? [`<strong>Department:</strong> ${p.department}`] : []),
+        ],
+        ctaText: 'View task',
+        ctaUrl: `${appUrl()}/marketing/tasks/${p.task_id}`,
+      }),
+    }
+  },
+}
+
 // ─── Registry ─────────────────────────────────────────────────────────────────
 //
 // To add a new notification type:
@@ -216,9 +408,14 @@ export const accessRequestDenied: NotificationDefinition<AccessRequestDeniedPayl
 
 export const NOTIFICATION_REGISTRY = {
   task_assigned: taskAssigned,
+  task_completed: taskCompleted,
   'access_request.new': accessRequestNew,
   'access_request.approved': accessRequestApproved,
   'access_request.denied': accessRequestDenied,
+  'expense_report.submitted': expenseReportSubmitted,
+  'expense_report.needs_changes': expenseReportNeedsChanges,
+  'expense_report.approved': expenseReportApproved,
+  'expense_report.submitted_to_payroll': expenseReportSubmittedToPayroll,
 } as const
 
 export type NotificationType = keyof typeof NOTIFICATION_REGISTRY

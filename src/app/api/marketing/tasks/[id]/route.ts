@@ -3,7 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 import { DEPARTMENTS, getDepartmentForTaskCategory } from '@/lib/task-constants'
 import { dispatchNotification, fetchActor } from '@/lib/notifications/dispatch'
-import { taskAssigned } from '@/lib/notifications/registry'
+import { taskAssigned, taskCompleted } from '@/lib/notifications/registry'
 
 const TRACKED_FIELDS = ['status', 'assigned_to', 'department', 'priority', 'category', 'due_date', 'progress'] as const
 const TASK_UPDATE_FIELDS = [
@@ -311,6 +311,27 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           fanout_kind: 'department',
         },
         recipientSpec: { department: data.department },
+        suppressUserIds: [appUser.id],
+      })
+    }
+
+    // Notify the task creator when someone else marks the task complete
+    const statusChangedToCompleted =
+      'status' in safeUpdates &&
+      data.status === 'completed' &&
+      current.status !== 'completed'
+    if (statusChangedToCompleted && current.created_by && current.created_by !== appUser.id) {
+      const actor = await fetchActor(appUser.id)
+      await dispatchNotification({
+        definition: taskCompleted,
+        payload: {
+          task_id: data.id,
+          task_title: data.title,
+          actor_id: appUser.id,
+          actor_name: actor.display_name,
+          department: data.department ?? null,
+        },
+        recipientSpec: { userId: current.created_by },
         suppressUserIds: [appUser.id],
       })
     }

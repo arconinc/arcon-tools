@@ -902,6 +902,7 @@ export default function TaskDetailPage() {
                   <Field label="Department / Category" value={formatTaskAssignment(task.department, task.category)} />
                   <Field label="Due Date" value={fmtDate(task.due_date)} />
                   <Field label="Assigned To" value={task.assigned_user?.display_name ?? null} />
+                  <Field label="Assigned By" value={task.created_user?.display_name ?? null} />
                   {task.description && (
                     <div className="col-span-2">
                       <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Description</div>
