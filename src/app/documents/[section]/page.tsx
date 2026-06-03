@@ -74,6 +74,15 @@ export default function SectionDocumentsPage() {
   const [editDocDescription, setEditDocDescription] = useState('')
   const [editDocLoading, setEditDocLoading] = useState(false)
 
+  // Replace document modal
+  const [replaceDocModal, setReplaceDocModal] = useState<DriveDocument | null>(null)
+  const [replaceDocSource, setReplaceDocSource] = useState<DocSource>('drive')
+  const [replaceDocDriveUrl, setReplaceDocDriveUrl] = useState('')
+  const [replaceDocFile, setReplaceDocFile] = useState<File | null>(null)
+  const [replaceDocLoading, setReplaceDocLoading] = useState(false)
+  const [replaceDocError, setReplaceDocError] = useState<string | null>(null)
+  const replaceFileInputRef = useRef<HTMLInputElement>(null)
+
   // Permission modal
   const [permModal, setPermModal] = useState<DriveDocument | null>(null)
 
@@ -263,6 +272,51 @@ export default function SectionDocumentsPage() {
     showToast('Document deleted')
   }
 
+  function openReplaceDoc(doc: DriveDocument) {
+    setReplaceDocModal(doc)
+    setReplaceDocSource(doc.storage_path ? 'upload' : 'drive')
+    setReplaceDocDriveUrl('')
+    setReplaceDocFile(null)
+    setReplaceDocError(null)
+  }
+
+  async function handleReplaceDoc() {
+    if (!replaceDocModal) return
+    setReplaceDocLoading(true)
+    setReplaceDocError(null)
+
+    if (replaceDocSource === 'upload') {
+      if (!replaceDocFile) { setReplaceDocError('Please select a file.'); setReplaceDocLoading(false); return }
+      const form = new FormData()
+      form.append('file', replaceDocFile)
+      const res = await fetch(`/api/documents/manage/items/${replaceDocModal.id}/replace`, { method: 'POST', body: form })
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: 'Replace failed' }))
+        setReplaceDocError(error)
+        setReplaceDocLoading(false)
+        return
+      }
+    } else {
+      if (!replaceDocDriveUrl.trim()) { setReplaceDocError('Drive URL is required.'); setReplaceDocLoading(false); return }
+      const res = await fetch(`/api/documents/manage/items/${replaceDocModal.id}/replace`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ drive_url: replaceDocDriveUrl.trim() }),
+      })
+      if (!res.ok) {
+        const { error } = await res.json().catch(() => ({ error: 'Replace failed' }))
+        setReplaceDocError(error)
+        setReplaceDocLoading(false)
+        return
+      }
+    }
+
+    setReplaceDocModal(null)
+    await reload()
+    showToast('Document replaced')
+    setReplaceDocLoading(false)
+  }
+
   async function handleSaveEditDoc() {
     if (!editDocModal || !editDocTitle.trim()) return
     setEditDocLoading(true)
@@ -413,6 +467,8 @@ export default function SectionDocumentsPage() {
 
         .edit-folder-row { display: flex; align-items: center; gap: 0.375rem; padding: 0.25rem 0 0.5rem; }
         .edit-folder-input { padding: 0.35rem 0.6rem; border: 1.5px solid #7c3aed; border-radius: 6px; font-size: 0.85rem; outline: none; width: 160px; }
+
+        .version-badge { font-size: 0.68rem; color: #c4b5fd; font-weight: 500; letter-spacing: 0.02em; }
       `}</style>
 
       <div className="section-docs-page">
@@ -539,6 +595,7 @@ export default function SectionDocumentsPage() {
                             permBadge={permBadgeText(doc.id)}
                             onShareCopied={() => showToast('Link copied to clipboard')}
                             onEdit={() => { setEditDocModal(doc); setEditDocTitle(doc.title); setEditDocDescription(doc.description ?? '') }}
+                            onReplace={() => openReplaceDoc(doc)}
                             onDelete={() => handleDeleteDoc(doc)}
                             onPermissions={() => setPermModal(doc)}
                           />
@@ -660,6 +717,51 @@ export default function SectionDocumentsPage() {
         </div>
       )}
 
+      {/* Replace Document Modal */}
+      {replaceDocModal && (
+        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setReplaceDocModal(null) }}>
+          <div className="modal">
+            <div className="modal-header">
+              <h3>Replace Document</h3>
+              <button className="modal-close" onClick={() => setReplaceDocModal(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ margin: 0, fontSize: '0.85rem', color: '#6b7280' }}>
+                Replacing <strong style={{ color: '#111' }}>{replaceDocModal.title}</strong> will increment its version number. The existing file or link will be overwritten.
+              </p>
+              <div className="source-tabs">
+                <button className={`source-tab${replaceDocSource === 'drive' ? ' active' : ''}`} onClick={() => setReplaceDocSource('drive')}>Google Drive Link</button>
+                <button className={`source-tab${replaceDocSource === 'upload' ? ' active' : ''}`} onClick={() => setReplaceDocSource('upload')}>Upload File</button>
+              </div>
+
+              {replaceDocSource === 'drive' ? (
+                <div className="form-group">
+                  <label className="form-label">New Drive URL *</label>
+                  <input className="form-input" placeholder="https://docs.google.com/…" value={replaceDocDriveUrl} onChange={e => setReplaceDocDriveUrl(e.target.value)} />
+                </div>
+              ) : (
+                <div className="form-group">
+                  <label className="form-label">New File * (max 50 MB)</label>
+                  <input ref={replaceFileInputRef} type="file" style={{ display: 'none' }} onChange={e => setReplaceDocFile(e.target.files?.[0] ?? null)} />
+                  <button className="picker-btn" onClick={() => replaceFileInputRef.current?.click()}>
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" /></svg>
+                    {replaceDocFile ? replaceDocFile.name : 'Choose file…'}
+                  </button>
+                </div>
+              )}
+
+              {replaceDocError && <p className="error-msg">{replaceDocError}</p>}
+            </div>
+            <div className="modal-footer">
+              <button className="btn-sm btn-secondary" onClick={() => setReplaceDocModal(null)}>Cancel</button>
+              <button className="btn-sm btn-primary" onClick={handleReplaceDoc} disabled={replaceDocLoading}>
+                {replaceDocLoading ? 'Replacing…' : 'Replace'}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {/* Permission Modal */}
       {permModal && (
         <PermissionModal
@@ -681,6 +783,7 @@ function DocumentRow({
   permBadge,
   onShareCopied,
   onEdit,
+  onReplace,
   onDelete,
   onPermissions,
 }: {
@@ -692,6 +795,7 @@ function DocumentRow({
   permBadge: string | null
   onShareCopied: () => void
   onEdit: () => void
+  onReplace: () => void
   onDelete: () => void
   onPermissions: () => void
 }) {
@@ -730,7 +834,10 @@ function DocumentRow({
             <svg className="doc-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
           )}
           <div>
-            <div>{doc.title}</div>
+            <div style={{ display: 'flex', alignItems: 'baseline', gap: '0.375rem' }}>
+              {doc.title}
+              {(doc.version ?? 1) > 1 && <span className="version-badge">v{doc.version}</span>}
+            </div>
             {canManage && permBadge !== null && (
               <div className="perm-badge">{permBadge}</div>
             )}
@@ -746,6 +853,9 @@ function DocumentRow({
           <div className="actions">
             <button className="action-btn manage-btn" onClick={onPermissions} title="Manage permissions">
               <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+            </button>
+            <button className="action-btn manage-btn" onClick={onReplace} title="Replace document">
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
             </button>
             <button className="action-btn manage-btn" onClick={onEdit} title="Edit document">
               <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>

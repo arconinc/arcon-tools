@@ -465,6 +465,7 @@ export interface DriveDocument {
   required_role: string | null
   owner_id: string | null
   sort_order: number
+  version: number
   created_at: string
   updated_at: string
 }

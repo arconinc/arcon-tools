@@ -66,7 +66,11 @@ export async function GET(req: NextRequest) {
     }
   }
 
+  const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
+
   const applyFilters = (q: any) => {
+    // Hide completed tasks that were last updated more than 2 weeks ago
+    q = q.or(`status.neq.completed,updated_at.gte.${twoWeeksAgo}`)
     if (delegatedByMe) {
       // Show tasks where current user created, owns, or delegated the task
       q = q.or(`created_by.eq.${appUser.id},task_owner.eq.${appUser.id},delegators.cs.{${appUser.id}}`)

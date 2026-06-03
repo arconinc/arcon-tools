@@ -347,6 +347,7 @@ function KanbanColumn({
         display: 'flex',
         flexDirection: 'column',
         maxHeight: 'calc(100vh - 200px)',
+        overflow: 'hidden',
         transition: 'background 0.15s, border-color 0.15s',
       }}
     >
@@ -374,7 +375,7 @@ function KanbanColumn({
       </div>
 
       <div style={{
-        flex: 1, overflowY: 'auto', padding: '10px',
+        flex: 1, minHeight: 0, overflowY: 'auto', padding: '10px',
         display: 'flex', flexDirection: 'column', gap: 8,
       }}>
         {tasks.length === 0 && (
