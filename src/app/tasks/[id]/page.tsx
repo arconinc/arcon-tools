@@ -16,6 +16,12 @@ type TaskPriority = 'low' | 'medium' | 'high'
 type DropdownUser = { id: string; display_name: string; email: string }
 type DropdownContact = { id: string; first_name: string; last_name: string }
 
+type TaskAttachment = {
+  id: string; task_id: string; url: string
+  file_name: string | null; file_size: number | null; mime_type: string | null
+  uploaded_by: string; created_at: string
+}
+
 type Attachment = {
   id: string; comment_id: string; label: string; url: string
   file_name: string | null; file_size: number | null; mime_type: string | null
@@ -51,6 +57,7 @@ type TaskDetail = {
   assigned_user: { id: string; display_name: string; email: string } | null
   created_user: { id: string; display_name: string } | null
   delegator_users: { id: string; display_name: string }[]
+  attachments: TaskAttachment[]
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -563,6 +570,8 @@ export default function TaskDetailPage() {
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState<Partial<TaskDetail>>({})
   const [saving, setSaving] = useState(false)
+  const [uploadingAttachment, setUploadingAttachment] = useState(false)
+  const attachmentInputRef = useRef<HTMLInputElement>(null)
 
   // Dropdown data
   const [crmUsers, setCrmUsers] = useState<DropdownUser[]>([])
@@ -644,6 +653,37 @@ export default function TaskDetailPage() {
     } catch {
       setTask((t) => t ? { ...t, status: prev } : t)
     }
+  }
+
+  async function uploadTaskAttachment(file: File) {
+    if (!task) return
+    setUploadingAttachment(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const uploadRes = await fetch('/api/marketing/upload', { method: 'POST', body: fd })
+      if (!uploadRes.ok) { alert('Upload failed'); return }
+      const uploaded = await uploadRes.json()
+      await fetch(`/api/marketing/tasks/${task.id}/attachments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          url: uploaded.url,
+          file_name: uploaded.file_name,
+          file_size: uploaded.file_size,
+          mime_type: uploaded.mime_type,
+        }),
+      })
+      await loadTask()
+    } finally {
+      setUploadingAttachment(false)
+    }
+  }
+
+  async function deleteTaskAttachment(attachmentId: string) {
+    if (!task || !confirm('Remove this attachment?')) return
+    await fetch(`/api/marketing/tasks/${task.id}/attachments?attachment_id=${attachmentId}`, { method: 'DELETE' })
+    await loadTask()
   }
 
   if (isNew) {
@@ -934,6 +974,71 @@ export default function TaskDetailPage() {
             comments={task.comments}
             onViewAll={() => setActiveTab('comments')}
           />
+
+          {/* Attachments */}
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
+              <h2 className="text-sm font-semibold text-slate-700">
+                Attachments
+                {task.attachments.length > 0 && (
+                  <span className="ml-1.5 text-xs font-normal text-slate-400">({task.attachments.length})</span>
+                )}
+              </h2>
+              <div>
+                <input
+                  ref={attachmentInputRef}
+                  type="file"
+                  className="hidden"
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0]
+                    if (file) await uploadTaskAttachment(file)
+                    e.target.value = ''
+                  }}
+                />
+                <button
+                  onClick={() => attachmentInputRef.current?.click()}
+                  disabled={uploadingAttachment}
+                  className="px-3 py-1.5 text-xs font-semibold border border-slate-300 text-slate-600 rounded-lg hover:bg-white transition-colors disabled:opacity-60"
+                >
+                  {uploadingAttachment ? 'Uploading…' : '+ Attach'}
+                </button>
+              </div>
+            </div>
+            {task.attachments.length === 0 ? (
+              <div className="px-6 py-4 text-sm text-slate-400">No attachments yet.</div>
+            ) : (
+              <div className="p-4 flex flex-wrap gap-2">
+                {task.attachments.map((att) => (
+                  <div key={att.id} className="group relative">
+                    {isImageMime(att.mime_type) ? (
+                      <a href={att.url} target="_blank" rel="noopener noreferrer"
+                        className="block w-20 h-20 rounded-lg overflow-hidden border border-slate-200 hover:border-purple-300 transition-colors">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={att.url} alt={att.file_name ?? 'attachment'} className="w-full h-full object-cover" />
+                      </a>
+                    ) : (
+                      <a href={att.url} target="_blank" rel="noopener noreferrer"
+                        className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-purple-700 hover:bg-purple-50 hover:border-purple-300 transition-colors">
+                        <svg className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                        </svg>
+                        <span className="truncate max-w-[160px]">{att.file_name ?? 'file'}</span>
+                        {att.file_size && <span className="text-slate-400 flex-shrink-0">{fmtFileSize(att.file_size)}</span>}
+                      </a>
+                    )}
+                    {(att.uploaded_by === appUser?.id || appUser?.is_admin) && (
+                      <button
+                        onClick={() => deleteTaskAttachment(att.id)}
+                        className="absolute -top-1.5 -right-1.5 hidden group-hover:flex w-5 h-5 bg-red-500 text-white rounded-full items-center justify-center text-xs leading-none"
+                      >
+                        ×
+                      </button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
 
           {/* History timeline */}
           {task.history.length > 0 && (

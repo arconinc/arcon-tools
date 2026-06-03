@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useRef } from 'react'
+import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { AppUser } from '@/types'
@@ -704,7 +704,7 @@ export default function AdminUsersPage() {
               <TableHeader />
               <tbody>
                 {activeUsers.map((user) => (
-                  <UserRows key={user.id} user={user} />
+                  <Fragment key={user.id}>{UserRows({ user })}</Fragment>
                 ))}
               </tbody>
             </table>
@@ -731,7 +731,7 @@ export default function AdminUsersPage() {
                     <TableHeader />
                     <tbody>
                       {deactivatedUsers.map((user) => (
-                        <UserRows key={user.id} user={user} isDeactivated />
+                        <Fragment key={user.id}>{UserRows({ user, isDeactivated: true })}</Fragment>
                       ))}
                     </tbody>
                   </table>

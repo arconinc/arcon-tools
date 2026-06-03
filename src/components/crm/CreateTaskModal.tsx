@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useAppUser } from '@/components/layout/AppShell'
 import { TaskAssignmentSelect } from '@/components/crm/TaskAssignmentSelect'
@@ -13,6 +14,15 @@ type TaskNote = {
   comment: string
   created_at: string
   user: { display_name: string }
+}
+
+type TaskAttachment = {
+  id: string
+  file_name: string | null
+  url: string
+  mime_type: string | null
+  file_size: number | null
+  uploaded_by: string
 }
 
 function relativeTime(iso: string): string {
@@ -137,6 +147,7 @@ export function TaskFormModal({
   const [crmUsers, setCrmUsers] = useState<DropdownUser[]>([])
   const [form, setForm] = useState<TaskForm>(() => task ? formFromTask(task) : emptyForm(defaultDepartment))
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
+  const [existingAttachments, setExistingAttachments] = useState<TaskAttachment[]>([])
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [notes, setNotes] = useState<TaskNote[]>(() => task?.comments ?? [])
@@ -149,7 +160,14 @@ export function TaskFormModal({
     let active = true
     setForm(task ? formFromTask(task) : emptyForm(defaultDepartment))
     setPendingFiles([])
+    setExistingAttachments([])
     setError(null)
+    if (mode === 'edit' && task?.id) {
+      fetch(`/api/marketing/tasks/${task.id}/attachments`)
+        .then((r) => r.json())
+        .then((data) => { if (active && Array.isArray(data)) setExistingAttachments(data) })
+        .catch(() => {})
+    }
     fetch('/api/marketing/users')
       .then((r) => r.json())
       .then((users) => {
@@ -191,6 +209,12 @@ export function TaskFormModal({
     } finally {
       setSubmittingNote(false)
     }
+  }
+
+  async function deleteExistingAttachment(attachmentId: string) {
+    if (!task?.id) return
+    await fetch(`/api/marketing/tasks/${task.id}/attachments?attachment_id=${attachmentId}`, { method: 'DELETE' })
+    setExistingAttachments((prev) => prev.filter((a) => a.id !== attachmentId))
   }
 
   async function uploadAttachments(taskId: string) {
@@ -286,16 +310,31 @@ export function TaskFormModal({
               <p className="mt-0.5 text-xs font-medium text-slate-500">{linkedEntityLabel(displayLinkedEntity)}</p>
             )}
           </div>
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-            aria-label="Close"
-          >
-            <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18 18 6M6 6l12 12" />
-            </svg>
-          </button>
+          <div className="flex items-center gap-2">
+            {mode === 'edit' && task?.id && (
+              <Link
+                href={`/tasks/${task.id}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                aria-label="Open full task view"
+              >
+                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                </svg>
+              </Link>
+            )}
+            <button
+              type="button"
+              onClick={onClose}
+              className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+              aria-label="Close"
+            >
+              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18 18 6M6 6l12 12" />
+              </svg>
+            </button>
+          </div>
         </div>
 
         <form onSubmit={handleSubmit} className="p-6 space-y-4">
@@ -402,6 +441,24 @@ export function TaskFormModal({
 
           <div>
             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Attachments</label>
+            {existingAttachments.length > 0 && (
+              <div className="mb-2 flex flex-wrap gap-1.5">
+                {existingAttachments.map((att) => (
+                  <span key={att.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded-full">
+                    <a href={att.url} target="_blank" rel="noopener noreferrer" className="hover:underline truncate max-w-[160px]">
+                      {att.file_name ?? 'file'}
+                    </a>
+                    <button
+                      type="button"
+                      onClick={() => deleteExistingAttachment(att.id)}
+                      className="text-slate-400 hover:text-red-500 leading-none"
+                    >
+                      ×
+                    </button>
+                  </span>
+                ))}
+              </div>
+            )}
             <input
               type="file"
               multiple
@@ -415,14 +472,14 @@ export function TaskFormModal({
             {pendingFiles.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1.5">
                 {pendingFiles.map((file, index) => (
-                  <span key={`${file.name}-${index}`} className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded-full">
+                  <span key={`${file.name}-${index}`} className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-50 text-purple-700 text-xs rounded-full">
                     {file.name}
                     <button
                       type="button"
                       onClick={() => setPendingFiles((prev) => prev.filter((_, i) => i !== index))}
                       className="text-slate-400 hover:text-red-500 leading-none"
                     >
-                      x
+                      ×
                     </button>
                   </span>
                 ))}

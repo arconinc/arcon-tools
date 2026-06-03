@@ -2,6 +2,23 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 
+// GET /api/marketing/tasks/[id]/attachments
+export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
+  const appUser = await requireUser()
+  if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+
+  const { id } = await params
+  const adminClient = createAdminClient()
+  const { data, error } = await adminClient
+    .from('crm_task_attachments')
+    .select('*')
+    .eq('task_id', id)
+    .order('created_at', { ascending: true })
+
+  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  return NextResponse.json(data ?? [])
+}
+
 // POST /api/marketing/tasks/[id]/attachments
 // Body: multipart/form-data with 'file' field, or JSON { url, label, file_name, file_size, mime_type }
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
