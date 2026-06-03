@@ -131,6 +131,7 @@ export function TaskFormModal({
   mode,
   onClose,
   onSaved,
+  onDeleted,
   defaultDepartment,
   linkedEntity,
   task,
@@ -139,6 +140,7 @@ export function TaskFormModal({
   mode: 'create' | 'edit'
   onClose: () => void
   onSaved: (task: TaskFormTask) => void
+  onDeleted?: () => void
   defaultDepartment?: CrmTaskDepartment
   linkedEntity?: TaskLinkedEntity
   task?: TaskFormTask | null
@@ -154,6 +156,8 @@ export function TaskFormModal({
   const [noteText, setNoteText] = useState('')
   const [submittingNote, setSubmittingNote] = useState(false)
   const notesEndRef = useRef<HTMLDivElement>(null)
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
+  const [deleting, setDeleting] = useState(false)
 
   useEffect(() => {
     if (!open) return
@@ -215,6 +219,24 @@ export function TaskFormModal({
     if (!task?.id) return
     await fetch(`/api/marketing/tasks/${task.id}/attachments?attachment_id=${attachmentId}`, { method: 'DELETE' })
     setExistingAttachments((prev) => prev.filter((a) => a.id !== attachmentId))
+  }
+
+  async function handleDeleteTask() {
+    if (!task?.id) return
+    setDeleting(true)
+    try {
+      const res = await fetch(`/api/marketing/tasks/${task.id}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const data = await res.json()
+        setError(data.error ?? 'Delete failed')
+        setShowDeleteConfirm(false)
+        return
+      }
+      onDeleted?.()
+      onClose()
+    } finally {
+      setDeleting(false)
+    }
   }
 
   async function uploadAttachments(taskId: string) {
@@ -337,7 +359,7 @@ export function TaskFormModal({
           </div>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="relative p-6 space-y-4">
           {error && (
             <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
           )}
@@ -529,22 +551,75 @@ export function TaskFormModal({
             </div>
           )}
 
-          <div className="flex justify-end gap-3 pt-2">
-            <button
-              type="button"
-              onClick={onClose}
-              className="px-5 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors"
-            >
-              Cancel
-            </button>
-            <button
-              type="submit"
-              disabled={saving}
-              className="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl disabled:opacity-60 transition-colors"
-            >
-              {saving ? savingLabel : actionLabel}
-            </button>
+          <div className="flex items-center justify-between gap-3 pt-2">
+            <div>
+              {mode === 'edit' && task?.id && (appUser?.is_admin || task.created_by === appUser?.id || task.task_owner === appUser?.id) && (
+                <button
+                  type="button"
+                  onClick={() => setShowDeleteConfirm(true)}
+                  className="px-4 py-2 text-sm font-semibold text-red-600 border border-red-200 rounded-xl hover:bg-red-50 transition-colors"
+                >
+                  Delete
+                </button>
+              )}
+            </div>
+            <div className="flex gap-3">
+              <button
+                type="button"
+                onClick={onClose}
+                className="px-5 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                type="submit"
+                disabled={saving}
+                className="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl disabled:opacity-60 transition-colors"
+              >
+                {saving ? savingLabel : actionLabel}
+              </button>
+            </div>
           </div>
+
+          {showDeleteConfirm && (
+            <div className="absolute inset-0 z-10 flex items-center justify-center rounded-2xl bg-white/95 backdrop-blur-sm p-6">
+              <div className="w-full max-w-sm">
+                <div className="flex items-center gap-3 mb-4">
+                  <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
+                    </svg>
+                  </div>
+                  <h3 className="text-lg font-bold text-slate-900">Delete Task?</h3>
+                </div>
+                <p className="text-sm text-slate-600 mb-1">You are about to permanently delete:</p>
+                <p className="text-sm font-semibold text-slate-900 mb-4 bg-slate-50 px-3 py-2 rounded-lg truncate">
+                  {task?.title}
+                </p>
+                <p className="text-sm text-red-600 font-medium mb-6">
+                  This cannot be undone. All comments, history, and attachments will be deleted.
+                </p>
+                <div className="flex gap-3 justify-end">
+                  <button
+                    type="button"
+                    onClick={() => setShowDeleteConfirm(false)}
+                    disabled={deleting}
+                    className="px-4 py-2 text-sm font-semibold border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-60"
+                  >
+                    Cancel
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleDeleteTask}
+                    disabled={deleting}
+                    className="px-4 py-2 text-sm font-semibold bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-60"
+                  >
+                    {deleting ? 'Deleting…' : 'Delete Task'}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </form>
       </div>
     </div>

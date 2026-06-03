@@ -702,6 +702,10 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
             assigned_user_name: updated.assigned_user?.display_name ?? null,
           } : task))
         }}
+        onTaskDeleted={() => {
+          setTasks((prev) => prev.filter((task) => task.id !== selectedTaskId))
+          setSelectedTaskId(null)
+        }}
       />
     </div>
   )

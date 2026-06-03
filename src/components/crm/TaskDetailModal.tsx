@@ -7,10 +7,12 @@ export function TaskDetailModal({
   taskId,
   onClose,
   onTaskUpdated,
+  onTaskDeleted,
 }: {
   taskId: string | null
   onClose: () => void
   onTaskUpdated?: (task: TaskFormTask) => void
+  onTaskDeleted?: () => void
 }) {
   const [task, setTask] = useState<TaskFormTask | null>(null)
   const [loading, setLoading] = useState(false)
@@ -88,6 +90,7 @@ export function TaskDetailModal({
         setTask(savedTask)
         onTaskUpdated?.(savedTask)
       }}
+      onDeleted={onTaskDeleted}
     />
   )
 }
