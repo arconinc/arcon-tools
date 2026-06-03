@@ -5,6 +5,7 @@ import Link from 'next/link'
 import dynamic from 'next/dynamic'
 import { useAppUser } from '@/components/layout/AppShell'
 import { NewsFeed } from '@/components/news/NewsFeed'
+import { DashboardTasksWidget } from '@/components/dashboard/DashboardTasksWidget'
 import { BannerSlide, BannerStripItem } from '@/types'
 
 const DashboardCalendar = dynamic(() => import('@/components/dashboard/DashboardCalendar'), {
@@ -266,6 +267,9 @@ export default function DashboardPage() {
 
       {/* ── Below-fold content ── */}
       <div className="dash-content">
+          {/* My Tasks */}
+          <DashboardTasksWidget />
+
           {/* News & Announcements */}
           <div style={{ marginBottom: 24 }}>
               <NewsFeed />

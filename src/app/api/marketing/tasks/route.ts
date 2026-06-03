@@ -45,6 +45,7 @@ export async function GET(req: NextRequest) {
   const category = searchParams.get('category')
   const department = searchParams.get('department')
   const delegatedByMe = searchParams.get('delegated_by_me') === 'true'
+  const hideCompleted = searchParams.get('hide_completed') === 'true'
   const dueBefore = searchParams.get('due_before')
   const opportunityId = searchParams.get('opportunity_id')
   const customerId = searchParams.get('customer_id')
@@ -69,8 +70,12 @@ export async function GET(req: NextRequest) {
   const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
 
   const applyFilters = (q: any) => {
-    // Hide completed tasks that were last updated more than 2 weeks ago
-    q = q.or(`status.neq.completed,updated_at.gte.${twoWeeksAgo}`)
+    if (hideCompleted) {
+      q = q.neq('status', 'completed')
+    } else {
+      // Always hide completed tasks that were last updated more than 2 weeks ago
+      q = q.or(`status.neq.completed,updated_at.gte.${twoWeeksAgo}`)
+    }
     if (delegatedByMe) {
       // Show tasks where current user created, owns, or delegated the task
       q = q.or(`created_by.eq.${appUser.id},task_owner.eq.${appUser.id},delegators.cs.{${appUser.id}}`)

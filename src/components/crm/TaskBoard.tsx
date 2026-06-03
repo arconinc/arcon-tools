@@ -148,6 +148,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
       params.set('assigned_to', 'all')
     }
 
+    if (hideCompleted) params.set('hide_completed', 'true')
     if (department) params.set('department', department)
     if (category) params.set('category', category)
     if (view === 'table') {
@@ -167,7 +168,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
       .catch(() => setTasks([]))
       .finally(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usersKey, department, category, showDelegated, initialized, view, page, refreshKey])
+  }, [usersKey, department, category, showDelegated, hideCompleted, initialized, view, page, refreshKey])
 
   // ── Filter helpers ─────────────────────────────────────────────────────────
 
