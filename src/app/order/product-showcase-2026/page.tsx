@@ -312,10 +312,27 @@ export default function ProductShowcasePage() {
       {/* Stars hero banner */}
       <div style={{
         background: `linear-gradient(135deg, ${NAVY_DARK} 0%, ${NAVY} 60%, #2c4a8a 100%)`,
-        padding: '36px 24px 32px',
+        padding: '72px 24px 56px',
         position: 'relative',
         overflow: 'hidden',
       }}>
+        {/* Video background */}
+        <video
+          autoPlay
+          muted
+          loop
+          playsInline
+          style={{ position: 'absolute', inset: 0, width: '100%', height: '100%', objectFit: 'cover', opacity: 0.28 }}
+        >
+          <source src="https://hrjlnxoyindmmacdjbsn.supabase.co/storage/v1/object/public/banner-images/ArconEventPromo.mp4" type="video/mp4" />
+        </video>
+        {/* USA patriotic stripe band */}
+        <div style={{ position: 'absolute', top: 0, left: 0, right: 0, height: 20, display: 'flex', flexDirection: 'column' }}>
+          <div style={{ flex: 1, background: '#BF0A30' }} />
+          <div style={{ flex: 1, background: '#ffffff' }} />
+          <div style={{ flex: 1, background: '#002868' }} />
+          <div style={{ flex: 1, background: '#BF0A30' }} />
+        </div>
         {/* decorative stars */}
         <div style={{ position: 'absolute', inset: 0, opacity: 0.08, backgroundImage: 'radial-gradient(circle, #fff 1px, transparent 1px)', backgroundSize: '28px 28px' }} />
         <div style={{ maxWidth: 760, margin: '0 auto', position: 'relative' }}>
@@ -345,6 +362,14 @@ export default function ProductShowcasePage() {
       </div>
 
       <div style={{ background: '#f0f2f7', padding: '32px 16px 48px' }}>
+        {/* Stars divider */}
+        <div style={{ textAlign: 'center', marginBottom: 24, color: '#BF0A30', fontSize: 18, letterSpacing: 2 }}>
+          <span style={{ fontSize: 12, letterSpacing: 4, verticalAlign: 'middle' }}>══</span>
+          {' '}<span style={{ verticalAlign: 'middle' }}>★</span>{' '}
+          <span style={{ verticalAlign: 'middle' }}>★</span>{' '}
+          <span style={{ verticalAlign: 'middle' }}>★</span>{' '}
+          <span style={{ fontSize: 12, letterSpacing: 4, verticalAlign: 'middle' }}>══</span>
+        </div>
         <div className="form-grid" style={{ maxWidth: 760, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 280px', gap: 24, alignItems: 'start' }}>
 
           {/* ---- Main form ---- */}
