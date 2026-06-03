@@ -137,8 +137,7 @@ export async function sendLureOrderConfirmation(details: LureOrderEmailDetails) 
 </html>`
 
   return resend.emails.send({
-    from: process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev',
-    replyTo: 'awheatcraft@arconinc.com',
+    from: process.env.RESEND_FROM_EMAIL_PERSONAL ?? process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev',
     to: details.email,
     subject: `Lure Order Received — ${details.company} · ${lureName} (${details.quantity.toLocaleString()} units)`,
     html,

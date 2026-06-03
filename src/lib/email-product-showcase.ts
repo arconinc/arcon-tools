@@ -191,7 +191,7 @@ export async function sendProductShowcaseConfirmation(
 </html>`
 
   await resend.emails.send({
-    from: process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev',
+    from: process.env.RESEND_FROM_EMAIL_PERSONAL ?? process.env.RESEND_FROM_EMAIL ?? 'onboarding@resend.dev',
     to: email,
     subject: `You're registered for the Arcon Product Showcase 2026!`,
     html,

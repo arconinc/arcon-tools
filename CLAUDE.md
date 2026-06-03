@@ -34,11 +34,22 @@ src/
   app/
     api/                    # Route handlers
       admin/                # Admin-only mutations (check is_admin)
+        access-requests/    # Approve/deny role access requests
+        expense-reports/    # Admin review of expense reports + config
+        feature-flags/[key] # Feature flag enable/disable
+        roles/              # List roles (read-only, any auth'd user)
+        user-roles/         # Assign/revoke roles for users
       marketing/            # Marketing/CRM CRUD endpoints
       notifications/        # In-app + email notification endpoints
       employees/            # Employee directory endpoints
       documents/            # Document library endpoints
       forms/                # Form submission endpoints
+      expense-reports/      # User-facing expense report endpoints
+      access-requests/      # User submits role access requests
+      orders/               # Promobuillit order list + detail
+      tracking/             # Add shipment tracking to Promobuillit orders
+      files/signed-url      # Signed URLs for private storage buckets (role-gated)
+      cron/sync-orders      # Vercel cron — sync Promobuillit orders to DB
     admin/                  # Admin UI pages (layout.tsx enforces is_admin)
       users/                # User management + impersonation
       employees/[id]/       # Employee profile editor
@@ -48,8 +59,10 @@ src/
       documents/            # Document library admin
       forms/                # Form builder admin
       marketing-goals/      # Marketing goal editor
-      stores/               # E-commerce store config
+      stores/               # E-commerce store config + sync
       audit-log/            # Audit log viewer
+      expense-reports/[id]/ # Admin expense report review
+      feature-flags/        # Feature flag management
     marketing/              # Marketing CRM pages (contacts, customers, opportunities, tasks)
     employees/              # Employee directory + profile pages
     documents/              # Document library (Google Drive links)
@@ -57,23 +70,30 @@ src/
     accounting/tasks/       # Accounting department task board
     sales/tasks/            # Sales department task board
     warehouse/tasks/        # Warehouse department task board
+    hr/tasks/               # HR department task board
+    it/tasks/               # IT department task board
+    ecommerce/tasks/        # E-Commerce department task board
     dashboard/              # Main dashboard
     news/                   # News reader
     profile/                # User profile + notification preferences
     settings/               # User settings
     birthdays/              # Birthday/anniversary viewer
-    stores/[id]/            # E-commerce store detail with tabs
+    stores/[id]/            # E-commerce store detail (tabs: Overview, Tasks, Team, CRM Links, AddTracking)
+    expense-reports/        # User expense report list + detail
+    access-requests/new     # Role access request form
     tasks/                  # Task detail + add-tracking
     order/rapala-lure/      # Lure order submission
     releases/               # Release notes
     login/, auth/           # Auth flow
   components/
-    layout/AppShell.tsx     # Nav, UserContext, StoreContext, NotificationBell
+    layout/AppShell.tsx     # Nav, UserContext, StoreContext, FeatureFlagsContext, NotificationBell
     layout/NotificationBell.tsx  # In-app notification dropdown
+    FeatureFlag.tsx         # <FeatureFlag name="key"> — renders children only if flag is enabled
     news/                   # Tiptap editor/renderer, article cards
     crm/                    # Task board, kanban, modals, quick-edit panel
     employees/              # EmployeeCard, EmployeeAvatar, OfficeLocationBadge
     forms/                  # FormRecommender, TaxFormCard
+    stores/CredentialPrompt.tsx  # Prompts user to configure store API credentials
     profile/NotificationPreferences.tsx  # Per-user notification opt-in/out
   lib/
     supabase/
@@ -87,19 +107,27 @@ src/
       recipients.ts         # resolveRecipients() — user or department fan-out
       email.ts              # sendNotificationEmail() via Resend/SMTP
       template.ts           # renderGenericEmail() HTML template
+    permissions.ts          # RESTRICTED_RESOURCES map + PRIVATE_BUCKETS set (RBAC)
+    access.ts               # hasFileAccess(), requiredRoleFor() — role-check helpers
     ticker-sources.ts       # Banner strip data aggregation
     news-utils.ts           # Excerpt/reading-time helpers
     credentials.ts          # Per-user credential encryption
+    encryption.ts           # Low-level encrypt/decrypt utilities
     audit.ts                # Audit log helpers
-    task-constants.ts       # CrmTaskDepartment, CrmTaskStatus, CrmTaskPriority, CrmTaskCategory constants
+    task-constants.ts       # CrmTaskDepartment, CrmTaskStatus, CrmTaskPriority, CrmTaskCategory constants + DEPARTMENT_ROUTES
     crm/require-user.ts     # Auth helper used in marketing/CRM route handlers
     email.ts                # Generic email sending
     phone.ts                # Phone formatting helpers
     cloudinary.ts           # Cloudinary image helpers
     google-calendar.ts      # Google Calendar API integration
+    google-drive.ts         # Google Drive API integration (expense report file ops)
+    google-sheets.ts        # Google Sheets API integration
     company-calendar-config.ts  # Calendar event type definitions
     forms-utils.ts          # Form submission helpers
     analytics.ts            # Analytics helpers
+    env.ts                  # Environment variable helpers
+    slog.ts                 # Structured logging
+    promobuillit/api.ts     # Promobuillit/Uducat API client (orders, stores, tracking)
   types/index.ts            # All shared TypeScript types
 ```
 
@@ -196,10 +224,15 @@ Full CRM under `/marketing` (was previously `/crm`). Departments use `CrmTaskDep
 
 **Department task boards:**
 - `/marketing/tasks` — Marketing/CRM tasks
+- `/ecommerce/tasks` — E-Commerce tasks
+- `/hr/tasks` — HR tasks
+- `/it/tasks` — IT tasks
 - `/accounting/tasks` — Accounting tasks
 - `/sales/tasks` — Sales tasks
 - `/warehouse/tasks` — Warehouse tasks
 - `/my-tasks` — cross-department personal view
+
+See `src/lib/task-constants.ts` for `DEPARTMENT_ROUTES` and `ROUTE_TO_DEPARTMENT` maps.
 
 **Key API routes:**
 - `GET/POST /api/marketing/tasks` — task list + create
@@ -215,6 +248,104 @@ Full CRM under `/marketing` (was previously `/crm`). Departments use `CrmTaskDep
 - `GET/PUT /api/admin/marketing/import` — bulk contact import
 - `GET/PUT /api/admin/marketing-goals/[user_id]` — per-user marketing goals
 - `GET /api/marketing/pipeline-chart` — opportunity pipeline chart data
+
+## Feature Flags
+
+Feature flags control access to in-progress or experimental features.
+
+**Table:** `feature_flags` (key, label, enabled)
+
+**Admin UI:** `/admin/feature-flags` — toggle flags on/off
+
+**API:** `GET/PUT /api/admin/feature-flags/[key]` — admin only
+
+**Usage in components:**
+```tsx
+import { FeatureFlag } from '@/components/FeatureFlag'
+// renders children only when flag is enabled:
+<FeatureFlag name="my-feature">...</FeatureFlag>
+
+// or via hook:
+import { useFeatureFlags } from '@/components/layout/AppShell'
+const flags = useFeatureFlags()
+if (flags['my-feature']) { ... }
+```
+
+Flags are fetched in AppShell on mount and cached. Adding a new flag requires a row in the `feature_flags` table.
+
+## RBAC / Roles
+
+Fine-grained role-based access control layered on top of the is_admin gate.
+
+**Tables:** `roles` (name, label, description, color), `user_roles` (user_id, role_id), `access_requests`
+
+**How it works:**
+- `src/lib/permissions.ts` defines `RESTRICTED_RESOURCES` (maps resource key → required role) and `PRIVATE_BUCKETS` (set of role-gated storage buckets)
+- `src/lib/access.ts` provides `hasFileAccess()` and `requiredRoleFor()` helpers
+- Admins bypass all role checks; non-admin users need the matching role
+- Users request access via `/access-requests/new`; admins approve/deny at `/api/admin/access-requests`
+- Approved/denied requests trigger notifications via the Notifications system
+
+**Checking roles in a route handler:**
+```ts
+// Verify user has a specific role (after auth check):
+const { data: userRoles } = await adminClient
+  .from('user_roles')
+  .select('roles(name)')
+  .eq('user_id', dbUser.id)
+const hasRole = userRoles?.some(r => (r.roles as any)?.name === 'accounting')
+if (!hasRole) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+```
+
+**Private file serving:** `GET /api/files/signed-url?bucket=<name>&path=<path>` — verifies role before issuing a 1-hour signed URL. Never link directly to private bucket files.
+
+## Expense Reports
+
+Employee expense report workflow integrated with Google Drive.
+
+**Tables:** `expense_reports`, `expense_report_config`
+
+**Status flow:** `draft` → `submitted` → `needs_changes` | `approved` → `submitted_to_payroll`
+
+**Pages:**
+- `/expense-reports` — user's report list
+- `/expense-reports/[id]` — report detail (submit, view Drive link)
+- `/admin/expense-reports` — admin review queue
+- `/admin/expense-reports/[id]` — admin review a specific report
+
+**API routes:**
+- `GET/POST /api/expense-reports` — list/create user's reports
+- `GET/PUT /api/expense-reports/[id]` — report detail/update
+- `POST /api/expense-reports/[id]/drive-action` — Google Drive operations (copy template, share with reviewer, etc.)
+- `GET /api/admin/expense-reports` — admin list all reports
+- `PUT /api/admin/expense-reports/[id]` — admin sets status + reviewer_comment
+- `GET/PUT /api/admin/expense-reports/config` — configure reviewer, template Drive file ID, expense folder ID
+
+**Key types:** `ExpenseReport`, `ExpenseReportConfig`, `ExpenseReportStatus` in `src/types/index.ts`
+
+## E-Commerce / Promobuillit
+
+Promobuillit (a.k.a. Uducat) is the e-commerce platform. Store data and orders are synced to the local DB and displayed in the stores UI.
+
+**Store detail page:** `/stores/[id]` — tabbed interface:
+- **Overview** — store info, status, dates
+- **Tasks** — CRM tasks linked to this store
+- **Team** — team members
+- **CRM Links** — linked customers/opportunities
+- **Add Tracking** — submit shipment tracking numbers to Promobuillit
+
+**API routes:**
+- `GET /api/orders?storeId=...` — order list (paginated, searchable)
+- `GET /api/orders/[orderId]` — order detail
+- `POST /api/tracking` — add shipment tracking (calls Promobuillit API + sends email)
+- `POST /api/admin/stores/sync` — sync store list from Promobuillit
+- `GET /api/cron/sync-orders` — Vercel cron job (syncs orders nightly)
+
+**Promobuillit API client:** `src/lib/promobuillit/api.ts` — `listStores()`, `listOrders()`, `fetchOrdersPage()`, `addShipment()`, `sendNotificationEmail()`
+
+**Credentials:** Per-user Promobuillit API credentials stored in `app_credentials`. `CredentialPrompt` component prompts users to configure credentials if missing.
+
+**Key types:** `PromoOrder`, `PromoOrderDetail`, `PromoOrderProduct`, `PromoOrdersResponse` in `src/types/index.ts`
 
 ## Document Library
 
@@ -292,11 +423,11 @@ The interactive script will:
 
 ## Context Hooks (client components only)
 ```ts
-import { useAppUser } from '@/components/layout/AppShell'
-import { useStore } from '@/components/layout/AppShell'
+import { useAppUser, useStore, useFeatureFlags } from '@/components/layout/AppShell'
 
-const { user } = useAppUser()   // { email, display_name, is_admin, avatar_url, clickup_user_id, department, ... }
-const { selectedStore } = useStore()  // current e-commerce store
+const { user } = useAppUser()        // { email, display_name, is_admin, avatar_url, clickup_user_id, department, roles, ... }
+const { selectedStore } = useStore() // current e-commerce store
+const flags = useFeatureFlags()      // Record<string, boolean> — feature flag state
 ```
 
 ## Styling Conventions
@@ -309,7 +440,8 @@ const { selectedStore } = useStore()  // current e-commerce store
 | Table | Purpose |
 |---|---|
 | `users` | Full user + employee profile (see Employee Directory section) |
-| `stores` | E-commerce store config |
+| `stores` | E-commerce store config (domain, launch_date, takedown_date, is_active, in_production, last_order_at) |
+| `promo_orders` | Cached Promobuillit orders synced via cron |
 | `app_credentials` | Per-user encrypted API credentials |
 | `audit_logs` | User action log |
 | `banner_config` | Hero carousel slides — two rows: `draft` + `published` |
@@ -328,6 +460,12 @@ const { selectedStore } = useStore()  // current e-commerce store
 | `crm_tags` | Tags for CRM entities |
 | `crm_artwork` | Artwork/asset records for customers |
 | `crm_brand_data` | Brandfetch brand data cache |
+| `roles` | RBAC role definitions (name, label, description, color) |
+| `user_roles` | User-to-role assignments |
+| `access_requests` | User requests for role access (status: pending/approved/denied) |
+| `feature_flags` | Feature flag registry (key, label, enabled) |
+| `expense_reports` | Expense reports (period_month, status, drive_file_id, reviewer_comment) |
+| `expense_report_config` | Global expense config (reviewer, template Drive file, expense folder) |
 
 ## Key API Routes
 | Route | Description |
@@ -348,6 +486,24 @@ const { selectedStore } = useStore()  // current e-commerce store
 | `POST /api/admin/stop-impersonation` | End impersonation |
 | `GET /api/admin/audit-log` | Audit log |
 | `GET /api/addon/*` | Gmail add-on endpoints |
+| `GET/POST /api/expense-reports` | User expense report list + create |
+| `GET/PUT /api/expense-reports/[id]` | Expense report detail + update |
+| `POST /api/expense-reports/[id]/drive-action` | Google Drive file actions (copy, share, etc.) |
+| `GET /api/admin/expense-reports` | Admin expense report list |
+| `PUT /api/admin/expense-reports/[id]` | Admin review (status, reviewer_comment) |
+| `GET/PUT /api/admin/expense-reports/config` | Expense report global config |
+| `GET/PUT /api/admin/feature-flags/[key]` | Enable/disable a feature flag |
+| `GET /api/admin/roles` | List all roles |
+| `GET/PUT /api/admin/user-roles` | Manage user role assignments |
+| `GET /api/admin/access-requests` | List access requests (admin) |
+| `PUT /api/admin/access-requests` | Approve or deny an access request |
+| `POST /api/access-requests` | User submits a role access request |
+| `GET /api/orders` | Promobuillit order list (filtered by store + query) |
+| `GET /api/orders/[orderId]` | Promobuillit order detail |
+| `POST /api/tracking` | Add shipment tracking to a Promobuillit order |
+| `GET /api/files/signed-url` | Issue signed URL for private storage bucket (role-gated) |
+| `GET /api/cron/sync-orders` | Vercel cron — sync Promobuillit orders to DB |
+| `POST /api/admin/stores/sync` | Manual sync of Promobuillit store list |
 
 ## Tiptap Editor
 - Use named import: `import { TextStyle } from '@tiptap/extension-text-style'`
@@ -357,6 +513,8 @@ const { selectedStore } = useStore()  // current e-commerce store
 ## Supabase Storage Buckets
 - `banner-images` — public, hero carousel backgrounds (recommended 1440×480px)
 - `news-images` — public, article cover images
+- `financial-reports` — **private**, role-gated (`accounting` role required); files served via `/api/files/signed-url`
+- `hr-documents` — **private**, role-gated (`hr` role required); files served via `/api/files/signed-url`
 
 ## What NOT to do
 - Do not use `tailwind.config.js` for plugins — use `@plugin` in `globals.css` (Tailwind v4)
@@ -368,6 +526,8 @@ const { selectedStore } = useStore()  // current e-commerce store
 - Do not use `--force` flags with git, npm, or deployment tools without explicit reasoning and documentation
 - Do not disable security features (RLS, CORS, auth) "temporarily" — temporary bypasses often become permanent vulnerabilities
 - Do not call `getEffectiveUser()` in place of the standard admin auth check — `getEffectiveUser()` resolves impersonation but does NOT replace the `is_admin` gate
+- Do not link directly to private storage buckets — always serve via `/api/files/signed-url` with a role check
+- Do not hard-code feature availability — check `feature_flags` via `useFeatureFlags()` or query the DB; a flag absent from the table is treated as disabled
 
 ## Security Considerations
 - **Convenience is not a reason to bypass security.** Shortcuts that skip auth checks, skip permission validation, or circumvent role-based access controls create vulnerabilities even if they work initially.
