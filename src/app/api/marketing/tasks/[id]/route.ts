@@ -48,11 +48,14 @@ function normalizeTaskAssignment(updates: Record<string, unknown>, current: Reco
 
   if ('category' in normalized && typeof normalized.category === 'string' && normalized.category) {
     const categoryDepartment = getDepartmentForTaskCategory(normalized.category)
-    if (!categoryDepartment) return { error: 'Invalid category' }
-    if (normalized.department && normalized.department !== categoryDepartment) {
-      return { error: 'Category does not belong to selected department' }
+    if (!categoryDepartment) {
+      normalized.category = null
+    } else {
+      if (normalized.department && normalized.department !== categoryDepartment) {
+        return { error: 'Category does not belong to selected department' }
+      }
+      normalized.department = categoryDepartment
     }
-    normalized.department = categoryDepartment
   }
 
   if (

@@ -47,8 +47,8 @@ export function TaskDetailModal({
 
   if (loading || error || !task) {
     return (
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4 py-6">
-        <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl">
+      <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4 py-6" onClick={onClose}>
+        <div className="w-full max-w-2xl rounded-2xl bg-white shadow-2xl" onClick={e => e.stopPropagation()}>
           <div className="flex items-center justify-between border-b border-slate-100 px-6 py-4">
             <h2 className="text-xl font-bold text-slate-900">Edit Task</h2>
             <button

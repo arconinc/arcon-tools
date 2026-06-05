@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { sendLureOrderConfirmation } from '@/lib/email'
+import { dispatchNotification } from '@/lib/notifications/dispatch'
+import { taskAssigned } from '@/lib/notifications/registry'
 
 export const runtime = 'nodejs'
 
@@ -217,48 +219,46 @@ export async function POST(request: Request) {
     const tagId = await ensureTag(adminClient)
     await applyTag(adminClient, tagId, customerId)
 
-    // 5. Build task description
+    // 5. Build task description (HTML for Tiptap rendering)
     const submittedAt = new Date().toLocaleString('en-US', { timeZone: 'America/Chicago', dateStyle: 'full', timeStyle: 'short' })
+    const esc = (s: string) => s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+    const row = (label: string, value: string) => `<p><strong>${label}:</strong> ${value}</p>`
     const description = [
-      'RAPALA LURE ORDER',
-      '',
-      `  Lure Style: ${lureName} (${lureType.toUpperCase()})`,
-      '',
-      'CONTACT',
-      `  Name:    ${firstName} ${lastName}`,
-      `  Company: ${company}`,
-      `  Email:   ${email}`,
-      phone ? `  Phone:   ${phone}` : null,
-      '',
-      'ORDER DETAILS',
-      `  Quantity:           ${quantity.toLocaleString()} units`,
-      `  Unit Price:         $${unitPrice.toFixed(2)}`,
-      `  Base:               $${(quantity * unitPrice).toFixed(2)}`,
-      `  Art Setup:          ${artColors} color${artColors !== 1 ? 's' : ''} × $50.00 = $${(artColors * 50).toFixed(2)}`,
-      pantoneColor ? `  Pantone Color(s):   ${pantoneColor}` : null,
-      backImprint ? `  Back Location:      $1.00` : null,
-      backColors > 0 ? `  Back Colors:        ${backColors} × $0.50 = $${(backColors * 0.5).toFixed(2)}` : null,
-      `  Estimated Total:    $${estimatedTotal.toFixed(2)}`,
-      '',
-      'ARTWORK',
-      `  Front: ${frontArtworkUrl}`,
-      backArtworkUrl ? `  Back:  ${backArtworkUrl}` : '  Back:  Not provided',
-      notes ? '' : null,
-      notes ? 'NOTES' : null,
-      notes ? `  ${notes}` : null,
-      '',
-      `Submitted: ${submittedAt} CT`,
-      'Source: Online Order Form (thearc.arconinc.com/order/rapala-lure)',
+      `<h2>Rapala Lure Order — ${esc(lureName)} (${lureType.toUpperCase()})</h2>`,
+      '<h3>Contact</h3>',
+      row('Name', esc(`${firstName} ${lastName}`)),
+      row('Company', esc(company)),
+      row('Email', `<a href="mailto:${esc(email)}">${esc(email)}</a>`),
+      phone ? row('Phone', esc(phone)) : null,
+      '<h3>Order Details</h3>',
+      row('Quantity', `${quantity.toLocaleString()} units`),
+      row('Unit Price', `$${unitPrice.toFixed(2)}`),
+      row('Base', `$${(quantity * unitPrice).toFixed(2)}`),
+      row('Art Setup', `${artColors} color${artColors !== 1 ? 's' : ''} × $50.00 = $${(artColors * 50).toFixed(2)}`),
+      pantoneColor ? row('Pantone Color(s)', esc(pantoneColor)) : null,
+      backImprint ? row('Back Location', '$1.00') : null,
+      backColors > 0 ? row('Back Colors', `${backColors} × $0.50 = $${(backColors * 0.5).toFixed(2)}`) : null,
+      `<p><strong>Estimated Total:</strong> <strong>$${estimatedTotal.toFixed(2)}</strong></p>`,
+      '<h3>Artwork</h3>',
+      row('Front', `<a href="${esc(frontArtworkUrl)}" target="_blank" rel="noopener noreferrer">View front artwork</a>`),
+      backArtworkUrl
+        ? row('Back', `<a href="${esc(backArtworkUrl)}" target="_blank" rel="noopener noreferrer">View back artwork</a>`)
+        : row('Back', 'Not provided'),
+      notes ? '<h3>Notes</h3>' : null,
+      notes ? `<p>${esc(notes)}</p>` : null,
+      '<hr>',
+      `<p><em>Submitted ${esc(submittedAt)} CT · <a href="https://thearc.arconinc.com/order/rapala-lure" target="_blank" rel="noopener noreferrer">Online Order Form</a></em></p>`,
     ]
       .filter((l) => l !== null)
-      .join('\n')
+      .join('')
 
     // 6. Create CRM task assigned to the configured assignee
     const dueDate = addBusinessDays(new Date(), 3).toISOString().split('T')[0]
+    const taskTitle = `Lure Order — ${company} · ${lureName} (${quantity.toLocaleString()} units)`
     const { data: task, error: taskErr } = await adminClient
       .from('crm_tasks')
       .insert({
-        title: `Lure Order — ${company} · ${lureName} (${quantity.toLocaleString()} units)`,
+        title: taskTitle,
         description,
         customer_id: customerId,
         assigned_to: ASSIGNEE_ID,
@@ -301,6 +301,28 @@ export async function POST(request: Request) {
         ? `Confirmation email sent to ${email} at ${new Date().toISOString()}.`
         : `Confirmation email FAILED to send to ${email}. Please send manually.`,
     })
+
+    // 9. Notify the assignee that a new task was created for them
+    try {
+      await dispatchNotification({
+        definition: taskAssigned,
+        payload: {
+          task_id: task.id,
+          task_title: taskTitle,
+          actor_id: ASSIGNEE_ID,
+          actor_name: 'Arcon Lure Order Form',
+          department: null,
+          due_date: dueDate,
+          priority: 'high',
+          status: 'not_started',
+          description,
+          fanout_kind: 'user',
+        },
+        recipientSpec: { userId: ASSIGNEE_ID },
+      })
+    } catch (notifyErr) {
+      console.error('Task assignment notification failed:', notifyErr)
+    }
 
     return NextResponse.json({ success: true }, { status: 201 })
   } catch (err) {

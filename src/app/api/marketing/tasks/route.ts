@@ -23,11 +23,14 @@ function normalizeTaskAssignment(task: Record<string, unknown>) {
 
   if (typeof normalized.category === 'string' && normalized.category) {
     const categoryDepartment = getDepartmentForTaskCategory(normalized.category)
-    if (!categoryDepartment) return { error: 'Invalid category' }
-    if (normalized.department && normalized.department !== categoryDepartment) {
-      return { error: 'Category does not belong to selected department' }
+    if (!categoryDepartment) {
+      normalized.category = null
+    } else {
+      if (normalized.department && normalized.department !== categoryDepartment) {
+        return { error: 'Category does not belong to selected department' }
+      }
+      normalized.department = categoryDepartment
     }
-    normalized.department = categoryDepartment
   }
 
   return { task: normalized }

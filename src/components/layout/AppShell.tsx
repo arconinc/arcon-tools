@@ -45,6 +45,7 @@ type NavItemDef = {
 type NavSection = {
   label: string
   items: NavItemDef[]
+  href?: string  // if set, header is a link and items are not rendered
 }
 
 // ── Contexts ──────────────────────────────────────────────────────────────────
@@ -98,9 +99,8 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
   const sections: NavSection[] = [
     {
       label: 'Home',
-      items: [
-        { href: '/dashboard', label: 'Home', icon: HomeIcon },
-      ],
+      href: '/dashboard',
+      items: [],
     },
       {
           label: 'Company',
@@ -204,10 +204,10 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
     })
   }
 
-  // Filter each section's items by role, then drop sections that become empty
+  // Filter each section's items by role, then drop sections that become empty (keep link-sections)
   return sections
     .map(s => ({ ...s, items: filter(s.items) }))
-    .filter(s => s.items.length > 0)
+    .filter(s => s.href || s.items.length > 0)
 }
 
 // ── AppShell ──────────────────────────────────────────────────────────────────
@@ -228,12 +228,12 @@ export default function AppShell({ children, user, isImpersonating, impersonated
   const [countdownFading, setCountdownFading] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [profileOpen, setProfileOpen] = useState(false)
-  const [collapsedSections, setCollapsedSections] = useState<Set<string>>(new Set())
+  const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
 
   useEffect(() => {
     try {
-      const saved = localStorage.getItem('nav-collapsed-sections')
-      if (saved) setCollapsedSections(new Set(JSON.parse(saved)))
+      const saved = localStorage.getItem('nav-expanded-sections')
+      if (saved) setExpandedSections(new Set(JSON.parse(saved)))
     } catch {}
   }, [])
   const countdownEventsRef = useRef<CalendarCountdownEvent[]>([])
@@ -241,10 +241,10 @@ export default function AppShell({ children, user, isImpersonating, impersonated
   const profileRef = useRef<HTMLDivElement | null>(null)
 
   function toggleSection(label: string) {
-    setCollapsedSections(prev => {
+    setExpandedSections(prev => {
       const next = new Set(prev)
       next.has(label) ? next.delete(label) : next.add(label)
-      try { localStorage.setItem('nav-collapsed-sections', JSON.stringify([...next])) } catch {}
+      try { localStorage.setItem('nav-expanded-sections', JSON.stringify([...next])) } catch {}
       return next
     })
   }
@@ -454,31 +454,48 @@ export default function AppShell({ children, user, isImpersonating, impersonated
             {/* Nav */}
             <nav style={{ flex: 1, paddingBottom: 16 }}>
               {navSections.map((section, si) => {
-                const isSectionCollapsed = !sidebarCollapsed && collapsedSections.has(section.label)
+                const isSectionCollapsed = !sidebarCollapsed && !expandedSections.has(section.label)
+                const isLinkSection = !!section.href
+                const isHomeActive = isLinkSection && pathname === section.href
                 return (
                   <div key={si}>
                     {si > 0 && <div style={{ height: 1, background: '#2a2a2a', margin: '6px 0' }} />}
-                    <div style={{ paddingTop: sidebarCollapsed ? 4 : 10, paddingBottom: isSectionCollapsed ? 4 : 2 }}>
+                    <div style={{ paddingTop: sidebarCollapsed ? 4 : 10, paddingBottom: 2 }}>
                       {!sidebarCollapsed && (
-                        <button
-                          onClick={() => toggleSection(section.label)}
-                          style={{
-                            width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
-                            padding: '0 16px 6px', background: 'none', border: 'none', cursor: 'pointer',
-                          }}
-                        >
-                          <span style={{ color: '#9333ea', fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
-                            {section.label}
-                          </span>
-                          <svg
-                            width="10" height="10" fill="none" stroke="#555" viewBox="0 0 24 24"
-                            style={{ transition: 'transform 0.2s', transform: isSectionCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', flexShrink: 0 }}
+                        isLinkSection ? (
+                          <Link
+                            href={section.href!}
+                            onClick={() => setSidebarOpen(false)}
+                            style={{
+                              width: '100%', display: 'flex', alignItems: 'center',
+                              padding: '0 16px 6px', textDecoration: 'none',
+                            }}
                           >
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-                          </svg>
-                        </button>
+                            <span style={{ color: isHomeActive ? '#c084fc' : '#9333ea', fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                              {section.label}
+                            </span>
+                          </Link>
+                        ) : (
+                          <button
+                            onClick={() => toggleSection(section.label)}
+                            style={{
+                              width: '100%', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+                              padding: '0 16px 6px', background: 'none', border: 'none', cursor: 'pointer',
+                            }}
+                          >
+                            <span style={{ color: '#9333ea', fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                              {section.label}
+                            </span>
+                            <svg
+                              width="10" height="10" fill="none" stroke="#555" viewBox="0 0 24 24"
+                              style={{ transition: 'transform 0.2s', transform: isSectionCollapsed ? 'rotate(-90deg)' : 'rotate(0deg)', flexShrink: 0 }}
+                            >
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
+                            </svg>
+                          </button>
+                        )
                       )}
-                      {!isSectionCollapsed && section.items.map((item) => {
+                      {!isLinkSection && !isSectionCollapsed && section.items.map((item) => {
                         const active = item.href !== '#' && (
                           item.adminMatch
                             ? pathname.startsWith(item.href)

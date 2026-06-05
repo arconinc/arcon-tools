@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import type { DriveDocument, DocumentAccessSummary } from '@/types'
 
 interface Role {
@@ -27,10 +27,13 @@ interface PermissionModalProps {
 export function PermissionModal({ doc, onClose, onSaved }: PermissionModalProps) {
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
+  const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const [canEdit, setCanEdit] = useState(false)
   const [owner, setOwner] = useState<{ id: string; display_name: string; email: string } | null>(null)
   const [roleGrants, setRoleGrants] = useState<string[]>([])
   const [userGrants, setUserGrants] = useState<ModalUser[]>([])
+  const initialRoleGrantsRef = useRef<string[]>([])
+  const initialUserGrantsRef = useRef<string[]>([])
   const [allRoles, setAllRoles] = useState<Role[]>([])
   const [allUsers, setAllUsers] = useState<ModalUser[]>([])
   const [userSearch, setUserSearch] = useState('')
@@ -50,10 +53,14 @@ export function PermissionModal({ doc, onClose, onSaved }: PermissionModalProps)
       const { roles } = await rolesRes.json()
       const { users } = await usersRes.json()
 
+      const loadedRoleGrants = permissions.filter((p: { role_id: string | null }) => p.role_id).map((p: { role_id: string }) => p.role_id)
+      const loadedUserGrants = permissions.filter((p: { user_id: string | null; user: ModalUser | null }) => p.user_id && p.user).map((p: { user: ModalUser }) => p.user)
       setOwner(o)
       setCanEdit(ce)
-      setRoleGrants(permissions.filter((p: { role_id: string | null }) => p.role_id).map((p: { role_id: string }) => p.role_id))
-      setUserGrants(permissions.filter((p: { user_id: string | null; user: ModalUser | null }) => p.user_id && p.user).map((p: { user: ModalUser }) => p.user))
+      setRoleGrants(loadedRoleGrants)
+      setUserGrants(loadedUserGrants)
+      initialRoleGrantsRef.current = loadedRoleGrants
+      initialUserGrantsRef.current = loadedUserGrants.map((u: ModalUser) => u.id)
       setAllRoles(roles ?? [])
       setAllUsers(users ?? [])
       setLoading(false)
@@ -66,6 +73,20 @@ export function PermissionModal({ doc, onClose, onSaved }: PermissionModalProps)
     const res = await fetch(`/api/documents/manage/items/${doc.id}/access-summary`)
     if (res.ok) setAccessSummary(await res.json())
     setAccessSummaryLoading(false)
+  }
+
+  function isDirty() {
+    if (!canEdit) return false
+    const currentRoleIds = [...roleGrants].sort().join(',')
+    const initialRoleIds = [...initialRoleGrantsRef.current].sort().join(',')
+    if (currentRoleIds !== initialRoleIds) return true
+    const currentUserIds = userGrants.map(u => u.id).sort().join(',')
+    const initialUserIds = [...initialUserGrantsRef.current].sort().join(',')
+    return currentUserIds !== initialUserIds
+  }
+
+  function handleClose() {
+    if (isDirty()) { setShowDiscardConfirm(true) } else { onClose() }
   }
 
   async function save() {
@@ -151,8 +172,8 @@ export function PermissionModal({ doc, onClose, onSaved }: PermissionModalProps)
         .btn-save:disabled { opacity: 0.6; cursor: not-allowed; }
       `}</style>
 
-      <div className="perm-overlay" onClick={e => { if (e.target === e.currentTarget) onClose() }}>
-        <div className="perm-modal">
+      <div className="perm-overlay" onClick={e => { if (e.target === e.currentTarget) handleClose() }}>
+        <div className="perm-modal" style={{ position: 'relative' }}>
           <div className="perm-header">
             <h3>Permissions — {doc.title}</h3>
             <button className="perm-close" onClick={onClose}>✕</button>
@@ -289,7 +310,7 @@ export function PermissionModal({ doc, onClose, onSaved }: PermissionModalProps)
               </div>
 
               <div className="perm-footer">
-                <button className="btn-cancel" onClick={onClose}>Cancel</button>
+                <button className="btn-cancel" onClick={handleClose}>Cancel</button>
                 {canEdit && (
                   <button className="btn-save" onClick={save} disabled={saving}>
                     {saving ? 'Saving…' : 'Save permissions'}
@@ -297,6 +318,18 @@ export function PermissionModal({ doc, onClose, onSaved }: PermissionModalProps)
                 )}
               </div>
             </>
+          )}
+          {showDiscardConfirm && (
+            <div style={{ position: 'absolute', inset: 0, background: 'rgba(255,255,255,0.95)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', borderRadius: 14, zIndex: 20, padding: '1.5rem' }}>
+              <div style={{ textAlign: 'center', maxWidth: 320 }}>
+                <p style={{ fontWeight: 700, fontSize: '1rem', color: '#111827', marginBottom: '0.5rem' }}>Discard changes?</p>
+                <p style={{ fontSize: '0.875rem', color: '#6b7280', marginBottom: '1.5rem' }}>Your permission changes have not been saved.</p>
+                <div style={{ display: 'flex', gap: '0.75rem', justifyContent: 'center' }}>
+                  <button className="btn-cancel" onClick={() => setShowDiscardConfirm(false)}>Keep editing</button>
+                  <button style={{ padding: '0.5rem 1rem', border: 'none', borderRadius: 8, background: '#d97706', color: '#fff', fontSize: '0.875rem', cursor: 'pointer', fontWeight: 600 }} onClick={onClose}>Discard</button>
+                </div>
+              </div>
+            </div>
           )}
         </div>
       </div>

@@ -422,7 +422,14 @@ export default function RapalaLureOrderPage() {
                   </div>
                   <div>
                     <label style={labelStyle}>Phone</label>
-                    <input style={inputStyle} type="tel" value={form.phone} onChange={(e) => set('phone', e.target.value)} autoComplete="tel" placeholder="(555) 000-0000" />
+                    <input style={inputStyle} type="tel" value={form.phone} onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, '').slice(0, 10)
+                      let formatted = digits
+                      if (digits.length > 6) formatted = `(${digits.slice(0,3)}) ${digits.slice(3,6)}-${digits.slice(6)}`
+                      else if (digits.length > 3) formatted = `(${digits.slice(0,3)}) ${digits.slice(3)}`
+                      else if (digits.length > 0) formatted = `(${digits}`
+                      set('phone', formatted)
+                    }} autoComplete="tel" placeholder="(555) 000-0000" />
                   </div>
                 </div>
               </div>

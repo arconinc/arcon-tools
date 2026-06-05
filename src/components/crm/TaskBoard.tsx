@@ -238,7 +238,12 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
   function handleToggleDelegated() {
     const next = !showDelegated
     setShowDelegated(next)
-    syncUrl({ delegated: next ? 'true' : null })
+    if (next) {
+      setSelectedUserIds('all')
+      syncUrl({ delegated: 'true', assignees: null })
+    } else {
+      syncUrl({ delegated: null })
+    }
     setPage(1)
   }
 
@@ -482,7 +487,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
             <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
-            My Delegated Tasks
+              Tasks I've Delegated
           </button>
         </div>
 

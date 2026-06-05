@@ -105,18 +105,34 @@ export async function GET() {
     )
   }
 
+  // Build a nested folder tree for each section
+  function buildFolderTree(
+    sectionId: string,
+    parentId: string | null,
+    allFolders: typeof folders,
+    allDocs: typeof docs,
+  ): object[] {
+    return (allFolders ?? [])
+      .filter(f =>
+        f.section_id === sectionId &&
+        (f.parent_folder_id ?? null) === parentId &&
+        canAccessSection(f.required_role),
+      )
+      .map(f => ({
+        ...f,
+        documents: (allDocs ?? [])
+          .filter(d => d.folder_id === f.id && canSeeDoc(d))
+          // eslint-disable-next-line @typescript-eslint/no-unused-vars
+          .map(({ drive_url: _omit, ...rest }) => rest),
+        children: buildFolderTree(sectionId, f.id, allFolders, allDocs),
+      }))
+  }
+
   const tree = (sections ?? [])
     .filter(s => canAccessSection(s.required_role))
     .map(s => ({
       ...s,
-      folders: (folders ?? [])
-        .filter(f => f.section_id === s.id && canAccessSection(f.required_role))
-        .map(f => ({
-          ...f,
-          documents: (docs ?? [])
-            .filter(d => d.folder_id === f.id && canSeeDoc(d))
-            .map(({ drive_url: _omit, ...rest }) => rest), // strip drive_url — use /open endpoint
-        })),
+      folders: buildFolderTree(s.id, null, folders, docs),
     }))
 
   return NextResponse.json({ sections: tree })

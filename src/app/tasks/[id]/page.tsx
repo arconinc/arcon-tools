@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import EntitySearchPicker from '@/components/crm/EntitySearchPicker'
 import { TaskAssignmentSelect } from '@/components/crm/TaskAssignmentSelect'
+import { TaskDescriptionEditor } from '@/components/crm/TaskDescriptionEditor'
 import { getTaskCategoryLabel } from '@/lib/task-constants'
 import { useAppUser } from '@/components/layout/AppShell'
 
@@ -211,6 +212,18 @@ function FieldInput({
 function formatTaskAssignment(department: string | null, category: string | null) {
   if (department && category) return `${department} / ${getTaskCategoryLabel(category)}`
   return department ?? category ?? null
+}
+
+function isHtmlContent(str: string) {
+  return str.trim().startsWith('<')
+}
+
+function PencilIcon() {
+  return (
+    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+    </svg>
+  )
 }
 
 function fmtFileSize(bytes: number | null) {
@@ -567,8 +580,12 @@ export default function TaskDetailPage() {
   const [loading, setLoading] = useState(!isNew)
   const [error, setError] = useState<string | null>(null)
   const [activeTab, setActiveTab] = useState<'details' | 'related' | 'comments'>('details')
-  const [editing, setEditing] = useState(false)
-  const [editForm, setEditForm] = useState<Partial<TaskDetail>>({})
+  const [editingField, setEditingField] = useState<'title' | 'priority' | 'dept' | 'due_date' | 'assigned_to' | 'description' | null>(null)
+  const descriptionDraftRef = useRef<string | null>(null)
+  const dueDateRef = useRef<HTMLInputElement>(null)
+  // linked-record editing (Related tab)
+  const [editingLinked, setEditingLinked] = useState(false)
+  const [linkedForm, setLinkedForm] = useState<Partial<TaskDetail>>({})
   const [saving, setSaving] = useState(false)
   const [uploadingAttachment, setUploadingAttachment] = useState(false)
   const attachmentInputRef = useRef<HTMLInputElement>(null)
@@ -605,26 +622,52 @@ export default function TaskDetailPage() {
     loadTask().finally(() => setLoading(false))
   }, [id, isNew, router])
 
-  function startEdit() {
-    if (!task) return
-    setEditForm({ ...task })
-    setEditing(true)
-  }
-
-  function cancelEdit() {
-    setEditing(false)
-    setEditForm({})
-  }
-
-  function handleEditChange(field: string, value: string) {
-    setEditForm((prev) => ({ ...prev, [field]: value === '' ? null : value }))
-  }
-
-  async function saveEdit() {
+  async function saveFieldValues(fields: Record<string, unknown>) {
     if (!task) return
     setSaving(true)
     try {
-      const payload = { ...editForm }
+      const res = await fetch(`/api/marketing/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(fields),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        alert(data.error ?? 'Save failed')
+        return
+      }
+      await loadTask()
+    } finally {
+      setSaving(false)
+    }
+  }
+
+  async function saveFieldValue(field: string, value: unknown) {
+    await saveFieldValues({ [field]: value })
+  }
+
+  // linked-record editing helpers (Related tab)
+  function startEditLinked() {
+    if (!task) return
+    setLinkedForm({ ...task })
+    setEditingLinked(true)
+  }
+
+  function cancelEditLinked() {
+    setEditingLinked(false)
+    setLinkedForm({})
+  }
+
+  async function saveLinked() {
+    if (!task) return
+    setSaving(true)
+    try {
+      const payload = {
+        opportunity_id: (linkedForm.opportunity_id as string | null) ?? null,
+        customer_id: (linkedForm.customer_id as string | null) ?? null,
+        vendor_id: (linkedForm.vendor_id as string | null) ?? null,
+        contact_id: (linkedForm.contact_id as string | null) ?? null,
+      }
       const res = await fetch(`/api/marketing/tasks/${task.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
@@ -632,9 +675,8 @@ export default function TaskDetailPage() {
       })
       const data = await res.json()
       if (!res.ok) { alert(data.error ?? 'Save failed'); return }
-      // Reload full detail to get new history
       await loadTask()
-      setEditing(false)
+      setEditingLinked(false)
     } finally {
       setSaving(false)
     }
@@ -732,7 +774,6 @@ export default function TaskDetailPage() {
     )
   }
 
-  const ef = editForm as Partial<TaskDetail>
   const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'completed'
   const statusInfo = STATUSES.find((s) => s.value === task.status)
 
@@ -877,157 +918,240 @@ export default function TaskDetailPage() {
       {/* ── Details Tab ── */}
       {activeTab === 'details' && (
         <div className="space-y-5">
+          {/* Task Details — inline per-field editing */}
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
               <h2 className="text-sm font-semibold text-slate-700">Task Details</h2>
-              {!editing ? (
-                <button onClick={startEdit}
-                  className="px-3 py-1.5 text-xs font-semibold border border-slate-300 text-slate-600 rounded-lg hover:bg-white transition-colors">
-                  Edit
-                </button>
-              ) : (
-                <div className="flex gap-2">
-                  <button onClick={saveEdit} disabled={saving}
-                    className="px-3 py-1.5 text-xs font-semibold bg-purple-700 text-white rounded-lg hover:bg-purple-800 disabled:opacity-60 transition-colors">
-                    {saving ? 'Saving…' : 'Save'}
-                  </button>
-                  <button onClick={cancelEdit}
-                    className="px-3 py-1.5 text-xs font-semibold border border-slate-300 text-slate-600 rounded-lg hover:bg-white transition-colors">
-                    Cancel
-                  </button>
-                </div>
-              )}
+              {saving && <span className="text-xs text-slate-400 animate-pulse">Saving…</span>}
             </div>
 
-            <div className="p-6 grid grid-cols-2 gap-5">
-              {editing ? (
-                <>
-                  <div className="col-span-2">
-                    <FieldInput label="Title" name="title" value={(ef.title as string) ?? ''} onChange={handleEditChange} />
-                  </div>
-                  <div className="col-span-2">
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-2">Status</label>
-                    <StatusBar
-                      currentStatus={(ef.status as string) ?? 'not_started'}
-                      onStatusClick={(s) => handleEditChange('status', s)}
-                      disabled={false}
+            <div className="divide-y divide-slate-100">
+
+              {/* Title */}
+              <div className="group flex items-center gap-3 px-6 py-3">
+                <div className="w-36 flex-shrink-0 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Title</div>
+                <div className="flex-1 min-w-0">
+                  {editingField === 'title' ? (
+                    <input
+                      type="text"
+                      defaultValue={task.title}
+                      autoFocus
+                      onBlur={(e) => {
+                        const val = e.target.value.trim()
+                        if (val && val !== task.title) saveFieldValue('title', val)
+                        else setEditingField(null)
+                      }}
+                      onKeyDown={(e) => { if (e.key === 'Enter') e.currentTarget.blur() }}
+                      className="w-full px-2 py-1 text-sm border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
                     />
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Priority</label>
-                    <select value={(ef.priority as string) ?? 'medium'}
-                      onChange={(e) => handleEditChange('priority', e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                  ) : (
+                    <span className="text-sm font-medium text-slate-800">{task.title}</span>
+                  )}
+                </div>
+                {editingField !== 'title' && (
+                  <button type="button" onClick={() => setEditingField('title')}
+                    className="flex-shrink-0 p-1 text-slate-300 hover:text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity rounded"
+                    aria-label="Edit title">
+                    <PencilIcon />
+                  </button>
+                )}
+              </div>
+
+              {/* Priority */}
+              <div className="group flex items-center gap-3 px-6 py-3">
+                <div className="w-36 flex-shrink-0 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Priority</div>
+                <div className="flex-1 min-w-0">
+                  {editingField === 'priority' ? (
+                    <select
+                      defaultValue={task.priority}
+                      autoFocus
+                      onChange={(e) => { saveFieldValue('priority', e.target.value); setEditingField(null) }}
+                      onBlur={() => setEditingField(null)}
+                      className="px-2 py-1 text-sm border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
+                    >
                       <option value="low">Low</option>
                       <option value="medium">Medium</option>
                       <option value="high">High</option>
                     </select>
-                  </div>
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Department / Category</label>
+                  ) : (
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold capitalize ${PRIORITY_BADGE[task.priority]}`}>
+                      {task.priority}
+                    </span>
+                  )}
+                </div>
+                {editingField !== 'priority' && (
+                  <button type="button" onClick={() => setEditingField('priority')}
+                    className="flex-shrink-0 p-1 text-slate-300 hover:text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity rounded"
+                    aria-label="Edit priority">
+                    <PencilIcon />
+                  </button>
+                )}
+              </div>
+
+              {/* Department / Category */}
+              <div className="group flex items-center gap-3 px-6 py-3">
+                <div className="w-36 flex-shrink-0 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Dept / Category</div>
+                <div className="flex-1 min-w-0">
+                  {editingField === 'dept' ? (
                     <TaskAssignmentSelect
-                      department={(ef.department as string | null) ?? null}
-                      category={(ef.category as string | null) ?? null}
-                      onChange={(assignment) =>
-                        setEditForm((p) => ({
-                          ...p,
-                          department: assignment.department,
-                          category: assignment.category,
-                        }))
-                      }
+                      department={task.department ?? null}
+                      category={task.category ?? null}
+                      onChange={(a) => {
+                        saveFieldValues({ department: a.department ?? null, category: a.category ?? null })
+                        setEditingField(null)
+                      }}
                     />
-                  </div>
-                  <FieldInput label="Due Date" name="due_date" value={(ef.due_date as string)?.slice(0, 10) ?? ''} onChange={handleEditChange} type="date" />
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Assigned To</label>
-                    <select value={(ef.assigned_to as string) ?? ''}
-                      onChange={(e) => handleEditChange('assigned_to', e.target.value)}
-                      className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                  ) : (
+                    <span className="text-sm text-slate-800">
+                      {formatTaskAssignment(task.department, task.category) ?? <span className="italic text-slate-400">Not set</span>}
+                    </span>
+                  )}
+                </div>
+                {editingField !== 'dept' && (
+                  <button type="button" onClick={() => setEditingField('dept')}
+                    className="flex-shrink-0 p-1 text-slate-300 hover:text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity rounded"
+                    aria-label="Edit department">
+                    <PencilIcon />
+                  </button>
+                )}
+              </div>
+
+              {/* Due Date */}
+              <div className="flex items-center gap-3 px-6 py-3">
+                <div className="w-36 flex-shrink-0 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Due Date</div>
+                <div className="flex items-center gap-2">
+                  <span className={`text-sm ${isOverdue ? 'text-red-600 font-semibold' : 'text-slate-800'}`}>
+                    {task.due_date ? fmtDate(task.due_date) : <span className="italic text-slate-400">No date</span>}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => (dueDateRef.current as HTMLInputElement & { showPicker?: () => void })?.showPicker?.() ?? dueDateRef.current?.click()}
+                    className="p-1 text-slate-400 hover:text-purple-600 transition-colors rounded"
+                    aria-label="Pick date"
+                  >
+                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" strokeWidth={2} />
+                      <line x1="16" y1="2" x2="16" y2="6" strokeWidth={2} />
+                      <line x1="8" y1="2" x2="8" y2="6" strokeWidth={2} />
+                      <line x1="3" y1="10" x2="21" y2="10" strokeWidth={2} />
+                    </svg>
+                  </button>
+                  <input
+                    ref={dueDateRef}
+                    type="date"
+                    defaultValue={task.due_date?.slice(0, 10) ?? ''}
+                    onChange={(e) => saveFieldValue('due_date', e.target.value || null)}
+                    className="sr-only"
+                    tabIndex={-1}
+                    aria-hidden="true"
+                  />
+                </div>
+              </div>
+
+              {/* Assigned To */}
+              <div className="group flex items-center gap-3 px-6 py-3">
+                <div className="w-36 flex-shrink-0 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Assigned To</div>
+                <div className="flex-1 min-w-0">
+                  {editingField === 'assigned_to' ? (
+                    <select
+                      defaultValue={task.assigned_to ?? ''}
+                      autoFocus
+                      onChange={(e) => { saveFieldValue('assigned_to', e.target.value || null); setEditingField(null) }}
+                      onBlur={() => setEditingField(null)}
+                      className="w-full px-2 py-1 text-sm border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
+                    >
                       <option value="">— Unassigned —</option>
                       {crmUsers.map((u) => (
                         <option key={u.id} value={u.id}>{u.display_name}</option>
                       ))}
                     </select>
-                  </div>
-                  <div className="col-span-2">
-                    <FieldInput label="Description" name="description" value={(ef.description as string) ?? ''} onChange={handleEditChange} textarea />
-                  </div>
-                  <div className="col-span-2 border-t border-slate-100 pt-4">
-                    <div className="text-xs font-semibold text-slate-500 uppercase tracking-wide mb-3">Linked Record</div>
-                    <div className="grid grid-cols-2 gap-4">
-                      <EntitySearchPicker
-                        label="Opportunity"
-                        apiPath="/api/marketing/opportunities"
-                        resultsKey="items"
-                        value={(ef.opportunity_id as string) ?? null}
-                        displayName={(ef.opportunity as { name: string } | null)?.name ?? null}
-                        onSelect={(id, name) =>
-                          setEditForm((p) => ({ ...p, opportunity_id: id ?? null, opportunity: id ? { id, name: name! } : null }))
-                        }
-                        placeholder="Search opportunities…"
-                      />
-                      <EntitySearchPicker
-                        label="Customer"
-                        apiPath="/api/marketing/customers"
-                        resultsKey="customers"
-                        value={(ef.customer_id as string) ?? null}
-                        displayName={(ef.customer as { name: string } | null)?.name ?? null}
-                        onSelect={(id, name) =>
-                          setEditForm((p) => ({ ...p, customer_id: id ?? null, customer: id ? { id, name: name! } : null }))
-                        }
-                        placeholder="Search customers…"
-                      />
-                      <EntitySearchPicker
-                        label="Vendor"
-                        apiPath="/api/marketing/vendors"
-                        resultsKey="vendors"
-                        value={(ef.vendor_id as string) ?? null}
-                        displayName={(ef.vendor as { name: string } | null)?.name ?? null}
-                        onSelect={(id, name) =>
-                          setEditForm((p) => ({ ...p, vendor_id: id ?? null, vendor: id ? { id, name: name! } : null }))
-                        }
-                        placeholder="Search vendors…"
-                      />
-                      <div>
-                        <label className="block text-xs text-slate-500 mb-1">Contact</label>
-                        <select value={(ef.contact_id as string) ?? ''}
-                          onChange={(e) => handleEditChange('contact_id', e.target.value)}
-                          className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                          <option value="">— None —</option>
-                          {contacts.map((c) => (
-                            <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>
-                          ))}
-                        </select>
-                      </div>
-                    </div>
-                  </div>
-                </>
-              ) : (
-                <>
-                  <Field label="Status" value={statusInfo?.label ?? task.status} />
-                  <Field label="Priority" value={task.priority} />
-                  <Field label="Department / Category" value={formatTaskAssignment(task.department, task.category)} />
-                  <Field label="Due Date" value={fmtDate(task.due_date)} />
-                  <Field label="Assigned To" value={task.assigned_user?.display_name ?? null} />
-                  <Field label="Assigned By" value={task.created_user?.display_name ?? null} />
-                  {task.description && (
-                    <div className="col-span-2">
-                      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Description</div>
-                      <div className="text-sm text-slate-800 whitespace-pre-wrap">{task.description}</div>
-                    </div>
+                  ) : (
+                    <span className="text-sm text-slate-800">
+                      {task.assigned_user?.display_name ?? <span className="italic text-slate-400">Unassigned</span>}
+                    </span>
                   )}
-                  {linkedObj && (
-                    <div className="col-span-2">
-                      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Linked To</div>
-                      <Link href={linkedObj.href} className="inline-flex items-center gap-2 hover:underline">
-                        <span className={`text-xs font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${linkedObj.color}`}>
-                          {linkedObj.label.slice(0, 3)}
-                        </span>
-                        <span className="text-sm text-purple-700">{linkedObj.name}</span>
-                      </Link>
-                    </div>
+                </div>
+                {editingField !== 'assigned_to' && (
+                  <button type="button" onClick={() => setEditingField('assigned_to')}
+                    className="flex-shrink-0 p-1 text-slate-300 hover:text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity rounded"
+                    aria-label="Edit assignee">
+                    <PencilIcon />
+                  </button>
+                )}
+              </div>
+
+              {/* Assigned By (read-only) */}
+              <div className="flex items-center gap-3 px-6 py-3">
+                <div className="w-36 flex-shrink-0 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Assigned By</div>
+                <span className="text-sm text-slate-800">
+                  {task.created_user?.display_name ?? <span className="italic text-slate-400">—</span>}
+                </span>
+              </div>
+
+              {/* Description */}
+              <div className="px-6 pt-4 pb-5">
+                <div className="flex items-center justify-between mb-2">
+                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Description</span>
+                  {editingField !== 'description' && (
+                    <button
+                      type="button"
+                      onClick={() => { descriptionDraftRef.current = task.description ?? ''; setEditingField('description') }}
+                      className="p-1 text-slate-300 hover:text-purple-600 transition-colors rounded"
+                      aria-label="Edit description"
+                    >
+                      <PencilIcon />
+                    </button>
                   )}
-                </>
+                </div>
+
+                {editingField === 'description' ? (
+                  <div
+                    className="flex flex-col"
+                    style={{ minHeight: 220 }}
+                    onBlur={(e) => {
+                      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                        const html = descriptionDraftRef.current
+                        if (html !== null && html !== task.description) {
+                          saveFieldValue('description', html || null)
+                        }
+                        setEditingField(null)
+                      }
+                    }}
+                  >
+                    <TaskDescriptionEditor
+                      initialHtml={task.description ?? ''}
+                      onChange={(html) => { descriptionDraftRef.current = html }}
+                    />
+                  </div>
+                ) : (
+                  <div
+                    className="cursor-text min-h-[60px] rounded-lg border border-transparent hover:border-slate-200 hover:bg-slate-50/50 px-3 py-2 transition-colors"
+                    onClick={() => { descriptionDraftRef.current = task.description ?? ''; setEditingField('description') }}
+                  >
+                    {task.description ? (
+                      isHtmlContent(task.description) ? (
+                        <div className="prose prose-sm prose-slate max-w-none" dangerouslySetInnerHTML={{ __html: task.description }} />
+                      ) : (
+                        <p className="text-sm text-slate-700 whitespace-pre-wrap">{task.description}</p>
+                      )
+                    ) : (
+                      <p className="text-sm text-slate-400 italic">Add a description…</p>
+                    )}
+                  </div>
+                )}
+              </div>
+
+              {/* Linked record (read-only; edit in Related tab) */}
+              {linkedObj && (
+                <div className="px-6 py-3">
+                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Linked To</div>
+                  <Link href={linkedObj.href} className="inline-flex items-center gap-2 hover:underline">
+                    <span className={`text-xs font-bold px-1.5 py-0.5 rounded uppercase tracking-wider ${linkedObj.color}`}>
+                      {linkedObj.label.slice(0, 3)}
+                    </span>
+                    <span className="text-sm text-purple-700">{linkedObj.name}</span>
+                  </Link>
+                </div>
               )}
             </div>
 
@@ -1145,13 +1269,80 @@ export default function TaskDetailPage() {
       {/* ── Related Tab ── */}
       {activeTab === 'related' && (
         <div className="space-y-5">
-          {/* Linked object card */}
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-            <div className="px-5 py-4 border-b border-slate-100 bg-slate-50">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50">
               <h2 className="text-sm font-semibold text-slate-700">Linked Record</h2>
+              {!editingLinked ? (
+                <button onClick={startEditLinked}
+                  className="px-3 py-1.5 text-xs font-semibold border border-slate-300 text-slate-600 rounded-lg hover:bg-white transition-colors">
+                  Edit
+                </button>
+              ) : (
+                <div className="flex gap-2">
+                  <button onClick={saveLinked} disabled={saving}
+                    className="px-3 py-1.5 text-xs font-semibold bg-purple-700 text-white rounded-lg hover:bg-purple-800 disabled:opacity-60 transition-colors">
+                    {saving ? 'Saving…' : 'Save'}
+                  </button>
+                  <button onClick={cancelEditLinked}
+                    className="px-3 py-1.5 text-xs font-semibold border border-slate-300 text-slate-600 rounded-lg hover:bg-white transition-colors">
+                    Cancel
+                  </button>
+                </div>
+              )}
             </div>
-            {!linkedObj ? (
-              <div className="px-5 py-6 text-sm text-slate-400 text-center">This task is not linked to any record.</div>
+
+            {editingLinked ? (
+              <div className="p-5 grid grid-cols-2 gap-4">
+                <EntitySearchPicker
+                  label="Opportunity"
+                  apiPath="/api/marketing/opportunities"
+                  resultsKey="items"
+                  value={(linkedForm.opportunity_id as string) ?? null}
+                  displayName={(linkedForm.opportunity as { name: string } | null)?.name ?? null}
+                  onSelect={(id, name) =>
+                    setLinkedForm((p) => ({ ...p, opportunity_id: id ?? null, opportunity: id ? { id, name: name! } : null }))
+                  }
+                  placeholder="Search opportunities…"
+                />
+                <EntitySearchPicker
+                  label="Customer"
+                  apiPath="/api/marketing/customers"
+                  resultsKey="customers"
+                  value={(linkedForm.customer_id as string) ?? null}
+                  displayName={(linkedForm.customer as { name: string } | null)?.name ?? null}
+                  onSelect={(id, name) =>
+                    setLinkedForm((p) => ({ ...p, customer_id: id ?? null, customer: id ? { id, name: name! } : null }))
+                  }
+                  placeholder="Search customers…"
+                />
+                <EntitySearchPicker
+                  label="Vendor"
+                  apiPath="/api/marketing/vendors"
+                  resultsKey="vendors"
+                  value={(linkedForm.vendor_id as string) ?? null}
+                  displayName={(linkedForm.vendor as { name: string } | null)?.name ?? null}
+                  onSelect={(id, name) =>
+                    setLinkedForm((p) => ({ ...p, vendor_id: id ?? null, vendor: id ? { id, name: name! } : null }))
+                  }
+                  placeholder="Search vendors…"
+                />
+                <div>
+                  <label className="block text-xs text-slate-500 mb-1">Contact</label>
+                  <select value={(linkedForm.contact_id as string) ?? ''}
+                    onChange={(e) => setLinkedForm((p) => ({ ...p, contact_id: e.target.value || null }))}
+                    className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
+                    <option value="">— None —</option>
+                    {contacts.map((c) => (
+                      <option key={c.id} value={c.id}>{c.first_name} {c.last_name}</option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+            ) : !linkedObj ? (
+              <div className="px-5 py-6 text-sm text-slate-400 text-center">
+                This task is not linked to any record.{' '}
+                <button onClick={startEditLinked} className="text-purple-600 hover:underline font-medium">Add a link</button>
+              </div>
             ) : (
               <div className="p-5">
                 <Link href={linkedObj.href} className="flex items-center gap-4 p-4 border border-slate-200 rounded-xl hover:border-purple-300 hover:bg-purple-50 transition-colors group">

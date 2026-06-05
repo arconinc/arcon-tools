@@ -447,6 +447,7 @@ export interface DocSection {
 export interface DocFolder {
   id: string
   section_id: string
+  parent_folder_id: string | null
   name: string
   sort_order: number
   required_role: string | null
@@ -510,8 +511,17 @@ export interface DocFolderWithDocuments extends DocFolder {
   documents: DriveDocument[]
 }
 
+export interface DocFolderNode extends DocFolder {
+  documents: DriveDocument[]
+  children: DocFolderNode[]
+}
+
 export interface DocSectionWithFolders extends DocSection {
   folders: DocFolderWithDocuments[]
+}
+
+export interface DocSectionWithTree extends DocSection {
+  folders: DocFolderNode[]
 }
 
 // ─── CRM ─────────────────────────────────────────────────────────────────────
