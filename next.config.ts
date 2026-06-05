@@ -1,4 +1,5 @@
 import type { NextConfig } from "next";
+import { withSentryConfig } from "@sentry/nextjs";
 
 const nextConfig: NextConfig = {
   // potrace and jimp are native CJS modules that use instanceof checks internally.
@@ -16,4 +17,15 @@ const nextConfig: NextConfig = {
   },
 };
 
-export default nextConfig;
+export default withSentryConfig(nextConfig, {
+  org: process.env.SENTRY_ORG,
+  project: process.env.SENTRY_PROJECT,
+  authToken: process.env.SENTRY_AUTH_TOKEN,
+
+  widenClientFileUpload: true,
+
+  // Proxy Sentry requests through /monitoring to bypass ad-blockers
+  tunnelRoute: "/monitoring",
+
+  silent: !process.env.CI,
+});
