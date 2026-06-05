@@ -59,26 +59,39 @@ function FolderTreeNode({
   selectedId,
   expandedIds,
   canManage,
+  canMoveUp,
+  canMoveDown,
+  reorderingId,
   onSelect,
   onToggleExpand,
   onAddSub,
   onRename,
   onDelete,
+  onMoveUp,
+  onMoveDown,
+  onReorder,
 }: {
   node: DocFolderNode
   depth: number
   selectedId: string | null
   expandedIds: Set<string>
   canManage: boolean
+  canMoveUp: boolean
+  canMoveDown: boolean
+  reorderingId: string | null
   onSelect: (id: string) => void
   onToggleExpand: (id: string) => void
   onAddSub: (parentId: string) => void
   onRename: (node: DocFolderNode) => void
   onDelete: (node: DocFolderNode) => void
+  onMoveUp: () => void
+  onMoveDown: () => void
+  onReorder: (nodeId: string, direction: 'up' | 'down') => void
 }) {
   const isSelected = selectedId === node.id
   const isExpanded = expandedIds.has(node.id)
   const hasChildren = node.children.length > 0
+  const isReordering = reorderingId === node.id
 
   function handleClick() {
     onSelect(node.id)
@@ -88,13 +101,15 @@ function FolderTreeNode({
   return (
     <>
       <div
-        className={`folder-row${isSelected ? ' selected' : ''}`}
+        className={`folder-row${isSelected ? ' selected' : ''}${isReordering ? ' reordering' : ''}`}
         style={{ paddingLeft: `${0.625 + depth * 1.125}rem` }}
         title={node.name}
         onClick={handleClick}
       >
         <span className="folder-chevron">
-          {hasChildren ? (
+          {isReordering ? (
+            <svg width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" className="folder-spinner"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M4 12a8 8 0 018-8V4" /></svg>
+          ) : hasChildren ? (
             <svg width="10" height="10" viewBox="0 0 10 10" fill="currentColor">
               {isExpanded
                 ? <path d="M1 3l4 4 4-4" stroke="currentColor" strokeWidth="1.5" fill="none" strokeLinecap="round" strokeLinejoin="round"/>
@@ -112,6 +127,16 @@ function FolderTreeNode({
         )}
         {canManage && (
           <span className="folder-actions" onClick={e => e.stopPropagation()}>
+            {canMoveUp && (
+              <button className="folder-action-btn" title="Move up" onClick={onMoveUp} disabled={!!reorderingId}>
+                <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
+              </button>
+            )}
+            {canMoveDown && (
+              <button className="folder-action-btn" title="Move down" onClick={onMoveDown} disabled={!!reorderingId}>
+                <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+              </button>
+            )}
             <button className="folder-action-btn" title="New subfolder" onClick={() => onAddSub(node.id)}>
               <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
             </button>
@@ -124,7 +149,7 @@ function FolderTreeNode({
           </span>
         )}
       </div>
-      {isExpanded && node.children.map(child => (
+      {isExpanded && node.children.map((child, idx) => (
         <FolderTreeNode
           key={child.id}
           node={child}
@@ -132,11 +157,17 @@ function FolderTreeNode({
           selectedId={selectedId}
           expandedIds={expandedIds}
           canManage={canManage}
+          canMoveUp={canManage && idx > 0}
+          canMoveDown={canManage && idx < node.children.length - 1}
+          reorderingId={reorderingId}
           onSelect={onSelect}
           onToggleExpand={onToggleExpand}
           onAddSub={onAddSub}
           onRename={onRename}
           onDelete={onDelete}
+          onMoveUp={() => onReorder(child.id, 'up')}
+          onMoveDown={() => onReorder(child.id, 'down')}
+          onReorder={onReorder}
         />
       ))}
     </>
@@ -197,6 +228,7 @@ export default function SectionDocumentsPage() {
   const [canManage, setCanManage] = useState(false)
   const [sectionId, setSectionId] = useState<string | null>(null)
   const [permSummary, setPermSummary] = useState<Record<string, PermSummaryEntry>>({})
+  const [reorderingId, setReorderingId] = useState<string | null>(null)
 
   // Add folder
   const [addFolderParentId, setAddFolderParentId] = useState<string | null | undefined>(undefined) // undefined = closed, null = top-level
@@ -359,6 +391,37 @@ export default function SectionDocumentsPage() {
     setEditingFolder(null)
     await reload()
     showToast('Folder renamed')
+  }
+
+  async function handleReorder(nodeId: string, direction: 'up' | 'down') {
+    if (!section || reorderingId) return
+
+    function findSiblings(nodes: DocFolderNode[]): DocFolderNode[] | null {
+      if (nodes.some(n => n.id === nodeId)) return nodes
+      for (const n of nodes) {
+        const found = findSiblings(n.children)
+        if (found) return found
+      }
+      return null
+    }
+
+    const siblings = findSiblings(section.folders)
+    if (!siblings) return
+    const idx = siblings.findIndex(n => n.id === nodeId)
+    const swapIdx = direction === 'up' ? idx - 1 : idx + 1
+    if (swapIdx < 0 || swapIdx >= siblings.length) return
+
+    const newOrder = [...siblings]
+    ;[newOrder[idx], newOrder[swapIdx]] = [newOrder[swapIdx], newOrder[idx]]
+
+    setReorderingId(nodeId)
+    await fetch('/api/documents/manage/folders/reorder', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ updates: newOrder.map((f, i) => ({ id: f.id, sort_order: i })) }),
+    })
+    await reload()
+    setReorderingId(null)
   }
 
   async function handleDeleteFolder(node: DocFolderNode) {
@@ -620,6 +683,10 @@ export default function SectionDocumentsPage() {
         .folder-action-btn { background: none; border: none; cursor: pointer; color: #9ca3af; padding: 2px; border-radius: 3px; display: flex; align-items: center; line-height: 1; }
         .folder-action-btn:hover { color: #7c3aed; background: #ede9fe; }
         .folder-action-btn.danger:hover { color: #ef4444; background: #fef2f2; }
+        .folder-action-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+        .folder-row.reordering { opacity: 0.6; pointer-events: none; }
+        .folder-spinner { animation: spin 0.7s linear infinite; color: #7c3aed; }
+        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
         .add-folder-inline { padding: 0.5rem 0.75rem; display: flex; flex-direction: column; gap: 0.375rem; border-top: 1px solid #e5e7eb; background: #fafafa; }
         .add-folder-label { font-size: 0.72rem; color: #6b7280; font-weight: 600; }
@@ -739,7 +806,7 @@ export default function SectionDocumentsPage() {
               {section.folders.length === 0 && addFolderParentId === undefined && (
                 <div className="sidebar-empty">No folders yet.</div>
               )}
-              {section.folders.map(node => (
+              {section.folders.map((node, idx) => (
                 editingFolder?.id === node.id ? (
                   <div key={node.id} className="add-folder-inline" style={{ paddingLeft: '0.875rem' }}>
                     <input
@@ -762,11 +829,17 @@ export default function SectionDocumentsPage() {
                     selectedId={selectedFolderId}
                     expandedIds={expandedIds}
                     canManage={canManage}
+                    canMoveUp={canManage && idx > 0}
+                    canMoveDown={canManage && idx < section.folders.length - 1}
+                    reorderingId={reorderingId}
                     onSelect={selectFolder}
                     onToggleExpand={toggleExpand}
                     onAddSub={id => { setAddFolderParentId(id); setNewFolderName(''); setExpandedIds(prev => new Set([...prev, id])) }}
                     onRename={node => { setEditingFolder(node); setEditFolderName(node.name) }}
                     onDelete={handleDeleteFolder}
+                    onMoveUp={() => handleReorder(node.id, 'up')}
+                    onMoveDown={() => handleReorder(node.id, 'down')}
+                    onReorder={handleReorder}
                   />
                 )
               ))}
