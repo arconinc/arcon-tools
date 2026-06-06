@@ -58,35 +58,19 @@ function FolderTreeNode({
   depth,
   selectedId,
   expandedIds,
-  canManage,
-  canMoveUp,
-  canMoveDown,
   reorderingId,
   onSelect,
   onToggleExpand,
-  onAddSub,
-  onRename,
-  onDelete,
-  onMoveUp,
-  onMoveDown,
-  onReorder,
+  onRightClick,
 }: {
   node: DocFolderNode
   depth: number
   selectedId: string | null
   expandedIds: Set<string>
-  canManage: boolean
-  canMoveUp: boolean
-  canMoveDown: boolean
   reorderingId: string | null
   onSelect: (id: string) => void
   onToggleExpand: (id: string) => void
-  onAddSub: (parentId: string) => void
-  onRename: (node: DocFolderNode) => void
-  onDelete: (node: DocFolderNode) => void
-  onMoveUp: () => void
-  onMoveDown: () => void
-  onReorder: (nodeId: string, direction: 'up' | 'down') => void
+  onRightClick: (node: DocFolderNode, x: number, y: number) => void
 }) {
   const isSelected = selectedId === node.id
   const isExpanded = expandedIds.has(node.id)
@@ -98,6 +82,12 @@ function FolderTreeNode({
     if (hasChildren) onToggleExpand(node.id)
   }
 
+  function handleContextMenu(e: React.MouseEvent) {
+    e.preventDefault()
+    e.stopPropagation()
+    onRightClick(node, e.clientX, e.clientY)
+  }
+
   return (
     <>
       <div
@@ -105,6 +95,7 @@ function FolderTreeNode({
         style={{ paddingLeft: `${0.625 + depth * 1.125}rem` }}
         title={node.name}
         onClick={handleClick}
+        onContextMenu={handleContextMenu}
       >
         <span className="folder-chevron">
           {isReordering ? (
@@ -125,29 +116,6 @@ function FolderTreeNode({
         {node.documents.length > 0 && (
           <span className="folder-count">{node.documents.length}</span>
         )}
-        {canManage && (
-          <span className="folder-actions" onClick={e => e.stopPropagation()}>
-            {canMoveUp && (
-              <button className="folder-action-btn" title="Move up" onClick={onMoveUp} disabled={!!reorderingId}>
-                <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
-              </button>
-            )}
-            {canMoveDown && (
-              <button className="folder-action-btn" title="Move down" onClick={onMoveDown} disabled={!!reorderingId}>
-                <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
-              </button>
-            )}
-            <button className="folder-action-btn" title="New subfolder" onClick={() => onAddSub(node.id)}>
-              <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
-            </button>
-            <button className="folder-action-btn" title="Rename" onClick={() => onRename(node)}>
-              <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-            </button>
-            <button className="folder-action-btn danger" title="Delete" onClick={() => onDelete(node)}>
-              <svg width="11" height="11" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
-          </span>
-        )}
       </div>
       {isExpanded && node.children.map((child, idx) => (
         <FolderTreeNode
@@ -156,18 +124,10 @@ function FolderTreeNode({
           depth={depth + 1}
           selectedId={selectedId}
           expandedIds={expandedIds}
-          canManage={canManage}
-          canMoveUp={canManage && idx > 0}
-          canMoveDown={canManage && idx < node.children.length - 1}
           reorderingId={reorderingId}
           onSelect={onSelect}
           onToggleExpand={onToggleExpand}
-          onAddSub={onAddSub}
-          onRename={onRename}
-          onDelete={onDelete}
-          onMoveUp={() => onReorder(child.id, 'up')}
-          onMoveDown={() => onReorder(child.id, 'down')}
-          onReorder={onReorder}
+          onRightClick={onRightClick}
         />
       ))}
     </>
@@ -270,6 +230,36 @@ export default function SectionDocumentsPage() {
   const [moveDocLoading, setMoveDocLoading] = useState(false)
   const [allSectionsForMove, setAllSectionsForMove] = useState<DocSectionWithTree[]>([])
 
+  // Folder right-click context menu
+  type CtxMenu = { node: DocFolderNode; x: number; y: number }
+  const [folderCtxMenu, setFolderCtxMenu] = useState<CtxMenu | null>(null)
+  const ctxMenuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!folderCtxMenu) return
+    function close(e: MouseEvent | KeyboardEvent) {
+      if (e instanceof KeyboardEvent) { if (e.key === 'Escape') setFolderCtxMenu(null); return }
+      if (ctxMenuRef.current && !ctxMenuRef.current.contains(e.target as Node)) setFolderCtxMenu(null)
+    }
+    document.addEventListener('mousedown', close)
+    document.addEventListener('keydown', close)
+    return () => { document.removeEventListener('mousedown', close); document.removeEventListener('keydown', close) }
+  }, [folderCtxMenu])
+
+  function handleFolderRightClick(node: DocFolderNode, x: number, y: number) {
+    const menuW = 200, menuH = 280
+    setFolderCtxMenu({
+      node,
+      x: Math.min(x, window.innerWidth - menuW - 8),
+      y: Math.min(y, window.innerHeight - menuH - 8),
+    })
+  }
+
+  // Move folder modal
+  const [moveFolderModal, setMoveFolderModal] = useState<DocFolderNode | null>(null)
+  const [moveFolderParentId, setMoveFolderParentId] = useState<string>('')
+  const [moveFolderLoading, setMoveFolderLoading] = useState(false)
+
   // Permission modal
   const [permModal, setPermModal] = useState<DriveDocument | null>(null)
 
@@ -347,6 +337,17 @@ export default function SectionDocumentsPage() {
   function selectFolder(id: string) {
     setSelectedFolderId(id)
     setHighlightedDocId(null)
+    const url = new URL(window.location.href)
+    url.searchParams.set('folder', id)
+    url.searchParams.delete('doc')
+    window.history.replaceState(null, '', url.toString())
+  }
+
+  function copyFolderLink(node: DocFolderNode) {
+    const url = new URL(window.location.href)
+    url.searchParams.set('folder', node.id)
+    url.searchParams.delete('doc')
+    navigator.clipboard.writeText(url.toString()).then(() => showToast('Link copied to clipboard'))
   }
 
   // ── Folder CRUD ───────────────────────────────────────────────────────────────
@@ -434,6 +435,47 @@ export default function SectionDocumentsPage() {
     if (selectedFolderId === node.id) setSelectedFolderId(null)
     await reload()
     showToast('Folder deleted')
+  }
+
+  function openMoveFolder(node: DocFolderNode) {
+    setMoveFolderModal(node)
+    setMoveFolderParentId(node.parent_folder_id ?? '')
+    setMoveFolderLoading(false)
+  }
+
+  async function handleMoveFolder() {
+    if (!moveFolderModal) return
+    setMoveFolderLoading(true)
+    const res = await fetch(`/api/documents/manage/folders/${moveFolderModal.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ parent_folder_id: moveFolderParentId || null }),
+    })
+    if (res.ok) {
+      setMoveFolderModal(null)
+      await reload()
+      showToast('Folder moved')
+    } else {
+      const { error } = await res.json().catch(() => ({ error: 'Move failed' }))
+      alert(error ?? 'Could not move folder.')
+    }
+    setMoveFolderLoading(false)
+  }
+
+  function getDescendantIds(node: DocFolderNode): Set<string> {
+    const ids = new Set<string>([node.id])
+    function walk(n: DocFolderNode) { n.children.forEach(c => { ids.add(c.id); walk(c) }) }
+    walk(node)
+    return ids
+  }
+
+  function flattenWithDepth(nodes: DocFolderNode[], depth = 0): Array<{ node: DocFolderNode; depth: number }> {
+    const result: Array<{ node: DocFolderNode; depth: number }> = []
+    for (const n of nodes) {
+      result.push({ node: n, depth })
+      if (n.children.length > 0) result.push(...flattenWithDepth(n.children, depth + 1))
+    }
+    return result
   }
 
   // ── Document CRUD ─────────────────────────────────────────────────────────────
@@ -678,15 +720,18 @@ export default function SectionDocumentsPage() {
         .folder-count { font-size: 0.7rem; color: #9ca3af; flex-shrink: 0; background: #f3f4f6; border-radius: 8px; padding: 0.1rem 0.4rem; }
         .folder-row.selected .folder-count { background: #ddd6fe; color: #6d28d9; }
 
-        .folder-actions { display: none; align-items: center; gap: 2px; flex-shrink: 0; }
-        .folder-row:hover .folder-actions { display: flex; }
-        .folder-action-btn { background: none; border: none; cursor: pointer; color: #9ca3af; padding: 2px; border-radius: 3px; display: flex; align-items: center; line-height: 1; }
-        .folder-action-btn:hover { color: #7c3aed; background: #ede9fe; }
-        .folder-action-btn.danger:hover { color: #ef4444; background: #fef2f2; }
-        .folder-action-btn:disabled { opacity: 0.35; cursor: not-allowed; }
         .folder-row.reordering { opacity: 0.6; pointer-events: none; }
         .folder-spinner { animation: spin 0.7s linear infinite; color: #7c3aed; }
         @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+
+        .ctx-menu { position: fixed; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.14); min-width: 190px; z-index: 9999; overflow: hidden; padding: 0.25rem 0; }
+        .ctx-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.55rem 0.875rem; font-size: 0.85rem; color: #374151; cursor: pointer; border: none; background: none; width: 100%; text-align: left; }
+        .ctx-item:hover { background: #f9fafb; }
+        .ctx-item.danger { color: #ef4444; }
+        .ctx-item.danger:hover { background: #fef2f2; }
+        .ctx-item svg { flex-shrink: 0; color: #9ca3af; }
+        .ctx-item.danger svg { color: #fca5a5; }
+        .ctx-divider { height: 1px; background: #f3f4f6; margin: 0.25rem 0; }
 
         .add-folder-inline { padding: 0.5rem 0.75rem; display: flex; flex-direction: column; gap: 0.375rem; border-top: 1px solid #e5e7eb; background: #fafafa; }
         .add-folder-label { font-size: 0.72rem; color: #6b7280; font-weight: 600; }
@@ -828,18 +873,10 @@ export default function SectionDocumentsPage() {
                     depth={0}
                     selectedId={selectedFolderId}
                     expandedIds={expandedIds}
-                    canManage={canManage}
-                    canMoveUp={canManage && idx > 0}
-                    canMoveDown={canManage && idx < section.folders.length - 1}
                     reorderingId={reorderingId}
                     onSelect={selectFolder}
                     onToggleExpand={toggleExpand}
-                    onAddSub={id => { setAddFolderParentId(id); setNewFolderName(''); setExpandedIds(prev => new Set([...prev, id])) }}
-                    onRename={node => { setEditingFolder(node); setEditFolderName(node.name) }}
-                    onDelete={handleDeleteFolder}
-                    onMoveUp={() => handleReorder(node.id, 'up')}
-                    onMoveDown={() => handleReorder(node.id, 'down')}
-                    onReorder={handleReorder}
+                    onRightClick={handleFolderRightClick}
                   />
                 )
               ))}
@@ -1108,6 +1145,110 @@ export default function SectionDocumentsPage() {
           </div>
         </div>
       )}
+
+      {/* Folder right-click context menu */}
+      {folderCtxMenu && section && (() => {
+        const ctxNode = folderCtxMenu.node
+        // Compute sibling position live from current section state — never stale
+        function findSiblings(nodes: DocFolderNode[]): DocFolderNode[] | null {
+          if (nodes.some(n => n.id === ctxNode.id)) return nodes
+          for (const n of nodes) {
+            const found = findSiblings(n.children)
+            if (found) return found
+          }
+          return null
+        }
+        const siblings = findSiblings(section.folders) ?? []
+        const sibIdx = siblings.findIndex(n => n.id === ctxNode.id)
+        const canMoveUp = sibIdx > 0
+        const canMoveDown = sibIdx < siblings.length - 1
+        return (
+          <div ref={ctxMenuRef} className="ctx-menu" style={{ left: folderCtxMenu.x, top: folderCtxMenu.y }}>
+            <button className="ctx-item" onClick={() => { copyFolderLink(folderCtxMenu.node); setFolderCtxMenu(null) }}>
+              <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+              Copy link
+            </button>
+            {canManage && (
+              <>
+                <div className="ctx-divider" />
+                {canMoveUp && (
+                  <button className="ctx-item" onClick={() => { handleReorder(folderCtxMenu.node.id, 'up'); setFolderCtxMenu(null) }}>
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" /></svg>
+                    Move up
+                  </button>
+                )}
+                {canMoveDown && (
+                  <button className="ctx-item" onClick={() => { handleReorder(folderCtxMenu.node.id, 'down'); setFolderCtxMenu(null) }}>
+                    <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
+                    Move down
+                  </button>
+                )}
+                <button className="ctx-item" onClick={() => { openMoveFolder(folderCtxMenu.node); setFolderCtxMenu(null) }}>
+                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
+                  Move to folder…
+                </button>
+                <button className="ctx-item" onClick={() => { setAddFolderParentId(folderCtxMenu.node.id); setNewFolderName(''); setExpandedIds(prev => new Set([...prev, folderCtxMenu.node.id])); setFolderCtxMenu(null) }}>
+                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+                  New subfolder
+                </button>
+                <button className="ctx-item" onClick={() => { setEditingFolder(folderCtxMenu.node); setEditFolderName(folderCtxMenu.node.name); setFolderCtxMenu(null) }}>
+                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                  Rename
+                </button>
+                <div className="ctx-divider" />
+                <button className="ctx-item danger" onClick={() => { handleDeleteFolder(folderCtxMenu.node); setFolderCtxMenu(null) }}>
+                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                  Delete
+                </button>
+              </>
+            )}
+          </div>
+        )
+      })()}
+
+      {/* Move Folder Modal */}
+      {moveFolderModal && section && (() => {
+        const excluded = getDescendantIds(moveFolderModal)
+        const options = flattenWithDepth(section.folders).filter(({ node }) => !excluded.has(node.id))
+        const currentParentId = moveFolderModal.parent_folder_id ?? ''
+        const isDirty = moveFolderParentId !== currentParentId
+        return (
+          <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setMoveFolderModal(null) }}>
+            <div className="modal">
+              <div className="modal-header">
+                <h3>Move Folder</h3>
+                <button className="modal-close" onClick={() => setMoveFolderModal(null)}>✕</button>
+              </div>
+              <div className="modal-body">
+                <p style={{ margin: 0, fontSize: '0.85rem', color: '#6b7280' }}>
+                  Move <strong style={{ color: '#111' }}>{moveFolderModal.name}</strong> to a different location.
+                </p>
+                <div className="form-group">
+                  <label className="form-label">Destination</label>
+                  <select className="form-select" value={moveFolderParentId} onChange={e => setMoveFolderParentId(e.target.value)}>
+                    <option value="">(Top level)</option>
+                    {options.map(({ node, depth }) => (
+                      <option key={node.id} value={node.id}>
+                        {'  '.repeat(depth)}{depth > 0 ? '↳ ' : ''}{node.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </div>
+              <div className="modal-footer">
+                <button className="btn-sm btn-secondary" onClick={() => setMoveFolderModal(null)}>Cancel</button>
+                <button
+                  className="btn-sm btn-primary"
+                  onClick={handleMoveFolder}
+                  disabled={moveFolderLoading || !isDirty}
+                >
+                  {moveFolderLoading ? 'Moving…' : 'Move'}
+                </button>
+              </div>
+            </div>
+          </div>
+        )
+      })()}
 
       {/* Permission Modal */}
       {permModal && (
