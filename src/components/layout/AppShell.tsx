@@ -6,6 +6,7 @@ import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Store, CalendarCountdownEvent } from '@/types'
 import { setGAUser, trackPageView } from '@/lib/analytics'
+import * as Sentry from '@sentry/nextjs'
 import { NotificationBell } from './NotificationBell'
 
 // ── Module-level fetch cache ──────────────────────────────────────────────────
@@ -365,7 +366,8 @@ export default function AppShell({ children, user, isImpersonating, impersonated
   // ── Analytics ──────────────────────────────────────────────────────────────
   useEffect(() => {
     setGAUser(user.email)
-  }, [user.email])
+    Sentry.setUser({ id: user.id, email: user.email })
+  }, [user.id, user.email])
 
   useEffect(() => {
     trackPageView(window.location.href, user.email)
@@ -388,6 +390,7 @@ export default function AppShell({ children, user, isImpersonating, impersonated
   }
 
   async function handleSignOut() {
+    Sentry.setUser(null)
     await supabase.auth.signOut()
     sessionStorage.clear()
     router.push('/login')
