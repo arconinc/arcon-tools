@@ -237,6 +237,60 @@ export async function writeArcSheetMetadata(
   )
 }
 
+/**
+ * Appends rows to the main data sheet (Sheet1) of an expense report file.
+ * Uses the same drive+spreadsheets token as writeArcSheetMetadata.
+ */
+/**
+ * Inserts rows at the top of the data table in the "Detailed Log" sheet
+ * (row 6, immediately after the header row at row 5), pushing existing
+ * entries and the Total row down.
+ *
+ * Two-step: insertDimension creates blank rows at the right position,
+ * then values.update fills them. values:append always goes to the table
+ * end so it can't be used for top-of-table insertion.
+ */
+export async function appendExpenseRows(
+  fileId: string,
+  rows: string[][]
+): Promise<void> {
+  const sheetsBase = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(fileId)}`
+
+  // 1. Resolve the numeric sheetId for "Detailed Log"
+  const meta = await driveRequest<{
+    sheets: { properties: { title: string; sheetId: number } }[]
+  }>('GET', sheetsBase, undefined, { fields: 'sheets.properties(title,sheetId)' })
+
+  const sheet = meta.sheets.find((s) => s.properties.title === 'Detailed Log')
+  if (!sheet) throw new Error('Sheet tab "Detailed Log" not found in this spreadsheet.')
+
+  // 2. Insert N blank rows at index 5 (0-based) = row 6 (1-based), between header and first data row
+  await driveRequest('POST', `${sheetsBase}:batchUpdate`, {
+    requests: [
+      {
+        insertDimension: {
+          range: {
+            sheetId: sheet.properties.sheetId,
+            dimension: 'ROWS',
+            startIndex: 5,                    // row 6 (0-based)
+            endIndex: 5 + rows.length,
+          },
+          inheritFromBefore: false,           // inherit formatting from first data row, not header
+        },
+      },
+    ],
+  })
+
+  // 3. Write data into the newly inserted rows
+  const range = encodeURIComponent('Detailed Log!A6')
+  await driveRequest(
+    'PUT',
+    `${sheetsBase}/values/${range}`,
+    { values: rows },
+    { valueInputOption: 'USER_ENTERED' }
+  )
+}
+
 // ─── JWT helpers (mirrors google-calendar.ts) ─────────────────────────────────
 
 function signJwt(payload: Record<string, string | number>, privateKey: string): string {

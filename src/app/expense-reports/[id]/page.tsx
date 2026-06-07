@@ -41,6 +41,9 @@ export default function ExpenseReportDetailPage() {
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [importing, setImporting] = useState(false)
+  const [importResult, setImportResult] = useState<string | null>(null)
+  const [importError, setImportError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch(`/api/expense-reports/${id}`)
@@ -48,6 +51,31 @@ export default function ExpenseReportDetailPage() {
       .then(data => { if (data) setReport(data.report) })
       .finally(() => setLoading(false))
   }, [id])
+
+  async function handleImport(e: React.ChangeEvent<HTMLInputElement>) {
+    const file = e.target.files?.[0]
+    if (!file) return
+    e.target.value = ''
+    setImporting(true)
+    setImportResult(null)
+    setImportError(null)
+    const formData = new FormData()
+    formData.append('file', file)
+    try {
+      const res = await fetch(`/api/expense-reports/${id}/import-expensify`, { method: 'POST', body: formData })
+      const data = await res.json().catch(() => ({}))
+      if (res.ok) {
+        setImportResult(`${data.imported} expense${data.imported === 1 ? '' : 's'} imported`)
+        router.refresh()
+      } else {
+        setImportError(data.error ?? 'Import failed')
+      }
+    } catch {
+      setImportError('Network error — please try again')
+    } finally {
+      setImporting(false)
+    }
+  }
 
   async function handleDelete() {
     setDeleting(true)
@@ -74,6 +102,9 @@ export default function ExpenseReportDetailPage() {
         .btn-sheets:hover { background: #137333; }
         .btn-secondary { background: #ede9fe; color: #5b21b6; border: none; padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
         .btn-secondary:hover { background: #ddd6fe; }
+        .btn-import { display: inline-block; background: #ede9fe; color: #5b21b6; border: 1.5px solid #c4b5fd; padding: 8px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+        .btn-import:hover:not(:disabled) { background: #ddd6fe; }
+        .btn-import:disabled { opacity: .6; cursor: not-allowed; }
         .btn-danger { background: #fee2e2; color: #dc2626; border: none; padding: 9px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
         .btn-danger:hover:not(:disabled) { background: #fecaca; }
         .btn-danger-solid { background: #dc2626; color: #fff; border: none; padding: 9px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
@@ -130,7 +161,36 @@ export default function ExpenseReportDetailPage() {
       )}
 
       {report.status === 'draft' && (
-        <div style={{ marginTop: 32, paddingTop: 24, borderTop: '1px solid #f3f4f6' }}>
+        <div style={{ marginTop: 28, padding: '20px 24px', background: '#faf5ff', border: '1.5px solid #e9d5ff', borderRadius: 12 }}>
+          <div style={{ fontSize: 13, fontWeight: 700, color: '#5b21b6', textTransform: 'uppercase', letterSpacing: '.04em', marginBottom: 10 }}>
+            Import from Expensify
+          </div>
+          <p style={{ margin: '0 0 14px', fontSize: 13, color: '#6b7280', lineHeight: 1.5 }}>
+            Export a CSV from Expensify and upload it here to append the rows directly to your Google Sheet.
+          </p>
+          <label style={{ display: 'inline-block' }}>
+            <span className="btn-import" style={{ pointerEvents: importing ? 'none' : 'auto', opacity: importing ? 0.6 : 1 }}>
+              {importing ? 'Importing…' : 'Choose CSV file'}
+            </span>
+            <input
+              type="file"
+              accept=".csv"
+              style={{ display: 'none' }}
+              disabled={importing}
+              onChange={handleImport}
+            />
+          </label>
+          {importResult && (
+            <p style={{ margin: '12px 0 0', fontSize: 14, color: '#166534', fontWeight: 600 }}>{importResult}</p>
+          )}
+          {importError && (
+            <p style={{ margin: '12px 0 0', fontSize: 14, color: '#dc2626' }}>{importError}</p>
+          )}
+        </div>
+      )}
+
+      {report.status === 'draft' && (
+        <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid #f3f4f6' }}>
           <button className="btn-danger" onClick={() => { setShowDeleteConfirm(true); setDeleteError(null) }}>
             Delete Report
           </button>

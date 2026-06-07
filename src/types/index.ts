@@ -1025,6 +1025,7 @@ export interface ExpenseReportConfig {
   template_drive_url: string | null
   expense_folder_id: string | null
   template_instructions: string | null
+  sheet_column_mapping: string[] | null
   updated_at: string
   updated_by: string | null
   reviewer?: { id: string; display_name: string; email: string } | null

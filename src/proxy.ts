@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { RESTRICTED_RESOURCES } from '@/lib/permissions'
+import * as Sentry from '@sentry/nextjs'
 
 // Pre-compute the set of restricted page prefixes for fast lookup in middleware
 const RESTRICTED_PAGE_PREFIXES: { prefix: string; role: string }[] = Object.entries(RESTRICTED_RESOURCES)
@@ -32,6 +33,12 @@ export async function proxy(request: NextRequest) {
   const {
     data: { user },
   } = await supabase.auth.getUser()
+
+  if (user) {
+    Sentry.setUser({ id: user.id, email: user.email ?? undefined })
+  } else {
+    Sentry.setUser(null)
+  }
 
   const pathname = request.nextUrl.pathname
 
