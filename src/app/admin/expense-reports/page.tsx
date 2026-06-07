@@ -16,12 +16,16 @@ function formatDate(iso: string) {
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
+function formatCurrency(n: number) {
+  return n.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+}
+
 const STATUS_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
-  draft:                 { label: 'Draft',                  bg: '#f3f4f6', color: '#374151' },
-  submitted:             { label: 'Submitted',              bg: '#dbeafe', color: '#1d4ed8' },
-  needs_changes:         { label: 'Needs Changes',          bg: '#fef3c7', color: '#92400e' },
-  approved:              { label: 'Approved',               bg: '#dcfce7', color: '#166534' },
-  submitted_to_payroll:  { label: 'Submitted to Payroll',   bg: '#ede9fe', color: '#5b21b6' },
+  draft:                { label: 'In Progress',          bg: '#f3f4f6', color: '#374151' },
+  submitted:            { label: 'Submitted',            bg: '#dbeafe', color: '#1d4ed8' },
+  needs_changes:        { label: 'Changes Needed',       bg: '#fef3c7', color: '#92400e' },
+  approved:             { label: 'Approved',             bg: '#dcfce7', color: '#166534' },
+  submitted_to_payroll: { label: 'Submitted to Payroll', bg: '#ede9fe', color: '#5b21b6' },
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -36,12 +40,9 @@ export default function AdminExpenseReportsPage() {
   const [monthFilter, setMonthFilter] = useState('')
   const [tab, setTab] = useState<'reports' | 'config'>('reports')
 
-  // Config state
+  // Config
   const [config, setConfig] = useState<{
     reviewer_user_id: string | null
-    template_drive_file_id: string | null
-    template_drive_url: string | null
-    expense_folder_id: string | null
     template_instructions: string | null
     reviewer?: { id: string; display_name: string } | null
   } | null>(null)
@@ -50,13 +51,9 @@ export default function AdminExpenseReportsPage() {
   const [configError, setConfigError] = useState<string | null>(null)
   const [configSuccess, setConfigSuccess] = useState(false)
 
-  // Config form fields
   const [reviewerSearch, setReviewerSearch] = useState('')
   const [reviewerOptions, setReviewerOptions] = useState<UserOption[]>([])
   const [reviewerSearchLoading, setReviewerSearchLoading] = useState(false)
-  const [templateFileId, setTemplateFileId] = useState('')
-  const [templateUrl, setTemplateUrl] = useState('')
-  const [folderId, setFolderId] = useState('')
   const [instructions, setInstructions] = useState('')
 
   async function loadReports() {
@@ -76,9 +73,6 @@ export default function AdminExpenseReportsPage() {
     const data = await res.json()
     if (data.config) {
       setConfig(data.config)
-      setTemplateFileId(data.config.template_drive_file_id ?? '')
-      setTemplateUrl(data.config.template_drive_url ?? '')
-      setFolderId(data.config.expense_folder_id ?? '')
       setInstructions(data.config.template_instructions ?? '')
     }
     setConfigLoading(false)
@@ -121,13 +115,12 @@ export default function AdminExpenseReportsPage() {
     setSavingConfig(false)
   }
 
-  // Summary counts
   const counts = Object.fromEntries(
     Object.keys(STATUS_CONFIG).map(s => [s, reports.filter(r => r.status === s).length])
   )
 
   return (
-    <div style={{ maxWidth: 980, margin: '0 auto', padding: '32px 24px' }}>
+    <div style={{ maxWidth: 1000, margin: '0 auto', padding: '32px 16px' }}>
       <style>{`
         .er-table { width: 100%; border-collapse: collapse; }
         .er-table th { text-align: left; padding: 10px 14px; background: #f8f7ff; color: #6d28d9; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; border-bottom: 2px solid #ede9fe; }
@@ -140,15 +133,13 @@ export default function AdminExpenseReportsPage() {
         .btn-secondary { background: #ede9fe; color: #5b21b6; border: none; padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
         .btn-secondary:hover:not(:disabled) { background: #ddd6fe; }
         .btn-secondary:disabled { opacity: .6; cursor: not-allowed; }
-        .btn-sheets { background: #188038; color: #fff; border: none; padding: 6px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
-        .btn-sheets:hover { background: #137333; }
         .form-input { width: 100%; border: 1.5px solid #d1d5db; border-radius: 8px; padding: 8px 12px; font-size: 14px; box-sizing: border-box; }
         .form-input:focus { outline: none; border-color: #7c3aed; }
         .form-label { display: block; font-size: 13px; font-weight: 600; color: #374151; margin-bottom: 4px; }
         .form-hint { font-size: 12px; color: #9ca3af; margin: 4px 0 0; }
         .tab { padding: 8px 20px; border: none; background: none; font-size: 14px; font-weight: 600; cursor: pointer; border-bottom: 3px solid transparent; color: #6b7280; }
         .tab.active { color: #7c3aed; border-bottom-color: #7c3aed; }
-        .stat-card { background: #fff; border: 1px solid #e9d5ff; border-radius: 12px; padding: 14px 18px; text-align: center; }
+        .stat-card { background: #fff; border: 1px solid #e9d5ff; border-radius: 12px; padding: 14px 18px; text-align: center; cursor: pointer; }
         .config-card { background: #fff; border: 1px solid #e9d5ff; border-radius: 12px; padding: 24px; }
       `}</style>
 
@@ -164,17 +155,15 @@ export default function AdminExpenseReportsPage() {
 
       {tab === 'reports' && (
         <>
-          {/* Status summary */}
           <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 24 }}>
             {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
-              <div key={key} className="stat-card" style={{ cursor: 'pointer', outline: statusFilter === key ? `2px solid ${cfg.color}` : 'none' }} onClick={() => setStatusFilter(statusFilter === key ? '' : key)}>
+              <div key={key} className="stat-card" style={{ outline: statusFilter === key ? `2px solid ${cfg.color}` : 'none' }} onClick={() => setStatusFilter(statusFilter === key ? '' : key)}>
                 <div style={{ fontSize: 24, fontWeight: 700, color: cfg.color }}>{counts[key] ?? 0}</div>
                 <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{cfg.label}</div>
               </div>
             ))}
           </div>
 
-          {/* Filters */}
           <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
             <select className="form-input" style={{ width: 'auto', minWidth: 180 }} value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
               <option value="">All Statuses</option>
@@ -200,8 +189,8 @@ export default function AdminExpenseReportsPage() {
                     <th>Employee</th>
                     <th>Month</th>
                     <th>Status</th>
-                    <th>Reviewer Note</th>
-                    <th>Submitted</th>
+                    <th>Items</th>
+                    <th>Total</th>
                     <th>Updated</th>
                     <th></th>
                   </tr>
@@ -215,22 +204,15 @@ export default function AdminExpenseReportsPage() {
                       </td>
                       <td style={{ fontWeight: 600, color: '#374151' }}>{formatMonth(r.period_month)}</td>
                       <td><StatusBadge status={r.status} /></td>
-                      <td style={{ fontSize: 13, color: '#6b7280', maxWidth: 200, fontStyle: 'italic' }}>
-                        {r.reviewer_comment ? `"${r.reviewer_comment}"` : '—'}
+                      <td style={{ color: '#6b7280', fontSize: 13 }}>{r.line_item_count ?? 0}</td>
+                      <td style={{ fontWeight: 500, color: '#1e1b4b', fontSize: 13 }}>
+                        {(r.total_original ?? 0) > 0 ? formatCurrency(r.total_original ?? 0) : '—'}
                       </td>
-                      <td style={{ fontSize: 13, color: '#6b7280' }}>{formatDate(r.created_at)}</td>
                       <td style={{ fontSize: 13, color: '#6b7280' }}>{formatDate(r.updated_at)}</td>
-                      <td style={{ whiteSpace: 'nowrap' }}>
-                        <div style={{ display: 'flex', gap: 8 }}>
-                          {r.drive_url && (
-                            <a href={r.drive_url} target="_blank" rel="noopener noreferrer" className="btn-sheets">
-                              Open in Sheets ↗
-                            </a>
-                          )}
-                          <Link href={`/admin/expense-reports/${r.id}`} style={{ textDecoration: 'none' }}>
-                            <button className="btn-secondary">Details</button>
-                          </Link>
-                        </div>
+                      <td>
+                        <Link href={`/admin/expense-reports/${r.id}`} style={{ textDecoration: 'none' }}>
+                          <button className="btn-secondary">Review</button>
+                        </Link>
                       </td>
                     </tr>
                   ))}
@@ -262,7 +244,7 @@ export default function AdminExpenseReportsPage() {
               <div className="config-card">
                 <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: '#1e1b4b' }}>Reviewer</h3>
                 <p style={{ margin: '0 0 16px', fontSize: 13, color: '#6b7280' }}>
-                  This person is notified when expense reports are submitted and can approve/reject them via the Apps Script menu in Google Sheets.
+                  This person is notified when expense reports are submitted and can review and approve them in The Arc.
                 </p>
                 {config?.reviewer && (
                   <div style={{ background: '#f5f3ff', borderRadius: 8, padding: '10px 14px', marginBottom: 14, fontSize: 14, color: '#4c1d95', fontWeight: 600 }}>
@@ -289,37 +271,6 @@ export default function AdminExpenseReportsPage() {
                 )}
               </div>
 
-              {/* Template + Folder */}
-              <div className="config-card">
-                <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: '#1e1b4b' }}>Google Sheets Template</h3>
-                <p style={{ margin: '0 0 16px', fontSize: 13, color: '#6b7280' }}>
-                  When an employee creates a new expense report, Arc copies this template and shares it with them and the reviewer.
-                  Make sure the service account email has <strong>editor</strong> access to both the template and the folder.
-                </p>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 14 }}>
-                  <div>
-                    <label className="form-label">Template File ID</label>
-                    <input type="text" className="form-input" placeholder="e.g. 1BxiMVs0XRA5nFMdKvBdBZjgmUUqptlbs74OgVE2upms" value={templateFileId} onChange={e => setTemplateFileId(e.target.value)} />
-                    <p className="form-hint">Find this in the Google Sheets URL: docs.google.com/spreadsheets/d/<strong>[FILE_ID]</strong>/edit</p>
-                  </div>
-                  <div>
-                    <label className="form-label">Template View URL (optional)</label>
-                    <input type="text" className="form-input" placeholder="https://docs.google.com/spreadsheets/d/…" value={templateUrl} onChange={e => setTemplateUrl(e.target.value)} />
-                    <p className="form-hint">If set, employees see a "View Template" button on their expense reports page.</p>
-                  </div>
-                  <div>
-                    <label className="form-label">Destination Folder ID</label>
-                    <input type="text" className="form-input" placeholder="e.g. 1A2B3C4D5E6F7G8H9I0J" value={folderId} onChange={e => setFolderId(e.target.value)} />
-                    <p className="form-hint">Find this in the Drive folder URL: drive.google.com/drive/folders/<strong>[FOLDER_ID]</strong></p>
-                  </div>
-                  <div>
-                    <button className="btn-primary" disabled={savingConfig} onClick={() => saveConfig({ template_drive_file_id: templateFileId, template_drive_url: templateUrl, expense_folder_id: folderId })}>
-                      {savingConfig ? 'Saving…' : 'Save Drive Settings'}
-                    </button>
-                  </div>
-                </div>
-              </div>
-
               {/* Instructions */}
               <div className="config-card">
                 <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: '#1e1b4b' }}>Instructions</h3>
@@ -328,21 +279,6 @@ export default function AdminExpenseReportsPage() {
                 <button className="btn-primary" style={{ marginTop: 10 }} disabled={savingConfig} onClick={() => saveConfig({ template_instructions: instructions })}>
                   {savingConfig ? 'Saving…' : 'Save Instructions'}
                 </button>
-              </div>
-
-              {/* Apps Script setup */}
-              <div className="config-card" style={{ background: '#f8f7ff' }}>
-                <h3 style={{ margin: '0 0 4px', fontSize: 16, fontWeight: 700, color: '#1e1b4b' }}>Apps Script Setup</h3>
-                <p style={{ margin: '0 0 12px', fontSize: 13, color: '#6b7280', lineHeight: 1.6 }}>
-                  To enable the <strong>Arc Expense Report</strong> menu inside Google Sheets, install the Apps Script in the template once:
-                </p>
-                <ol style={{ margin: 0, paddingLeft: 20, fontSize: 13, color: '#374151', lineHeight: 2 }}>
-                  <li>Open the template Sheet → <strong>Extensions → Apps Script</strong></li>
-                  <li>Delete any existing code and paste the Arc Expense Report script</li>
-                  <li>Replace <code style={{ background: '#e5e7eb', padding: '1px 5px', borderRadius: 4 }}>{'<<EXPENSE_REPORT_API_KEY>>'}</code> with your actual API key from <code>.env.local</code></li>
-                  <li>Save, then run <code>onOpen()</code> once to grant permissions</li>
-                  <li>The script copies automatically to every new expense report created by The Arc</li>
-                </ol>
               </div>
             </>
           )}

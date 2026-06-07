@@ -1021,11 +1021,7 @@ export type ExpenseReportStatus =
 export interface ExpenseReportConfig {
   id: string
   reviewer_user_id: string | null
-  template_drive_file_id: string | null
-  template_drive_url: string | null
-  expense_folder_id: string | null
   template_instructions: string | null
-  sheet_column_mapping: string[] | null
   updated_at: string
   updated_by: string | null
   reviewer?: { id: string; display_name: string; email: string } | null
@@ -1035,11 +1031,75 @@ export interface ExpenseReport {
   id: string
   created_by: string
   period_month: string          // YYYY-MM
+  title: string | null
   status: ExpenseReportStatus
-  drive_file_id: string | null
-  drive_url: string | null
+  drive_file_id: string | null  // legacy — kept for old records
+  drive_url: string | null      // legacy — kept for old records
   reviewer_comment: string | null
   created_at: string
   updated_at: string
   submitter?: { id: string; display_name: string; email: string } | null
+  line_items?: ExpenseReportLineItem[]
+  line_item_count?: number
+  total_original?: number
+  total_adjusted?: number
+}
+
+export interface ExpenseReportLineItem {
+  id: string
+  report_id: string
+  expense_date: string | null
+  vendor: string | null
+  category: string | null
+  description: string | null
+  original_amount: number | null
+  adjusted_amount: number | null
+  payment_type: 'cash' | 'credit_card' | null
+  receipt_url: string | null
+  reimbursable: boolean
+  sort_order: number
+  created_at: string
+  updated_at: string
+  receipts?: ExpenseReportReceipt[]
+  comments?: ExpenseReportComment[]
+}
+
+export interface ExpenseReportReceipt {
+  id: string
+  report_id: string
+  line_item_id: string | null
+  filename: string
+  storage_path: string
+  mime_type: string | null
+  file_size: number | null
+  uploaded_by: string
+  created_at: string
+  signed_url?: string
+}
+
+export interface ExpenseReportVersion {
+  id: string
+  report_id: string
+  changed_by: string
+  action: string
+  previous_status: string | null
+  new_status: string | null
+  comment: string | null
+  created_at: string
+  changer?: { id: string; display_name: string; email: string } | null
+}
+
+export interface ExpenseReportComment {
+  id: string
+  report_id: string
+  line_item_id: string | null
+  parent_id: string | null
+  author_id: string
+  body: string
+  resolved_at: string | null
+  resolved_by: string | null
+  created_at: string
+  updated_at: string
+  author?: { id: string; display_name: string; email: string; avatar_url?: string | null }
+  replies?: ExpenseReportComment[]
 }

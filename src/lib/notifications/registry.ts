@@ -212,7 +212,6 @@ export interface ExpenseReportSubmittedPayload {
   report_id: string
   period_month: string    // e.g. "2026-05"
   submitter_name: string
-  drive_url: string
 }
 
 export const expenseReportSubmitted: NotificationDefinition<ExpenseReportSubmittedPayload> = {
@@ -222,7 +221,7 @@ export const expenseReportSubmitted: NotificationDefinition<ExpenseReportSubmitt
   defaultEmail: true,
   render: (p) => ({
     title: `${p.submitter_name} submitted an expense report for ${p.period_month}`,
-    body: 'Ready for your review in Google Sheets.',
+    body: 'Ready for your review in The Arc.',
     linkUrl: `/admin/expense-reports/${p.report_id}`,
   }),
   email: (p, recipient) => {
@@ -235,10 +234,10 @@ export const expenseReportSubmitted: NotificationDefinition<ExpenseReportSubmitt
         greeting: `Hi ${firstName},`,
         bodyLines: [
           `<strong>${p.submitter_name}</strong> has submitted their expense report for <strong>${p.period_month}</strong> and it is ready for your review.`,
-          `Open the sheet, review the details, and use the <strong>Arc Expense Report</strong> menu to approve, request changes, or submit to payroll.`,
+          `Review the line items, leave comments on specific rows, and approve or request changes directly in The Arc.`,
         ],
-        ctaText: 'Open in Google Sheets',
-        ctaUrl: p.drive_url,
+        ctaText: 'Review in The Arc',
+        ctaUrl: `${appUrl()}/admin/expense-reports/${p.report_id}`,
       }),
     }
   },
@@ -251,7 +250,6 @@ export interface ExpenseReportNeedsChangesPayload {
   period_month: string
   reviewer_name: string
   comment: string | null
-  drive_url: string
 }
 
 export const expenseReportNeedsChanges: NotificationDefinition<ExpenseReportNeedsChangesPayload> = {
@@ -275,10 +273,10 @@ export const expenseReportNeedsChanges: NotificationDefinition<ExpenseReportNeed
         bodyLines: [
           `<strong>${p.reviewer_name}</strong> has reviewed your expense report for <strong>${p.period_month}</strong> and has requested some changes.`,
           ...(p.comment ? [`Their note: <em>${p.comment}</em>`] : []),
-          `Please open the report in Google Sheets, make the necessary corrections, and re-submit using the <strong>Arc Expense Report</strong> menu.`,
+          `Please open the report in The Arc, make the necessary corrections, and re-submit.`,
         ],
-        ctaText: 'Open in Google Sheets',
-        ctaUrl: p.drive_url,
+        ctaText: 'Open Expense Report',
+        ctaUrl: `${appUrl()}/expense-reports/${p.report_id}`,
       }),
     }
   },
@@ -358,6 +356,49 @@ export const expenseReportSubmittedToPayroll: NotificationDefinition<ExpenseRepo
   },
 }
 
+// ─── expense_report.comment_added ────────────────────────────────────────────
+
+export interface ExpenseReportCommentAddedPayload {
+  report_id: string
+  period_month: string
+  author_name: string
+  is_line_item_comment: boolean
+  body_excerpt: string
+  recipient_is_admin: boolean
+}
+
+export const expenseReportCommentAdded: NotificationDefinition<ExpenseReportCommentAddedPayload> = {
+  type: 'expense_report.comment_added',
+  label: 'Comment added to my expense report',
+  description: 'When a comment or reply is added to your expense report.',
+  defaultEmail: true,
+  render: (p) => ({
+    title: `${p.author_name} commented on your ${p.period_month} expense report`,
+    body: p.body_excerpt,
+    linkUrl: p.recipient_is_admin ? `/admin/expense-reports/${p.report_id}` : `/expense-reports/${p.report_id}`,
+  }),
+  email: (p, recipient) => {
+    const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
+    const context = p.is_line_item_comment ? 'a specific line item on' : ''
+    return {
+      subject: `New comment on ${p.period_month} expense report`,
+      html: renderGenericEmail({
+        preheader: `${p.author_name} left a comment on your expense report`,
+        heading: 'New Expense Report Comment',
+        greeting: `Hi ${firstName},`,
+        bodyLines: [
+          `<strong>${p.author_name}</strong> left a comment${context ? ` on ${context}` : ' on'} your expense report for <strong>${p.period_month}</strong>.`,
+          `<em>&ldquo;${p.body_excerpt}&rdquo;</em>`,
+        ],
+        ctaText: 'View Comment',
+        ctaUrl: p.recipient_is_admin
+          ? `${appUrl()}/admin/expense-reports/${p.report_id}`
+          : `${appUrl()}/expense-reports/${p.report_id}`,
+      }),
+    }
+  },
+}
+
 // ─── task_completed ───────────────────────────────────────────────────────────
 
 export interface TaskCompletedPayload {
@@ -416,6 +457,7 @@ export const NOTIFICATION_REGISTRY = {
   'expense_report.needs_changes': expenseReportNeedsChanges,
   'expense_report.approved': expenseReportApproved,
   'expense_report.submitted_to_payroll': expenseReportSubmittedToPayroll,
+  'expense_report.comment_added': expenseReportCommentAdded,
 } as const
 
 export type NotificationType = keyof typeof NOTIFICATION_REGISTRY

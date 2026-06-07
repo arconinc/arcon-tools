@@ -19,7 +19,7 @@ export async function GET() {
   const adminClient = createAdminClient()
   const { data: config, error } = await adminClient
     .from('expense_report_config')
-    .select('id, reviewer_user_id, template_drive_file_id, template_drive_url, expense_folder_id, template_instructions, updated_at, updated_by')
+    .select('id, reviewer_user_id, template_instructions, updated_at, updated_by')
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
@@ -38,7 +38,7 @@ export async function GET() {
 }
 
 // PUT /api/admin/expense-reports/config
-// Body: { reviewer_user_id?, template_drive_file_id?, template_drive_url?, expense_folder_id?, template_instructions? }
+// Body: { reviewer_user_id?, template_instructions? }
 export async function PUT(req: NextRequest) {
   const admin = await getAdminUser()
   if (!admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
@@ -48,16 +48,13 @@ export async function PUT(req: NextRequest) {
 
   const updates: Record<string, unknown> = { updated_at: new Date().toISOString(), updated_by: admin.id }
   if ('reviewer_user_id' in body) updates.reviewer_user_id = body.reviewer_user_id || null
-  if ('template_drive_file_id' in body) updates.template_drive_file_id = body.template_drive_file_id || null
-  if ('template_drive_url' in body) updates.template_drive_url = body.template_drive_url || null
-  if ('expense_folder_id' in body) updates.expense_folder_id = body.expense_folder_id || null
   if ('template_instructions' in body) updates.template_instructions = body.template_instructions || null
 
   const { data, error } = await adminClient
     .from('expense_report_config')
     .update(updates)
     .not('id', 'is', null)
-    .select()
+    .select('id, reviewer_user_id, template_instructions, updated_at, updated_by')
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })

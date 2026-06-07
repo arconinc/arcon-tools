@@ -27,6 +27,7 @@ npm run release  # interactive release script (creates tag, updates releases.jso
 - **Clean up only your own mess.** — You are responsible for the quality of code you write, not for fixing unrelated technical debt.
 - **Define success criteria.** — Be explicit about what "done" means before starting. How will you know the change is working? What should be tested?
 - **Security first — never shortcut auth, validation, or permission checks.** — Even when a shortcut *seems* safe or convenient, always follow the documented auth patterns. Never skip environment verification, permission checks, or role validation. Never use flags like `--no-verify` or similar bypasses. Always verify intended behavior against security patterns (RLS, auth checks, admin gates).
+- **User tests everything. Never run build or test yourself.** — Do not invoke `npm run build`, `npm run test`, `npm run dev`, or similar commands. The user will test all changes. Focus on code changes only.
 
 ## Project Structure
 ```
@@ -435,6 +436,7 @@ const flags = useFeatureFlags()      // Record<string, boolean> — feature flag
 - Tailwind utility classes for component-level styling
 - Typography plugin loaded via `@plugin "@tailwindcss/typography"` in `globals.css`
 - Color theme: **purple** as primary brand color
+- **Page containers default to full width** — use `width: '100%'` instead of `maxWidth` for main page containers, allowing content to span full viewport width
 
 ## Database Tables
 | Table | Purpose |

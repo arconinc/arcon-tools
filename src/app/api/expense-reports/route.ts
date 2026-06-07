@@ -1,11 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
-import { copyExpenseTemplate, writeArcSheetMetadata } from '@/lib/google-drive'
-import { dispatchNotification } from '@/lib/notifications/dispatch'
-import { expenseReportSubmitted } from '@/lib/notifications/registry'
 
-// GET /api/expense-reports — list current user's expense reports
+// GET /api/expense-reports — list current user's expense reports with totals
 export async function GET() {
   const appUser = await requireUser()
   if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -13,16 +10,42 @@ export async function GET() {
   const adminClient = createAdminClient()
   const { data, error } = await adminClient
     .from('expense_reports')
-    .select('id, created_by, period_month, status, drive_file_id, drive_url, reviewer_comment, created_at, updated_at')
+    .select('id, created_by, period_month, title, status, reviewer_comment, created_at, updated_at')
     .eq('created_by', appUser.id)
     .order('period_month', { ascending: false })
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ reports: data ?? [] })
+
+  // Fetch line item counts + totals for all reports in one query
+  const reportIds = (data ?? []).map(r => r.id)
+  let totalsMap: Record<string, { count: number; total_original: number; total_adjusted: number }> = {}
+
+  if (reportIds.length > 0) {
+    const { data: lineItems } = await adminClient
+      .from('expense_report_line_items')
+      .select('report_id, original_amount, adjusted_amount')
+      .in('report_id', reportIds)
+
+    for (const item of lineItems ?? []) {
+      if (!totalsMap[item.report_id]) totalsMap[item.report_id] = { count: 0, total_original: 0, total_adjusted: 0 }
+      totalsMap[item.report_id].count++
+      totalsMap[item.report_id].total_original += item.original_amount ?? 0
+      totalsMap[item.report_id].total_adjusted += item.adjusted_amount ?? 0
+    }
+  }
+
+  const reports = (data ?? []).map(r => ({
+    ...r,
+    line_item_count: totalsMap[r.id]?.count ?? 0,
+    total_original: totalsMap[r.id]?.total_original ?? 0,
+    total_adjusted: totalsMap[r.id]?.total_adjusted ?? 0,
+  }))
+
+  return NextResponse.json({ reports })
 }
 
-// POST /api/expense-reports — create a new report by copying the Drive template
-// Body: { period_month }  (YYYY-MM format)
+// POST /api/expense-reports — create a new report
+// Body: { period_month, title? }  (YYYY-MM format)
 export async function POST(req: NextRequest) {
   const appUser = await requireUser()
   if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
@@ -36,98 +59,42 @@ export async function POST(req: NextRequest) {
 
   const adminClient = createAdminClient()
 
-  // Enforce one report per user/month
+  // Check for existing report for this month (allow multiple, but warn)
   const { data: existing } = await adminClient
     .from('expense_reports')
-    .select('id, drive_url')
+    .select('id, status')
     .eq('created_by', appUser.id)
     .eq('period_month', period_month)
-    .single()
+    .not('status', 'eq', 'approved')
+    .not('status', 'eq', 'submitted_to_payroll')
 
-  if (existing) {
+  if (existing && existing.length > 0 && !body.allow_duplicate) {
     return NextResponse.json(
-      { error: 'A report for this month already exists.', report: existing },
+      { error: 'An active report for this month already exists.', existing: existing[0] },
       { status: 409 }
     )
   }
 
-  // Load config: template file ID, folder ID, reviewer email
-  const { data: config } = await adminClient
-    .from('expense_report_config')
-    .select('template_drive_file_id, expense_folder_id, reviewer_user_id')
-    .single()
-
-  if (!config?.template_drive_file_id || !config?.expense_folder_id) {
-    return NextResponse.json(
-      { error: 'Expense report template is not configured yet. Please contact your administrator.' },
-      { status: 503 }
-    )
-  }
-
-  // Look up the employee's email and the reviewer's email
-  const [{ data: employee }, { data: reviewer }] = await Promise.all([
-    adminClient.from('users').select('email, display_name').eq('id', appUser.id).single(),
-    config.reviewer_user_id
-      ? adminClient.from('users').select('email, display_name').eq('id', config.reviewer_user_id).single()
-      : Promise.resolve({ data: null }),
-  ])
-
-  if (!employee?.email) {
-    return NextResponse.json({ error: 'Could not resolve your user record.' }, { status: 500 })
-  }
-
-  // Format: "Matt Christianson — Expense Report — May 2026"
-  const [year, month] = period_month.split('-')
-  const monthLabel = new Date(Number(year), Number(month) - 1, 1)
-    .toLocaleDateString('en-US', { month: 'long', year: 'numeric' })
-  const fileName = `${employee.display_name ?? employee.email} — Expense Report — ${monthLabel}`
-
-  // Copy the template in Google Drive
-  let fileId: string
-  let webViewLink: string
-  try {
-    const result = await copyExpenseTemplate(
-      config.template_drive_file_id,
-      config.expense_folder_id,
-      fileName,
-      employee.email,
-      reviewer?.email ?? employee.email
-    )
-    fileId = result.fileId
-    webViewLink = result.webViewLink
-  } catch (err) {
-    const message = err instanceof Error ? err.message : 'Failed to create expense report in Google Drive'
-    return NextResponse.json({ error: message }, { status: 500 })
-  }
-
-  // Create the DB record
   const { data: report, error: dbError } = await adminClient
     .from('expense_reports')
     .insert({
       created_by: appUser.id,
       period_month,
+      title: body.title ?? null,
       status: 'draft',
-      drive_file_id: fileId,
-      drive_url: webViewLink,
     })
-    .select()
+    .select('id, created_by, period_month, title, status, reviewer_comment, created_at, updated_at')
     .single()
 
-  if (dbError) {
-    return NextResponse.json({ error: dbError.message }, { status: 500 })
-  }
+  if (dbError) return NextResponse.json({ error: dbError.message }, { status: 500 })
 
-  // Write metadata to the hidden _arc sheet so the Apps Script can identify
-  // users without needing Session.getActiveUser() (removes userinfo.email scope).
-  // Fire-and-forget — the report is already created, don't fail on metadata error.
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? 'https://thearc.arconinc.com'
-  writeArcSheetMetadata(
-    fileId,
-    employee.email,
-    reviewer?.email ?? employee.email,
-    `${appUrl}/expense-reports/${report.id}`,
-    `${appUrl}/admin/expense-reports/${report.id}`
-  ).catch(() => {})
+  // Log version
+  await adminClient.from('expense_report_versions').insert({
+    report_id: report.id,
+    changed_by: appUser.id,
+    action: 'created',
+    new_status: 'draft',
+  })
 
   return NextResponse.json({ report }, { status: 201 })
 }
