@@ -300,7 +300,7 @@ export async function POST(request: Request) {
       shipToAttention ? row('Attention', esc(shipToAttention)) : null,
       shipToAddress1 ? `<p>${esc(shipToAddress1)}${shipToAddress2 ? `, ${esc(shipToAddress2)}` : ''}</p>` : null,
       (shipToCity || shipToState || shipToZip)
-        ? `<p>${[shipToCity, shipToState, shipToZip].filter(Boolean).map(esc).join(', ')}</p>`
+        ? `<p>${[shipToCity, shipToState, shipToZip].filter((s): s is string => Boolean(s)).map(esc).join(', ')}</p>`
         : null,
       '<h3>Bill To</h3>',
       billSameAsShip
@@ -308,12 +308,12 @@ export async function POST(request: Request) {
         : [
             billToAddress1 ? `<p>${esc(billToAddress1)}${billToAddress2 ? `, ${esc(billToAddress2)}` : ''}</p>` : null,
             (billToCity || billToState || billToZip)
-              ? `<p>${[billToCity, billToState, billToZip].filter(Boolean).map(esc).join(', ')}</p>`
+              ? `<p>${[billToCity, billToState, billToZip].filter((s): s is string => Boolean(s)).map(esc).join(', ')}</p>`
               : null,
           ].filter(Boolean).join(''),
       (billingContactFirst || billingContactLast || billingEmail) ? '<h3>Billing Contact</h3>' : null,
       (billingContactFirst || billingContactLast)
-        ? row('Name', esc([billingContactFirst, billingContactLast].filter(Boolean).join(' ')))
+        ? row('Name', esc([billingContactFirst, billingContactLast].filter((s): s is string => Boolean(s)).join(' ')))
         : null,
       billingEmail ? row('Email', `<a href="mailto:${esc(billingEmail)}">${esc(billingEmail)}</a>`) : null,
       '<h3>Tax Exempt</h3>',
