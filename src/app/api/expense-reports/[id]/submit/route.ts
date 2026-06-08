@@ -81,12 +81,8 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
   }
 
   // Notify reviewer
-  const { data: config } = await adminClient
-    .from('expense_report_config')
-    .select('reviewer_user_id')
-    .single()
-
-  if (config?.reviewer_user_id) {
+  const reviewerUserId = process.env.EXPENSE_REPORT_REVIEWER_ID
+  if (reviewerUserId) {
     try {
       await dispatchNotification({
         definition: expenseReportSubmitted,
@@ -95,7 +91,7 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
           period_month: report.period_month,
           submitter_name: submitter?.display_name ?? 'Employee',
         },
-        recipientSpec: { userId: config.reviewer_user_id },
+        recipientSpec: { userId: reviewerUserId },
         suppressUserIds: [appUser.id],
       })
     } catch {}

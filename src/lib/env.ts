@@ -27,6 +27,7 @@ const FEATURE_VARS: Record<string, string[]> = {
   cloudinary: ['CLOUDINARY_CLOUD_NAME', 'CLOUDINARY_API_KEY', 'CLOUDINARY_API_SECRET'],
   addon: ['ADDON_API_KEY'],
   promoBullit: ['PROMOBULLIT_AUTH'],
+  expenseReports: ['EXPENSE_REPORT_REVIEWER_ID'],
 }
 
 // Optional vars with sensible defaults
