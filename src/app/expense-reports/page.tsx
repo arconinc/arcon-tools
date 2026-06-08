@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { ExpenseReport } from '@/types'
 
@@ -126,6 +127,7 @@ function StatusBadge({ status }: { status: string }) {
 }
 
 export default function ExpenseReportsPage() {
+  const router = useRouter()
   const [reports, setReports] = useState<ExpenseReport[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
@@ -197,6 +199,7 @@ export default function ExpenseReportsPage() {
         .er-table td { padding: 14px 16px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
         .er-table tr:last-child td { border-bottom: none; }
         .er-table tr:hover td { background: #faf5ff; }
+        .er-table tbody tr { cursor: pointer; }
         .er-month { font-weight: 700; color: #1e1b4b; font-size: 15px; }
         .er-meta { font-size: 12px; color: #9ca3af; margin-top: 2px; }
         .er-actions { display: flex; gap: 8px; align-items: center; }
@@ -278,7 +281,7 @@ export default function ExpenseReportsPage() {
               {reports.map(r => {
                 const isComplete = r.status === 'approved' || r.status === 'submitted_to_payroll'
                 return (
-                  <tr key={r.id}>
+                  <tr key={r.id} onClick={() => router.push(`/expense-reports/${r.id}`)}>
                     <td>
                       <div className="er-month">{formatMonth(r.period_month)}</div>
                       {r.reviewer_comment && (
@@ -297,7 +300,7 @@ export default function ExpenseReportsPage() {
                     <td className="hide-mobile" style={{ fontSize: 13, color: '#9ca3af' }}>{formatDate(r.updated_at)}</td>
                     <td>
                       {/* Desktop */}
-                      <div className="er-actions er-actions-desktop" style={{ justifyContent: 'flex-end' }}>
+                      <div className="er-actions er-actions-desktop" style={{ justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
                         {!isComplete && (
                           <Link href={`/expense-reports/${r.id}/edit`} style={{ textDecoration: 'none' }}>
                             <button className="btn-primary" style={{ fontSize: 13, padding: '7px 14px' }}>Edit</button>
@@ -313,7 +316,7 @@ export default function ExpenseReportsPage() {
                         )}
                       </div>
                       {/* Mobile dropdown */}
-                      <div className="er-actions-mobile" style={{ justifyContent: 'flex-end' }}>
+                      <div className="er-actions-mobile" style={{ justifyContent: 'flex-end' }} onClick={e => e.stopPropagation()}>
                         {openMenuId === r.id && (
                           <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => { setOpenMenuId(null); setMenuAnchor(null) }} />
                         )}

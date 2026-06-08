@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import * as XLSX from 'xlsx'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
+import { EXPENSIFY_CATEGORY_MAP } from '@/lib/expense-constants'
 
 // POST /api/expense-reports/[id]/line-items/import
 // Accepts multipart/form-data with a CSV file from Expensify
@@ -122,7 +123,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       report_id: id,
       expense_date,
       vendor: row['Merchant'] || row['Vendor'] || null,
-      category: row['Category'] || null,
+      category: (() => { const raw = row['Category'] || ''; return EXPENSIFY_CATEGORY_MAP[raw] ?? raw || null })(),
       description: row['Description'] || null,
       original_amount: isNaN(amount as number) ? null : amount,
       adjusted_amount: null,

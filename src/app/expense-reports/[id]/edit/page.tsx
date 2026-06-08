@@ -36,7 +36,23 @@ const EMPTY_ITEM: Partial<ExpenseReportLineItem> = {
   reimbursable: true,
 }
 
-function ExistingReceipt({ receipt, reportId }: { receipt: ExpenseReportReceipt; reportId: string }) {
+function ExternalReceiptLink({ url, compact }: { url: string; compact?: boolean }) {
+  if (compact) {
+    return (
+      <a href={url} target="_blank" rel="noreferrer" title="View Expensify receipt" style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 5, padding: '3px 7px', fontSize: 11, fontWeight: 600, color: '#166534', textDecoration: 'none', whiteSpace: 'nowrap' }}>
+        🔗 Receipt
+      </a>
+    )
+  }
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 6, padding: '6px 10px' }}>
+      <span style={{ fontSize: 13, color: '#374151', flex: 1 }}>🔗 Expensify receipt</span>
+      <a href={url} target="_blank" rel="noreferrer" style={{ color: '#166534', fontSize: 12, fontWeight: 600, textDecoration: 'none', flexShrink: 0 }}>View</a>
+    </div>
+  )
+}
+
+function ExistingReceipt({ receipt, reportId, compact }: { receipt: ExpenseReportReceipt; reportId: string; compact?: boolean }) {
   const [loading, setLoading] = useState(false)
 
   async function open() {
@@ -49,13 +65,63 @@ function ExistingReceipt({ receipt, reportId }: { receipt: ExpenseReportReceipt;
     setLoading(false)
   }
 
+  const isImage = receipt.mime_type?.startsWith('image/')
+
+  if (compact) {
+    return (
+      <button onClick={open} disabled={loading} title={receipt.filename} style={{ display: 'inline-flex', alignItems: 'center', gap: 4, background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 5, padding: '3px 7px', fontSize: 11, fontWeight: 600, color: '#7c3aed', cursor: 'pointer', whiteSpace: 'nowrap', maxWidth: 100, overflow: 'hidden', textOverflow: 'ellipsis' }}>
+        {loading ? '…' : <>{isImage ? '🖼' : '📎'} {receipt.filename.length > 10 ? receipt.filename.slice(0, 10) + '…' : receipt.filename}</>}
+      </button>
+    )
+  }
+
   return (
     <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 6, padding: '6px 10px' }}>
-      <span style={{ fontSize: 13, color: '#374151', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📎 {receipt.filename}</span>
+      <span style={{ fontSize: 13, color: '#374151', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{isImage ? '🖼' : '📎'} {receipt.filename}</span>
       <button onClick={open} disabled={loading} style={{ background: 'none', border: 'none', color: '#7c3aed', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0, padding: 0 }}>
         {loading ? 'Opening…' : 'View'}
       </button>
     </div>
+  )
+}
+
+function ReceiptPreviewMobile({ receipt, reportId }: { receipt: ExpenseReportReceipt; reportId: string }) {
+  const [loading, setLoading] = useState(false)
+  const [thumbUrl, setThumbUrl] = useState<string | null>(null)
+  const isImage = receipt.mime_type?.startsWith('image/')
+
+  useEffect(() => {
+    if (!isImage) return
+    let cancelled = false
+    fetch(`/api/expense-reports/${reportId}/receipts/${receipt.id}/signed-url`)
+      .then(r => r.ok ? r.json() : null)
+      .then(d => { if (d && !cancelled) setThumbUrl(d.signed_url) })
+    return () => { cancelled = true }
+  }, [receipt.id, reportId, isImage])
+
+  async function open() {
+    if (thumbUrl) { window.open(thumbUrl, '_blank'); return }
+    setLoading(true)
+    const res = await fetch(`/api/expense-reports/${reportId}/receipts/${receipt.id}/signed-url`)
+    if (res.ok) { const { signed_url } = await res.json(); window.open(signed_url, '_blank') }
+    setLoading(false)
+  }
+
+  if (isImage && thumbUrl) {
+    return (
+      <button onClick={open} style={{ background: 'none', border: 'none', padding: 0, cursor: 'pointer', display: 'block', width: '100%' }}>
+        <img src={thumbUrl} alt={receipt.filename} style={{ width: '100%', maxHeight: 160, objectFit: 'cover', borderRadius: 8, border: '1px solid #ddd6fe' }} />
+        <p style={{ margin: '4px 0 0', fontSize: 11, color: '#9ca3af', textAlign: 'center' }}>{receipt.filename}</p>
+      </button>
+    )
+  }
+
+  return (
+    <button onClick={open} disabled={loading} style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 8, padding: '10px 12px', cursor: 'pointer', width: '100%', textAlign: 'left' }}>
+      <span style={{ fontSize: 20 }}>{isImage ? '🖼' : '📄'}</span>
+      <span style={{ flex: 1, fontSize: 13, color: '#374151', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{receipt.filename}</span>
+      <span style={{ fontSize: 12, color: '#7c3aed', fontWeight: 600, flexShrink: 0 }}>{loading ? '…' : 'View'}</span>
+    </button>
   )
 }
 
@@ -74,6 +140,17 @@ function RowDialog({
 }) {
   const [form, setForm] = useState<Partial<ExpenseReportLineItem>>({ ...EMPTY_ITEM, ...initial })
   const [receiptFile, setReceiptFile] = useState<File | null>(null)
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null)
+
+  useEffect(() => {
+    if (!receiptFile) { setPreviewUrl(null); return }
+    if (receiptFile.type.startsWith('image/')) {
+      const url = URL.createObjectURL(receiptFile)
+      setPreviewUrl(url)
+      return () => URL.revokeObjectURL(url)
+    }
+    setPreviewUrl(null)
+  }, [receiptFile])
 
   function set(field: string, value: unknown) {
     setForm(f => ({ ...f, [field]: value }))
@@ -81,15 +158,15 @@ function RowDialog({
 
   return (
     <div>
-      <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 14 }}>
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(2, minmax(0, 1fr))', gap: 14 }}>
         {/* Date */}
-        <div style={{ gridColumn: '1 / 2' }}>
+        <div style={{ gridColumn: '1 / 2', minWidth: 0 }}>
           <label style={labelStyle}>Date</label>
           <input type="date" style={inputStyle} value={form.expense_date ?? ''} onChange={e => set('expense_date', e.target.value || null)} />
         </div>
 
         {/* Vendor */}
-        <div style={{ gridColumn: '2 / 3' }}>
+        <div style={{ gridColumn: '2 / 3', minWidth: 0 }}>
           <label style={labelStyle}>Vendor / Merchant</label>
           <input type="text" style={inputStyle} placeholder="e.g. Amazon, Delta" value={form.vendor ?? ''} onChange={e => set('vendor', e.target.value || null)} />
         </div>
@@ -110,13 +187,13 @@ function RowDialog({
         </div>
 
         {/* Original Amount */}
-        <div>
+        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
           <label style={labelStyle}>Amount ($)</label>
           <input type="number" style={inputStyle} placeholder="0.00" min="0" step="0.01" value={form.original_amount ?? ''} onChange={e => set('original_amount', e.target.value ? parseFloat(e.target.value) : null)} />
         </div>
 
         {/* Adjusted Amount */}
-        <div>
+        <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'flex-end' }}>
           <label style={labelStyle}>Adjusted Amount ($) <span style={{ fontWeight: 400, color: '#9ca3af' }}>optional</span></label>
           <input type="number" style={inputStyle} placeholder="0.00" min="0" step="0.01" value={form.adjusted_amount ?? ''} onChange={e => set('adjusted_amount', e.target.value ? parseFloat(e.target.value) : null)} />
         </div>
@@ -145,21 +222,31 @@ function RowDialog({
         {/* Receipt upload */}
         <div style={{ gridColumn: '1 / -1' }}>
           <label style={labelStyle}>Receipt Photo / File <span style={{ fontWeight: 400, color: '#9ca3af' }}>optional</span></label>
-          {(initial.receipts ?? []).length > 0 && (
+          {(initial.receipt_url || (initial.receipts ?? []).length > 0) && (
             <div style={{ marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {initial.receipt_url && <ExternalReceiptLink url={initial.receipt_url} />}
               {(initial.receipts ?? []).map(r => (
                 <ExistingReceipt key={r.id} receipt={r} reportId={initial.report_id!} />
               ))}
             </div>
           )}
-          <input
-            type="file"
-            accept="image/*,.pdf"
-            capture="environment"
-            style={{ display: 'block', fontSize: 14, color: '#374151', width: '100%' }}
-            onChange={e => setReceiptFile(e.target.files?.[0] ?? null)}
-          />
-          {receiptFile && <p style={{ margin: '4px 0 0', fontSize: 12, color: '#6b7280' }}>📎 {receiptFile.name}</p>}
+          <label style={{ display: 'inline-flex', alignItems: 'center', gap: 8, background: '#ede9fe', color: '#5b21b6', border: '1.5px solid #c4b5fd', borderRadius: 8, padding: '9px 16px', fontSize: 14, fontWeight: 600, cursor: 'pointer' }}>
+            📎 {receiptFile ? receiptFile.name : 'Choose Photo or File'}
+            <input
+              type="file"
+              accept="image/*,.pdf"
+              style={{ display: 'none' }}
+              onChange={e => setReceiptFile(e.target.files?.[0] ?? null)}
+            />
+          </label>
+          {previewUrl && (
+            <div style={{ marginTop: 8 }}>
+              <img src={previewUrl} alt="Receipt preview" style={{ maxWidth: '100%', maxHeight: 180, borderRadius: 8, border: '1px solid #ddd6fe', objectFit: 'contain' }} />
+            </div>
+          )}
+          {receiptFile && !previewUrl && (
+            <p style={{ margin: '6px 0 0', fontSize: 12, color: '#6b7280' }}>📄 {receiptFile.name}</p>
+          )}
         </div>
       </div>
 
@@ -698,7 +785,15 @@ export default function ExpenseReportEditPage() {
                             </>
                           )}
                           <td>
-                            <div style={{ display: 'flex', justifyContent: 'center' }}>
+                            <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: 4 }}>
+                              {(item.receipt_url || (item.receipts ?? []).length > 0) && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
+                                  {item.receipt_url && <ExternalReceiptLink url={item.receipt_url} compact />}
+                                  {(item.receipts ?? []).map(r => (
+                                    <ExistingReceipt key={r.id} receipt={r} reportId={id} compact />
+                                  ))}
+                                </div>
+                              )}
                               {openMenuId === item.id && (
                                 <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => { setOpenMenuId(null); setMenuAnchor(null) }} />
                               )}
@@ -991,7 +1086,7 @@ export default function ExpenseReportEditPage() {
                   </div>
                 </div>
               </div>
-              {(item.description || item.payment_type || item.adjusted_amount != null || itemComments.length > 0) && (
+              {(item.description || item.payment_type || item.adjusted_amount != null || itemComments.length > 0 || (item.receipts ?? []).length > 0) && (
                 <div className="mobile-card-body" onClick={e => e.stopPropagation()}>
                   {item.description && <p style={{ margin: '0 0 8px', fontSize: 13, color: '#6b7280' }}>{item.description}</p>}
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 12, color: '#6b7280' }}>
@@ -1001,6 +1096,22 @@ export default function ExpenseReportEditPage() {
                     )}
                     <span style={{ color: item.reimbursable ? '#166534' : '#dc2626' }}>{item.reimbursable ? '✓ Reimbursable' : '✗ Not reimbursable'}</span>
                   </div>
+
+                  {/* Receipts */}
+                  {(item.receipt_url || (item.receipts ?? []).length > 0) && (
+                    <div style={{ marginTop: 10, display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {item.receipt_url && (
+                        <a href={item.receipt_url} target="_blank" rel="noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f0fdf4', border: '1px solid #86efac', borderRadius: 8, padding: '10px 12px', textDecoration: 'none' }}>
+                          <span style={{ fontSize: 20 }}>🔗</span>
+                          <span style={{ flex: 1, fontSize: 13, color: '#374151' }}>Expensify receipt</span>
+                          <span style={{ fontSize: 12, color: '#166534', fontWeight: 600 }}>View</span>
+                        </a>
+                      )}
+                      {(item.receipts ?? []).map(r => (
+                        <ReceiptPreviewMobile key={r.id} receipt={r} reportId={id} />
+                      ))}
+                    </div>
+                  )}
 
                   {/* Comments toggle */}
                   <button
