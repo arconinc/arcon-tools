@@ -20,11 +20,18 @@ function formatCurrency(n: number) {
 
 const STATUS_CONFIG: Record<string, { label: string; bg: string; color: string }> = {
   draft:                { label: 'In Progress',          bg: '#f3f4f6', color: '#374151' },
-  submitted:            { label: 'Submitted',            bg: '#dbeafe', color: '#1d4ed8' },
-  needs_changes:        { label: 'Changes Needed',       bg: '#fef3c7', color: '#92400e' },
+  submitted:            { label: 'Needs Review',         bg: '#ede9fe', color: '#6d28d9' },
+  needs_changes:        { label: 'Awaiting Changes',     bg: '#fef3c7', color: '#92400e' },
   approved:             { label: 'Approved',             bg: '#dcfce7', color: '#166534' },
-  submitted_to_payroll: { label: 'Submitted to Payroll', bg: '#ede9fe', color: '#5b21b6' },
+  submitted_to_payroll: { label: 'Submitted to Payroll', bg: '#fce7f3', color: '#9f1239' },
 }
+
+const STAT_CARDS: { key: string; subtitle: (reports: ExpenseReport[], count: number) => string }[] = [
+  { key: 'submitted',            subtitle: (reports) => { const total = reports.filter(r => r.status === 'submitted').reduce((s, r) => s + (r.total_original ?? 0), 0); return total > 0 ? `${formatCurrency(total)} pending` : 'No pending reports' } },
+  { key: 'needs_changes',        subtitle: (_, count) => count === 1 ? 'Sent back to employee' : 'Sent back to employees' },
+  { key: 'approved',             subtitle: () => 'Ready for payroll' },
+  { key: 'submitted_to_payroll', subtitle: () => 'Completed' },
+]
 
 function StatusBadge({ status }: { status: string }) {
   const { label, bg, color } = STATUS_CONFIG[status] ?? { label: status, bg: '#f3f4f6', color: '#374151' }
@@ -67,8 +74,8 @@ export default function AdminExpenseReportsPage() {
         .btn-secondary:disabled { opacity: .6; cursor: not-allowed; }
         .form-input { border: 1.5px solid #d1d5db; border-radius: 8px; padding: 8px 12px; font-size: 14px; box-sizing: border-box; }
         .form-input:focus { outline: none; border-color: #7c3aed; }
-        .stat-card { background: #fff; border: 1px solid #e9d5ff; border-radius: 12px; padding: 14px 18px; text-align: center; cursor: pointer; transition: box-shadow .15s; }
-        .stat-card:hover { box-shadow: 0 2px 8px rgba(124,58,237,.12); }
+        .stat-card { border-radius: 14px; padding: 20px 22px; cursor: pointer; transition: box-shadow .15s, filter .15s; }
+        .stat-card:hover { filter: brightness(.96); box-shadow: 0 2px 10px rgba(0,0,0,.08); }
       `}</style>
 
       <div style={{ marginBottom: 28 }}>
@@ -76,13 +83,19 @@ export default function AdminExpenseReportsPage() {
         <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: 14 }}>Review and action employee expense report submissions.</p>
       </div>
 
-      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(130px, 1fr))', gap: 12, marginBottom: 24 }}>
-        {Object.entries(STATUS_CONFIG).map(([key, cfg]) => (
-          <div key={key} className="stat-card" style={{ outline: statusFilter === key ? `2px solid ${cfg.color}` : 'none' }} onClick={() => setStatusFilter(statusFilter === key ? '' : key)}>
-            <div style={{ fontSize: 24, fontWeight: 700, color: cfg.color }}>{counts[key] ?? 0}</div>
-            <div style={{ fontSize: 12, color: '#6b7280', marginTop: 2 }}>{cfg.label}</div>
-          </div>
-        ))}
+      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 28 }}>
+        {STAT_CARDS.map(({ key, subtitle }) => {
+          const cfg = STATUS_CONFIG[key]
+          const count = counts[key] ?? 0
+          const isActive = statusFilter === key
+          return (
+            <div key={key} className="stat-card" style={{ background: cfg.bg, outline: isActive ? `2.5px solid ${cfg.color}` : 'none' }} onClick={() => setStatusFilter(isActive ? '' : key)}>
+              <div style={{ fontSize: 32, fontWeight: 800, color: cfg.color, lineHeight: 1 }}>{count}</div>
+              <div style={{ fontSize: 14, fontWeight: 700, color: cfg.color, marginTop: 8 }}>{cfg.label}</div>
+              <div style={{ fontSize: 12, color: cfg.color, opacity: .7, marginTop: 3 }}>{subtitle(reports, count)}</div>
+            </div>
+          )
+        })}
       </div>
 
       <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>

@@ -160,6 +160,29 @@ export async function POST(request: Request) {
   const frontFile = formData.get('frontArtwork') as File | null
   const backFile = formData.get('backArtwork') as File | null
 
+  // Shipping
+  const shipToAttention = (formData.get('shipToAttention') as string | null)?.trim() || undefined
+  const shipToAddress1  = (formData.get('shipToAddress1') as string | null)?.trim() || undefined
+  const shipToAddress2  = (formData.get('shipToAddress2') as string | null)?.trim() || undefined
+  const shipToCity      = (formData.get('shipToCity') as string | null)?.trim() || undefined
+  const shipToState     = (formData.get('shipToState') as string | null)?.trim() || undefined
+  const shipToZip       = (formData.get('shipToZip') as string | null)?.trim() || undefined
+
+  // Billing
+  const billSameAsShip      = formData.get('billSameAsShip') !== 'false'
+  const billToAddress1      = (formData.get('billToAddress1') as string | null)?.trim() || undefined
+  const billToAddress2      = (formData.get('billToAddress2') as string | null)?.trim() || undefined
+  const billToCity          = (formData.get('billToCity') as string | null)?.trim() || undefined
+  const billToState         = (formData.get('billToState') as string | null)?.trim() || undefined
+  const billToZip           = (formData.get('billToZip') as string | null)?.trim() || undefined
+  const billingContactFirst = (formData.get('billingContactFirst') as string | null)?.trim() || undefined
+  const billingContactLast  = (formData.get('billingContactLast') as string | null)?.trim() || undefined
+  const billingEmail        = (formData.get('billingEmail') as string | null)?.trim() || undefined
+
+  // Tax exempt
+  const taxExempt     = formData.get('taxExempt') === 'true'
+  const taxExemptFile = formData.get('taxExemptCert') as File | null
+
   // --- Validate ---
   const LURE_NAMES: Record<string, string> = { bp: 'Blue Pearl', rh: 'Red Head' }
   if (!lureType || !LURE_NAMES[lureType]) {
@@ -193,6 +216,16 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Back artwork must be a PDF, EPS, AI, SVG, PNG, or JPG file' }, { status: 400 })
     }
   }
+  const TAX_EXEMPT_ALLOWED_EXTS = ['.pdf', '.jpg', '.jpeg', '.png']
+  if (taxExempt && taxExemptFile && taxExemptFile.size > 0) {
+    if (taxExemptFile.size > MAX_FILE_BYTES) {
+      return NextResponse.json({ error: 'Tax exempt certificate must be 25 MB or smaller' }, { status: 400 })
+    }
+    const taxExt = '.' + taxExemptFile.name.split('.').pop()?.toLowerCase()
+    if (!TAX_EXEMPT_ALLOWED_EXTS.includes(taxExt)) {
+      return NextResponse.json({ error: 'Tax exempt certificate must be a PDF, JPG, or PNG file' }, { status: 400 })
+    }
+  }
 
   const unitPrice = getUnitPrice(quantity)
   const estimatedTotal =
@@ -211,9 +244,28 @@ export async function POST(request: Request) {
     const frontArtworkUrl = await uploadArtwork(adminClient, frontFile, 'front')
     const backArtworkUrl =
       backFile && backFile.size > 0 ? await uploadArtwork(adminClient, backFile, 'back') : undefined
+    const taxExemptUrl =
+      taxExempt && taxExemptFile && taxExemptFile.size > 0
+        ? await uploadArtwork(adminClient, taxExemptFile, 'tax-exempt')
+        : undefined
 
     // 3. Find or create CRM customer + contact
     const customerId = await upsertCustomerAndContact(adminClient, { firstName, lastName, company, email, phone })
+
+    // 3b. Update customer with shipping/billing addresses and tax exempt status
+    await adminClient.from('crm_customers').update({
+      shipping_address1: shipToAddress1 ?? null,
+      shipping_address2: shipToAddress2 ?? null,
+      shipping_city:     shipToCity     ?? null,
+      shipping_state:    shipToState    ?? null,
+      shipping_zip:      shipToZip      ?? null,
+      billing_address1:  billSameAsShip ? (shipToAddress1 ?? null) : (billToAddress1 ?? null),
+      billing_address2:  billSameAsShip ? (shipToAddress2 ?? null) : (billToAddress2 ?? null),
+      billing_city:      billSameAsShip ? (shipToCity     ?? null) : (billToCity     ?? null),
+      billing_state:     billSameAsShip ? (shipToState    ?? null) : (billToState    ?? null),
+      billing_zip:       billSameAsShip ? (shipToZip      ?? null) : (billToZip      ?? null),
+      tax_exempt:        taxExempt,
+    }).eq('id', customerId)
 
     // 4. Ensure "Rapala Lure" tag exists and apply it
     const tagId = await ensureTag(adminClient)
@@ -244,6 +296,32 @@ export async function POST(request: Request) {
       backArtworkUrl
         ? row('Back', `<a href="${esc(backArtworkUrl)}" target="_blank" rel="noopener noreferrer">View back artwork</a>`)
         : row('Back', 'Not provided'),
+      '<h3>Ship To</h3>',
+      shipToAttention ? row('Attention', esc(shipToAttention)) : null,
+      shipToAddress1 ? `<p>${esc(shipToAddress1)}${shipToAddress2 ? `, ${esc(shipToAddress2)}` : ''}</p>` : null,
+      (shipToCity || shipToState || shipToZip)
+        ? `<p>${[shipToCity, shipToState, shipToZip].filter(Boolean).map(esc).join(', ')}</p>`
+        : null,
+      '<h3>Bill To</h3>',
+      billSameAsShip
+        ? '<p>Same as Ship To</p>'
+        : [
+            billToAddress1 ? `<p>${esc(billToAddress1)}${billToAddress2 ? `, ${esc(billToAddress2)}` : ''}</p>` : null,
+            (billToCity || billToState || billToZip)
+              ? `<p>${[billToCity, billToState, billToZip].filter(Boolean).map(esc).join(', ')}</p>`
+              : null,
+          ].filter(Boolean).join(''),
+      (billingContactFirst || billingContactLast || billingEmail) ? '<h3>Billing Contact</h3>' : null,
+      (billingContactFirst || billingContactLast)
+        ? row('Name', esc([billingContactFirst, billingContactLast].filter(Boolean).join(' ')))
+        : null,
+      billingEmail ? row('Email', `<a href="mailto:${esc(billingEmail)}">${esc(billingEmail)}</a>`) : null,
+      '<h3>Tax Exempt</h3>',
+      taxExempt
+        ? (taxExemptUrl
+            ? `<p>Yes — <a href="${esc(taxExemptUrl)}" target="_blank" rel="noopener noreferrer">View certificate</a></p>`
+            : '<p>Yes (no certificate uploaded)</p>')
+        : '<p>No</p>',
       notes ? '<h3>Notes</h3>' : null,
       notes ? `<p>${esc(notes)}</p>` : null,
       '<hr>',

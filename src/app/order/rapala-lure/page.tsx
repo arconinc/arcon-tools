@@ -36,7 +36,7 @@ function fmt(n: number) {
 }
 
 const LURE_OPTIONS = [
-  { id: 'bp', name: 'Blue Pearl', image: '/lure_bp.png' },
+  { id: 'bp', name: 'Black Pearl', image: '/lure_bp.png' },
   { id: 'rh', name: 'Red Head', image: '/lure_rh.png' },
 ] as const
 
@@ -50,9 +50,10 @@ interface FileZoneProps {
   file: File | null
   onChange: (f: File | null) => void
   required?: boolean
+  accept?: string
 }
 
-function FileZone({ label, hint, file, onChange, required }: FileZoneProps) {
+function FileZone({ label, hint, file, onChange, required, accept = '.pdf,.eps,.ai,.svg,.png,.jpg,.jpeg' }: FileZoneProps) {
   const inputRef = useRef<HTMLInputElement>(null)
   const [dragging, setDragging] = useState(false)
 
@@ -112,7 +113,7 @@ function FileZone({ label, hint, file, onChange, required }: FileZoneProps) {
       <input
         ref={inputRef}
         type="file"
-        accept=".pdf,.eps,.ai,.svg,.png,.jpg,.jpeg"
+        accept={accept}
         style={{ display: 'none' }}
         onChange={(e) => onChange(e.target.files?.[0] ?? null)}
       />
@@ -136,19 +137,45 @@ interface FormState {
   pantoneColor: string
   backImprint: boolean
   backColors: string
+  // Shipping
+  shipToAttention: string
+  shipToAddress1: string
+  shipToAddress2: string
+  shipToCity: string
+  shipToState: string
+  shipToZip: string
+  // Billing
+  billSameAsShip: boolean
+  billToAddress1: string
+  billToAddress2: string
+  billToCity: string
+  billToState: string
+  billToZip: string
+  billingContactFirst: string
+  billingContactLast: string
+  billingEmail: string
+  // Tax exempt
+  taxExempt: boolean
   notes: string
 }
 
 const INITIAL: FormState = {
   lureType: '',
   firstName: '', lastName: '', company: '', email: '', phone: '',
-  quantity: '', artColors: '1', pantoneColor: '', backImprint: false, backColors: '0', notes: '',
+  quantity: '', artColors: '1', pantoneColor: '', backImprint: false, backColors: '0',
+  shipToAttention: '', shipToAddress1: '', shipToAddress2: '', shipToCity: '', shipToState: '', shipToZip: '',
+  billSameAsShip: true,
+  billToAddress1: '', billToAddress2: '', billToCity: '', billToState: '', billToZip: '',
+  billingContactFirst: '', billingContactLast: '', billingEmail: '',
+  taxExempt: false,
+  notes: '',
 }
 
 export default function RapalaLureOrderPage() {
   const [form, setForm] = useState<FormState>(INITIAL)
   const [frontFile, setFrontFile] = useState<File | null>(null)
   const [backFile, setBackFile] = useState<File | null>(null)
+  const [taxExemptFile, setTaxExemptFile] = useState<File | null>(null)
   const [submitting, setSubmitting] = useState(false)
   const [submitted, setSubmitted] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -179,6 +206,7 @@ export default function RapalaLureOrderPage() {
     Object.entries(form).forEach(([k, v]) => fd.append(k, String(v)))
     fd.append('frontArtwork', frontFile)
     if (backFile && form.backImprint) fd.append('backArtwork', backFile)
+    if (form.taxExempt && taxExemptFile) fd.append('taxExemptCert', taxExemptFile)
 
     try {
       const res = await fetch('/api/public/lure-order', { method: 'POST', body: fd })
@@ -432,6 +460,139 @@ export default function RapalaLureOrderPage() {
                     }} autoComplete="tel" placeholder="(555) 000-0000" />
                   </div>
                 </div>
+              </div>
+
+              {/* Ship To Address */}
+              <div style={{ padding: '28px 32px', borderBottom: '1px solid #f3f4f6' }}>
+                <p style={sectionHeadStyle}>Ship To Address</p>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={labelStyle}>Attention</label>
+                  <input style={inputStyle} value={form.shipToAttention} onChange={(e) => set('shipToAttention', e.target.value)} placeholder="Name of person receiving shipment" />
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={labelStyle}>Address Line 1 <span style={{ color: '#6b1e98' }}>*</span></label>
+                  <input style={inputStyle} value={form.shipToAddress1} onChange={(e) => set('shipToAddress1', e.target.value)} required autoComplete="shipping address-line1" />
+                </div>
+                <div style={{ marginBottom: 16 }}>
+                  <label style={labelStyle}>Address Line 2</label>
+                  <input style={inputStyle} value={form.shipToAddress2} onChange={(e) => set('shipToAddress2', e.target.value)} placeholder="Suite, floor, etc." autoComplete="shipping address-line2" />
+                </div>
+                <div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: 16 }}>
+                  <div>
+                    <label style={labelStyle}>City <span style={{ color: '#6b1e98' }}>*</span></label>
+                    <input style={inputStyle} value={form.shipToCity} onChange={(e) => set('shipToCity', e.target.value)} required autoComplete="shipping address-level2" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>State <span style={{ color: '#6b1e98' }}>*</span></label>
+                    <input style={inputStyle} value={form.shipToState} onChange={(e) => set('shipToState', e.target.value)} required placeholder="MN" autoComplete="shipping address-level1" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>ZIP <span style={{ color: '#6b1e98' }}>*</span></label>
+                    <input style={inputStyle} value={form.shipToZip} onChange={(e) => set('shipToZip', e.target.value)} required autoComplete="shipping postal-code" />
+                  </div>
+                </div>
+              </div>
+
+              {/* Billing Information */}
+              <div style={{ padding: '28px 32px', borderBottom: '1px solid #f3f4f6' }}>
+                <p style={sectionHeadStyle}>Billing Information</p>
+
+                <label style={{ display: 'flex', alignItems: 'center', gap: 10, cursor: 'pointer', marginBottom: 20 }}>
+                  <input
+                    type="checkbox"
+                    checked={form.billSameAsShip}
+                    onChange={(e) => set('billSameAsShip', e.target.checked)}
+                    style={{ width: 16, height: 16, accentColor: '#6b1e98', cursor: 'pointer' }}
+                  />
+                  <span style={{ fontSize: 14, color: '#374151', fontWeight: 500 }}>Billing address is the same as ship-to</span>
+                </label>
+
+                {!form.billSameAsShip && (
+                  <div style={{ marginBottom: 20 }}>
+                    <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600, color: '#6b7280' }}>Bill To Address</p>
+                    <div style={{ marginBottom: 16 }}>
+                      <label style={labelStyle}>Address Line 1</label>
+                      <input style={inputStyle} value={form.billToAddress1} onChange={(e) => set('billToAddress1', e.target.value)} autoComplete="billing address-line1" />
+                    </div>
+                    <div style={{ marginBottom: 16 }}>
+                      <label style={labelStyle}>Address Line 2</label>
+                      <input style={inputStyle} value={form.billToAddress2} onChange={(e) => set('billToAddress2', e.target.value)} placeholder="Suite, floor, etc." autoComplete="billing address-line2" />
+                    </div>
+                    <div className="two-col" style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 120px', gap: 16 }}>
+                      <div>
+                        <label style={labelStyle}>City</label>
+                        <input style={inputStyle} value={form.billToCity} onChange={(e) => set('billToCity', e.target.value)} autoComplete="billing address-level2" />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>State</label>
+                        <input style={inputStyle} value={form.billToState} onChange={(e) => set('billToState', e.target.value)} placeholder="MN" autoComplete="billing address-level1" />
+                      </div>
+                      <div>
+                        <label style={labelStyle}>ZIP</label>
+                        <input style={inputStyle} value={form.billToZip} onChange={(e) => set('billToZip', e.target.value)} autoComplete="billing postal-code" />
+                      </div>
+                    </div>
+                  </div>
+                )}
+
+                <p style={{ margin: '0 0 12px', fontSize: 13, fontWeight: 600, color: '#6b7280' }}>Billing Contact</p>
+                <div className="two-col" style={{ ...rowStyle, marginBottom: 16 }}>
+                  <div>
+                    <label style={labelStyle}>First Name</label>
+                    <input style={inputStyle} value={form.billingContactFirst} onChange={(e) => set('billingContactFirst', e.target.value)} autoComplete="billing given-name" />
+                  </div>
+                  <div>
+                    <label style={labelStyle}>Last Name</label>
+                    <input style={inputStyle} value={form.billingContactLast} onChange={(e) => set('billingContactLast', e.target.value)} autoComplete="billing family-name" />
+                  </div>
+                </div>
+                <div>
+                  <label style={labelStyle}>Billing Email Address</label>
+                  <input style={inputStyle} type="email" value={form.billingEmail} onChange={(e) => set('billingEmail', e.target.value)} autoComplete="billing email" placeholder="billing@company.com" />
+                </div>
+              </div>
+
+              {/* Tax Exempt */}
+              <div style={{ padding: '28px 32px', borderBottom: '1px solid #f3f4f6' }}>
+                <p style={sectionHeadStyle}>Tax Exempt</p>
+                <p style={{ margin: '0 0 14px', fontSize: 14, color: '#6b7280' }}>Is this order tax exempt?</p>
+                <div style={{ display: 'flex', gap: 12, marginBottom: form.taxExempt ? 20 : 0 }}>
+                  {(['No', 'Yes'] as const).map((opt) => {
+                    const active = opt === 'Yes' ? form.taxExempt : !form.taxExempt
+                    return (
+                      <button
+                        key={opt}
+                        type="button"
+                        onClick={() => {
+                          set('taxExempt', opt === 'Yes')
+                          if (opt === 'No') setTaxExemptFile(null)
+                        }}
+                        style={{
+                          padding: '8px 24px',
+                          border: `2px solid ${active ? '#6b1e98' : '#e5e7eb'}`,
+                          borderRadius: 8,
+                          background: active ? '#faf5ff' : '#fafafa',
+                          color: active ? '#6b1e98' : '#374151',
+                          fontSize: 14,
+                          fontWeight: active ? 600 : 400,
+                          cursor: 'pointer',
+                          transition: 'all 0.15s',
+                        }}
+                      >
+                        {opt}
+                      </button>
+                    )
+                  })}
+                </div>
+                {form.taxExempt && (
+                  <FileZone
+                    label="Tax Exempt Certificate"
+                    hint="PDF or image of your tax exempt certificate. Max 25 MB."
+                    file={taxExemptFile}
+                    onChange={setTaxExemptFile}
+                    accept=".pdf,.jpg,.jpeg,.png"
+                  />
+                )}
               </div>
 
               {/* Notes */}
