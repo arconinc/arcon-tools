@@ -123,7 +123,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
       report_id: id,
       expense_date,
       vendor: row['Merchant'] || row['Vendor'] || null,
-      category: (() => { const raw = row['Category'] || ''; return EXPENSIFY_CATEGORY_MAP[raw] ?? raw || null })(),
+      category: (() => { const raw = row['Category'] || ''; const mapped = EXPENSIFY_CATEGORY_MAP[raw] ?? raw; return mapped || null })(),
       description: row['Description'] || null,
       original_amount: isNaN(amount as number) ? null : amount,
       adjusted_amount: null,
