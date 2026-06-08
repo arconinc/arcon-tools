@@ -251,14 +251,14 @@ export default function ExpenseReportDetailPage() {
   const unresolvedLineComments = lineItemComments.filter(c => !c.resolved_at).length
 
   return (
-    <div style={{ width: '100%', padding: '24px 16px 80px' }}>
+    <div style={{ width: '100%', padding: '24px 16px 40px' }}>
       <style>{`
-        .btn-primary { background: #7c3aed; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+        .btn-primary { background: #7c3aed; color: #fff; border: none; padding: 9px 18px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
         .btn-primary:hover:not(:disabled) { background: #6d28d9; }
         .btn-primary:disabled { opacity: .6; cursor: not-allowed; }
         .btn-secondary { background: #ede9fe; color: #5b21b6; border: none; padding: 8px 16px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
         .btn-secondary:hover { background: #ddd6fe; }
-        .btn-submit { background: #16a34a; color: #fff; border: none; padding: 12px 24px; border-radius: 10px; font-size: 15px; font-weight: 700; cursor: pointer; width: 100%; }
+        .btn-submit { background: #16a34a; color: #fff; border: none; padding: 9px 18px; border-radius: 8px; font-size: 14px; font-weight: 700; cursor: pointer; white-space: nowrap; }
         .btn-submit:hover:not(:disabled) { background: #15803d; }
         .btn-submit:disabled { opacity: .6; cursor: not-allowed; }
         .modal-backdrop { position: fixed; inset: 0; background: rgba(0,0,0,.35); z-index: 50; display: flex; align-items: flex-end; justify-content: center; }
@@ -270,6 +270,12 @@ export default function ExpenseReportDetailPage() {
         .li-table td { padding: 10px; border-bottom: 1px solid #f3f4f6; vertical-align: top; }
         .li-table tr:last-child td { border-bottom: none; }
         @media (max-width: 639px) { .li-table-wrap { overflow-x: auto; -webkit-overflow-scrolling: touch; } }
+        .bottom-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+        @media (max-width: 767px) { .bottom-grid { grid-template-columns: 1fr; } }
+        .status-description { display: inline; }
+        @media (max-width: 639px) { .status-description { display: none; } }
+        .stat-block { text-align: center; padding-right: 16px; }
+        @media (max-width: 639px) { .stat-block { padding-right: 8px; } .stat-block .stat-val { font-size: 16px; } }
       `}</style>
 
       <div style={{ marginBottom: 12 }}>
@@ -278,7 +284,8 @@ export default function ExpenseReportDetailPage() {
         </Link>
       </div>
 
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 20 }}>
+      {/* Header row */}
+      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', gap: 12, flexWrap: 'wrap', marginBottom: 16 }}>
         <div>
           <h1 style={{ margin: '0 0 4px', fontSize: 22, fontWeight: 700, color: '#1e1b4b' }}>
             {formatMonth(report.period_month)} Expense Report
@@ -287,51 +294,64 @@ export default function ExpenseReportDetailPage() {
             Created {formatDate(report.created_at)}
           </p>
         </div>
-        {canEdit && (
-          <Link href={`/expense-reports/${id}/edit`} style={{ textDecoration: 'none' }}>
-            <button className="btn-primary">Edit Report</button>
-          </Link>
-        )}
+        <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+          {canSubmit && (
+            <button className="btn-submit" onClick={() => { setSubmitError(null); setShowSubmitConfirm(true) }}>
+              {report.status === 'needs_changes' ? '↩ Resubmit for Review' : '📤 Submit for Review'}
+            </button>
+          )}
+          {canEdit && (
+            <Link href={`/expense-reports/${id}/edit`} style={{ textDecoration: 'none' }}>
+              <button className="btn-primary">Edit Report</button>
+            </Link>
+          )}
+        </div>
       </div>
 
-      {/* Status */}
-      <div style={{ background: statusCfg.bg, border: `1.5px solid ${statusCfg.color}33`, borderRadius: 12, padding: '16px 20px', marginBottom: 20 }}>
-        <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 4 }}>
-          <span style={{ background: statusCfg.bg, color: statusCfg.color, border: `1.5px solid ${statusCfg.color}55`, padding: '3px 12px', borderRadius: 999, fontSize: 13, fontWeight: 700 }}>
+      {/* Status + stats row */}
+      <div style={{ background: statusCfg.bg, border: `1.5px solid ${statusCfg.color}33`, borderRadius: 12, padding: '10px 14px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 0, flexWrap: 'nowrap', overflow: 'hidden' }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: 8, paddingRight: 12, minWidth: 0, flexShrink: 1 }}>
+          <span style={{ background: statusCfg.bg, color: statusCfg.color, border: `1.5px solid ${statusCfg.color}55`, padding: '3px 10px', borderRadius: 999, fontSize: 12, fontWeight: 700, whiteSpace: 'nowrap', flexShrink: 0 }}>
             {statusCfg.label}
           </span>
+          <span className="status-description" style={{ fontSize: 12, color: statusCfg.color, fontWeight: 500, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{statusCfg.description}</span>
+          {report.status === 'needs_changes' && report.reviewer_comment && (
+            <span className="status-description" style={{ fontSize: 12, color: statusCfg.color, fontStyle: 'italic', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>&ldquo;{report.reviewer_comment}&rdquo;</span>
+          )}
         </div>
-        <p style={{ margin: 0, fontSize: 13, color: statusCfg.color, fontWeight: 500 }}>{statusCfg.description}</p>
+        {lineItems.length > 0 && (
+          <>
+            <div style={{ width: 1, background: `${statusCfg.color}33`, alignSelf: 'stretch', margin: '0 12px 0 auto', flexShrink: 0 }} />
+            <div className="stat-block" style={{ flexShrink: 0 }}>
+              <div className="stat-val" style={{ fontSize: 18, fontWeight: 700, color: '#1e1b4b' }}>{lineItems.length}</div>
+              <div style={{ fontSize: 11, color: '#6b7280' }}>Line Items</div>
+            </div>
+            <div style={{ width: 1, background: `${statusCfg.color}33`, alignSelf: 'stretch', margin: '0 12px 0 0', flexShrink: 0 }} />
+            <div className="stat-block" style={{ paddingRight: 0, flexShrink: 0 }}>
+              <div className="stat-val" style={{ fontSize: 18, fontWeight: 700, color: '#1e1b4b' }}>{formatCurrency(totalOriginal)}</div>
+              <div style={{ fontSize: 11, color: '#6b7280' }}>Total Amount</div>
+            </div>
+            {totalAdjusted !== totalOriginal && (
+              <>
+                <div style={{ width: 1, background: `${statusCfg.color}33`, alignSelf: 'stretch', margin: '0 12px', flexShrink: 0 }} />
+                <div className="stat-block" style={{ paddingRight: 0, flexShrink: 0 }}>
+                  <div className="stat-val" style={{ fontSize: 18, fontWeight: 700, color: '#7c3aed' }}>{formatCurrency(totalAdjusted)}</div>
+                  <div style={{ fontSize: 11, color: '#6b7280' }}>Adjusted Total</div>
+                </div>
+              </>
+            )}
+          </>
+        )}
       </div>
 
       {/* Inline line-item comment alert */}
       {unresolvedLineComments > 0 && (
-        <div style={{ background: '#fef3c7', border: '1.5px solid #fcd34d', borderRadius: 10, padding: '12px 16px', marginBottom: 20, fontSize: 14, color: '#78350f' }}>
+        <div style={{ background: '#fef3c7', border: '1.5px solid #fcd34d', borderRadius: 10, padding: '12px 16px', marginBottom: 16, fontSize: 14, color: '#78350f' }}>
           💬 {unresolvedLineComments} unresolved comment{unresolvedLineComments > 1 ? 's' : ''} on line items — see the editor for details.
           {canEdit && (
             <Link href={`/expense-reports/${id}/edit`} style={{ marginLeft: 8, color: '#92400e', fontWeight: 600, textDecoration: 'underline' }}>
               Open editor →
             </Link>
-          )}
-        </div>
-      )}
-
-      {/* Totals */}
-      {lineItems.length > 0 && (
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(140px, 1fr))', gap: 12, marginBottom: 20 }}>
-          <div style={{ background: '#fff', border: '1px solid #e9d5ff', borderRadius: 10, padding: '14px 16px', textAlign: 'center' }}>
-            <div style={{ fontSize: 22, fontWeight: 700, color: '#1e1b4b' }}>{lineItems.length}</div>
-            <div style={{ fontSize: 12, color: '#6b7280' }}>Line Items</div>
-          </div>
-          <div style={{ background: '#fff', border: '1px solid #e9d5ff', borderRadius: 10, padding: '14px 16px', textAlign: 'center' }}>
-            <div style={{ fontSize: 20, fontWeight: 700, color: '#1e1b4b' }}>{formatCurrency(totalOriginal)}</div>
-            <div style={{ fontSize: 12, color: '#6b7280' }}>Total Amount</div>
-          </div>
-          {totalAdjusted !== totalOriginal && (
-            <div style={{ background: '#fff', border: '1px solid #e9d5ff', borderRadius: 10, padding: '14px 16px', textAlign: 'center' }}>
-              <div style={{ fontSize: 20, fontWeight: 700, color: '#1e1b4b' }}>{formatCurrency(totalAdjusted)}</div>
-              <div style={{ fontSize: 12, color: '#6b7280' }}>Adjusted Total</div>
-            </div>
           )}
         </div>
       )}
@@ -391,60 +411,55 @@ export default function ExpenseReportDetailPage() {
         </div>
       )}
 
-      {/* Submit button */}
-      {canSubmit && (
-        <div style={{ marginBottom: 24 }}>
-          <button className="btn-submit" onClick={() => { setSubmitError(null); setShowSubmitConfirm(true) }}>
-            {report.status === 'needs_changes' ? '↩ Resubmit for Review' : '📤 Submit for Review'}
-          </button>
-          {submitError && (
-            <p style={{ marginTop: 8, fontSize: 14, color: '#dc2626', textAlign: 'center' }}>{submitError}</p>
-          )}
-        </div>
+      {submitError && (
+        <p style={{ marginBottom: 12, fontSize: 14, color: '#dc2626' }}>{submitError}</p>
       )}
 
-      {/* Comments */}
-      <div style={{ background: '#fff', border: '1px solid #e9d5ff', borderRadius: 12, marginBottom: 24, overflow: 'hidden' }}>
-        <div style={{ padding: '14px 16px', borderBottom: '1px solid #e9d5ff' }}>
-          <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#1e1b4b' }}>Comments</h2>
-        </div>
-        <div style={{ padding: 16 }}>
-          {generalComments.length === 0 ? (
-            <p style={{ margin: '0 0 16px', fontSize: 14, color: '#9ca3af' }}>No comments yet.</p>
-          ) : (
-            <div style={{ marginBottom: 16 }}>
-              {generalComments.map(c => (
-                <CommentThread key={c.id} comment={c} reportId={id} canComment={true} onRefresh={load} />
-              ))}
-            </div>
-          )}
-          <div>
-            <textarea
-              value={newComment}
-              onChange={e => setNewComment(e.target.value)}
-              placeholder="Add a comment…"
-              rows={3}
-              style={{ width: '100%', border: '1.5px solid #d1d5db', borderRadius: 8, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box', resize: 'vertical' }}
-              onFocus={e => (e.currentTarget.style.borderColor = '#7c3aed')}
-              onBlur={e => (e.currentTarget.style.borderColor = '#d1d5db')}
-            />
-            <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
-              <button onClick={postComment} disabled={postingComment || !newComment.trim()} style={{ background: '#7c3aed', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer', opacity: (postingComment || !newComment.trim()) ? 0.6 : 1 }}>
-                {postingComment ? 'Sending…' : 'Comment'}
-              </button>
+      {/* Comments + History side by side */}
+      <div className="bottom-grid">
+        {/* Comments */}
+        <div style={{ background: '#fff', border: '1px solid #e9d5ff', borderRadius: 12, overflow: 'hidden', display: 'flex', flexDirection: 'column' }}>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid #e9d5ff' }}>
+            <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#1e1b4b' }}>Comments</h2>
+          </div>
+          <div style={{ padding: 16, flex: 1 }}>
+            {generalComments.length === 0 ? (
+              <p style={{ margin: '0 0 16px', fontSize: 14, color: '#9ca3af' }}>No comments yet.</p>
+            ) : (
+              <div style={{ marginBottom: 16 }}>
+                {generalComments.map(c => (
+                  <CommentThread key={c.id} comment={c} reportId={id} canComment={true} onRefresh={load} />
+                ))}
+              </div>
+            )}
+            <div>
+              <textarea
+                value={newComment}
+                onChange={e => setNewComment(e.target.value)}
+                placeholder="Add a comment…"
+                rows={3}
+                style={{ width: '100%', border: '1.5px solid #d1d5db', borderRadius: 8, padding: '10px 12px', fontSize: 14, boxSizing: 'border-box', resize: 'vertical' }}
+                onFocus={e => (e.currentTarget.style.borderColor = '#7c3aed')}
+                onBlur={e => (e.currentTarget.style.borderColor = '#d1d5db')}
+              />
+              <div style={{ display: 'flex', justifyContent: 'flex-end', marginTop: 8 }}>
+                <button onClick={postComment} disabled={postingComment || !newComment.trim()} style={{ background: '#7c3aed', color: '#fff', border: 'none', padding: '8px 18px', borderRadius: 8, fontSize: 14, fontWeight: 600, cursor: 'pointer', opacity: (postingComment || !newComment.trim()) ? 0.6 : 1 }}>
+                  {postingComment ? 'Sending…' : 'Comment'}
+                </button>
+              </div>
             </div>
           </div>
         </div>
-      </div>
 
-      {/* Version history */}
-      {versions.length > 0 && (
+        {/* History */}
         <div style={{ background: '#fff', border: '1px solid #e9d5ff', borderRadius: 12, overflow: 'hidden' }}>
-          <div style={{ padding: '14px 16px', borderBottom: '1px solid #e9d5ff' }}>
+          <div style={{ padding: '12px 16px', borderBottom: '1px solid #e9d5ff' }}>
             <h2 style={{ margin: 0, fontSize: 14, fontWeight: 700, color: '#1e1b4b' }}>History</h2>
           </div>
-          <div style={{ padding: '8px 16px' }}>
-            {versions.map((v, i) => {
+          <div style={{ padding: '4px 16px' }}>
+            {versions.length === 0 ? (
+              <p style={{ padding: '12px 0', fontSize: 14, color: '#9ca3af', margin: 0 }}>No history yet.</p>
+            ) : versions.map((v, i) => {
               const actionCfg = VERSION_ACTIONS[v.action] ?? { label: v.action, icon: '•' }
               return (
                 <div key={v.id} style={{ display: 'flex', gap: 10, padding: '10px 0', borderBottom: i < versions.length - 1 ? '1px solid #f3f4f6' : 'none' }}>
@@ -461,7 +476,7 @@ export default function ExpenseReportDetailPage() {
             })}
           </div>
         </div>
-      )}
+      </div>
 
       {/* Submit confirmation modal */}
       {showSubmitConfirm && (

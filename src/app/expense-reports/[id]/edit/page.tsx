@@ -4,7 +4,7 @@ import { useState, useEffect, useCallback, useRef, Fragment } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { EXPENSE_CATEGORIES } from '@/lib/expense-constants'
-import type { ExpenseReportLineItem, ExpenseReportComment } from '@/types'
+import type { ExpenseReportLineItem, ExpenseReportComment, ExpenseReportReceipt } from '@/types'
 
 interface ReportInfo {
   id: string
@@ -34,6 +34,29 @@ const EMPTY_ITEM: Partial<ExpenseReportLineItem> = {
   adjusted_amount: null,
   payment_type: null,
   reimbursable: true,
+}
+
+function ExistingReceipt({ receipt, reportId }: { receipt: ExpenseReportReceipt; reportId: string }) {
+  const [loading, setLoading] = useState(false)
+
+  async function open() {
+    setLoading(true)
+    const res = await fetch(`/api/expense-reports/${reportId}/receipts/${receipt.id}/signed-url`)
+    if (res.ok) {
+      const { signed_url } = await res.json()
+      window.open(signed_url, '_blank')
+    }
+    setLoading(false)
+  }
+
+  return (
+    <div style={{ display: 'flex', alignItems: 'center', gap: 8, background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 6, padding: '6px 10px' }}>
+      <span style={{ fontSize: 13, color: '#374151', flex: 1, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>📎 {receipt.filename}</span>
+      <button onClick={open} disabled={loading} style={{ background: 'none', border: 'none', color: '#7c3aed', fontSize: 12, fontWeight: 600, cursor: 'pointer', flexShrink: 0, padding: 0 }}>
+        {loading ? 'Opening…' : 'View'}
+      </button>
+    </div>
+  )
 }
 
 // ── Row dialog (add/edit) ────────────────────────────────────────────────────
@@ -122,6 +145,13 @@ function RowDialog({
         {/* Receipt upload */}
         <div style={{ gridColumn: '1 / -1' }}>
           <label style={labelStyle}>Receipt Photo / File <span style={{ fontWeight: 400, color: '#9ca3af' }}>optional</span></label>
+          {(initial.receipts ?? []).length > 0 && (
+            <div style={{ marginBottom: 8, display: 'flex', flexDirection: 'column', gap: 4 }}>
+              {(initial.receipts ?? []).map(r => (
+                <ExistingReceipt key={r.id} receipt={r} reportId={initial.report_id!} />
+              ))}
+            </div>
+          )}
           <input
             type="file"
             accept="image/*,.pdf"
@@ -297,6 +327,12 @@ export default function ExpenseReportEditPage() {
   const [savingItem, setSavingItem] = useState(false)
   const [itemError, setItemError] = useState<string | null>(null)
 
+  // Inline new row (desktop only)
+  const [inlineNewRow, setInlineNewRow] = useState<Partial<ExpenseReportLineItem> | null>(null)
+  const [savingInline, setSavingInline] = useState(false)
+  const [inlineError, setInlineError] = useState<string | null>(null)
+  const newRowDateRef = useRef<HTMLInputElement>(null)
+
   // Delete
   const [deleteTarget, setDeleteTarget] = useState<ExpenseReportLineItem | null>(null)
   const [deletingItem, setDeletingItem] = useState(false)
@@ -313,6 +349,8 @@ export default function ExpenseReportEditPage() {
   const [newCommentFor, setNewCommentFor] = useState<string | null>(null)
   const [newCommentBody, setNewCommentBody] = useState('')
   const [postingComment, setPostingComment] = useState(false)
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [menuAnchor, setMenuAnchor] = useState<{ top: number; right: number } | null>(null)
 
   const load = useCallback(async () => {
     const res = await fetch(`/api/expense-reports/${id}`)
@@ -330,8 +368,21 @@ export default function ExpenseReportEditPage() {
     setIsReviewer(data.is_reviewer ?? false)
     setCanEdit(data.can_edit ?? false)
 
-    const cRes = await fetch(`/api/expense-reports/${id}/comments`)
+    const [cRes, rRes] = await Promise.all([
+      fetch(`/api/expense-reports/${id}/comments`),
+      fetch(`/api/expense-reports/${id}/receipts`),
+    ])
     if (cRes.ok) setComments((await cRes.json()).comments ?? [])
+    if (rRes.ok) {
+      const allReceipts: ExpenseReportReceipt[] = (await rRes.json()).receipts ?? []
+      const byItem: Record<string, ExpenseReportReceipt[]> = {}
+      for (const r of allReceipts) {
+        if (r.line_item_id) {
+          byItem[r.line_item_id] = [...(byItem[r.line_item_id] ?? []), r]
+        }
+      }
+      setLineItems(prev => prev.map(li => ({ ...li, receipts: byItem[li.id] ?? [] })))
+    }
 
     setLoading(false)
   }, [id, router])
@@ -339,9 +390,38 @@ export default function ExpenseReportEditPage() {
   useEffect(() => { load() }, [load])
 
   function openAdd() {
+    if (typeof window !== 'undefined' && window.innerWidth >= 768) {
+      if (inlineNewRow) {
+        newRowDateRef.current?.focus()
+        return
+      }
+      setInlineNewRow({ ...EMPTY_ITEM, reimbursable: true })
+      setInlineError(null)
+      return
+    }
     setEditingItem({ ...EMPTY_ITEM })
     setItemError(null)
     setDialogOpen(true)
+  }
+
+  async function saveInlineNewRow() {
+    if (!inlineNewRow) return
+    setSavingInline(true)
+    setInlineError(null)
+    const res = await fetch(`/api/expense-reports/${id}/line-items`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(inlineNewRow),
+    })
+    const json = await res.json()
+    if (!res.ok) {
+      setInlineError(json.error ?? 'Save failed')
+      setSavingInline(false)
+      return
+    }
+    setInlineNewRow(null)
+    setSavingInline(false)
+    load()
   }
 
   function openEdit(item: ExpenseReportLineItem) {
@@ -535,8 +615,10 @@ export default function ExpenseReportEditPage() {
           <span style={{ fontSize: 14, color: '#374151' }}><strong>{lineItems.length}</strong> items</span>
           <span style={{ fontSize: 14, color: '#374151' }}>Total: <strong>${formatCurrency(totalOriginal)}</strong></span>
           {canEdit && (
-            <Link href={`/expense-reports/${id}`} style={{ marginLeft: 'auto', textDecoration: 'none', color: '#7c3aed', fontSize: 13, fontWeight: 600 }}>
-              View / Submit →
+            <Link href={`/expense-reports/${id}`} style={{ marginLeft: 'auto', textDecoration: 'none' }}>
+              <button style={{ background: '#16a34a', color: '#fff', border: 'none', borderRadius: 8, padding: '7px 16px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
+                View / Submit →
+              </button>
             </Link>
           )}
         </div>
@@ -545,13 +627,13 @@ export default function ExpenseReportEditPage() {
       {/* ── Desktop spreadsheet ─────────────────────────── */}
       <div className="li-desktop">
         <div style={{ background: '#fff', border: '1px solid #e9d5ff', borderRadius: 12, overflow: 'hidden' }}>
-          {lineItems.length === 0 && (
+          {lineItems.length === 0 && !inlineNewRow && (
             <div style={{ textAlign: 'center', padding: '48px 24px', color: '#9ca3af' }}>
               <p style={{ margin: '0 0 16px', fontSize: 15 }}>No expenses yet.</p>
               {canEdit && <button onClick={openAdd} style={primaryBtnStyle}>+ Add Your First Expense</button>}
             </div>
           )}
-          {lineItems.length > 0 && (
+          {(lineItems.length > 0 || !!inlineNewRow) && (
             <div style={{ overflowX: 'auto' }}>
               <table className="sheet-table">
                 <thead>
@@ -587,8 +669,8 @@ export default function ExpenseReportEditPage() {
                                 </select>
                               </td>
                               <td><input className="cell-input" type="text" defaultValue={item.description ?? ''} placeholder="Notes…" style={{ minWidth: 120 }} onBlur={async e => { if (e.target.value !== (item.description ?? '')) await fetch(`/api/expense-reports/${id}/line-items/${item.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ description: e.target.value || null }) }) }} /></td>
-                              <td><div className="amount-cell"><span className="currency-prefix">$</span><input className="cell-input" type="number" defaultValue={item.original_amount ?? ''} placeholder="0.00" style={{ textAlign: 'right', minWidth: 80 }} onBlur={async e => { const v = e.target.value ? parseFloat(e.target.value) : null; if (v !== item.original_amount) await fetch(`/api/expense-reports/${id}/line-items/${item.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ original_amount: v }) }) }} /></div></td>
-                              <td><div className="amount-cell"><span className="currency-prefix">$</span><input className="cell-input" type="number" defaultValue={item.adjusted_amount ?? ''} placeholder="—" style={{ textAlign: 'right', minWidth: 80 }} onBlur={async e => { const v = e.target.value ? parseFloat(e.target.value) : null; if (v !== item.adjusted_amount) await fetch(`/api/expense-reports/${id}/line-items/${item.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ adjusted_amount: v }) }) }} /></div></td>
+                              <td><div className="amount-cell"><span className="currency-prefix">$</span><input className="cell-input" type="number" defaultValue={item.original_amount ?? ''} placeholder="0.00" style={{ textAlign: 'right', minWidth: 80 }} onBlur={async e => { const v = e.target.value ? parseFloat(e.target.value) : null; if (v !== item.original_amount) { await fetch(`/api/expense-reports/${id}/line-items/${item.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ original_amount: v }) }); setLineItems(prev => prev.map(li => li.id === item.id ? { ...li, original_amount: v } : li)) } }} /></div></td>
+                              <td><div className="amount-cell"><span className="currency-prefix">$</span><input className="cell-input" type="number" defaultValue={item.adjusted_amount ?? ''} placeholder="—" style={{ textAlign: 'right', minWidth: 80 }} onBlur={async e => { const v = e.target.value ? parseFloat(e.target.value) : null; if (v !== item.adjusted_amount) { await fetch(`/api/expense-reports/${id}/line-items/${item.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ adjusted_amount: v }) }); setLineItems(prev => prev.map(li => li.id === item.id ? { ...li, adjusted_amount: v } : li)) } }} /></div></td>
                               <td>
                                 <select className="cell-select" defaultValue={item.payment_type ?? ''} style={{ minWidth: 100 }} onBlur={async e => { const v = e.target.value || null; if (v !== item.payment_type) await fetch(`/api/expense-reports/${id}/line-items/${item.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ payment_type: v }) }) }}>
                                   <option value="">—</option>
@@ -616,24 +698,46 @@ export default function ExpenseReportEditPage() {
                             </>
                           )}
                           <td>
-                            <div style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '4px 6px' }}>
-                              {/* Comment badge */}
-                              <span
-                                className={`comment-badge ${unresolvedCount > 0 ? 'has-unresolved' : ''}`}
-                                onClick={() => setExpandedComments(prev => {
-                                  const n = new Set(prev)
-                                  n.has(item.id) ? n.delete(item.id) : n.add(item.id)
-                                  return n
-                                })}
-                                title={`${itemComments.length} comment${itemComments.length !== 1 ? 's' : ''}`}
+                            <div style={{ display: 'flex', justifyContent: 'center' }}>
+                              {openMenuId === item.id && (
+                                <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => { setOpenMenuId(null); setMenuAnchor(null) }} />
+                              )}
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation()
+                                  if (openMenuId === item.id) { setOpenMenuId(null); setMenuAnchor(null) }
+                                  else { const r = e.currentTarget.getBoundingClientRect(); setMenuAnchor({ top: r.bottom + 4, right: window.innerWidth - r.right }); setOpenMenuId(item.id) }
+                                }}
+                                style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: '2px 6px', color: '#9ca3af', borderRadius: 6, lineHeight: 1 }}
+                                title="Actions"
                               >
-                                💬 {itemComments.length > 0 ? itemComments.length : '+'}
-                              </span>
-                              {canEdit && (
-                                <>
-                                  <button onClick={() => openEdit(item)} style={{ background: 'none', border: 'none', color: '#7c3aed', cursor: 'pointer', fontSize: 14, padding: '2px 4px' }} title="Edit">✏️</button>
-                                  <button onClick={() => setDeleteTarget(item)} style={{ background: 'none', border: 'none', color: '#dc2626', cursor: 'pointer', fontSize: 14, padding: '2px 4px' }} title="Delete">🗑</button>
-                                </>
+                                ···
+                              </button>
+                              {openMenuId === item.id && menuAnchor && (
+                                <div style={{ position: 'fixed', top: menuAnchor.top, right: menuAnchor.right, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 100, minWidth: 150, padding: '4px 0' }}>
+                                  <button
+                                    onClick={() => { setOpenMenuId(null); setMenuAnchor(null); setExpandedComments(prev => { const n = new Set(prev); n.has(item.id) ? n.delete(item.id) : n.add(item.id); return n }) }}
+                                    style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: 'none', padding: '8px 14px', cursor: 'pointer', fontSize: 13, color: unresolvedCount > 0 ? '#92400e' : '#374151', textAlign: 'left', whiteSpace: 'nowrap' }}
+                                  >
+                                    💬 Comments{itemComments.length > 0 ? ` (${itemComments.length})` : ''}
+                                  </button>
+                                  {canEdit && (
+                                    <>
+                                      <button
+                                        onClick={() => { setOpenMenuId(null); setMenuAnchor(null); openEdit(item) }}
+                                        style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: 'none', padding: '8px 14px', cursor: 'pointer', fontSize: 13, color: '#7c3aed', textAlign: 'left', whiteSpace: 'nowrap' }}
+                                      >
+                                        ✏️ Edit
+                                      </button>
+                                      <button
+                                        onClick={() => { setOpenMenuId(null); setMenuAnchor(null); setDeleteTarget(item) }}
+                                        style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: 'none', padding: '8px 14px', cursor: 'pointer', fontSize: 13, color: '#dc2626', textAlign: 'left', whiteSpace: 'nowrap' }}
+                                      >
+                                        🗑 Delete
+                                      </button>
+                                    </>
+                                  )}
+                                </div>
                               )}
                             </div>
                           </td>
@@ -669,6 +773,121 @@ export default function ExpenseReportEditPage() {
                       </Fragment>
                     )
                   })}
+                  {inlineNewRow && (
+                    <tr style={{ background: '#fdf4ff', boxShadow: 'inset 0 0 0 2px #7c3aed' }}>
+                      <td>
+                        <input
+                          ref={newRowDateRef}
+                          autoFocus
+                          className="cell-input"
+                          type="date"
+                          value={inlineNewRow.expense_date ?? ''}
+                          style={{ background: '#fdf4ff' }}
+                          onChange={e => setInlineNewRow(r => ({ ...r!, expense_date: e.target.value || null }))}
+                        />
+                      </td>
+                      <td>
+                        <input
+                          className="cell-input"
+                          type="text"
+                          placeholder="Vendor…"
+                          value={inlineNewRow.vendor ?? ''}
+                          style={{ background: '#fdf4ff' }}
+                          onChange={e => setInlineNewRow(r => ({ ...r!, vendor: e.target.value || null }))}
+                        />
+                      </td>
+                      <td>
+                        <select
+                          className="cell-select"
+                          value={inlineNewRow.category ?? ''}
+                          style={{ background: '#fdf4ff' }}
+                          onChange={e => setInlineNewRow(r => ({ ...r!, category: e.target.value || null }))}
+                        >
+                          <option value="">— select —</option>
+                          {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </td>
+                      <td>
+                        <input
+                          className="cell-input"
+                          type="text"
+                          placeholder="Notes…"
+                          value={inlineNewRow.description ?? ''}
+                          style={{ minWidth: 120, background: '#fdf4ff' }}
+                          onChange={e => setInlineNewRow(r => ({ ...r!, description: e.target.value || null }))}
+                        />
+                      </td>
+                      <td>
+                        <div className="amount-cell">
+                          <span className="currency-prefix">$</span>
+                          <input
+                            className="cell-input"
+                            type="number"
+                            placeholder="0.00"
+                            style={{ textAlign: 'right', minWidth: 80, background: '#fdf4ff' }}
+                            value={inlineNewRow.original_amount ?? ''}
+                            onChange={e => setInlineNewRow(r => ({ ...r!, original_amount: e.target.value ? parseFloat(e.target.value) : null }))}
+                          />
+                        </div>
+                      </td>
+                      <td>
+                        <div className="amount-cell">
+                          <span className="currency-prefix">$</span>
+                          <input
+                            className="cell-input"
+                            type="number"
+                            placeholder="—"
+                            style={{ textAlign: 'right', minWidth: 80, background: '#fdf4ff' }}
+                            value={inlineNewRow.adjusted_amount ?? ''}
+                            onChange={e => setInlineNewRow(r => ({ ...r!, adjusted_amount: e.target.value ? parseFloat(e.target.value) : null }))}
+                          />
+                        </div>
+                      </td>
+                      <td>
+                        <select
+                          className="cell-select"
+                          value={inlineNewRow.payment_type ?? ''}
+                          style={{ minWidth: 100, background: '#fdf4ff' }}
+                          onChange={e => setInlineNewRow(r => ({ ...r!, payment_type: (e.target.value as 'cash' | 'credit_card') || null }))}
+                        >
+                          <option value="">—</option>
+                          <option value="cash">Cash</option>
+                          <option value="credit_card">Credit Card</option>
+                        </select>
+                      </td>
+                      <td>
+                        <select
+                          className="cell-select"
+                          value={(inlineNewRow.reimbursable ?? true) ? 'yes' : 'no'}
+                          style={{ background: '#fdf4ff' }}
+                          onChange={e => setInlineNewRow(r => ({ ...r!, reimbursable: e.target.value === 'yes' }))}
+                        >
+                          <option value="yes">Yes</option>
+                          <option value="no">No</option>
+                        </select>
+                      </td>
+                      <td>
+                        <div style={{ display: 'flex', gap: 4, alignItems: 'center', padding: '4px 6px' }}>
+                          <button
+                            onClick={saveInlineNewRow}
+                            disabled={savingInline}
+                            style={{ background: '#7c3aed', color: '#fff', border: 'none', borderRadius: 5, padding: '4px 9px', fontSize: 13, fontWeight: 700, cursor: 'pointer', opacity: savingInline ? 0.6 : 1 }}
+                            title="Save row"
+                          >
+                            {savingInline ? '…' : '✓'}
+                          </button>
+                          <button
+                            onClick={() => { setInlineNewRow(null); setInlineError(null) }}
+                            disabled={savingInline}
+                            style={{ background: 'none', border: '1px solid #d1d5db', borderRadius: 5, padding: '4px 9px', fontSize: 13, cursor: 'pointer', color: '#9ca3af' }}
+                            title="Cancel"
+                          >
+                            ✕
+                          </button>
+                        </div>
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
                 <tfoot>
                   <tr style={{ background: '#f8f7ff', borderTop: '2px solid #ede9fe' }}>
@@ -687,7 +906,10 @@ export default function ExpenseReportEditPage() {
               </table>
             </div>
           )}
-          {canEdit && lineItems.length > 0 && (
+          {inlineError && (
+            <div style={{ padding: '8px 16px', background: '#fef2f2', borderTop: '1px solid #fca5a5', color: '#dc2626', fontSize: 13 }}>{inlineError}</div>
+          )}
+          {canEdit && (lineItems.length > 0 || !!inlineNewRow) && (
             <div style={{ padding: '12px 16px', borderTop: '1px solid #f3f4f6' }}>
               <button onClick={openAdd} style={{ ...secondaryBtnStyle, flex: 'none', padding: '8px 16px', fontSize: 13 }}>+ Add row</button>
             </div>
@@ -709,7 +931,7 @@ export default function ExpenseReportEditPage() {
           const isExpanded = expandedComments.has(item.id)
 
           return (
-            <div key={item.id} className="mobile-card">
+            <div key={item.id} className="mobile-card" onClick={() => { if (canEdit) openEdit(item) }} style={canEdit ? { cursor: 'pointer' } : undefined}>
               <div className="mobile-card-header">
                 <div>
                   <div style={{ fontWeight: 600, color: '#1e1b4b', fontSize: 15 }}>
@@ -726,16 +948,51 @@ export default function ExpenseReportEditPage() {
                   <span style={{ fontWeight: 700, fontSize: 16, color: '#1e1b4b' }}>
                     {item.original_amount != null ? `$${formatCurrency(item.original_amount)}` : '—'}
                   </span>
-                  {canEdit && (
-                    <>
-                      <button onClick={() => openEdit(item)} style={{ background: '#ede9fe', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 14 }}>✏️</button>
-                      <button onClick={() => setDeleteTarget(item)} style={{ background: '#fee2e2', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 14 }}>🗑</button>
-                    </>
-                  )}
+                  <div>
+                    {openMenuId === `m-${item.id}` && (
+                      <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => { setOpenMenuId(null); setMenuAnchor(null) }} />
+                    )}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        if (openMenuId === `m-${item.id}`) { setOpenMenuId(null); setMenuAnchor(null) }
+                        else { const r = e.currentTarget.getBoundingClientRect(); setMenuAnchor({ top: r.bottom + 4, right: window.innerWidth - r.right }); setOpenMenuId(`m-${item.id}`) }
+                      }}
+                      style={{ background: '#f3f4f6', border: 'none', borderRadius: 8, padding: '6px 10px', cursor: 'pointer', fontSize: 16, lineHeight: 1, color: '#6b7280' }}
+                    >
+                      ···
+                    </button>
+                    {openMenuId === `m-${item.id}` && menuAnchor && (
+                      <div style={{ position: 'fixed', top: menuAnchor.top, right: menuAnchor.right, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 100, minWidth: 150, padding: '4px 0' }}>
+                        <button
+                          onClick={() => { setOpenMenuId(null); setMenuAnchor(null); setExpandedComments(prev => { const n = new Set(prev); n.has(item.id) ? n.delete(item.id) : n.add(item.id); return n }) }}
+                          style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: 'none', padding: '8px 14px', cursor: 'pointer', fontSize: 13, color: unresolvedCount > 0 ? '#92400e' : '#374151', textAlign: 'left', whiteSpace: 'nowrap' }}
+                        >
+                          💬 Comments{itemComments.length > 0 ? ` (${itemComments.length})` : ''}
+                        </button>
+                        {canEdit && (
+                          <>
+                            <button
+                              onClick={() => { setOpenMenuId(null); setMenuAnchor(null); openEdit(item) }}
+                              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: 'none', padding: '8px 14px', cursor: 'pointer', fontSize: 13, color: '#7c3aed', textAlign: 'left', whiteSpace: 'nowrap' }}
+                            >
+                              ✏️ Edit
+                            </button>
+                            <button
+                              onClick={() => { setOpenMenuId(null); setMenuAnchor(null); setDeleteTarget(item) }}
+                              style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: 'none', padding: '8px 14px', cursor: 'pointer', fontSize: 13, color: '#dc2626', textAlign: 'left', whiteSpace: 'nowrap' }}
+                            >
+                              🗑 Delete
+                            </button>
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                 </div>
               </div>
               {(item.description || item.payment_type || item.adjusted_amount != null || itemComments.length > 0) && (
-                <div className="mobile-card-body">
+                <div className="mobile-card-body" onClick={e => e.stopPropagation()}>
                   {item.description && <p style={{ margin: '0 0 8px', fontSize: 13, color: '#6b7280' }}>{item.description}</p>}
                   <div style={{ display: 'flex', gap: 10, flexWrap: 'wrap', fontSize: 12, color: '#6b7280' }}>
                     {item.payment_type && <span>{item.payment_type === 'cash' ? '💵 Cash' : '💳 Credit Card'}</span>}

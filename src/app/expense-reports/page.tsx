@@ -31,6 +31,91 @@ const STATUS_CONFIG: Record<string, { label: string; bg: string; color: string }
   submitted_to_payroll:  { label: 'Submitted to Payroll',  bg: '#ede9fe', color: '#5b21b6' },
 }
 
+const STEPS = [
+  {
+    num: 1,
+    icon: '📋',
+    title: 'Create',
+    detail: 'Click "+ New Expense Report" and pick the month.',
+  },
+  {
+    num: 2,
+    icon: '✏️',
+    title: 'Add Expenses',
+    detail: 'Fill in date, vendor, category, and amount for each item. Import from Expensify CSV if you prefer.',
+  },
+  {
+    num: 3,
+    icon: '📎',
+    title: 'Attach Receipts',
+    detail: 'Upload receipt photos or PDFs — stored privately and linked to your report.',
+  },
+  {
+    num: 4,
+    icon: '📤',
+    title: 'Submit',
+    detail: 'Click "Submit for Review." Your reviewer is notified automatically.',
+  },
+  {
+    num: 5,
+    icon: '💬',
+    title: 'Respond',
+    detail: 'If changes are requested, make corrections and resubmit. Your reviewer can comment on individual items.',
+  },
+  {
+    num: 6,
+    icon: '✅',
+    title: 'Done',
+    detail: 'Once approved, your report moves to "Submitted to Payroll." No further action needed.',
+  },
+]
+
+function HowItWorks({ expanded, onToggle }: { expanded: boolean; onToggle: () => void }) {
+  return (
+    <div style={{ background: 'linear-gradient(135deg, #faf5ff 0%, #f0f9ff 100%)', border: '1px solid #e9d5ff', borderRadius: 14, marginBottom: 24, overflow: 'hidden' }}>
+      <button
+        onClick={onToggle}
+        style={{ width: '100%', background: 'none', border: 'none', padding: '14px 18px', display: 'flex', alignItems: 'center', justifyContent: 'space-between', cursor: 'pointer', gap: 8 }}
+      >
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          <span style={{ fontSize: 18 }}>💡</span>
+          <span style={{ fontSize: 14, fontWeight: 700, color: '#4c1d95' }}>How It Works</span>
+          <span style={{ fontSize: 12, color: '#7c3aed', background: '#ede9fe', padding: '2px 8px', borderRadius: 999, fontWeight: 600 }}>Due by the 5th</span>
+        </div>
+        <span style={{ color: '#7c3aed', fontSize: 14, fontWeight: 700, transform: expanded ? 'rotate(180deg)' : 'none', transition: 'transform .2s', display: 'inline-block' }}>▾</span>
+      </button>
+
+      {expanded && (
+        <div style={{ padding: '0 18px 18px' }}>
+          <div className="steps-grid">
+            {STEPS.map(step => (
+              <div key={step.num} className="step-card">
+                <div style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 8 }}>
+                  <div style={{
+                    width: 26, height: 26, borderRadius: '50%',
+                    background: 'linear-gradient(135deg, #7c3aed, #6d28d9)',
+                    color: '#fff', fontSize: 11, fontWeight: 800,
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    flexShrink: 0, boxShadow: '0 2px 6px rgba(124,58,237,.3)',
+                  }}>
+                    {step.num}
+                  </div>
+                  <span style={{ fontSize: 16, lineHeight: 1 }}>{step.icon}</span>
+                  <span style={{ fontSize: 13, fontWeight: 700, color: '#1e1b4b' }}>{step.title}</span>
+                </div>
+                <p style={{ margin: 0, fontSize: 12, color: '#6b7280', lineHeight: 1.55 }}>{step.detail}</p>
+              </div>
+            ))}
+          </div>
+          <p style={{ margin: '14px 0 0', fontSize: 12, color: '#7c3aed', textAlign: 'center', fontWeight: 500 }}>
+            Reports are due by the <strong>5th of the following month</strong>. Contact HR with questions.
+          </p>
+        </div>
+      )}
+    </div>
+  )
+}
+
 function StatusBadge({ status }: { status: string }) {
   const { label, bg, color } = STATUS_CONFIG[status] ?? { label: status, bg: '#f3f4f6', color: '#374151' }
   return (
@@ -42,7 +127,6 @@ function StatusBadge({ status }: { status: string }) {
 
 export default function ExpenseReportsPage() {
   const [reports, setReports] = useState<ExpenseReport[]>([])
-  const [instructions, setInstructions] = useState<string | null>(null)
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
@@ -51,26 +135,21 @@ export default function ExpenseReportsPage() {
   const [deleteTarget, setDeleteTarget] = useState<ExpenseReport | null>(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState<string | null>(null)
+  const [howItWorksOpen, setHowItWorksOpen] = useState(false)
+  const [openMenuId, setOpenMenuId] = useState<string | null>(null)
+  const [menuAnchor, setMenuAnchor] = useState<{ top: number; right: number } | null>(null)
 
   async function load() {
     setLoading(true)
-    const [reportsRes, configRes] = await Promise.all([
-      fetch('/api/expense-reports').then(r => r.json()),
-      fetch('/api/admin/expense-reports/config').catch(() => null),
-    ])
-    setReports(reportsRes.reports ?? [])
-    try {
-      const configData = configRes ? await (configRes as Response).json() : null
-      setInstructions(configData?.config?.template_instructions ?? null)
-    } catch {}
+    const res = await fetch('/api/expense-reports')
+    const data = await res.json()
+    setReports(data.reports ?? [])
     setLoading(false)
   }
 
   useEffect(() => { load() }, [])
 
-  const hasActiveCurrentMonth = reports.some(
-    r => r.period_month === currentYearMonth() && r.status !== 'approved' && r.status !== 'submitted_to_payroll'
-  )
+  const hasActiveCurrentMonth = reports.some(r => r.period_month === currentYearMonth())
 
   async function deleteReport() {
     if (!deleteTarget) return
@@ -110,22 +189,23 @@ export default function ExpenseReportsPage() {
   }
 
   return (
-    <div style={{ maxWidth: 900, margin: '0 auto', padding: '32px 16px' }}>
+    <div style={{ width: '100%', padding: '32px 16px' }}>
       <style>{`
-        .er-card { background: #fff; border: 1px solid #e9d5ff; border-radius: 12px; overflow: hidden; }
-        .er-row { padding: 16px; border-bottom: 1px solid #f3f4f6; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
-        .er-row:last-child { border-bottom: none; }
-        .er-row:hover { background: #faf5ff; }
-        .er-month { font-weight: 700; color: #1e1b4b; font-size: 15px; flex: 1; min-width: 140px; }
-        .er-meta { font-size: 12px; color: #9ca3af; }
-        .er-total { font-size: 13px; color: #374151; font-weight: 500; white-space: nowrap; }
-        .er-actions { display: flex; gap: 8px; align-items: center; flex-shrink: 0; flex-wrap: wrap; }
-        .btn-primary { background: #7c3aed; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
+        .er-card { background: #fff; border: 1px solid #e9d5ff; border-radius: 14px; overflow: hidden; }
+        .er-table { width: 100%; border-collapse: collapse; }
+        .er-table th { text-align: left; padding: 10px 16px; background: #f8f7ff; color: #6d28d9; font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; border-bottom: 2px solid #ede9fe; white-space: nowrap; }
+        .er-table td { padding: 14px 16px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
+        .er-table tr:last-child td { border-bottom: none; }
+        .er-table tr:hover td { background: #faf5ff; }
+        .er-month { font-weight: 700; color: #1e1b4b; font-size: 15px; }
+        .er-meta { font-size: 12px; color: #9ca3af; margin-top: 2px; }
+        .er-actions { display: flex; gap: 8px; align-items: center; }
+        .btn-primary { background: #7c3aed; color: #fff; border: none; padding: 10px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; transition: background .15s; }
         .btn-primary:hover:not(:disabled) { background: #6d28d9; }
         .btn-primary:disabled { opacity: .6; cursor: not-allowed; }
-        .btn-secondary { background: #ede9fe; color: #5b21b6; border: none; padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .btn-secondary { background: #ede9fe; color: #5b21b6; border: none; padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s; }
         .btn-secondary:hover { background: #ddd6fe; }
-        .btn-danger { background: #fee2e2; color: #dc2626; border: none; padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
+        .btn-danger { background: #fee2e2; color: #dc2626; border: none; padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; transition: background .15s; }
         .btn-danger:hover:not(:disabled) { background: #fecaca; }
         .btn-danger-solid { background: #dc2626; color: #fff; border: none; padding: 9px 20px; border-radius: 8px; font-size: 14px; font-weight: 600; cursor: pointer; }
         .btn-danger-solid:hover:not(:disabled) { background: #b91c1c; }
@@ -136,11 +216,18 @@ export default function ExpenseReportsPage() {
         @media (min-width: 640px) { .modal { border-radius: 16px; padding: 32px; box-shadow: 0 20px 60px rgba(0,0,0,.18); } }
         .form-input { width: 100%; border: 1.5px solid #d1d5db; border-radius: 8px; padding: 10px 12px; font-size: 15px; box-sizing: border-box; }
         .form-input:focus { outline: none; border-color: #7c3aed; }
+        .steps-grid { display: grid; grid-template-columns: repeat(6, 1fr); gap: 8px; }
+        .step-card { background: rgba(255,255,255,.85); border: 1px solid #e9d5ff; border-radius: 10px; padding: 12px; }
+        @media (max-width: 860px) { .steps-grid { grid-template-columns: repeat(3, 1fr); } }
+        @media (max-width: 520px) { .steps-grid { grid-template-columns: repeat(2, 1fr); } }
         @media (max-width: 639px) {
-          .er-table-row { display: none; }
-          .er-row { flex-direction: column; align-items: flex-start; gap: 8px; }
-          .er-actions { width: 100%; }
-          .er-actions a, .er-actions button { flex: 1; text-align: center; justify-content: center; }
+          .er-table th.hide-mobile, .er-table td.hide-mobile { display: none; }
+          .er-actions-desktop { display: none; }
+          .er-actions-mobile { display: flex; }
+        }
+        @media (min-width: 640px) {
+          .er-actions-desktop { display: flex; }
+          .er-actions-mobile { display: none; }
         }
       `}</style>
 
@@ -156,12 +243,7 @@ export default function ExpenseReportsPage() {
         </button>
       </div>
 
-      {instructions && (
-        <div style={{ background: '#f5f3ff', border: '1px solid #ddd6fe', borderRadius: 10, padding: '14px 18px', marginBottom: 24, fontSize: 14, color: '#4c1d95', whiteSpace: 'pre-wrap', lineHeight: 1.6 }}>
-          <strong style={{ display: 'block', marginBottom: 4 }}>Instructions</strong>
-          {instructions}
-        </div>
-      )}
+      <HowItWorks expanded={howItWorksOpen} onToggle={() => setHowItWorksOpen(v => !v)} />
 
       {!hasActiveCurrentMonth && !loading && (
         <div style={{ background: '#fef3c7', border: '1px solid #fcd34d', borderRadius: 10, padding: '14px 18px', marginBottom: 20, display: 'flex', alignItems: 'center', justifyContent: 'space-between', flexWrap: 'wrap', gap: 10, fontSize: 14, color: '#78350f' }}>
@@ -181,45 +263,101 @@ export default function ExpenseReportsPage() {
             <p style={{ fontSize: 14, margin: '8px 0 0' }}>Click <strong>+ New Expense Report</strong> to get started.</p>
           </div>
         ) : (
-          reports.map(r => (
-            <div key={r.id} className="er-row">
-              <div style={{ flex: 1, minWidth: 0 }}>
-                <div style={{ display: 'flex', alignItems: 'center', gap: 8, flexWrap: 'wrap', marginBottom: 4 }}>
-                  <span className="er-month">{formatMonth(r.period_month)}</span>
-                  <StatusBadge status={r.status} />
-                </div>
-                <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-                  {(r.line_item_count ?? 0) > 0 && (
-                    <span className="er-total">
-                      {r.line_item_count} item{r.line_item_count === 1 ? '' : 's'}
-                      {(r.total_original ?? 0) > 0 && ` · ${formatCurrency(r.total_original ?? 0)}`}
-                    </span>
-                  )}
-                  <span className="er-meta">Updated {formatDate(r.updated_at)}</span>
-                </div>
-                {r.reviewer_comment && (
-                  <p style={{ margin: '6px 0 0', fontSize: 13, color: '#92400e', fontStyle: 'italic', background: '#fef3c7', padding: '4px 10px', borderRadius: 6, display: 'inline-block' }}>
-                    &ldquo;{r.reviewer_comment}&rdquo;
-                  </p>
-                )}
-              </div>
-              <div className="er-actions">
-                {(r.status === 'draft' || r.status === 'needs_changes') && (
-                  <Link href={`/expense-reports/${r.id}/edit`} style={{ textDecoration: 'none' }}>
-                    <button className="btn-primary" style={{ fontSize: 13, padding: '7px 14px' }}>Edit</button>
-                  </Link>
-                )}
-                <Link href={`/expense-reports/${r.id}`} style={{ textDecoration: 'none' }}>
-                  <button className="btn-secondary">View</button>
-                </Link>
-                {r.status === 'draft' && (
-                  <button className="btn-danger" onClick={() => { setDeleteTarget(r); setDeleteError(null) }}>
-                    Delete
-                  </button>
-                )}
-              </div>
-            </div>
-          ))
+          <table className="er-table">
+            <thead>
+              <tr>
+                <th>Month</th>
+                <th className="hide-mobile">Items</th>
+                <th className="hide-mobile">Total</th>
+                <th>Status</th>
+                <th className="hide-mobile">Updated</th>
+                <th style={{ textAlign: 'right' }}>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {reports.map(r => {
+                const isComplete = r.status === 'approved' || r.status === 'submitted_to_payroll'
+                return (
+                  <tr key={r.id}>
+                    <td>
+                      <div className="er-month">{formatMonth(r.period_month)}</div>
+                      {r.reviewer_comment && (
+                        <div style={{ marginTop: 4, fontSize: 12, color: '#92400e', fontStyle: 'italic', background: '#fef3c7', padding: '3px 8px', borderRadius: 5, display: 'inline-block' }}>
+                          &ldquo;{r.reviewer_comment}&rdquo;
+                        </div>
+                      )}
+                    </td>
+                    <td className="hide-mobile" style={{ color: '#6b7280', fontSize: 13 }}>
+                      {(r.line_item_count ?? 0) > 0 ? r.line_item_count : '—'}
+                    </td>
+                    <td className="hide-mobile" style={{ fontWeight: 500, color: '#1e1b4b', fontSize: 13 }}>
+                      {(r.total_original ?? 0) > 0 ? formatCurrency(r.total_original ?? 0) : '—'}
+                    </td>
+                    <td><StatusBadge status={r.status} /></td>
+                    <td className="hide-mobile" style={{ fontSize: 13, color: '#9ca3af' }}>{formatDate(r.updated_at)}</td>
+                    <td>
+                      {/* Desktop */}
+                      <div className="er-actions er-actions-desktop" style={{ justifyContent: 'flex-end' }}>
+                        {!isComplete && (
+                          <Link href={`/expense-reports/${r.id}/edit`} style={{ textDecoration: 'none' }}>
+                            <button className="btn-primary" style={{ fontSize: 13, padding: '7px 14px' }}>Edit</button>
+                          </Link>
+                        )}
+                        <Link href={`/expense-reports/${r.id}`} style={{ textDecoration: 'none' }}>
+                          <button className="btn-secondary">View</button>
+                        </Link>
+                        {r.status === 'draft' && (
+                          <button className="btn-danger" onClick={() => { setDeleteTarget(r); setDeleteError(null) }}>
+                            Delete
+                          </button>
+                        )}
+                      </div>
+                      {/* Mobile dropdown */}
+                      <div className="er-actions-mobile" style={{ justifyContent: 'flex-end' }}>
+                        {openMenuId === r.id && (
+                          <div style={{ position: 'fixed', inset: 0, zIndex: 99 }} onClick={() => { setOpenMenuId(null); setMenuAnchor(null) }} />
+                        )}
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation()
+                            if (openMenuId === r.id) { setOpenMenuId(null); setMenuAnchor(null) }
+                            else { const rect = e.currentTarget.getBoundingClientRect(); setMenuAnchor({ top: rect.bottom + 4, right: window.innerWidth - rect.right }); setOpenMenuId(r.id) }
+                          }}
+                          style={{ background: 'none', border: 'none', cursor: 'pointer', fontSize: 18, padding: '2px 8px', color: '#9ca3af', borderRadius: 6, lineHeight: 1 }}
+                        >
+                          ···
+                        </button>
+                        {openMenuId === r.id && menuAnchor && (
+                          <div style={{ position: 'fixed', top: menuAnchor.top, right: menuAnchor.right, background: '#fff', border: '1px solid #e5e7eb', borderRadius: 8, boxShadow: '0 4px 16px rgba(0,0,0,0.12)', zIndex: 100, minWidth: 140, padding: '4px 0' }}>
+                            {!isComplete && (
+                              <Link href={`/expense-reports/${r.id}/edit`} style={{ textDecoration: 'none' }}>
+                                <button onClick={() => { setOpenMenuId(null); setMenuAnchor(null) }} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: 'none', padding: '10px 14px', cursor: 'pointer', fontSize: 13, color: '#7c3aed', fontWeight: 600, textAlign: 'left', whiteSpace: 'nowrap' }}>
+                                  ✏️ Edit
+                                </button>
+                              </Link>
+                            )}
+                            <Link href={`/expense-reports/${r.id}`} style={{ textDecoration: 'none' }}>
+                              <button onClick={() => { setOpenMenuId(null); setMenuAnchor(null) }} style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: 'none', padding: '10px 14px', cursor: 'pointer', fontSize: 13, color: '#374151', fontWeight: 600, textAlign: 'left', whiteSpace: 'nowrap' }}>
+                                👁 View
+                              </button>
+                            </Link>
+                            {r.status === 'draft' && (
+                              <button
+                                onClick={() => { setOpenMenuId(null); setMenuAnchor(null); setDeleteTarget(r); setDeleteError(null) }}
+                                style={{ display: 'flex', alignItems: 'center', gap: 8, width: '100%', background: 'none', border: 'none', padding: '10px 14px', cursor: 'pointer', fontSize: 13, color: '#dc2626', fontWeight: 600, textAlign: 'left', whiteSpace: 'nowrap' }}
+                              >
+                                🗑 Delete
+                              </button>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </td>
+                  </tr>
+                )
+              })}
+            </tbody>
+          </table>
         )}
       </div>
 
