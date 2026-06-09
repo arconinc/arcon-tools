@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
+import { LoadingState, EmptyState } from '@/components/ui'
 
 type SpecListItem = {
   id: string
@@ -263,7 +264,7 @@ export default function SpecSamplesDashboard() {
           </div>
 
           {loading ? (
-            <div className="empty-state">Loading…</div>
+            <LoadingState label="Loading specs…" />
           ) : specs.length === 0 ? (
             <div className="empty-state">
               <p style={{ marginBottom: 12 }}>No specs found for these filters.</p>

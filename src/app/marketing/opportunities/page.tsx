@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { opportunityStatusBadge } from '@/lib/badges'
 
 const PAGE_SIZE = 50
 
@@ -68,13 +69,6 @@ function PipelineMini({ stage, status }: { stage: string | null; status: string 
       })}
     </div>
   )
-}
-
-const STATUS_BADGE: Record<string, string> = {
-  open: 'bg-blue-100 text-blue-800',
-  won: 'bg-green-100 text-green-800',
-  lost: 'bg-red-100 text-red-700',
-  stalled: 'bg-slate-100 text-slate-600',
 }
 
 function fmt$(val: number | null) {
@@ -307,7 +301,7 @@ export default function OpportunitiesPage() {
                   <PipelineMini stage={o.pipeline_stage} status={o.status} />
                 </td>
                 <td className="px-5 py-3.5">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold capitalize ${STATUS_BADGE[o.status] ?? 'bg-slate-100 text-slate-600'}`}>
+                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold capitalize ${opportunityStatusBadge(o.status) ?? 'bg-slate-100 text-slate-600'}`}>
                     {o.status}
                   </span>
                 </td>

@@ -1,11 +1,5 @@
 // Shared helpers used across store detail tabs
-
-export function formatDate(s: string | null): string {
-  if (!s) return '—'
-  const d = new Date(s)
-  if (isNaN(d.getTime())) return '—'
-  return d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
+export { formatDate, todayISO } from '@/lib/format'
 
 export function statusColor(status: string): string {
   switch (status.toLowerCase()) {
@@ -15,8 +9,4 @@ export function statusColor(status: string): string {
     case 'shipped': return 'bg-purple-100 text-purple-700'
     default: return 'bg-slate-100 text-slate-600'
   }
-}
-
-export function todayISO(): string {
-  return new Date().toISOString().split('T')[0]
 }

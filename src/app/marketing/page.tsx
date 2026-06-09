@@ -6,6 +6,7 @@ import Link from 'next/link'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
+import { taskStatusBadge } from '@/lib/badges'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -61,14 +62,6 @@ function fmt$(val: number | null) {
 function fmtDate(iso: string | null) {
   if (!iso) return '—'
   return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
-const TASK_STATUS_BADGE: Record<string, string> = {
-  not_started: 'bg-slate-100 text-slate-600',
-  in_progress: 'bg-blue-100 text-blue-700',
-  waiting_on_approval: 'bg-yellow-100 text-yellow-700',
-  waiting_on_client_approval: 'bg-orange-100 text-orange-700',
-  need_changes: 'bg-red-100 text-red-600',
 }
 
 const TASK_STATUS_LABEL: Record<string, string> = {
@@ -403,7 +396,7 @@ export default function CrmDashboardPage() {
                       {t.category}
                     </span>
                   )}
-                  <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${TASK_STATUS_BADGE[t.status] ?? 'bg-slate-100 text-slate-600'}`}>
+                  <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${taskStatusBadge(t.status) ?? 'bg-slate-100 text-slate-600'}`}>
                     {TASK_STATUS_LABEL[t.status] ?? t.status}
                   </span>
                   <span className="text-xs text-red-500 font-medium whitespace-nowrap">

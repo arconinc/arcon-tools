@@ -8,6 +8,7 @@ import EntitySearchPicker from '@/components/crm/EntitySearchPicker'
 import { CreateTaskModal } from '@/components/crm/CreateTaskModal'
 import { CrmDetailActions } from '@/components/crm/CrmDetailActions'
 import { TaskCreatedToast } from '@/components/crm/TaskCreatedToast'
+import { opportunityStatusBadge, taskStatusBadge } from '@/lib/badges'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -83,22 +84,6 @@ const CATEGORIES: OppCategory[] = [
   'Apparel', 'Packaging Product', 'Print Product',
   'Promotional Product', 'Signage', 'Store/Ecommerce Build',
 ]
-
-const STATUS_BADGE: Record<OppStatus, string> = {
-  open: 'bg-blue-100 text-blue-800',
-  won: 'bg-green-100 text-green-800',
-  lost: 'bg-red-100 text-red-700',
-  stalled: 'bg-slate-100 text-slate-600',
-}
-
-const TASK_STATUS_BADGE: Record<string, string> = {
-  not_started: 'bg-slate-100 text-slate-600',
-  in_progress: 'bg-blue-100 text-blue-700',
-  completed: 'bg-green-100 text-green-700',
-  waiting_on_approval: 'bg-yellow-100 text-yellow-700',
-  waiting_on_client_approval: 'bg-orange-100 text-orange-700',
-  need_changes: 'bg-red-100 text-red-600',
-}
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -224,7 +209,7 @@ function PipelineBar({
       <div className="flex items-center gap-2 mb-4">
         <span className="text-sm font-semibold text-slate-700">Pipeline Stage</span>
         {isClosed && (
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_BADGE[status]}`}>
+          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${opportunityStatusBadge(status)}`}>
             {status === 'won' ? '🏆 Won' : '❌ Lost'}
           </span>
         )}
@@ -654,7 +639,7 @@ export default function OpportunityDetailPage() {
           <div className="min-w-0 flex-1">
             <h1 className="text-2xl font-bold text-slate-900 truncate">{opp.name}</h1>
             <div className="flex items-center gap-3 mt-2 flex-wrap">
-              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${STATUS_BADGE[opp.status]}`}>
+              <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize ${opportunityStatusBadge(opp.status)}`}>
                 {opp.status}
               </span>
               {opp.customer && (
@@ -887,7 +872,7 @@ export default function OpportunityDetailPage() {
                       </td>
                       <td className="px-5 py-3 capitalize hidden md:table-cell">
                         {h.status && (
-                          <span className={`inline-flex px-2 py-0.5 rounded font-semibold capitalize ${STATUS_BADGE[h.status as OppStatus] ?? 'bg-slate-100 text-slate-600'}`}>
+                          <span className={`inline-flex px-2 py-0.5 rounded font-semibold capitalize ${opportunityStatusBadge(h.status)}`}>
                             {h.status}
                           </span>
                         )}
@@ -922,7 +907,7 @@ export default function OpportunityDetailPage() {
                       <div className="text-sm font-medium text-slate-800 truncate">{t.title}</div>
                       {t.category && <div className="text-xs text-slate-400">{t.category}</div>}
                     </div>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap ${TASK_STATUS_BADGE[t.status] ?? 'bg-slate-100 text-slate-600'}`}>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap ${taskStatusBadge(t.status)}`}>
                       {t.status.replace(/_/g, ' ')}
                     </span>
                     {t.due_date && (
@@ -990,7 +975,7 @@ export default function OpportunityDetailPage() {
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-slate-800">{t.title}</div>
                     </div>
-                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${TASK_STATUS_BADGE[t.status] ?? 'bg-slate-100 text-slate-600'}`}>
+                    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${taskStatusBadge(t.status)}`}>
                       {t.status.replace(/_/g, ' ')}
                     </span>
                   </div>

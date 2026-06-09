@@ -11,6 +11,8 @@ import { formatPhoneInput } from '@/lib/phone'
 import { useFormValidation, inputCls, selectCls, FieldError } from '@/lib/form-validation'
 import { CrmForm } from '@/types'
 import { getCustomerFormsByState, getGeneralForms, US_STATES } from '@/lib/forms-utils'
+import { formatBytes } from '@/lib/format'
+import { customerStatusBadge, opportunityStatusBadge } from '@/lib/badges'
 
 type DropdownUser = { id: string; display_name: string; email: string }
 type TagOption = { id: string; name: string; color: string }
@@ -112,19 +114,6 @@ type CreateForm = {
   billing_address1: string; billing_city: string; billing_state: string; billing_zip: string
   orderer_first_name: string; orderer_last_name: string; orderer_email: string
   ap_first_name: string; ap_last_name: string; ap_email: string
-}
-
-const STATUS_BADGE: Record<string, string> = {
-  Active: 'bg-green-100 text-green-800',
-  Prospective: 'bg-slate-100 text-slate-700',
-  Former: 'bg-red-100 text-red-700',
-}
-
-const OPP_STATUS_BADGE: Record<string, string> = {
-  open: 'bg-blue-100 text-blue-800',
-  won: 'bg-green-100 text-green-800',
-  lost: 'bg-red-100 text-red-700',
-  stalled: 'bg-slate-100 text-slate-600',
 }
 
 function Field({ label, value, multiline, link, email }: { label: string; value: string | null | undefined; multiline?: boolean; link?: boolean; email?: boolean }) {
@@ -361,13 +350,6 @@ export default function CustomerDetailPage() {
     if (res.ok || res.status === 204) {
       setArtwork((prev) => prev.filter((a) => a.id !== id))
     }
-  }
-
-  function formatBytes(bytes: number | null) {
-    if (!bytes) return null
-    if (bytes < 1024) return `${bytes} B`
-    if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-    return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
   }
 
   useEffect(() => {
@@ -930,7 +912,7 @@ export default function CustomerDetailPage() {
             <div className="flex items-center gap-3 flex-wrap">
               <h1 className="text-xl font-bold text-slate-900 truncate">{customer.name}</h1>
               {customer.client_status && (
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${STATUS_BADGE[customer.client_status] ?? 'bg-slate-100 text-slate-600'}`}>
+                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${customerStatusBadge(customer.client_status)}`}>
                   {customer.client_status}
                 </span>
               )}
@@ -1492,7 +1474,7 @@ export default function CustomerDetailPage() {
                       </div>
                       <div className="text-right">
                         {o.value != null && <div className="text-sm font-semibold text-slate-700">${o.value.toLocaleString()}</div>}
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${OPP_STATUS_BADGE[o.status] ?? 'bg-slate-100 text-slate-600'}`}>
+                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${opportunityStatusBadge(o.status)}`}>
                           {o.status}
                         </span>
                       </div>
