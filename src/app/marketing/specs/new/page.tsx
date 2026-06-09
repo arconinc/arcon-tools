@@ -117,6 +117,15 @@ export default function NewSpecWizard() {
   // Using a map per item index
   const [itemDetails, setItemDetails] = useState<Record<number, Partial<SelectedItem>>>({})
 
+  // Artwork check
+  const [customerArtwork, setCustomerArtwork] = useState<{ id: string; name: string; thumbnail_url: string | null; url: string }[]>([])
+  const [artworkLoading, setArtworkLoading] = useState(false)
+  const [artworkLoaded, setArtworkLoaded] = useState(false)
+  const [createArtworkTask, setCreateArtworkTask] = useState(false)
+  const [artworkTaskCategory, setArtworkTaskCategory] = useState('Art Order')
+  const [artworkTaskDescription, setArtworkTaskDescription] = useState('')
+  const [showArtworkTaskForm, setShowArtworkTaskForm] = useState(false)
+
   // Step 4
   const [followUpDate, setFollowUpDate] = useState(futureDate(14))
   const [followUpNotes, setFollowUpNotes] = useState('')
@@ -183,6 +192,34 @@ export default function NewSpecWizard() {
     fetch(`/api/marketing/customers/${selectedCustomer.id}`).then(r => r.json()).then((d: any) => {
       setCustomerContacts(Array.isArray(d.contacts) ? d.contacts : [])
     })
+  }, [selectedCustomer])
+
+  // ── Load artwork when customer selected ───────────────────────────────────
+  useEffect(() => {
+    if (!selectedCustomer) {
+      setCustomerArtwork([])
+      setArtworkLoaded(false)
+      setCreateArtworkTask(false)
+      setShowArtworkTaskForm(false)
+      return
+    }
+    setArtworkLoading(true)
+    setArtworkLoaded(false)
+    fetch(`/api/marketing/artwork?customer_id=${selectedCustomer.id}`)
+      .then(r => r.json())
+      .then((d: any) => {
+        const records = Array.isArray(d) ? d : []
+        setCustomerArtwork(records)
+        setArtworkLoading(false)
+        setArtworkLoaded(true)
+        setArtworkTaskDescription(
+          `Please find or create artwork/logos for ${selectedCustomer.name}. Source existing files from the client or recreate their branding materials. Upload any files to the CRM artwork library when complete.`
+        )
+        if (records.length === 0) {
+          setCreateArtworkTask(true)
+          setShowArtworkTaskForm(true)
+        }
+      })
   }, [selectedCustomer])
 
   // ── Spec ideas search ─────────────────────────────────────────────────────
@@ -314,6 +351,33 @@ export default function NewSpecWizard() {
     })
 
     const created = await res.json()
+
+    if (res.ok && Array.isArray(created) && createArtworkTask && selectedCustomer) {
+      const artworkRes = await fetch('/api/marketing/tasks', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          title: `Artwork: ${selectedCustomer.name}`,
+          department: 'CRM',
+          category: artworkTaskCategory,
+          description: artworkTaskDescription || null,
+          customer_id: selectedCustomer.id,
+        }),
+      })
+      if (artworkRes.ok) {
+        const artworkTask = await artworkRes.json()
+        if (artworkTask?.id) {
+          await Promise.all(created.map((s: any) =>
+            fetch(`/api/marketing/specs/${s.id}`, {
+              method: 'PUT',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ artwork_task_id: artworkTask.id }),
+            })
+          ))
+        }
+      }
+    }
+
     setSaving(false)
     if (res.ok && Array.isArray(created)) {
       setCreatedIds(created.map((s: any) => s.id))
@@ -440,6 +504,94 @@ export default function NewSpecWizard() {
                         <option key={c.id} value={c.id}>{c.first_name} {c.last_name}{c.email ? ` (${c.email})` : ''}</option>
                       ))}
                     </select>
+                  </div>
+                )}
+
+                {/* Artwork check */}
+                {artworkLoading && (
+                  <div style={{ marginBottom: 20, color: '#94a3b8', fontSize: 13 }}>Checking artwork…</div>
+                )}
+
+                {artworkLoaded && customerArtwork.length > 0 && (
+                  <div style={{ marginBottom: 20 }}>
+                    <div style={{ background: '#f0fdf4', border: '1px solid #bbf7d0', borderRadius: 10, padding: '12px 16px', marginBottom: 12, display: 'flex', alignItems: 'center', gap: 10 }}>
+                      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#16a34a" strokeWidth={2.5}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                      <span style={{ fontSize: 14, fontWeight: 600, color: '#15803d' }}>Artwork on file</span>
+                      <span style={{ fontSize: 13, color: '#4ade80', marginLeft: 4 }}>({customerArtwork.length} file{customerArtwork.length !== 1 ? 's' : ''})</span>
+                    </div>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(80px, 1fr))', gap: 8, marginBottom: 12 }}>
+                      {customerArtwork.slice(0, 6).map(a => (
+                        <a key={a.id} href={a.url} target="_blank" rel="noopener noreferrer" title={a.name} style={{ display: 'block', aspectRatio: '1', borderRadius: 8, overflow: 'hidden', border: '1px solid #e2e8f0', background: '#f8fafc', textDecoration: 'none' }}>
+                          {a.thumbnail_url ? (
+                            <img src={a.thumbnail_url} alt={a.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                          ) : (
+                            <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                              <svg width="24" height="24" fill="none" viewBox="0 0 24 24" stroke="#94a3b8" strokeWidth={1.5}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path strokeLinecap="round" d="M21 15l-5-5L5 21"/></svg>
+                            </div>
+                          )}
+                        </a>
+                      ))}
+                    </div>
+                    <button
+                      onClick={() => setShowArtworkTaskForm(v => !v)}
+                      style={{ background: 'none', border: 'none', color: '#7c3aed', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: 0, display: 'flex', alignItems: 'center', gap: 4 }}
+                    >
+                      {showArtworkTaskForm ? '▾' : '▸'} Create artwork task anyway
+                    </button>
+                  </div>
+                )}
+
+                {artworkLoaded && customerArtwork.length === 0 && (
+                  <div style={{ background: '#fffbf0', border: '1px solid #fde68a', borderRadius: 10, padding: '12px 16px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#d97706" strokeWidth={2}><path strokeLinecap="round" strokeLinejoin="round" d="M12 9v4m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z"/></svg>
+                    <span style={{ fontSize: 14, fontWeight: 600, color: '#92400e' }}>No artwork found for {selectedCustomer.name}</span>
+                  </div>
+                )}
+
+                {artworkLoaded && (showArtworkTaskForm || customerArtwork.length === 0) && (
+                  <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 12, padding: '18px 20px', marginBottom: 20 }}>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
+                      <input
+                        type="checkbox"
+                        id="create_artwork_task"
+                        checked={createArtworkTask}
+                        onChange={e => setCreateArtworkTask(e.target.checked)}
+                        style={{ width: 16, height: 16, accentColor: '#7c3aed', cursor: 'pointer' }}
+                      />
+                      <label htmlFor="create_artwork_task" style={{ fontSize: 14, fontWeight: 600, color: '#1e293b', cursor: 'pointer' }}>
+                        Create artwork task
+                      </label>
+                    </div>
+
+                    {createArtworkTask && (
+                      <>
+                        <div style={{ marginBottom: 14 }}>
+                          <label className="wiz-label">Category</label>
+                          <select
+                            className="wiz-input"
+                            value={artworkTaskCategory}
+                            onChange={e => setArtworkTaskCategory(e.target.value)}
+                          >
+                            <option value="Art Order">Art Order</option>
+                            <option value="Art Proactive Prospecting">Art Proactive Prospecting</option>
+                            <option value="Art Rush - Drop Everything">Art Rush - Drop Everything</option>
+                            <option value="Art Rush - EOD">Art Rush - EOD</option>
+                            <option value="Art Store Mocks">Art Store Mocks</option>
+                            <option value="Art Waiting on Approval">Art Waiting on Approval</option>
+                          </select>
+                        </div>
+                        <div>
+                          <label className="wiz-label">Description</label>
+                          <textarea
+                            className="wiz-input"
+                            rows={4}
+                            value={artworkTaskDescription}
+                            onChange={e => setArtworkTaskDescription(e.target.value)}
+                            style={{ resize: 'vertical' }}
+                          />
+                        </div>
+                      </>
+                    )}
                   </div>
                 )}
 
@@ -956,6 +1108,7 @@ export default function NewSpecWizard() {
             <p style={{ color: '#64748b', fontSize: 15, margin: '0 0 28px' }}>
               {createdIds.length} spec{createdIds.length > 1 ? 's' : ''} created for {selectedCustomer?.name}.
               {createTask && followUpDate ? ` A follow-up task has been scheduled for ${followUpDate}.` : ''}
+              {createArtworkTask ? ' An artwork task has been created.' : ''}
             </p>
             <div style={{ display: 'flex', gap: 12, justifyContent: 'center' }}>
               {createdIds[0] && (
@@ -972,6 +1125,12 @@ export default function NewSpecWizard() {
                   setItemDetails({})
                   setCreatedIds([])
                   setCustSearch('')
+                  setCreateArtworkTask(false)
+                  setArtworkTaskCategory('Art Order')
+                  setArtworkTaskDescription('')
+                  setShowArtworkTaskForm(false)
+                  setCustomerArtwork([])
+                  setArtworkLoaded(false)
                 }}
                 style={{ background: 'white', color: '#374151', border: '1px solid #e2e8f0', borderRadius: 9, padding: '11px 22px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
               >

@@ -222,17 +222,19 @@ export default function CustomerDetailPage() {
     width: number | null; height: number | null; url: string
     cloudinary_public_id: string | null; cloudinary_resource_type: string | null
     thumbnail_url: string | null; is_drive_link: boolean
+    dropbox_url: string | null; is_dropbox_file: boolean
     added_by: string; created_at: string; updated_at: string
   }
   const [artwork, setArtwork] = useState<ArtworkItem[]>([])
   const [artworkLoaded, setArtworkLoaded] = useState(false)
   const [artworkLoading, setArtworkLoading] = useState(false)
   const [showArtworkModal, setShowArtworkModal] = useState(false)
-  const [artworkMode, setArtworkMode] = useState<'upload' | 'drive'>('upload')
+  const [artworkMode, setArtworkMode] = useState<'upload' | 'drive' | 'dropbox'>('upload')
   const [artworkFile, setArtworkFile] = useState<File | null>(null)
   const [artworkName, setArtworkName] = useState('')
   const [artworkDesc, setArtworkDesc] = useState('')
   const [artworkDriveUrl, setArtworkDriveUrl] = useState('')
+  const [artworkDropboxUrl, setArtworkDropboxUrl] = useState('')
   const [artworkUploading, setArtworkUploading] = useState(false)
   const [artworkError, setArtworkError] = useState<string | null>(null)
   const [vectorizingIds, setVectorizingIds] = useState<Set<string>>(new Set())
@@ -298,6 +300,11 @@ export default function CustomerDetailPage() {
         payload = { ...payload, ...uploaded }
       } else if (artworkMode === 'drive') {
         payload.url = artworkDriveUrl
+      } else if (artworkMode === 'dropbox') {
+        const isDropboxFile = !artworkDropboxUrl.includes('/fo/')
+        payload.url = artworkDropboxUrl
+        payload.dropbox_url = artworkDropboxUrl
+        payload.is_dropbox_file = isDropboxFile
       }
 
       const saveRes = await fetch('/api/marketing/artwork', {
@@ -317,6 +324,7 @@ export default function CustomerDetailPage() {
       setArtworkName('')
       setArtworkDesc('')
       setArtworkDriveUrl('')
+      setArtworkDropboxUrl('')
       setArtworkMode('upload')
     } finally {
       setArtworkUploading(false)
@@ -1601,6 +1609,13 @@ export default function CustomerDetailPage() {
                             <path d="M73.4 26.5l-12.85-22.3c-.8-1.4-1.95-2.5-3.3-3.3L43.65 25 60.1 50h27.45c0-1.55-.4-3.1-1.2-4.5L73.4 26.5z" fill="#FFBA00"/>
                           </svg>
                         </div>
+                      ) : item.dropbox_url && !item.is_dropbox_file ? (
+                        <div className="h-36 bg-slate-50 flex items-center justify-center">
+                          {/* Dropbox folder icon */}
+                          <svg className="w-14 h-14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                            <path d="M3 5.25a1.5 1.5 0 011.5-1.5h6l1.5 1.5H18a1.5 1.5 0 011.5 1.5v11a1.5 1.5 0 01-1.5 1.5H4.5a1.5 1.5 0 01-1.5-1.5V5.25z" fill="#0061FF"/>
+                          </svg>
+                        </div>
                       ) : thumb ? (
                         <div className="h-36 bg-slate-100 overflow-hidden relative">
                           <img src={thumb} alt={item.name} className="w-full h-full object-contain"
@@ -1631,6 +1646,8 @@ export default function CustomerDetailPage() {
                       <div className="text-xs text-slate-400 mt-auto pt-1 space-y-0.5">
                         {item.is_drive_link
                           ? <span>Google Drive</span>
+                          : item.dropbox_url
+                          ? <span>{item.is_dropbox_file ? 'Dropbox File' : 'Dropbox Folder'}</span>
                           : (
                             <span>
                               {item.mime_type?.split('/')[1]?.toUpperCase() ?? ext}
@@ -1642,7 +1659,7 @@ export default function CustomerDetailPage() {
                         <div>{date}</div>
                       </div>
                       <div className="mt-2 flex items-center gap-3">
-                        {!item.is_drive_link &&
+                        {!item.is_drive_link && !item.dropbox_url &&
                           item.cloudinary_resource_type === 'image' &&
                           (item.mime_type === 'image/png' || item.mime_type === 'image/jpeg') && (
                           <button
@@ -1681,15 +1698,19 @@ export default function CustomerDetailPage() {
                 </div>
                 <form onSubmit={handleArtworkSubmit} className="p-6 space-y-4">
                   {/* Mode toggle */}
-                  <div className="flex gap-2">
+                  <div className="grid grid-cols-3 gap-2">
                     <button type="button"
                       onClick={() => setArtworkMode('upload')}
-                      className={`flex-1 py-1.5 text-sm font-semibold rounded-lg border transition-colors ${artworkMode === 'upload' ? 'bg-purple-700 text-white border-purple-700' : 'text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                      className={`py-1.5 text-sm font-semibold rounded-lg border transition-colors ${artworkMode === 'upload' ? 'bg-purple-700 text-white border-purple-700' : 'text-slate-600 border-slate-200 hover:bg-slate-50'}`}
                     >Upload File</button>
                     <button type="button"
                       onClick={() => setArtworkMode('drive')}
-                      className={`flex-1 py-1.5 text-sm font-semibold rounded-lg border transition-colors ${artworkMode === 'drive' ? 'bg-purple-700 text-white border-purple-700' : 'text-slate-600 border-slate-200 hover:bg-slate-50'}`}
-                    >Google Drive Link</button>
+                      className={`py-1.5 text-sm font-semibold rounded-lg border transition-colors ${artworkMode === 'drive' ? 'bg-purple-700 text-white border-purple-700' : 'text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                    >Google Drive</button>
+                    <button type="button"
+                      onClick={() => setArtworkMode('dropbox')}
+                      className={`py-1.5 text-sm font-semibold rounded-lg border transition-colors ${artworkMode === 'dropbox' ? 'bg-purple-700 text-white border-purple-700' : 'text-slate-600 border-slate-200 hover:bg-slate-50'}`}
+                    >Dropbox Link</button>
                   </div>
 
                   {artworkMode === 'upload' ? (
@@ -1704,13 +1725,22 @@ export default function CustomerDetailPage() {
                         className="block w-full text-sm text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
                       />
                     </div>
-                  ) : (
+                  ) : artworkMode === 'drive' ? (
                     <div>
                       <label className="block text-xs font-semibold text-slate-600 mb-1">Google Drive URL</label>
                       <input type="url" required value={artworkDriveUrl} onChange={(e) => setArtworkDriveUrl(e.target.value)}
                         placeholder="https://drive.google.com/..."
                         className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
                       />
+                    </div>
+                  ) : (
+                    <div>
+                      <label className="block text-xs font-semibold text-slate-600 mb-1">Dropbox URL</label>
+                      <input type="url" required value={artworkDropboxUrl} onChange={(e) => setArtworkDropboxUrl(e.target.value)}
+                        placeholder="https://www.dropbox.com/..."
+                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
+                      />
+                      <p className="text-xs text-slate-500 mt-1">Paste a link to a Dropbox file or folder. We'll detect which automatically.</p>
                     </div>
                   )}
 
@@ -1861,6 +1891,7 @@ export default function CustomerDetailPage() {
                   {specs.map((s, i) => {
                     const statusColors: Record<string, { bg: string; color: string }> = {
                       not_contacted: { bg: '#f1f5f9', color: '#64748b' },
+                      artwork: { bg: '#fdf4ff', color: '#7e22ce' },
                       ordered: { bg: '#eff6ff', color: '#1d4ed8' },
                       in_production: { bg: '#fefce8', color: '#a16207' },
                       shipped: { bg: '#fff7ed', color: '#c2410c' },

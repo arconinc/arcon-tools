@@ -59,6 +59,7 @@ type TaskDetail = {
   created_user: { id: string; display_name: string } | null
   delegator_users: { id: string; display_name: string }[]
   attachments: TaskAttachment[]
+  linked_spec: { id: string; item_name: string; status: string } | null
 }
 
 // ── Constants ─────────────────────────────────────────────────────────────────
@@ -1150,6 +1151,19 @@ export default function TaskDetailPage() {
                       {linkedObj.label.slice(0, 3)}
                     </span>
                     <span className="text-sm text-purple-700">{linkedObj.name}</span>
+                  </Link>
+                </div>
+              )}
+
+              {/* Linked spec sample */}
+              {task.linked_spec && (
+                <div className="px-6 py-3">
+                  <div className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide mb-1.5">Spec Sample</div>
+                  <Link href={`/marketing/specs/${task.linked_spec.id}`} className="inline-flex items-center gap-2 hover:underline">
+                    <span className="text-xs font-bold px-1.5 py-0.5 rounded uppercase tracking-wider bg-purple-100 text-purple-700">
+                      Spec
+                    </span>
+                    <span className="text-sm text-purple-700">{task.linked_spec.item_name}</span>
                   </Link>
                 </div>
               )}

@@ -16,7 +16,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
   if (error || !spec) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   // Enrich with names
-  const [custRes, contactRes, csrRes, repRes, taskRes, ideaRes] = await Promise.all([
+  const [custRes, contactRes, csrRes, repRes, taskRes, artworkTaskRes, ideaRes] = await Promise.all([
     spec.customer_id
       ? adminClient.from('crm_customers').select('id, name, logo_url, billing_city, billing_state').eq('id', spec.customer_id).single()
       : Promise.resolve({ data: null }),
@@ -30,7 +30,10 @@ export async function GET(_req: NextRequest, { params }: Params) {
       ? adminClient.from('users').select('id, display_name, avatar_url, profile_image_url').eq('id', spec.sales_rep_id).single()
       : Promise.resolve({ data: null }),
     spec.linked_task_id
-      ? adminClient.from('crm_tasks').select('id, title, status, due_date, assigned_to').eq('id', spec.linked_task_id).single()
+      ? adminClient.from('crm_tasks').select('id, title, status, due_date').eq('id', spec.linked_task_id).single()
+      : Promise.resolve({ data: null }),
+    spec.artwork_task_id
+      ? adminClient.from('crm_tasks').select('id, title, status, due_date').eq('id', spec.artwork_task_id).single()
       : Promise.resolve({ data: null }),
     spec.spec_idea_id
       ? adminClient.from('spec_ideas').select('id, item_name, vendor, image_url, ordering_instructions_html').eq('id', spec.spec_idea_id).single()
@@ -44,6 +47,7 @@ export async function GET(_req: NextRequest, { params }: Params) {
     assigned_csr: csrRes.data,
     sales_rep: repRes.data,
     linked_task: taskRes.data,
+    artwork_task: artworkTaskRes.data,
     spec_idea: ideaRes.data,
   })
 }
@@ -59,7 +63,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     id: _id, created_at: _ca,
     vendor_id: _vid, vendor: _v,
     customer_name: _cn, contact_name: _con, csr_name: _csrn, sales_rep_name: _srn,
-    customer: _c, contact: _ct, assigned_csr: _ac, sales_rep: _sr, linked_task: _lt, spec_idea: _si,
+    customer: _c, contact: _ct, assigned_csr: _ac, sales_rep: _sr, linked_task: _lt, artwork_task: _at, spec_idea: _si,
     ...rest
   } = body
 

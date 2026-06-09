@@ -1013,6 +1013,7 @@ export interface NotificationPreferenceView {
 
 export type SpecSampleStatus =
   | 'not_contacted'
+  | 'artwork'
   | 'ordered'
   | 'in_production'
   | 'shipped'
@@ -1042,6 +1043,7 @@ export interface SpecSample {
   follow_up_notes: string | null
   notes: string | null
   linked_task_id: string | null
+  artwork_task_id: string | null
   spec_idea_id: string | null
   created_at: string
   updated_at: string

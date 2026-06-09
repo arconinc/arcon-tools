@@ -30,18 +30,20 @@ type SpecDetail = {
   assigned_csr: { id: string; display_name: string; avatar_url: string | null; profile_image_url: string | null } | null
   sales_rep: { id: string; display_name: string; avatar_url: string | null; profile_image_url: string | null } | null
   linked_task: { id: string; title: string; status: string; due_date: string | null } | null
+  artwork_task: { id: string; title: string; status: string; due_date: string | null } | null
   spec_idea: { id: string; item_name: string; vendor: string; image_url: string | null; ordering_instructions_html: string | null } | null
 }
 
 // ─── Status config ────────────────────────────────────────────────────────────
 
 const STATUS_ORDER: SpecSampleStatus[] = [
-  'not_contacted', 'ordered', 'in_production', 'shipped', 'delivered', 'approved',
+  'not_contacted', 'artwork', 'ordered', 'in_production', 'shipped', 'delivered', 'approved',
 ]
 const TERMINAL_STATUSES: SpecSampleStatus[] = ['declined', 'no_response']
 
 const STATUS_LABEL: Record<SpecSampleStatus, string> = {
-  not_contacted: 'Not Contacted',
+  not_contacted: 'Prospect Contacted',
+  artwork: 'Artwork',
   ordered: 'Ordered',
   in_production: 'In Production',
   shipped: 'Shipped',
@@ -53,6 +55,7 @@ const STATUS_LABEL: Record<SpecSampleStatus, string> = {
 
 const STATUS_COLOR: Record<SpecSampleStatus, { bg: string; text: string; border: string }> = {
   not_contacted: { bg: '#f1f5f9', text: '#64748b', border: '#cbd5e1' },
+  artwork: { bg: '#fdf4ff', text: '#7e22ce', border: '#e9d5ff' },
   ordered: { bg: '#eff6ff', text: '#1d4ed8', border: '#bfdbfe' },
   in_production: { bg: '#fefce8', text: '#a16207', border: '#fde68a' },
   shipped: { bg: '#fff7ed', text: '#c2410c', border: '#fed7aa' },
@@ -260,7 +263,13 @@ export default function SpecDetailPage() {
               const done = idx < currentIdx
               const active = idx === currentIdx
               return (
-                <div key={s} className="progress-step">
+                <div
+                  key={s}
+                  className="progress-step"
+                  onClick={() => !saving && !active && updateStatus(s)}
+                  title={`Set status: ${STATUS_LABEL[s]}`}
+                  style={{ cursor: active || saving ? 'default' : 'pointer' }}
+                >
                   <div
                     className="step-circle"
                     style={{
@@ -268,6 +277,7 @@ export default function SpecDetailPage() {
                       color: done || active ? 'white' : '#cbd5e1',
                       border: `2px solid ${done || active ? '#7c3aed' : '#e2e8f0'}`,
                       boxShadow: active ? '0 0 0 4px #ede9fe' : 'none',
+                      transition: 'background .15s, border-color .15s',
                     }}
                   >
                     {done ? '✓' : idx + 1}
@@ -477,20 +487,30 @@ export default function SpecDetailPage() {
             )}
           </div>
 
-          {/* Linked CRM task */}
-          {spec.linked_task && (
+          {/* Linked CRM tasks */}
+          {(spec.linked_task || spec.artwork_task) && (
             <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 14, padding: '16px 18px' }}>
-              <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: '#94a3b8', marginBottom: 10 }}>Linked Task</div>
-              <div style={{ fontSize: 14, fontWeight: 600, color: '#1e293b', marginBottom: 4 }}>{spec.linked_task.title}</div>
-              <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
-                <span style={{
-                  background: spec.linked_task.status === 'complete' ? '#dcfce7' : '#eff6ff',
-                  color: spec.linked_task.status === 'complete' ? '#16a34a' : '#1d4ed8',
-                  fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10,
-                }}>
-                  {spec.linked_task.status}
-                </span>
-                {spec.linked_task.due_date && <span style={{ fontSize: 12, color: '#64748b' }}>Due {fmtDate(spec.linked_task.due_date)}</span>}
+              <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: '#94a3b8', marginBottom: 10 }}>Linked Tasks</div>
+              <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                {[
+                  spec.linked_task ? { task: spec.linked_task, label: 'Follow-up' } : null,
+                  spec.artwork_task ? { task: spec.artwork_task, label: 'Artwork' } : null,
+                ].filter((x) => x !== null).map(({ task, label }) => (
+                  <div key={task!.id} style={{ borderLeft: '3px solid #e2e8f0', paddingLeft: 10 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: '#94a3b8', marginBottom: 2 }}>{label}</div>
+                    <Link href={`/tasks/${task!.id}`} style={{ fontSize: 13, fontWeight: 600, color: '#7c3aed', textDecoration: 'none', display: 'block', marginBottom: 4 }}>{task!.title}</Link>
+                    <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                      <span style={{
+                        background: task!.status === 'complete' ? '#dcfce7' : '#eff6ff',
+                        color: task!.status === 'complete' ? '#16a34a' : '#1d4ed8',
+                        fontSize: 11, fontWeight: 600, padding: '2px 7px', borderRadius: 10,
+                      }}>
+                        {task!.status}
+                      </span>
+                      {task!.due_date && <span style={{ fontSize: 12, color: '#64748b' }}>Due {fmtDate(task!.due_date)}</span>}
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
           )}

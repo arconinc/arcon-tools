@@ -132,8 +132,10 @@ export async function POST(req: NextRequest) {
         ...rest,
         item_name: spec.item_name.trim(),
         assigned_csr_id: assigned_csr_id ?? appUser.id,
-        follow_up_date: follow_up_date ?? null,
+        follow_up_date: follow_up_date || null,
         follow_up_notes: follow_up_notes ?? null,
+        order_date: rest.order_date || null,
+        date_sent: rest.date_sent || null,
       })
       .select()
       .single()

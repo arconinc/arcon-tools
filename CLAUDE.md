@@ -64,7 +64,12 @@ src/
       audit-log/            # Audit log viewer
       expense-reports/[id]/ # Admin expense report review
       feature-flags/        # Feature flag management
+      specs/ideas/          # Admin spec idea CRUD + editor
     marketing/              # Marketing CRM pages (contacts, customers, opportunities, tasks)
+      specs/                # Spec sample list
+      specs/new/            # Create spec sample
+      specs/[id]/           # Spec sample detail
+      specs/ideas/          # Spec idea catalog browser
     employees/              # Employee directory + profile pages
     documents/              # Document library (Google Drive links)
     my-tasks/               # Cross-department personal task view
@@ -94,6 +99,7 @@ src/
     crm/                    # Task board, kanban, modals, quick-edit panel
     employees/              # EmployeeCard, EmployeeAvatar, OfficeLocationBadge
     forms/                  # FormRecommender, TaxFormCard
+    specs/VendorSearch.tsx  # Vendor typeahead linked to crm_vendors
     stores/CredentialPrompt.tsx  # Prompts user to configure store API credentials
     profile/NotificationPreferences.tsx  # Per-user notification opt-in/out
   lib/
@@ -219,7 +225,7 @@ Full employee profiles with org chart relationships.
 
 Full CRM under `/marketing` (was previously `/crm`). Departments use `CrmTaskDepartment` values.
 
-**Entities:** Customers, Contacts, Opportunities, Tasks, Tags, Artwork, Vendors
+**Entities:** Customers, Contacts, Opportunities, Tasks, Tags, Artwork, Vendors, Spec Ideas, Spec Samples
 
 **Task departments:** `CRM | E-Commerce | HR | IT | Accounting | Sales | Warehouse | General`
 
@@ -249,6 +255,42 @@ See `src/lib/task-constants.ts` for `DEPARTMENT_ROUTES` and `ROUTE_TO_DEPARTMENT
 - `GET/PUT /api/admin/marketing/import` — bulk contact import
 - `GET/PUT /api/admin/marketing-goals/[user_id]` — per-user marketing goals
 - `GET /api/marketing/pipeline-chart` — opportunity pipeline chart data
+- `GET/POST /api/marketing/specs` — spec sample list + create (filters: customer_id, csr_id, status, vendor, month)
+- `GET/PUT/DELETE /api/marketing/specs/[id]` — spec sample CRUD
+- `GET /api/marketing/specs/stats` — aggregate stats (counts by status)
+- `GET/POST /api/marketing/spec-ideas` — spec idea catalog list + create
+- `GET/PUT/DELETE /api/marketing/spec-ideas/[id]` — spec idea CRUD
+- `POST /api/marketing/spec-ideas/[id]/upload` — upload image to `spec-idea-images` bucket
+- `POST /api/marketing/spec-ideas/[id]/fetch-image` — fetch + cache remote image to storage
+- `POST /api/marketing/spec-ideas/suggest` — AI-assisted spec idea suggestions
+
+## Spec Samples
+
+Tracks physical samples sent to customers. Two-table system: `spec_ideas` (catalog of products) + `spec_samples` (per-customer send records).
+
+**Tables:** `spec_ideas`, `spec_samples`
+
+**Pages:**
+- `/marketing/specs` — spec sample list (filterable by status, CSR, customer, month)
+- `/marketing/specs/new` — create new spec sample (wizard-style)
+- `/marketing/specs/[id]` — spec sample detail + status tracking
+- `/marketing/specs/ideas` — spec idea catalog browser
+- `/admin/specs/ideas` — admin spec idea CRUD
+- `/admin/specs/ideas/[id]` — admin spec idea editor
+
+**Statuses:** `not_contacted | ordered | in_production | shipped | delivered | approved | declined | no_response`
+
+**Key types:** `SpecSample`, `SpecSampleListItem`, `SpecSampleStatus`, `SpecIdea` in `src/types/index.ts`
+
+**Component:** `src/components/specs/VendorSearch.tsx` — vendor typeahead linked to `crm_vendors`
+
+**Storage bucket:** `spec-idea-images` — public bucket for spec idea product images
+
+**Required DB setup:**
+```sql
+-- Run supabase/migrations/spec_samples.sql in Supabase SQL editor
+-- Also create a PUBLIC bucket named spec-idea-images in Supabase Storage dashboard
+```
 
 ## Feature Flags
 
@@ -468,6 +510,8 @@ const flags = useFeatureFlags()      // Record<string, boolean> — feature flag
 | `feature_flags` | Feature flag registry (key, label, enabled) |
 | `expense_reports` | Expense reports (period_month, status, drive_file_id, reviewer_comment) |
 | `expense_report_config` | Global expense config (reviewer, template Drive file, expense folder) |
+| `spec_ideas` | Spec sample product catalog (vendor, item_name, image_urls, tags, ordering instructions) |
+| `spec_samples` | Per-customer spec sample send records (status, dates, tracking, linked task) |
 
 ## Key API Routes
 | Route | Description |
@@ -506,6 +550,12 @@ const flags = useFeatureFlags()      // Record<string, boolean> — feature flag
 | `GET /api/files/signed-url` | Issue signed URL for private storage bucket (role-gated) |
 | `GET /api/cron/sync-orders` | Vercel cron — sync Promobuillit orders to DB |
 | `POST /api/admin/stores/sync` | Manual sync of Promobuillit store list |
+| `GET/POST /api/marketing/specs` | Spec sample list + create |
+| `GET/PUT/DELETE /api/marketing/specs/[id]` | Spec sample detail CRUD |
+| `GET /api/marketing/specs/stats` | Spec sample aggregate stats |
+| `GET/POST /api/marketing/spec-ideas` | Spec idea catalog list + create |
+| `GET/PUT/DELETE /api/marketing/spec-ideas/[id]` | Spec idea CRUD |
+| `POST /api/marketing/spec-ideas/suggest` | AI spec idea suggestions |
 
 ## Tiptap Editor
 - Use named import: `import { TextStyle } from '@tiptap/extension-text-style'`
@@ -517,6 +567,7 @@ const flags = useFeatureFlags()      // Record<string, boolean> — feature flag
 - `news-images` — public, article cover images
 - `financial-reports` — **private**, role-gated (`accounting` role required); files served via `/api/files/signed-url`
 - `hr-documents` — **private**, role-gated (`hr` role required); files served via `/api/files/signed-url`
+- `spec-idea-images` — public, spec idea product images
 
 ## What NOT to do
 - Do not use `tailwind.config.js` for plugins — use `@plugin` in `globals.css` (Tailwind v4)

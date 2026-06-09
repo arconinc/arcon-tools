@@ -87,7 +87,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (error || !task) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   // Fetch all related data in parallel
-  const [commentsRes, historyRes, attachmentsRes, oppRes, custRes, vendRes, contRes, assignedUserRes] = await Promise.all([
+  const [commentsRes, historyRes, attachmentsRes, oppRes, custRes, vendRes, contRes, assignedUserRes, specRes] = await Promise.all([
     adminClient
       .from('crm_task_comments')
       .select('*, crm_comment_attachments(*)')
@@ -118,6 +118,12 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     task.assigned_to
       ? adminClient.from('users').select('id, display_name, email').eq('id', task.assigned_to).single()
       : Promise.resolve({ data: null }),
+    adminClient
+      .from('spec_samples')
+      .select('id, item_name, status')
+      .or(`linked_task_id.eq.${id},artwork_task_id.eq.${id}`)
+      .limit(1)
+      .maybeSingle(),
   ])
 
   // Resolve created_by and delegators to display names
@@ -205,6 +211,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     assigned_user: assignedUserRes.data ?? null,
     created_user: createdUser,
     delegator_users: delegatorUsers,
+    linked_spec: specRes.data ?? null,
   })
 }
 

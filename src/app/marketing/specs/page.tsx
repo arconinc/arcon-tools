@@ -34,7 +34,8 @@ type ProactiveCustomer = {
 }
 
 const STATUS_LABELS: Record<string, string> = {
-  not_contacted: 'Not Contacted',
+  not_contacted: 'Prospect Contacted',
+  artwork: 'Artwork',
   ordered: 'Ordered',
   in_production: 'In Production',
   shipped: 'Shipped',
@@ -46,6 +47,7 @@ const STATUS_LABELS: Record<string, string> = {
 
 const STATUS_COLORS: Record<string, string> = {
   not_contacted: 'bg-slate-100 text-slate-600',
+  artwork: 'bg-purple-50 text-purple-700',
   ordered: 'bg-blue-100 text-blue-700',
   in_production: 'bg-yellow-100 text-yellow-700',
   shipped: 'bg-orange-100 text-orange-700',
@@ -349,7 +351,7 @@ export default function SpecSamplesDashboard() {
       {activeTab === 'proactive' && (
         <>
           <p style={{ color: '#64748b', fontSize: 14, marginBottom: 20 }}>
-            Customers with spec samples in "Not Contacted" status — ready for outreach.
+            Customers with spec samples in "Prospect Contacted" status — ready for outreach.
           </p>
           {proactive.length === 0 ? (
             <div className="empty-state">No customers pending outreach.</div>

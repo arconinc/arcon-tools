@@ -42,6 +42,8 @@ export async function POST(req: NextRequest) {
     width,
     height,
     is_drive_link,
+    dropbox_url,
+    is_dropbox_file,
   } = body
 
   if (!customer_id || !name || !url) {
@@ -65,6 +67,8 @@ export async function POST(req: NextRequest) {
       width: width ?? null,
       height: height ?? null,
       is_drive_link: is_drive_link ?? false,
+      dropbox_url: dropbox_url ?? null,
+      is_dropbox_file: is_dropbox_file ?? true,
       added_by: appUser.id,
     })
     .select()
