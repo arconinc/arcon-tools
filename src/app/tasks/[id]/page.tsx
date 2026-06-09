@@ -898,13 +898,13 @@ export default function TaskDetailPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-5">
+      <div className="flex border-b border-slate-200 mb-5">
         {(['details', 'related', 'comments'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-sm font-semibold rounded-lg capitalize transition-colors ${
-              activeTab === tab ? 'bg-purple-700 text-white' : 'text-slate-600 hover:bg-slate-100'
+            className={`px-4 py-2 text-sm capitalize transition-colors border-b-2 -mb-px ${
+              activeTab === tab ? 'font-bold text-purple-700 border-purple-700' : 'font-medium text-slate-500 border-transparent hover:text-slate-700'
             }`}
           >
             {tab === 'comments' ? 'Notes' : tab}

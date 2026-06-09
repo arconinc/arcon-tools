@@ -815,9 +815,9 @@ export default function SectionDocumentsPage() {
         .form-input, .form-textarea, .form-select { padding: 0.5rem 0.75rem; border: 1.5px solid #e5e7eb; border-radius: 8px; font-size: 0.875rem; outline: none; width: 100%; box-sizing: border-box; font-family: inherit; }
         .form-input:focus, .form-textarea:focus, .form-select:focus { border-color: #7c3aed; }
         .form-textarea { resize: vertical; min-height: 70px; }
-        .source-tabs { display: flex; border: 1.5px solid #e5e7eb; border-radius: 8px; overflow: hidden; }
-        .source-tab { flex: 1; padding: 0.5rem; font-size: 0.85rem; font-weight: 500; text-align: center; cursor: pointer; border: none; background: #fff; color: #6b7280; transition: all 0.15s; }
-        .source-tab.active { background: #7c3aed; color: #fff; }
+        .source-tabs { display: flex; border-bottom: 1px solid #e5e7eb; margin-bottom: 4px; }
+        .source-tab { flex: 1; padding: 0.5rem; font-size: 0.85rem; font-weight: 500; text-align: center; cursor: pointer; border: none; background: transparent; color: #6b7280; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; }
+        .source-tab.active { color: #7c3aed; font-weight: 700; border-bottom-color: #7c3aed; }
         .error-msg { color: #ef4444; font-size: 0.8rem; }
         .picker-btn { display: flex; align-items: center; gap: 0.5rem; padding: 0.5rem 0.875rem; border: 1.5px solid #e5e7eb; border-radius: 8px; background: #fff; font-size: 0.85rem; color: #374151; cursor: pointer; width: 100%; }
         .picker-btn:hover { border-color: #7c3aed; color: #7c3aed; background: #faf5ff; }

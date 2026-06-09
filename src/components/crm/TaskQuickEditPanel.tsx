@@ -32,17 +32,18 @@ type UserOption = {
   profile_image_url: string | null
 }
 
-type MenuField = 'assignee' | 'assignment' | 'priority' | 'due_date'
+type MenuField = 'assignee' | 'assignment' | 'priority' | 'due_date' | 'delete'
 
 interface TaskQuickEditPanelProps {
   task: TaskItem
   position: { x: number; y: number }
   onClose: () => void
   onUpdate: (field: string, value: unknown) => Promise<void>
+  onDelete?: (taskId: string) => Promise<void>
   allUsers: UserOption[]
 }
 
-export function TaskQuickEditPanel({ task, position, onClose, onUpdate, allUsers }: TaskQuickEditPanelProps) {
+export function TaskQuickEditPanel({ task, position, onClose, onUpdate, onDelete, allUsers }: TaskQuickEditPanelProps) {
   const [selectedField, setSelectedField] = useState<MenuField | null>(null)
   const [loading, setLoading] = useState<string | null>(null)
   const [assigneeSearch, setAssigneeSearch] = useState('')
@@ -121,12 +122,25 @@ export function TaskQuickEditPanel({ task, position, onClose, onUpdate, allUsers
     }
   }
 
-  const menuItems: Array<{ id: MenuField; label: string }> = [
+  async function handleDelete() {
+    if (!onDelete) return
+    setLoading('delete')
+    try {
+      await onDelete(task.id)
+      onClose()
+    } catch (error) {
+      console.error('Failed to delete task:', error)
+    } finally {
+      setLoading(null)
+    }
+  }
+
+  const menuItems: Array<{ id: MenuField; label: string; destructive?: boolean }> = [
     { id: 'assignee', label: 'Assign to' },
-    { id: 'assignment', label: '' +
-            'Category' },
+    { id: 'assignment', label: 'Category' },
     { id: 'priority', label: 'Priority' },
     { id: 'due_date', label: 'Due Date' },
+    { id: 'delete', label: 'Delete', destructive: true },
   ]
 
   return (
@@ -147,16 +161,21 @@ export function TaskQuickEditPanel({ task, position, onClose, onUpdate, allUsers
     >
       {/* Left menu */}
       <div style={{ width: 160, borderRight: '1px solid #e5e7eb', background: '#fafafa' }}>
-        {menuItems.map((item) => (
+        {menuItems.map((item, idx) => (
           <button
             key={item.id}
-            onClick={() => setSelectedField(selectedField === item.id ? null : item.id)}
+            onClick={() => setSelectedField(item.destructive ? item.id : selectedField === item.id ? null : item.id)}
             onMouseEnter={() => setSelectedField(item.id)}
             style={{
               width: '100%', padding: '11px 12px', fontSize: 13,
               border: 'none',
-              background: selectedField === item.id ? '#f5f3ff' : 'transparent',
-              color: selectedField === item.id ? '#6b1e98' : '#222',
+              borderTop: idx > 0 && item.destructive ? '1px solid #fee2e2' : 'none',
+              background: item.destructive
+                ? selectedField === item.id ? '#fef2f2' : 'transparent'
+                : selectedField === item.id ? '#f5f3ff' : 'transparent',
+              color: item.destructive
+                ? selectedField === item.id ? '#dc2626' : '#ef4444'
+                : selectedField === item.id ? '#6b1e98' : '#222',
               fontWeight: selectedField === item.id ? 600 : 400,
               textAlign: 'left', cursor: 'pointer',
               transition: 'background 0.12s, color 0.12s',
@@ -165,14 +184,14 @@ export function TaskQuickEditPanel({ task, position, onClose, onUpdate, allUsers
             }}
           >
             <span>{item.label}</span>
-            {selectedField === item.id && <span style={{ fontSize: 10, marginLeft: 4 }}>▶</span>}
+            {selectedField === item.id && !item.destructive && <span style={{ fontSize: 10, marginLeft: 4 }}>▶</span>}
           </button>
         ))}
       </div>
 
       {/* Right submenu */}
       {selectedField && (
-        <div style={{ width: 250, padding: '8px 0', maxHeight: 340, overflowY: 'auto' }}>
+        <div style={{ width: selectedField === 'delete' ? 220 : 250, padding: '8px 0', maxHeight: 340, overflowY: 'auto' }}>
 
           {selectedField === 'assignee' && (
             <div>
@@ -258,6 +277,40 @@ export function TaskQuickEditPanel({ task, position, onClose, onUpdate, allUsers
                   Clear date
                 </button>
               )}
+            </div>
+          )}
+
+          {selectedField === 'delete' && (
+            <div style={{ padding: '16px 14px' }}>
+              <p style={{ fontSize: 12, color: '#374151', marginBottom: 12, lineHeight: 1.5 }}>
+                Delete <strong style={{ color: '#111' }}>&ldquo;{task.title}&rdquo;</strong>?
+                <br />
+                <span style={{ color: '#9ca3af' }}>This cannot be undone.</span>
+              </p>
+              <button
+                onClick={handleDelete}
+                disabled={loading === 'delete'}
+                style={{
+                  width: '100%', padding: '8px 10px', fontSize: 12, fontWeight: 700,
+                  border: 'none', borderRadius: 5, cursor: loading === 'delete' ? 'not-allowed' : 'pointer',
+                  background: loading === 'delete' ? '#fca5a5' : '#dc2626',
+                  color: '#fff', marginBottom: 6,
+                  opacity: loading === 'delete' ? 0.7 : 1,
+                }}
+              >
+                {loading === 'delete' ? 'Deleting…' : 'Delete Task'}
+              </button>
+              <button
+                onClick={() => setSelectedField(null)}
+                disabled={loading === 'delete'}
+                style={{
+                  width: '100%', padding: '7px 10px', fontSize: 12, fontWeight: 500,
+                  border: '1px solid #e5e7eb', borderRadius: 5, cursor: 'pointer',
+                  background: '#fff', color: '#666',
+                }}
+              >
+                Cancel
+              </button>
             </div>
           )}
         </div>

@@ -286,6 +286,14 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
 
   // ── Assign to me ──────────────────────────────────────────────────────────
 
+  async function handleDeleteTask(taskId: string) {
+    const response = await fetch(`/api/marketing/tasks/${taskId}`, { method: 'DELETE' })
+    if (!response.ok) throw new Error('Failed to delete task')
+    setTasks((prev) => prev.filter((t) => t.id !== taskId))
+    setTotal((prev) => prev - 1)
+    setContextMenu(null)
+  }
+
   async function handleAssignToMe(taskId: string) {
     if (!currentUser) return
     setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, assigned_to: currentUser.id, assigned_user_name: currentUser.display_name } : t))
@@ -674,6 +682,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
             position={contextMenu.position}
             onClose={() => setContextMenu(null)}
             onUpdate={handleQuickUpdate}
+            onDelete={handleDeleteTask}
             allUsers={allUsers}
           />
         ) : null

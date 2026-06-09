@@ -135,6 +135,7 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
         { href: '/marketing/opportunities', label: 'Opportunities', icon: CrmOppsIcon, adminMatch: true },
         { href: '/documents/marketing', label: 'Documents', icon: DocumentIcon, adminMatch: true },
         { href: '/marketing/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
+        { href: '/marketing/specs', label: 'Spec Samples', icon: SpecSampleIcon, adminMatch: true },
       ],
     },
     {
@@ -195,6 +196,7 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
         { href: '/admin/marketing-goals', label: 'Sales Goals', icon: GoalIcon, adminMatch: true },
         { href: '/admin/marketing-tags', label: 'Marketing Tags', icon: TagIcon, adminMatch: true },
         { href: '/admin/marketing-import', label: 'Marketing Import', icon: UploadIcon, adminMatch: true },
+        { href: '/admin/specs/ideas', label: 'Spec Ideas', icon: SpecSampleIcon, adminMatch: true },
         { href: '/admin/stores', label: 'Stores', icon: StoreIcon, adminMatch: true },
         { href: '/admin/users', label: 'Manage Users', icon: UserAdminIcon, adminMatch: true },
         { href: '/admin/access-requests', label: 'Access Requests', icon: LockIcon, adminMatch: true },
@@ -1022,4 +1024,8 @@ function LockIcon({ className }: { className?: string }) {
 
 function FeatureFlagIcon({ className }: { className?: string }) {
   return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3v18M3 5l14 4-14 4" /></svg>
+}
+
+function SpecSampleIcon({ className }: { className?: string }) {
+  return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" /></svg>
 }

@@ -182,7 +182,7 @@ export default function CustomerDetailPage() {
       if (Array.isArray(data)) setAllCrmTags(data)
     })
   }, [])
-  const [activeTab, setActiveTab] = useState<'details' | 'related' | 'activity' | 'artwork'>('details')
+  const [activeTab, setActiveTab] = useState<'details' | 'related' | 'activity' | 'artwork' | 'specs'>('details')
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState<Partial<CustomerDetail>>({})
   const [createTaskOpen, setCreateTaskOpen] = useState(false)
@@ -236,6 +236,28 @@ export default function CustomerDetailPage() {
   const [artworkUploading, setArtworkUploading] = useState(false)
   const [artworkError, setArtworkError] = useState<string | null>(null)
   const [vectorizingIds, setVectorizingIds] = useState<Set<string>>(new Set())
+
+  // Specs tab state
+  type SpecRow = {
+    id: string; item_name: string; item_number: string | null; item_image_url: string | null
+    vendor: string | null; status: string; date_sent: string | null; follow_up_date: string | null
+    po_number: string | null; csr_name: string | null
+  }
+  const [specs, setSpecs] = useState<SpecRow[]>([])
+  const [specsLoaded, setSpecsLoaded] = useState(false)
+  const [specsLoading, setSpecsLoading] = useState(false)
+
+  async function loadSpecs() {
+    if (!customer || specsLoaded) return
+    setSpecsLoading(true)
+    try {
+      const res = await fetch(`/api/marketing/specs?customer_id=${customer.id}&limit=200`)
+      if (res.ok) { const d = await res.json(); setSpecs(d.specs ?? d) }
+    } finally {
+      setSpecsLoading(false)
+      setSpecsLoaded(true)
+    }
+  }
 
   async function loadArtwork() {
     if (!customer || artworkLoaded) return
@@ -930,16 +952,17 @@ export default function CustomerDetailPage() {
       </div>
 
       {/* Tabs */}
-      <div className="flex gap-1 mb-3">
-        {(['details', 'related', 'activity', 'artwork'] as const).map((tab) => (
+      <div className="flex border-b border-slate-200 mb-3">
+        {(['details', 'related', 'activity', 'artwork', 'specs'] as const).map((tab) => (
           <button
             key={tab}
             onClick={() => {
               setActiveTab(tab)
               if (tab === 'artwork') loadArtwork()
+              if (tab === 'specs') loadSpecs()
             }}
-            className={`px-4 py-1.5 text-sm font-semibold rounded-lg capitalize transition-colors ${
-              activeTab === tab ? 'bg-purple-700 text-white' : 'text-slate-600 hover:bg-slate-100'
+            className={`px-4 py-2 text-sm capitalize transition-colors border-b-2 -mb-px ${
+              activeTab === tab ? 'font-bold text-purple-700 border-purple-700' : 'font-medium text-slate-500 border-transparent hover:text-slate-700'
             }`}
           >
             {tab}
@@ -950,6 +973,9 @@ export default function CustomerDetailPage() {
             )}
             {tab === 'artwork' && artworkLoaded && artwork.length > 0 && (
               <span className="ml-1.5 text-xs opacity-70">{artwork.length}</span>
+            )}
+            {tab === 'specs' && specsLoaded && specs.length > 0 && (
+              <span className="ml-1.5 text-xs opacity-70">{specs.length}</span>
             )}
           </button>
         ))}
@@ -1796,6 +1822,94 @@ export default function CustomerDetailPage() {
           </div>
         </div>
       )}
+      {/* ── Specs Tab ── */}
+      {activeTab === 'specs' && (
+        <div className="space-y-4">
+          <div className="flex items-center justify-between">
+            <h2 className="text-sm font-semibold text-slate-700">
+              Spec Samples{specsLoaded ? ` (${specs.length})` : ''}
+            </h2>
+            <a
+              href={`/marketing/specs/new?customerId=${customer.id}`}
+              className="px-3 py-1.5 bg-purple-700 text-white text-sm font-semibold rounded-lg hover:bg-purple-800 transition-colors"
+              style={{ textDecoration: 'none' }}
+            >
+              + New Spec
+            </a>
+          </div>
+
+          {specsLoading && <div className="text-center py-10 text-sm text-slate-400">Loading specs…</div>}
+
+          {specsLoaded && !specsLoading && specs.length === 0 && (
+            <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center text-sm text-slate-400">
+              No spec samples yet for this customer.{' '}
+              <a href={`/marketing/specs/new?customerId=${customer.id}`} className="text-purple-700 hover:underline">Create the first one →</a>
+            </div>
+          )}
+
+          {specs.length > 0 && (
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+              <table style={{ width: '100%', borderCollapse: 'collapse', fontSize: 13 }}>
+                <thead>
+                  <tr style={{ background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
+                    {['Item', 'Vendor', 'Status', 'Date Sent', 'Follow-up', 'CSR'].map(h => (
+                      <th key={h} style={{ padding: '10px 14px', textAlign: 'left', fontWeight: 600, color: '#64748b', fontSize: 12 }}>{h}</th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody>
+                  {specs.map((s, i) => {
+                    const statusColors: Record<string, { bg: string; color: string }> = {
+                      not_contacted: { bg: '#f1f5f9', color: '#64748b' },
+                      ordered: { bg: '#eff6ff', color: '#1d4ed8' },
+                      in_production: { bg: '#fefce8', color: '#a16207' },
+                      shipped: { bg: '#fff7ed', color: '#c2410c' },
+                      delivered: { bg: '#f0fdf4', color: '#166534' },
+                      approved: { bg: '#f3f0ff', color: '#7c3aed' },
+                      declined: { bg: '#fef2f2', color: '#b91c1c' },
+                      no_response: { bg: '#fafafa', color: '#71717a' },
+                    }
+                    const sc = statusColors[s.status] ?? { bg: '#f1f5f9', color: '#64748b' }
+                    const today = new Date().toISOString().slice(0, 10)
+                    const overdue = s.follow_up_date && s.follow_up_date < today && !['approved', 'declined'].includes(s.status)
+                    return (
+                      <tr key={s.id} style={{ borderBottom: i < specs.length - 1 ? '1px solid #f1f5f9' : 'none' }}>
+                        <td style={{ padding: '10px 14px' }}>
+                          <div style={{ display: 'flex', alignItems: 'center', gap: 8 }}>
+                            {s.item_image_url ? (
+                              <img src={s.item_image_url} alt="" style={{ width: 32, height: 32, borderRadius: 6, objectFit: 'cover', flexShrink: 0 }} />
+                            ) : (
+                              <div style={{ width: 32, height: 32, borderRadius: 6, background: '#f1f5f9', flexShrink: 0 }} />
+                            )}
+                            <div>
+                              <a href={`/marketing/specs/${s.id}`} style={{ color: '#1e293b', fontWeight: 600, textDecoration: 'none' }} className="hover:text-purple-700">{s.item_name}</a>
+                              {s.item_number && <div style={{ fontSize: 11, color: '#94a3b8' }}>#{s.item_number}</div>}
+                            </div>
+                          </div>
+                        </td>
+                        <td style={{ padding: '10px 14px', color: '#64748b' }}>{s.vendor ?? '—'}</td>
+                        <td style={{ padding: '10px 14px' }}>
+                          <span style={{ background: sc.bg, color: sc.color, padding: '2px 8px', borderRadius: 10, fontSize: 11, fontWeight: 700 }}>
+                            {s.status.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase())}
+                          </span>
+                        </td>
+                        <td style={{ padding: '10px 14px', color: '#64748b' }}>
+                          {s.date_sent ? new Date(s.date_sent + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+                        </td>
+                        <td style={{ padding: '10px 14px', color: overdue ? '#dc2626' : '#64748b', fontWeight: overdue ? 700 : 400 }}>
+                          {s.follow_up_date ? new Date(s.follow_up_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' }) : '—'}
+                        </td>
+                        <td style={{ padding: '10px 14px', color: '#64748b' }}>{s.csr_name ?? '—'}</td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </div>
+      )}
+
       <CreateTaskModal
         open={createTaskOpen}
         onClose={() => setCreateTaskOpen(false)}

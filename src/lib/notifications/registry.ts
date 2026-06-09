@@ -62,8 +62,7 @@ export const taskAssigned: NotificationDefinition<TaskAssignedPayload> = {
     }
     lines.push(`<strong style="font-size:16px;color:#1e293b">${p.task_title}</strong>`)
     if (p.description) {
-      const trimmed = p.description.length > 400 ? p.description.slice(0, 400) + '…' : p.description
-      lines.push(trimmed)
+      lines.push(p.description)
     }
     const meta: string[] = []
     if (due) meta.push(`<strong>Due:</strong> ${due}`)
@@ -439,6 +438,45 @@ export const taskCompleted: NotificationDefinition<TaskCompletedPayload> = {
   },
 }
 
+// ─── spec.follow_up_due ───────────────────────────────────────────────────────
+
+export interface SpecFollowUpDuePayload {
+  spec_id: string
+  item_name: string
+  customer_name: string
+  follow_up_date: string
+}
+
+export const specFollowUpDue: NotificationDefinition<SpecFollowUpDuePayload> = {
+  type: 'spec.follow_up_due',
+  label: 'Spec sample follow-up due',
+  description: 'When a spec sample follow-up date arrives.',
+  defaultEmail: true,
+  render: (p) => ({
+    title: `Follow-up due: ${p.customer_name} — ${p.item_name}`,
+    body: `Spec follow-up was due ${fmtDueDate(p.follow_up_date) ?? p.follow_up_date}.`,
+    linkUrl: `/marketing/specs/${p.spec_id}`,
+  }),
+  email: (p, recipient) => {
+    const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
+    return {
+      subject: `Spec follow-up due: ${p.customer_name} — ${p.item_name}`,
+      html: renderGenericEmail({
+        preheader: `Follow up on the ${p.item_name} spec sent to ${p.customer_name}`,
+        heading: 'Spec Follow-Up Due',
+        greeting: `Hi ${firstName},`,
+        bodyLines: [
+          `A spec sample follow-up is due today for <strong>${p.customer_name}</strong>.`,
+          `<strong style="font-size:16px;color:#1e293b">${p.item_name}</strong>`,
+          `Reach out to the customer to check if they received the sample and gather their feedback.`,
+        ],
+        ctaText: 'View Spec',
+        ctaUrl: `${appUrl()}/marketing/specs/${p.spec_id}`,
+      }),
+    }
+  },
+}
+
 // ─── Registry ─────────────────────────────────────────────────────────────────
 //
 // To add a new notification type:
@@ -458,6 +496,7 @@ export const NOTIFICATION_REGISTRY = {
   'expense_report.approved': expenseReportApproved,
   'expense_report.submitted_to_payroll': expenseReportSubmittedToPayroll,
   'expense_report.comment_added': expenseReportCommentAdded,
+  'spec.follow_up_due': specFollowUpDue,
 } as const
 
 export type NotificationType = keyof typeof NOTIFICATION_REGISTRY

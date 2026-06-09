@@ -1009,6 +1009,72 @@ export interface NotificationPreferenceView {
   email: boolean
 }
 
+// ─── Spec Samples ────────────────────────────────────────────────────────────
+
+export type SpecSampleStatus =
+  | 'not_contacted'
+  | 'ordered'
+  | 'in_production'
+  | 'shipped'
+  | 'delivered'
+  | 'approved'
+  | 'declined'
+  | 'no_response'
+
+export interface SpecSample {
+  id: string
+  customer_id: string | null
+  contact_id: string | null
+  sales_rep_id: string | null
+  assigned_csr_id: string | null
+  po_number: string | null
+  item_name: string
+  item_number: string | null
+  item_image_url: string | null
+  vendor: string | null
+  vendor_link: string | null
+  status: SpecSampleStatus
+  order_date: string | null
+  date_sent: string | null
+  ship_date: string | null
+  tracking_number: string | null
+  follow_up_date: string | null
+  follow_up_notes: string | null
+  notes: string | null
+  linked_task_id: string | null
+  spec_idea_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface SpecSampleListItem extends SpecSample {
+  customer_name: string | null
+  contact_name: string | null
+  csr_name: string | null
+  sales_rep_name: string | null
+}
+
+export interface SpecIdea {
+  id: string
+  vendor: string
+  vendor_id: string | null
+  item_name: string
+  item_number: string | null
+  vendor_url: string | null
+  image_url: string | null
+  image_urls: string[]
+  tags: string[]
+  category: string | null
+  price_range: string | null
+  notes: string | null
+  ordering_instructions_json: Record<string, unknown> | null
+  ordering_instructions_html: string | null
+  is_active: boolean
+  created_by: string | null
+  created_at: string
+  updated_at: string
+}
+
 // ─── Expense Reports ─────────────────────────────────────────────────────────
 
 export type ExpenseReportStatus =
