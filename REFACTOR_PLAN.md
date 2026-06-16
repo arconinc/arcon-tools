@@ -479,7 +479,7 @@ components/crm/customer/{CustomerHeader,CustomerDetailsCard,CustomerAddressCard,
 3. Page consumes the hook; delete the inline fetch `useEffect`s.
 **Done when:** page has no direct read `fetch`; smoke test passes.
 
-## - [ ] D3 — Extract read-only section components
+## - [x] D3 — Extract read-only section components
 **Goal:** `CustomerFilesList`, `CustomerOpportunitiesList`, `CustomerContactsList`, `CustomerHeader` (presentational; receive props, no fetch).
 **Steps:** lift JSX into components taking typed props; page passes data from `useCustomer`. Start with files (simplest).
 **Done when:** those sections are components; smoke test passes.

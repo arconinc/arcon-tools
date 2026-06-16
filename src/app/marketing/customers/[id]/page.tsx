@@ -5,15 +5,18 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import TagPicker from '@/components/crm/TagPicker'
 import { CreateTaskModal } from '@/components/crm/CreateTaskModal'
-import { CrmDetailActions } from '@/components/crm/CrmDetailActions'
 import { TaskCreatedToast } from '@/components/crm/TaskCreatedToast'
 import { Modal, Field, FieldInput, SocialIcon } from '@/components/ui'
+import { CustomerHeader } from '@/components/crm/customer/CustomerHeader'
+import { CustomerContactsList } from '@/components/crm/customer/CustomerContactsList'
+import { CustomerOpportunitiesList } from '@/components/crm/customer/CustomerOpportunitiesList'
+import { CustomerFilesList } from '@/components/crm/customer/CustomerFilesList'
 import { formatPhoneInput } from '@/lib/phone'
 import { useFormValidation, inputCls, selectCls, FieldError } from '@/lib/form-validation'
 import { CrmForm } from '@/types'
 import { getCustomerFormsByState, getGeneralForms, US_STATES } from '@/lib/forms-utils'
 import { formatBytes } from '@/lib/format'
-import { customerStatusBadge, opportunityStatusBadge } from '@/lib/badges'
+import { customerStatusBadge } from '@/lib/badges'
 import { buildCompanySummary } from '@/lib/customer/helpers'
 import { useCustomer, useCrmUsers, useCrmTags, type CustomerDetail, type BrandDataLocal, type TagOption } from '@/hooks'
 
@@ -753,49 +756,21 @@ export default function CustomerDetailPage() {
         Customers
       </Link>
 
-      {/* Header */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-3">
-        <div className="flex items-center gap-4">
-          {customer.logo_url && (
-            <img
-              src={customer.logo_url}
-              alt={`${customer.name} logo`}
-              className="h-10 w-auto max-w-[180px] object-contain flex-shrink-0"
-              onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-            />
-          )}
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-xl font-bold text-slate-900 truncate">{customer.name}</h1>
-              {customer.client_status && (
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${customerStatusBadge(customer.client_status)}`}>
-                  {customer.client_status}
-                </span>
-              )}
-            </div>
-            <div className="flex items-center gap-4 mt-1 flex-wrap">
-              {customer.assigned_user && (
-                <span className="text-xs text-slate-500">Owner: <span className="text-slate-700 font-medium">{customer.assigned_user.display_name}</span></span>
-              )}
-              {customer.phone && <span className="text-xs text-slate-500">{customer.phone}</span>}
-              {customer.website && (
-                <a href={customer.website} target="_blank" rel="noopener noreferrer" className="text-xs text-purple-700 hover:underline">
-                  {customer.website.replace(/^https?:\/\//, '')}
-                </a>
-              )}
-            </div>
-          </div>
-          <div className="flex flex-shrink-0 items-center gap-2">
-            <button
-              onClick={() => router.push(`/marketing/opportunities/new?customer_id=${customer.id}&customer_name=${encodeURIComponent(customer.name)}`)}
-              className="px-3 py-1.5 border border-purple-300 text-purple-700 text-sm font-medium rounded-lg hover:bg-purple-50 transition-colors"
-            >
-              + Opportunity
-            </button>
-            <CrmDetailActions onCreateTask={() => setCreateTaskOpen(true)} />
-          </div>
-        </div>
-      </div>
+      <CustomerHeader
+        name={customer.name}
+        logo_url={customer.logo_url}
+        client_status={customer.client_status}
+        assigned_user={customer.assigned_user}
+        phone={customer.phone}
+        website={customer.website}
+        id={customer.id}
+        onCreateOpportunity={() =>
+          router.push(
+            `/marketing/opportunities/new?customer_id=${customer.id}&customer_name=${encodeURIComponent(customer.name)}`
+          )
+        }
+        onCreateTask={() => setCreateTaskOpen(true)}
+      />
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200 mb-3">
@@ -1279,87 +1254,28 @@ export default function CustomerDetailPage() {
       {activeTab === 'related' && (
         <div className="grid grid-cols-2 gap-4">
           {/* Contacts */}
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50">
-              <h2 className="text-sm font-semibold text-slate-700">Contacts ({customer.contacts.length})</h2>
-              <button onClick={() => { setShowAddContact(true); setAddContactError(null) }}
-                className="text-xs font-semibold text-purple-700 hover:text-purple-900">
-                + Add
-              </button>
-            </div>
-            {customer.contacts.length === 0
-              ? <div className="px-5 py-5 text-sm text-slate-400 text-center">No contacts linked.</div>
-              : <div className="divide-y divide-slate-100">
-                  {customer.contacts.map((c) => (
-                    <div key={c.id} onClick={() => router.push(`/marketing/contacts/${c.id}`)}
-                      className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 cursor-pointer transition-colors">
-                      <div className="w-7 h-7 bg-purple-100 rounded-full flex items-center justify-center text-xs font-bold text-purple-700 flex-shrink-0">
-                        {c.first_name[0]}{c.last_name[0]}
-                      </div>
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-slate-800">{c.first_name} {c.last_name}</div>
-                        {(c.title || c.department) && (
-                          <div className="text-xs text-slate-400">{[c.title, c.department].filter(Boolean).join(' · ')}</div>
-                        )}
-                      </div>
-                      <div className="text-xs text-slate-400 truncate max-w-[120px]">{c.email ?? ''}</div>
-                    </div>
-                  ))}
-                </div>
-            }
-          </div>
+          <CustomerContactsList
+            contacts={customer.contacts}
+            onAddClick={() => {
+              setShowAddContact(true)
+              setAddContactError(null)
+            }}
+            onContactClick={(id) => router.push(`/marketing/contacts/${id}`)}
+          />
 
-          {/* Opportunities */}
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50">
-              <h2 className="text-sm font-semibold text-slate-700">Opportunities ({customer.opportunities.length})</h2>
-              <button onClick={() => router.push(`/marketing/opportunities/new?customer_id=${customer.id}&customer_name=${encodeURIComponent(customer.name)}`)}
-                className="text-xs font-semibold text-purple-700 hover:text-purple-900">
-                + Add
-              </button>
-            </div>
-            {customer.opportunities.length === 0
-              ? <div className="px-5 py-5 text-sm text-slate-400 text-center">No opportunities yet.</div>
-              : <div className="divide-y divide-slate-100">
-                  {customer.opportunities.map((o) => (
-                    <div key={o.id} onClick={() => router.push(`/marketing/opportunities/${o.id}`)}
-                      className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50 cursor-pointer transition-colors">
-                      <div className="flex-1 min-w-0">
-                        <div className="text-sm font-medium text-slate-800">{o.name}</div>
-                        <div className="text-xs text-slate-400">{o.pipeline_stage ?? 'No stage'}</div>
-                      </div>
-                      <div className="text-right">
-                        {o.value != null && <div className="text-sm font-semibold text-slate-700">${o.value.toLocaleString()}</div>}
-                        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${opportunityStatusBadge(o.status)}`}>
-                          {o.status}
-                        </span>
-                      </div>
-                    </div>
-                  ))}
-                </div>
+          <CustomerOpportunitiesList
+            opportunities={customer.opportunities}
+            customerName={customer.name}
+            customerId={customer.id}
+            onAddClick={() =>
+              router.push(
+                `/marketing/opportunities/new?customer_id=${customer.id}&customer_name=${encodeURIComponent(customer.name)}`
+              )
             }
-          </div>
+            onOpportunityClick={(id) => router.push(`/marketing/opportunities/${id}`)}
+          />
 
-          {/* Files */}
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-            <div className="px-5 py-3 border-b border-slate-100 bg-slate-50">
-              <h2 className="text-sm font-semibold text-slate-700">Files ({customer.files.length})</h2>
-            </div>
-            {customer.files.length === 0
-              ? <div className="px-5 py-5 text-sm text-slate-400 text-center">No files attached.</div>
-              : <div className="divide-y divide-slate-100">
-                  {customer.files.map((f) => (
-                    <a key={f.id} href={f.url} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 transition-colors">
-                      <svg className="w-4 h-4 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                      </svg>
-                      <span className="text-sm text-purple-700 hover:underline">{f.label}</span>
-                    </a>
-                  ))}
-                </div>
-            }
-          </div>
+          <CustomerFilesList files={customer.files} />
 
           {/* Stores */}
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
