@@ -1,6 +1,9 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
+import { unauthorized, forbidden, notFound, serverError, ok } from '@/lib/api/respond'
+import { stripReadOnly } from '@/lib/api/sanitize'
+import { setEntityTags } from '@/lib/crm/tags'
 
 // Fields that trigger a stage history row on change
 const TRACKED_FIELDS = ['pipeline_stage', 'status', 'value', 'probability', 'forecast_close_date'] as const
@@ -8,7 +11,7 @@ const TRACKED_FIELDS = ['pipeline_stage', 'status', 'value', 'probability', 'for
 // GET /api/marketing/opportunities/[id]
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const appUser = await requireUser()
-  if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!appUser) return unauthorized()
 
   const { id } = await params
   const adminClient = createAdminClient()
@@ -19,7 +22,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .eq('id', id)
     .single()
 
-  if (error || !opp) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (error || !opp) return notFound('Opportunity not found')
 
   // Fetch related data in parallel
   const [customerRes, assignedUserRes, tasksRes, historyRes, filesRes, entityTagsRes] = await Promise.all([
@@ -70,7 +73,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   const tags = (entityTagsRes.data ?? []).map((r: any) => r.crm_tags).filter(Boolean)
 
-  return NextResponse.json({
+  return ok({
     ...opp,
     customer: customerRes.data ?? null,
     assigned_user: assignedUserRes.data ?? null,
@@ -84,31 +87,23 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 // PATCH /api/marketing/opportunities/[id]
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const appUser = await requireUser()
-  if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!appUser) return unauthorized()
 
   const { id } = await params
   const body = await req.json()
 
-  // Strip read-only fields and extract tag_ids
-  const { id: _id, created_at: _ca, created_by: _cb, tag_ids, tags: _tags, ...updates } = body
+  // Extract tag_ids and strip read-only fields + related arrays
+  const { tag_ids, ...rest } = body
+  const updates = stripReadOnly(rest, ['tags', 'customer', 'assigned_user', 'tasks', 'stage_history', 'files', 'customer_name', 'assigned_user_name'])
 
   const adminClient = createAdminClient()
 
   // Handle tag updates if tag_ids provided
   if (Array.isArray(tag_ids)) {
-    await adminClient
-      .from('crm_entity_tags')
-      .delete()
-      .eq('entity_type', 'opportunity')
-      .eq('entity_id', id)
-    if (tag_ids.length > 0) {
-      await adminClient.from('crm_entity_tags').insert(
-        tag_ids.map((tid: string) => ({ tag_id: tid, entity_type: 'opportunity', entity_id: id }))
-      )
-    }
+    await setEntityTags(adminClient, 'opportunity', id, tag_ids)
     // If only updating tags, return early
     if (Object.keys(updates).length === 0) {
-      return NextResponse.json({ ok: true })
+      return ok({ ok: true })
     }
   }
 
@@ -119,7 +114,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .eq('id', id)
     .single()
 
-  if (fetchErr || !current) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (fetchErr || !current) return notFound('Opportunity not found')
 
   // Determine which tracked fields changed
   const changedFields = TRACKED_FIELDS.filter(
@@ -160,20 +155,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data)
+  if (error) return serverError(error.message)
+  return ok(data)
 }
 
 // DELETE /api/marketing/opportunities/[id] — admin only
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const appUser = await requireUser()
-  if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!appUser.is_admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!appUser) return unauthorized()
+  if (!appUser.is_admin) return forbidden()
 
   const { id } = await params
   const adminClient = createAdminClient()
   const { error } = await adminClient.from('crm_opportunities').delete().eq('id', id)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true })
+  if (error) return serverError(error.message)
+  return ok({ ok: true })
 }

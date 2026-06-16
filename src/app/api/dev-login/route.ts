@@ -20,10 +20,14 @@ export async function GET(req: NextRequest) {
   }
 
   const adminClient = createAdminClient()
+
+  // Generate a magic link. The browser follows it to Supabase, which redirects to
+  // /auth/magic-callback with hash-based tokens. The client-side page there processes
+  // the tokens via createBrowserClient (which stores them as SSR-compatible cookies).
   const { data, error } = await adminClient.auth.admin.generateLink({
     type: 'magiclink',
     email,
-    options: { redirectTo: `${req.nextUrl.origin}/auth/callback` },
+    options: { redirectTo: `${req.nextUrl.origin}/auth/magic-callback` },
   })
 
   if (error || !data.properties?.action_link) {

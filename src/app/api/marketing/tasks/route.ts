@@ -1,10 +1,12 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 import { DEPARTMENTS, DEPARTMENT_CATEGORIES, getDepartmentForTaskCategory } from '@/lib/task-constants'
 import type { CrmTaskDepartment } from '@/types'
 import { dispatchNotification, fetchActor } from '@/lib/notifications/dispatch'
 import { taskAssigned } from '@/lib/notifications/registry'
+import { unauthorized, badRequest, serverError, created, ok } from '@/lib/api/respond'
+import { stripReadOnly } from '@/lib/api/sanitize'
 
 function quotePostgrestValue(value: string) {
   return `"${value.replace(/"/g, '\\"')}"`
@@ -40,7 +42,7 @@ function normalizeTaskAssignment(task: Record<string, unknown>) {
 // ?assigned_to=me|all|<uuid>|<uuid1>,<uuid2>  ?status=  ?category=  ?department=  ?delegated_by_me=true  ?due_before=  ?opportunity_id=  ?customer_id=  ?vendor_id=  ?page=1&limit=50
 export async function GET(req: NextRequest) {
   const appUser = await requireUser()
-  if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!appUser) return unauthorized()
 
   const { searchParams } = new URL(req.url)
   const assignedTo = searchParams.get('assigned_to')
@@ -133,7 +135,7 @@ export async function GET(req: NextRequest) {
     ).range(from, to),
   ])
 
-  if (dataRes.error) return NextResponse.json({ error: dataRes.error.message }, { status: 500 })
+  if (dataRes.error) return serverError(dataRes.error.message)
 
   const total = countRes.count ?? 0
   const rows = (dataRes.data as any[]) ?? []
@@ -197,22 +199,22 @@ export async function GET(req: NextRequest) {
       : null,
   }))
 
-  return NextResponse.json({ tasks: enriched, total, page, limit })
+  return ok({ tasks: enriched, total, page, limit })
 }
 
 // POST /api/marketing/tasks
 export async function POST(req: NextRequest) {
   const appUser = await requireUser()
-  if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!appUser) return unauthorized()
 
   const body = await req.json()
   const { title, ...rest } = body
-  if (!title?.trim()) return NextResponse.json({ error: 'Title is required' }, { status: 400 })
+  if (!title?.trim()) return badRequest('Title is required')
 
-  const { id: _id, created_at: _ca, updated_at: _ua, created_by: _cb, ...safeRest } = rest
+  const safeRest = stripReadOnly(rest, ['assigned_user_name', 'linked_to_name', 'linked_to_type'])
 
   const normalized = normalizeTaskAssignment(safeRest)
-  if ('error' in normalized) return NextResponse.json({ error: normalized.error }, { status: 400 })
+  if ('error' in normalized) return badRequest(normalized.error)
 
   const adminClient = createAdminClient()
   const { data, error } = await adminClient
@@ -230,7 +232,7 @@ export async function POST(req: NextRequest) {
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(error.message)
 
   // Fire task_assigned notification. Wrapped in try/catch so a notification
   // failure (or missing migration) never blocks the task creation response.
@@ -263,5 +265,5 @@ export async function POST(req: NextRequest) {
     console.error('[notifications] task POST dispatch failed:', err)
   }
 
-  return NextResponse.json(data, { status: 201 })
+  return created(data)
 }

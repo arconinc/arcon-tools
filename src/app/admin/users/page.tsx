@@ -18,6 +18,47 @@ function formatDate(val: string | null): string {
   return `${MONTHS[m - 1]} ${d}`
 }
 
+const DAYS_IN_MONTH = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31]
+
+function MonthDayPicker({ value, onChange, className }: { value: string; onChange: (v: string) => void; className?: string }) {
+  const [mm, dd] = value ? value.split('-') : ['', '']
+  const monthIdx = mm ? parseInt(mm, 10) - 1 : -1
+  const maxDays = monthIdx >= 0 ? DAYS_IN_MONTH[monthIdx] : 31
+
+  function emit(newMm: string, newDd: string) {
+    if (!newMm && !newDd) { onChange(''); return }
+    const d = parseInt(newDd, 10)
+    const maxD = newMm ? DAYS_IN_MONTH[parseInt(newMm, 10) - 1] : 31
+    const clampedDd = d > maxD ? String(maxD).padStart(2, '0') : newDd
+    onChange(newMm && clampedDd ? `${newMm}-${clampedDd}` : '')
+  }
+
+  return (
+    <div className={`flex gap-2 ${className ?? ''}`}>
+      <select
+        value={mm || ''}
+        onChange={(e) => emit(e.target.value, dd || '')}
+        className="flex-1 text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-purple-400 bg-white"
+      >
+        <option value="">Month</option>
+        {MONTHS.map((m, i) => (
+          <option key={m} value={String(i + 1).padStart(2, '0')}>{m}</option>
+        ))}
+      </select>
+      <select
+        value={dd || ''}
+        onChange={(e) => emit(mm || '', e.target.value)}
+        className="w-20 text-sm border border-slate-200 rounded-lg px-2 py-1.5 focus:outline-none focus:border-purple-400 bg-white"
+      >
+        <option value="">Day</option>
+        {Array.from({ length: maxDays }, (_, i) => String(i + 1).padStart(2, '0')).map((d) => (
+          <option key={d} value={d}>{parseInt(d, 10)}</option>
+        ))}
+      </select>
+    </div>
+  )
+}
+
 function formatLastLogin(val: string | null): string {
   if (!val) return '—'
   return new Date(val).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })
@@ -276,13 +317,10 @@ export default function AdminUsersPage() {
                 <div />
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">Birth date</label>
-                  <input
-                    type="text"
+                  <MonthDayPicker
                     value={editForm.birth_date}
-                    onChange={(e) => setEditForm((f) => ({ ...f, birth_date: e.target.value }))}
-                    className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-purple-400 bg-white"
-                    placeholder="MM-DD"
-                    pattern="\d{2}-\d{2}"
+                    onChange={(v) => setEditForm((f) => ({ ...f, birth_date: v }))}
+                    className="w-full"
                   />
                 </div>
                 <div>
@@ -592,6 +630,21 @@ export default function AdminUsersPage() {
         </div>
       </div>
 
+      <div className="mb-5 grid grid-cols-2 gap-3">
+        <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
+          <p className="text-xs font-semibold text-blue-800 mb-1">Departments</p>
+          <p className="text-xs text-blue-700 leading-relaxed">
+            Org structure — determines which task boards a user belongs to and who receives department notifications. A user can be in multiple departments. Set via <strong>Edit</strong>.
+          </p>
+        </div>
+        <div className="rounded-xl border border-indigo-100 bg-indigo-50 px-4 py-3">
+          <p className="text-xs font-semibold text-indigo-800 mb-1">Roles</p>
+          <p className="text-xs text-indigo-700 leading-relaxed">
+            Access control — grants permission to restricted areas (e.g. financial reports, HR documents). Admins bypass all role checks. Assign via <strong>Manage Roles</strong>.
+          </p>
+        </div>
+      </div>
+
       {syncResult && (
         <div className={`mb-4 px-4 py-2.5 rounded-xl text-xs font-medium border ${syncResult.startsWith('Error') ? 'bg-red-50 border-red-200 text-red-700' : 'bg-green-50 border-green-200 text-green-700'}`}>
           {syncResult}
@@ -625,13 +678,10 @@ export default function AdminUsersPage() {
             </div>
             <div>
               <label className="block text-xs text-slate-500 mb-1">Birth date</label>
-              <input
-                type="text"
+              <MonthDayPicker
                 value={addForm.birth_date}
-                onChange={(e) => setAddForm((f) => ({ ...f, birth_date: e.target.value }))}
-                className="w-full text-sm border border-slate-200 rounded-lg px-3 py-1.5 focus:outline-none focus:border-purple-400"
-                placeholder="MM-DD"
-                pattern="\d{2}-\d{2}"
+                onChange={(v) => setAddForm((f) => ({ ...f, birth_date: v }))}
+                className="w-full"
               />
             </div>
             <div>

@@ -1,13 +1,14 @@
 import { unstable_cache } from 'next/cache'
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
+import { createAdminClient } from '@/lib/supabase/admin'
 import {
   COMPANY_CALENDAR_EVENT_TYPES,
   getCalendarCacheSeconds,
   getCalendarLookaheadDays,
 } from '@/lib/company-calendar-config'
 import { fetchCompanyCalendarEvents } from '@/lib/google-calendar'
-import { CompanyCalendarResponse } from '@/types'
+import { CompanyCalendarEvent, CompanyCalendarResponse } from '@/types'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -29,10 +30,14 @@ export async function GET() {
 
   try {
     const { timeMin, timeMax } = getCalendarWindow()
-    const events = await getCachedCalendarEvents(timeMin, timeMax)
+    const [googleEvents, dbBirthdays, dbAnniversaries] = await Promise.all([
+      getCachedCalendarEvents(timeMin, timeMax),
+      fetchDbBirthdayEvents(timeMin, timeMax),
+      fetchDbAnniversaryEvents(timeMin, timeMax),
+    ])
     const response: CompanyCalendarResponse = {
       eventTypes: COMPANY_CALENDAR_EVENT_TYPES,
-      events,
+      events: [...googleEvents, ...dbBirthdays, ...dbAnniversaries],
       cachedAt: new Date().toISOString(),
     }
 
@@ -44,6 +49,91 @@ export async function GET() {
       { status: 500 }
     )
   }
+}
+
+async function fetchDbBirthdayEvents(timeMin: string, timeMax: string): Promise<CompanyCalendarEvent[]> {
+  const adminClient = createAdminClient()
+  const { data: users } = await adminClient
+    .from('users')
+    .select('id, display_name, birth_date')
+    .not('birth_date', 'is', null)
+    .is('deactivated_at', null)
+
+  if (!users) return []
+
+  const events: CompanyCalendarEvent[] = []
+  const windowStart = timeMin.slice(0, 10)
+  const windowEnd = timeMax.slice(0, 10)
+  const currentYear = new Date().getFullYear()
+
+  for (const user of users) {
+    if (!user.birth_date || !user.display_name) continue
+    const [month, day] = user.birth_date.split('-')
+    for (const year of [currentYear, currentYear + 1]) {
+      const date = `${year}-${month}-${day}`
+      if (date >= windowStart && date < windowEnd) {
+        events.push({
+          id: `db-bday-${user.id}-${year}`,
+          title: user.display_name,
+          type: 'birthday',
+          typeLabel: 'Birthdays',
+          start: date,
+          end: null,
+          allDay: true,
+          description: null,
+          location: null,
+          htmlLink: null,
+          googleColorId: '3',
+        })
+      }
+    }
+  }
+
+  return events
+}
+
+async function fetchDbAnniversaryEvents(timeMin: string, timeMax: string): Promise<CompanyCalendarEvent[]> {
+  const adminClient = createAdminClient()
+  const { data: users } = await adminClient
+    .from('users')
+    .select('id, display_name, start_date')
+    .not('start_date', 'is', null)
+    .is('deactivated_at', null)
+
+  if (!users) return []
+
+  const events: CompanyCalendarEvent[] = []
+  const windowStart = timeMin.slice(0, 10)
+  const windowEnd = timeMax.slice(0, 10)
+  const currentYear = new Date().getFullYear()
+
+  for (const user of users) {
+    if (!user.start_date || !user.display_name) continue
+    const hireYear = parseInt(user.start_date.slice(0, 4), 10)
+    const monthDay = user.start_date.slice(5) // MM-DD
+    for (const year of [currentYear, currentYear + 1]) {
+      if (year <= hireYear) continue // no anniversary before or on hire year
+      const date = `${year}-${monthDay}`
+      if (date >= windowStart && date < windowEnd) {
+        const yearsCount = year - hireYear
+        events.push({
+          id: `db-anniversary-${user.id}-${year}`,
+          title: `${user.display_name} (${yearsCount}yr)`,
+          type: 'anniversary',
+          typeLabel: 'Anniversaries',
+          start: date,
+          end: null,
+          allDay: true,
+          description: null,
+          location: null,
+          htmlLink: null,
+          googleColorId: '6',
+        })
+      }
+    }
+  }
+
+  return events
 }
 
 function getCalendarWindow() {

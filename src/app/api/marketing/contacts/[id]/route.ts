@@ -1,11 +1,14 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
+import { unauthorized, forbidden, notFound, serverError, ok } from '@/lib/api/respond'
+import { stripReadOnly } from '@/lib/api/sanitize'
+import { setEntityTags } from '@/lib/crm/tags'
 
 // GET /api/marketing/contacts/[id]
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const appUser = await requireUser()
-  if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!appUser) return unauthorized()
 
   const { id } = await params
   const adminClient = createAdminClient()
@@ -16,7 +19,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .eq('id', id)
     .single()
 
-  if (error || !contact) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  if (error || !contact) return notFound('Contact not found')
 
   const [customerRes, vendorRes, filesRes, entityTagsRes] = await Promise.all([
     contact.customer_id
@@ -35,7 +38,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   const tags = (entityTagsRes.data ?? []).map((r: any) => r.crm_tags).filter(Boolean)
 
-  return NextResponse.json({
+  return ok({
     ...contact,
     customer: customerRes.data ?? null,
     vendor: vendorRes.data ?? null,
@@ -47,22 +50,18 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 // PATCH /api/marketing/contacts/[id]
 export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const appUser = await requireUser()
-  if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!appUser) return unauthorized()
 
   const { id } = await params
   const body = await req.json()
-  const { id: _id, created_at: _ca, updated_at: _ua, created_by: _cb, tag_ids, tags: _tags, customer: _customer, vendor: _vendor, files: _files, ...updates } = body
+  const { tag_ids, ...rest } = body
+  const updates = stripReadOnly(rest, ['tags', 'customer', 'vendor', 'files', 'customer_name', 'vendor_name'])
 
   const adminClient = createAdminClient()
 
   if (Array.isArray(tag_ids)) {
-    await adminClient.from('crm_entity_tags').delete().eq('entity_type', 'contact').eq('entity_id', id)
-    if (tag_ids.length > 0) {
-      await adminClient.from('crm_entity_tags').insert(
-        tag_ids.map((tid: string) => ({ tag_id: tid, entity_type: 'contact', entity_id: id }))
-      )
-    }
-    if (Object.keys(updates).length === 0) return NextResponse.json({ ok: true })
+    await setEntityTags(adminClient, 'contact', id, tag_ids)
+    if (Object.keys(updates).length === 0) return ok({ ok: true })
   }
 
   const { data, error } = await adminClient
@@ -72,20 +71,20 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data)
+  if (error) return serverError(error.message)
+  return ok(data)
 }
 
 // DELETE /api/marketing/contacts/[id] — admin only
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const appUser = await requireUser()
-  if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!appUser.is_admin) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!appUser) return unauthorized()
+  if (!appUser.is_admin) return forbidden()
 
   const { id } = await params
   const adminClient = createAdminClient()
   const { error } = await adminClient.from('crm_contacts').delete().eq('id', id)
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json({ ok: true })
+  if (error) return serverError(error.message)
+  return ok({ ok: true })
 }

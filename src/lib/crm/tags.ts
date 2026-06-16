@@ -39,6 +39,20 @@ export async function applyEntityTag(
   }
 }
 
+export async function setEntityTags(
+  adminClient: AdminClient,
+  entityType: 'contact' | 'customer' | 'vendor' | 'opportunity',
+  entityId: string,
+  tagIds: string[]
+): Promise<void> {
+  await adminClient.from('crm_entity_tags').delete().eq('entity_type', entityType).eq('entity_id', entityId)
+  if (tagIds.length > 0) {
+    await adminClient.from('crm_entity_tags').insert(
+      tagIds.map((tid: string) => ({ tag_id: tid, entity_type: entityType, entity_id: entityId }))
+    )
+  }
+}
+
 export async function upsertCustomer(
   adminClient: AdminClient,
   company: string,

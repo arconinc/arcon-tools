@@ -1,11 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
+import { unauthorized, badRequest, serverError, created, ok } from '@/lib/api/respond'
+import { stripReadOnly } from '@/lib/api/sanitize'
 
 // GET /api/marketing/contacts?search=&customer_id=&vendor_id=&type=&tag_id=&page=1&limit=50
 export async function GET(req: NextRequest) {
   const appUser = await requireUser()
-  if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!appUser) return unauthorized()
 
   const { searchParams } = new URL(req.url)
   const search = searchParams.get('search')?.trim()
@@ -28,7 +30,7 @@ export async function GET(req: NextRequest) {
       .eq('tag_id', tagId)
       .eq('entity_type', 'contact')
     tagFilterIds = (tagRows ?? []).map((r: any) => r.entity_id)
-    if (tagFilterIds.length === 0) return NextResponse.json({ contacts: [], total: 0, page, limit })
+    if (tagFilterIds.length === 0) return ok({ contacts: [], total: 0, page, limit })
   }
 
   const applyFilters = (q: any) => {
@@ -51,7 +53,7 @@ export async function GET(req: NextRequest) {
     ).range(from, to),
   ])
 
-  if (dataRes.error) return NextResponse.json({ error: dataRes.error.message }, { status: 500 })
+  if (dataRes.error) return serverError(dataRes.error.message)
 
   const total = countRes.count ?? 0
   const contacts = (dataRes.data as any[]) ?? []
@@ -95,21 +97,21 @@ export async function GET(req: NextRequest) {
     tags: tagsMap[c.id] ?? [],
   }))
 
-  return NextResponse.json({ contacts: enriched, total, page, limit })
+  return ok({ contacts: enriched, total, page, limit })
 }
 
 // POST /api/marketing/contacts
 export async function POST(req: NextRequest) {
   const appUser = await requireUser()
-  if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!appUser) return unauthorized()
 
   const body = await req.json()
-  const { first_name, last_name, tag_ids, tags: _tags, ...rest } = body
+  const { first_name, last_name, tag_ids, ...rest } = body
   if (!first_name?.trim() || !last_name?.trim()) {
-    return NextResponse.json({ error: 'First name and last name are required' }, { status: 400 })
+    return badRequest('First name and last name are required')
   }
 
-  const { id: _id, created_at: _ca, updated_at: _ua, created_by: _cb, ...safeRest } = rest
+  const safeRest = stripReadOnly(rest, ['tags', 'customer_name', 'vendor_name'])
 
   const adminClient = createAdminClient()
   const { data, error } = await adminClient
@@ -118,7 +120,7 @@ export async function POST(req: NextRequest) {
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(error.message)
 
   if (Array.isArray(tag_ids) && tag_ids.length > 0) {
     await adminClient.from('crm_entity_tags').insert(
@@ -126,5 +128,5 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  return NextResponse.json(data, { status: 201 })
+  return created(data)
 }

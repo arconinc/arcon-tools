@@ -1,11 +1,13 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
+import { unauthorized, badRequest, serverError, created, ok } from '@/lib/api/respond'
+import { stripReadOnly } from '@/lib/api/sanitize'
 
 // GET /api/marketing/opportunities?assigned_to=&status=&stage=&customer_id=&tag_id=&page=1&limit=50
 export async function GET(req: NextRequest) {
   const appUser = await requireUser()
-  if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!appUser) return unauthorized()
 
   const { searchParams } = new URL(req.url)
   const assignedTo = searchParams.get('assigned_to')
@@ -31,7 +33,7 @@ export async function GET(req: NextRequest) {
       .eq('entity_type', 'opportunity')
     tagFilterIds = (tagRows ?? []).map((r: any) => r.entity_id)
     if (tagFilterIds.length === 0) {
-      return NextResponse.json({ items: [], total: 0, page, limit, pipeline_total: 0 })
+      return ok({ items: [], total: 0, page, limit, pipeline_total: 0 })
     }
   }
 
@@ -55,7 +57,7 @@ export async function GET(req: NextRequest) {
     ).range(from, to),
   ])
 
-  if (dataRes.error) return NextResponse.json({ error: dataRes.error.message }, { status: 500 })
+  if (dataRes.error) return serverError(dataRes.error.message)
 
   const total = countRes.count ?? 0
   const rows = (dataRes.data as any[]) ?? []
@@ -107,20 +109,20 @@ export async function GET(req: NextRequest) {
     .filter((o: any) => o.status === 'open' && o.value != null)
     .reduce((sum: number, o: any) => sum + (o.value ?? 0), 0)
 
-  return NextResponse.json({ items: enriched, total, page, limit, pipeline_total: pipelineTotal })
+  return ok({ items: enriched, total, page, limit, pipeline_total: pipelineTotal })
 }
 
 // POST /api/marketing/opportunities
 export async function POST(req: NextRequest) {
   const appUser = await requireUser()
-  if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+  if (!appUser) return unauthorized()
 
   const body = await req.json()
-  const { name, customer_id, tag_ids, tags: _tags, ...rest } = body
-  if (!name?.trim()) return NextResponse.json({ error: 'Name is required' }, { status: 400 })
-  if (!customer_id) return NextResponse.json({ error: 'customer_id is required' }, { status: 400 })
+  const { name, customer_id, tag_ids, ...rest } = body
+  if (!name?.trim()) return badRequest('Name is required')
+  if (!customer_id) return badRequest('customer_id is required')
 
-  const { id: _id, created_at: _ca, updated_at: _ua, created_by: _cb, closed_at: _cl, ...safeRest } = rest
+  const safeRest = stripReadOnly(rest, ['tags', 'assigned_user_name', 'customer_name', 'closed_at'])
 
   const adminClient = createAdminClient()
   const { data, error } = await adminClient
@@ -135,7 +137,7 @@ export async function POST(req: NextRequest) {
     .select()
     .single()
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (error) return serverError(error.message)
 
   // Insert tags if provided
   if (Array.isArray(tag_ids) && tag_ids.length > 0) {
@@ -144,5 +146,5 @@ export async function POST(req: NextRequest) {
     )
   }
 
-  return NextResponse.json(data, { status: 201 })
+  return created(data)
 }
