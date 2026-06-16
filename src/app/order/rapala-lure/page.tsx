@@ -21,14 +21,17 @@ function getUnitPrice(qty: number): number | null {
   return PRICING_TIERS.find((t) => qty >= t.min)?.price ?? null
 }
 
+function setupFee(colors: number): number {
+  return colors >= 2 ? 75 : 50
+}
+
 function calcPricing(qty: number, colors: number, backImprint: boolean, backColors: number) {
   const unitPrice = getUnitPrice(qty)
   if (!unitPrice) return null
   const base = qty * unitPrice
-  const artSetup = colors * 50
-  const locationFee = backImprint ? 1 : 0
-  const extraColorFee = backColors * 0.5
-  return { unitPrice, base, artSetup, locationFee, extraColorFee, total: base + artSetup + locationFee + extraColorFee }
+  const artSetup = setupFee(colors)
+  const backSetup = backImprint ? setupFee(Math.max(1, backColors)) : 0
+  return { unitPrice, base, artSetup, backSetup, total: base + artSetup + backSetup }
 }
 
 function fmt(n: number) {
@@ -137,6 +140,7 @@ interface FormState {
   pantoneColor: string
   backImprint: boolean
   backColors: string
+  backPantoneColor: string
   // Shipping
   shipToAttention: string
   shipToAddress1: string
@@ -162,7 +166,7 @@ interface FormState {
 const INITIAL: FormState = {
   lureType: '',
   firstName: '', lastName: '', company: '', email: '', phone: '',
-  quantity: '', artColors: '1', pantoneColor: '', backImprint: false, backColors: '0',
+  quantity: '', artColors: '1', pantoneColor: '', backImprint: false, backColors: '1', backPantoneColor: '',
   shipToAttention: '', shipToAddress1: '', shipToAddress2: '', shipToCity: '', shipToState: '', shipToZip: '',
   billSameAsShip: true,
   billToAddress1: '', billToAddress2: '', billToCity: '', billToState: '', billToZip: '',
@@ -353,18 +357,19 @@ export default function RapalaLureOrderPage() {
 
                 <div className="two-col" style={{ ...rowStyle, marginBottom: 16 }}>
                   <div>
-                    <label style={labelStyle}>Number of Imprint Colors <span style={{ color: '#6b1e98' }}>*</span></label>
+                    <label style={labelStyle}>Front Imprint Colors <span style={{ color: '#6b1e98' }}>*</span></label>
                     <input
                       style={inputStyle} type="number" min={1} step={1}
                       value={form.artColors} onChange={(e) => set('artColors', e.target.value)}
                       required
                     />
                     <p style={{ margin: '4px 0 0', fontSize: 12, color: '#9ca3af' }}>
-                      Art setup fee: {colors} color{colors !== 1 ? 's' : ''} × $50.00 = {fmt(colors * 50)}
+                      Setup: {colors} color{colors !== 1 ? 's' : ''} = {fmt(setupFee(colors))}<br />
+                      $50 · 1 color &nbsp;·&nbsp; $75 · 2+ colors
                     </p>
                   </div>
                   <div>
-                    <label style={labelStyle}>Pantone Color(s)</label>
+                    <label style={labelStyle}>Front Pantone Color(s)</label>
                     <input
                       style={inputStyle}
                       value={form.pantoneColor}
@@ -386,20 +391,35 @@ export default function RapalaLureOrderPage() {
                     style={{ width: 16, height: 16, accentColor: '#6b1e98', cursor: 'pointer' }}
                   />
                   <span style={{ fontSize: 14, color: '#374151', fontWeight: 500 }}>
-                    Include back imprint <span style={{ fontWeight: 400, color: '#9ca3af' }}>($1.00 additional location)</span>
+                    Include back imprint
                   </span>
                 </label>
 
                 {form.backImprint && (
-                  <div>
-                    <label style={labelStyle}>Back Imprint Colors</label>
-                    <input
-                      style={inputStyle} type="number" min={0} step={1}
-                      value={form.backColors} onChange={(e) => set('backColors', e.target.value)}
-                    />
-                    <p style={{ margin: '4px 0 0', fontSize: 12, color: '#9ca3af' }}>
-                      Additional color fee: {backColors} × $0.50 = {fmt(backColors * 0.5)}
-                    </p>
+                  <div className="two-col" style={rowStyle}>
+                    <div>
+                      <label style={labelStyle}>Back Imprint Colors</label>
+                      <input
+                        style={inputStyle} type="number" min={1} step={1}
+                        value={form.backColors} onChange={(e) => set('backColors', e.target.value)}
+                      />
+                      <p style={{ margin: '4px 0 0', fontSize: 12, color: '#9ca3af' }}>
+                        Setup: {Math.max(1, backColors)} color{Math.max(1, backColors) !== 1 ? 's' : ''} = {fmt(setupFee(Math.max(1, backColors)))}<br />
+                        $50 · 1 color &nbsp;·&nbsp; $75 · 2+ colors
+                      </p>
+                    </div>
+                    <div>
+                      <label style={labelStyle}>Back Pantone Color(s)</label>
+                      <input
+                        style={inputStyle}
+                        value={form.backPantoneColor}
+                        onChange={(e) => set('backPantoneColor', e.target.value)}
+                        placeholder="e.g. PMS 286 C, PMS 032 C"
+                      />
+                      <p style={{ margin: '4px 0 0', fontSize: 12, color: '#9ca3af' }}>
+                        Separate multiple codes with commas
+                      </p>
+                    </div>
                   </div>
                 )}
               </div>
@@ -694,16 +714,10 @@ export default function RapalaLureOrderPage() {
                       <span>Art setup ({colors} color{colors !== 1 ? 's' : ''})</span>
                       <span>{fmt(pricing.artSetup)}</span>
                     </div>
-                    {pricing.locationFee > 0 && (
+                    {pricing.backSetup > 0 && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#374151', marginBottom: 6 }}>
-                        <span>Back imprint location</span>
-                        <span>{fmt(pricing.locationFee)}</span>
-                      </div>
-                    )}
-                    {pricing.extraColorFee > 0 && (
-                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#374151', marginBottom: 6 }}>
-                        <span>Back colors ({backColors} × $0.50)</span>
-                        <span>{fmt(pricing.extraColorFee)}</span>
+                        <span>Back setup ({Math.max(1, backColors)} color{Math.max(1, backColors) !== 1 ? 's' : ''})</span>
+                        <span>{fmt(pricing.backSetup)}</span>
                       </div>
                     )}
                     <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 15, fontWeight: 700, color: '#6b1e98', marginTop: 10, paddingTop: 10, borderTop: '1px solid #f3f4f6' }}>
