@@ -14,60 +14,10 @@ import { CrmForm } from '@/types'
 import { getCustomerFormsByState, getGeneralForms, US_STATES } from '@/lib/forms-utils'
 import { formatBytes } from '@/lib/format'
 import { customerStatusBadge, opportunityStatusBadge } from '@/lib/badges'
+import { buildCompanySummary } from '@/lib/customer/helpers'
+import { useCustomer, useCrmUsers, useCrmTags, type CustomerDetail, type BrandDataLocal, type TagOption } from '@/hooks'
 
 type DropdownUser = { id: string; display_name: string; email: string }
-type TagOption = { id: string; name: string; color: string }
-
-type BrandDataLocal = {
-  id: string; domain: string; brandfetch_id: string | null; name: string | null
-  description: string | null; long_description: string | null
-  logo_url: string | null; icon_url: string | null
-  colors: { hex: string; type: string; brightness: number }[] | null
-  links: { name: string; url: string }[] | null
-  company: {
-    employees: number | null; foundedYear: number | null
-    industries: { name: string; slug: string }[] | null
-    location: { city: string | null; state: string | null; country: string | null } | null
-    kind: string | null
-  } | null
-  fetched_at: string
-}
-
-type CustomerDetail = {
-  id: string; name: string; client_status: 'Prospective' | 'Active' | 'Former' | null
-  phone: string | null; website: string | null; linkedin: string | null; email_domains: string | null
-  billing_address1: string | null; billing_address2: string | null; billing_city: string | null
-  billing_state: string | null; billing_zip: string | null; billing_country: string | null
-  shipping_address1: string | null; shipping_address2: string | null; shipping_city: string | null
-  shipping_state: string | null; shipping_zip: string | null; shipping_country: string | null
-  description: string | null; tags: TagOption[]; artwork_notes: string | null; notes: string | null
-  general_logo_color: string | null; formal_pms_colors: string | null
-  assigned_to: string | null; created_by: string; created_at: string; updated_at: string
-  logo_url: string | null; brand_data_id: string | null; brand_data: BrandDataLocal | null
-  commissioned_client: string | null; tax_exempt: boolean
-  stores: { id: string; store_id: string; store_name: string; status: string; is_active: boolean }[]
-  contacts: { id: string; first_name: string; last_name: string; title: string | null; email: string | null; phone: string | null; department: string | null }[]
-  opportunities: { id: string; name: string; value: number | null; status: string; pipeline_stage: string | null; forecast_close_date: string | null }[]
-  files: { id: string; label: string; url: string; created_at: string }[]
-  assigned_user: { id: string; display_name: string; email: string } | null
-  created_by_user: { id: string; display_name: string; email: string } | null
-}
-
-function buildCompanySummary(company: BrandDataLocal['company']): string | null {
-  if (!company) return null
-  const parts: string[] = []
-  const kind = company.kind === 'PUBLIC_COMPANY' ? 'a public company'
-    : company.kind === 'PRIVATE_COMPANY' ? 'a private company' : null
-  const location = [company.location?.city, company.location?.state, company.location?.country].filter(Boolean).join(', ')
-  const industry = company.industries?.map((i) => i.name).join(' and ')
-  if (kind && company.foundedYear) parts.push(`${kind} founded in ${company.foundedYear}`)
-  else if (kind) parts.push(kind)
-  else if (company.foundedYear) parts.push(`founded in ${company.foundedYear}`)
-  if (location) parts.push(`headquartered in ${location}`)
-  if (company.employees) parts.push(`approximately ${company.employees} employees`)
-  if (industry) parts.push(`operating in ${industry}`)
-  return parts.length ? parts.join(', ') + '.' : null
-}
 
 type CreateForm = {
   name: string; client_status: string; assigned_to: string; phone: string; website: string
@@ -84,23 +34,9 @@ export default function CustomerDetailPage() {
   const id = params.id
   const isNew = id === 'new'
 
-  const [customer, setCustomer] = useState<CustomerDetail | null>(null)
-  const [loading, setLoading] = useState(!isNew)
-  const [error, setError] = useState<string | null>(null)
-
-  const [crmUsers, setCrmUsers] = useState<DropdownUser[]>([])
-
-  useEffect(() => {
-    fetch('/api/marketing/users').then((r) => r.json()).then((users) => {
-      if (Array.isArray(users)) setCrmUsers(users)
-    })
-  }, [])
-
-  useEffect(() => {
-    fetch('/api/marketing/tags').then((r) => r.json()).then((data) => {
-      if (Array.isArray(data)) setAllCrmTags(data)
-    })
-  }, [])
+  const { customer, loading, error, setCustomer } = useCustomer(isNew ? null : id)
+  const { data: crmUsers = [] } = useCrmUsers()
+  const { data: allCrmTags = [] } = useCrmTags()
   const [activeTab, setActiveTab] = useState<'details' | 'related' | 'activity' | 'artwork' | 'specs'>('details')
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState<Partial<CustomerDetail>>({})
@@ -111,7 +47,6 @@ export default function CustomerDetailPage() {
   const [tagIds, setTagIds] = useState<string[]>([])
   const [tagSaving, setTagSaving] = useState(false)
   const [aturianError, setAturianError] = useState<string | null>(null)
-  const [allCrmTags, setAllCrmTags] = useState<TagOption[]>([])
 
   const [createTagIds, setCreateTagIds] = useState<string[]>([])
   const { errors: createErrors, validate: validateCreate, clearError: clearCreateError } = useFormValidation<CreateForm>()
@@ -372,17 +307,8 @@ export default function CustomerDetailPage() {
   const [createError, setCreateError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (isNew) return
-    fetch(`/api/marketing/customers/${id}`)
-      .then((r) => r.json())
-      .then((data) => {
-        if (data.error) { setError(data.error); return }
-        setCustomer(data)
-        if (data.billing_state && !taxState) setTaxState(data.billing_state)
-      })
-      .catch(() => setError('Failed to load customer'))
-      .finally(() => setLoading(false))
-  }, [id, isNew])
+    if (customer?.billing_state && !taxState) setTaxState(customer.billing_state)
+  }, [customer, taxState])
 
   function startEdit() {
     if (!customer) return

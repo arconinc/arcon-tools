@@ -466,12 +466,12 @@ components/crm/customer/{CustomerHeader,CustomerDetailsCard,CustomerAddressCard,
   CustomerFilesList,CustomerArtworkGrid,AddContactModal,ArtworkUploadModal}.tsx
 ```
 
-## - [ ] D1 — Extract remaining pure helpers
+## - [x] D1 — Extract remaining pure helpers
 **Goal:** move `buildCompanySummary`, `SOCIAL_COLORS`, badge maps (if not already in A2), out of the page. (`Field`/`FieldInput`/`SocialIcon` already moved in B4.)
 **Steps:** copy verbatim to `lib/`/`components/ui/`; import; delete locals.
 **Done when:** page has no standalone pure helper definitions.
 
-## - [ ] D2 — Extract `useCustomer(id)` read hook
+## - [x] D2 — Extract `useCustomer(id)` read hook
 **Goal:** move all read `fetch` calls (customer + contacts/opps/files/stores/brand_data/tags + users + tags lookups) into a hook.
 **Steps:**
 1. Create `hooks/useCustomer.ts` returning `{ customer, loading, error, refetch }` where `customer` includes related arrays (the API already returns them joined — see `GET /api/marketing/customers/[id]`).
