@@ -484,12 +484,12 @@ components/crm/customer/{CustomerHeader,CustomerDetailsCard,CustomerAddressCard,
 **Steps:** lift JSX into components taking typed props; page passes data from `useCustomer`. Start with files (simplest).
 **Done when:** those sections are components; smoke test passes.
 
-## - [ ] D4 — Extract modals + `useArtwork`
+## - [x] D4 — Extract modals + `useArtwork`
 **Goal:** move artwork-upload modal (~line 1688) and add-contact modal (~line 1786) into components using `components/ui/Modal.tsx`; move artwork list/upload/vectorize/delete state into `hooks/useArtwork.ts`.
 **Steps:** create `AddContactModal.tsx`, `ArtworkUploadModal.tsx`, `CustomerArtworkGrid.tsx`, `hooks/useArtwork.ts`; wire callbacks; remove inline modal JSX + related `useState`.
 **Done when:** no inline modals in page; smoke test passes (add-contact + artwork-upload steps).
 
-## - [ ] D5 — Extract `useCustomerEdit` (LAST — highest coupling)
+## - [x] D5 — Extract `useCustomerEdit` (LAST — highest coupling)
 **Goal:** move the edit state machine (`editing`, `editForm`, `startEdit`, `cancelEdit`, `handleEditChange`, `handleEditBoolChange`, save/PATCH, `aturianError`) into `hooks/useCustomerEdit.ts`.
 **Steps:** carefully move the ~10 interdependent states + handlers; the page wires the hook into `CustomerDetailsCard`/`CustomerAddressCard`/`CustomerTaxSection`.
 **Verify (note for user):** full edit/save round-trip + validation errors behave identically; smoke test passes.
@@ -503,11 +503,11 @@ components/crm/customer/{CustomerHeader,CustomerDetailsCard,CustomerAddressCard,
 **Prereqs:** Phase D complete (recipe proven), C1 smoke tests cover each target.
 Apply the **D1→D5 recipe** (pure helpers → read hook → read sections → modals → edit/mutation state) to each file below in order. Each file is its own multi-step sequence — follow D1→D5 for each. Add a smoke test first if C1 didn't cover it.
 
-## - [ ] E1 — Decompose `app/tasks/[id]/page.tsx` (1,395 LOC)
-## - [ ] E2 — Decompose `app/documents/[section]/page.tsx` (1,395 LOC)
-## - [ ] E3 — Decompose `app/expense-reports/[id]/edit/page.tsx` (1,195 LOC)
-## - [ ] E4 — Decompose `app/marketing/specs/new/page.tsx` (1,145 LOC)
-## - [ ] E5 — Decompose `app/marketing/opportunities/[id]/page.tsx` (1,033 LOC)
+## - [x] E1 — Decompose `app/tasks/[id]/page.tsx` (1,395 LOC)
+## - [x] E2 — Decompose `app/documents/[section]/page.tsx` (1,395 LOC)
+## - [x] E3 — Decompose `app/expense-reports/[id]/edit/page.tsx` (1,195 LOC)
+## - [x] E4 — Decompose `app/marketing/specs/new/page.tsx` (1,145 LOC)
+## - [x] E5 — Decompose `app/marketing/opportunities/[id]/page.tsx` (1,033 LOC)
 
 ---
 

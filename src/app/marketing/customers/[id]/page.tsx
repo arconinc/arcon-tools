@@ -11,14 +11,15 @@ import { CustomerHeader } from '@/components/crm/customer/CustomerHeader'
 import { CustomerContactsList } from '@/components/crm/customer/CustomerContactsList'
 import { CustomerOpportunitiesList } from '@/components/crm/customer/CustomerOpportunitiesList'
 import { CustomerFilesList } from '@/components/crm/customer/CustomerFilesList'
+import { CustomerArtworkGrid } from '@/components/crm/customer/CustomerArtworkGrid'
+import { ArtworkUploadModal } from '@/components/crm/customer/ArtworkUploadModal'
+import { AddContactModal } from '@/components/crm/customer/AddContactModal'
 import { formatPhoneInput } from '@/lib/phone'
 import { useFormValidation, inputCls, selectCls, FieldError } from '@/lib/form-validation'
 import { CrmForm } from '@/types'
 import { getCustomerFormsByState, getGeneralForms, US_STATES } from '@/lib/forms-utils'
-import { formatBytes } from '@/lib/format'
-import { customerStatusBadge } from '@/lib/badges'
 import { buildCompanySummary } from '@/lib/customer/helpers'
-import { useCustomer, useCrmUsers, useCrmTags, type CustomerDetail, type BrandDataLocal, type TagOption } from '@/hooks'
+import { useCustomer, useCrmUsers, useCrmTags, useArtwork, useCustomerEdit, type CustomerDetail, type BrandDataLocal, type TagOption } from '@/hooks'
 
 type DropdownUser = { id: string; display_name: string; email: string }
 
@@ -38,26 +39,22 @@ export default function CustomerDetailPage() {
   const isNew = id === 'new'
 
   const { customer, loading, error, setCustomer } = useCustomer(isNew ? null : id)
-  const { data: crmUsers = [] } = useCrmUsers()
-  const { data: allCrmTags = [] } = useCrmTags()
+  const { data: crmUsersData } = useCrmUsers()
+  const crmUsers = crmUsersData ?? []
+  const { data: allCrmTagsData, setData: setAllCrmTags } = useCrmTags()
+  const allCrmTags = allCrmTagsData ?? []
+  const edit = useCustomerEdit(customer, setCustomer)
   const [activeTab, setActiveTab] = useState<'details' | 'related' | 'activity' | 'artwork' | 'specs'>('details')
-  const [editing, setEditing] = useState(false)
-  const [editForm, setEditForm] = useState<Partial<CustomerDetail>>({})
   const [createTaskOpen, setCreateTaskOpen] = useState(false)
   const [taskCreatedToastOpen, setTaskCreatedToastOpen] = useState(false)
-  const [saving, setSaving] = useState(false)
 
   const [tagIds, setTagIds] = useState<string[]>([])
   const [tagSaving, setTagSaving] = useState(false)
-  const [aturianError, setAturianError] = useState<string | null>(null)
 
   const [createTagIds, setCreateTagIds] = useState<string[]>([])
   const { errors: createErrors, validate: validateCreate, clearError: clearCreateError } = useFormValidation<CreateForm>()
 
   const [showAddContact, setShowAddContact] = useState(false)
-  const [addContactForm, setAddContactForm] = useState({ first_name: '', last_name: '', email: '', phone: '', title: '', department: '' })
-  const [addContactSaving, setAddContactSaving] = useState(false)
-  const [addContactError, setAddContactError] = useState<string | null>(null)
 
   const [brandData, setBrandData] = useState<BrandDataLocal | null>(null)
   const [brandFetching, setBrandFetching] = useState(false)
@@ -72,29 +69,8 @@ export default function CustomerDetailPage() {
     fetch('/api/admin/forms').then(r => r.json()).then(d => setTaxForms(d.forms ?? [])).catch(() => {})
   }, [])
 
-  // Artwork tab state
-  type ArtworkItem = {
-    id: string; customer_id: string; name: string; description: string | null
-    file_name: string | null; file_size: number | null; mime_type: string | null
-    width: number | null; height: number | null; url: string
-    cloudinary_public_id: string | null; cloudinary_resource_type: string | null
-    thumbnail_url: string | null; is_drive_link: boolean
-    dropbox_url: string | null; is_dropbox_file: boolean
-    added_by: string; created_at: string; updated_at: string
-  }
-  const [artwork, setArtwork] = useState<ArtworkItem[]>([])
-  const [artworkLoaded, setArtworkLoaded] = useState(false)
-  const [artworkLoading, setArtworkLoading] = useState(false)
   const [showArtworkModal, setShowArtworkModal] = useState(false)
-  const [artworkMode, setArtworkMode] = useState<'upload' | 'drive' | 'dropbox'>('upload')
-  const [artworkFile, setArtworkFile] = useState<File | null>(null)
-  const [artworkName, setArtworkName] = useState('')
-  const [artworkDesc, setArtworkDesc] = useState('')
-  const [artworkDriveUrl, setArtworkDriveUrl] = useState('')
-  const [artworkDropboxUrl, setArtworkDropboxUrl] = useState('')
-  const [artworkUploading, setArtworkUploading] = useState(false)
-  const [artworkError, setArtworkError] = useState<string | null>(null)
-  const [vectorizingIds, setVectorizingIds] = useState<Set<string>>(new Set())
+  const artworkHook = useArtwork(isNew ? null : id)
 
   // Specs tab state
   type SpecRow = {
@@ -115,108 +91,6 @@ export default function CustomerDetailPage() {
     } finally {
       setSpecsLoading(false)
       setSpecsLoaded(true)
-    }
-  }
-
-  async function loadArtwork() {
-    if (!customer || artworkLoaded) return
-    setArtworkLoading(true)
-    try {
-      const res = await fetch(`/api/marketing/artwork?customer_id=${customer.id}`)
-      if (res.ok) setArtwork(await res.json())
-    } finally {
-      setArtworkLoading(false)
-      setArtworkLoaded(true)
-    }
-  }
-
-  async function handleArtworkSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!customer) return
-    setArtworkUploading(true)
-    setArtworkError(null)
-    try {
-      let payload: Record<string, unknown> = {
-        customer_id: customer.id,
-        name: artworkName,
-        description: artworkDesc || null,
-        is_drive_link: artworkMode === 'drive',
-      }
-
-      if (artworkMode === 'upload' && artworkFile) {
-        const form = new FormData()
-        form.append('file', artworkFile)
-        form.append('customer_id', customer.id)
-        const uploadRes = await fetch('/api/marketing/artwork/upload', { method: 'POST', body: form })
-        if (!uploadRes.ok) {
-          const err = await uploadRes.json()
-          setArtworkError(err.error ?? 'Upload failed')
-          return
-        }
-        const uploaded = await uploadRes.json()
-        payload = { ...payload, ...uploaded }
-      } else if (artworkMode === 'drive') {
-        payload.url = artworkDriveUrl
-      } else if (artworkMode === 'dropbox') {
-        const isDropboxFile = !artworkDropboxUrl.includes('/fo/')
-        payload.url = artworkDropboxUrl
-        payload.dropbox_url = artworkDropboxUrl
-        payload.is_dropbox_file = isDropboxFile
-      }
-
-      const saveRes = await fetch('/api/marketing/artwork', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload),
-      })
-      if (!saveRes.ok) {
-        const err = await saveRes.json()
-        setArtworkError(err.error ?? 'Save failed')
-        return
-      }
-      const saved = await saveRes.json()
-      setArtwork((prev) => [saved, ...prev])
-      setShowArtworkModal(false)
-      setArtworkFile(null)
-      setArtworkName('')
-      setArtworkDesc('')
-      setArtworkDriveUrl('')
-      setArtworkDropboxUrl('')
-      setArtworkMode('upload')
-    } finally {
-      setArtworkUploading(false)
-    }
-  }
-
-  async function handleVectorize(item: ArtworkItem) {
-    setVectorizingIds((prev) => new Set(prev).add(item.id))
-    try {
-      const res = await fetch(`/api/marketing/artwork/${item.id}/vectorize`)
-      if (!res.ok) {
-        alert('Vectorize failed. Check that this is a supported image type.')
-        return
-      }
-      const blob = await res.blob()
-      const url = URL.createObjectURL(blob)
-      const a = document.createElement('a')
-      a.href = url
-      a.download = `${item.name}.eps`
-      a.click()
-      URL.revokeObjectURL(url)
-    } finally {
-      setVectorizingIds((prev) => {
-        const s = new Set(prev)
-        s.delete(item.id)
-        return s
-      })
-    }
-  }
-
-  async function handleArtworkDelete(id: string) {
-    if (!confirm('Delete this artwork?')) return
-    const res = await fetch(`/api/marketing/artwork/${id}`, { method: 'DELETE' })
-    if (res.ok || res.status === 204) {
-      setArtwork((prev) => prev.filter((a) => a.id !== id))
     }
   }
 
@@ -245,7 +119,7 @@ export default function CustomerDetailPage() {
   const ATURIAN_TAG_NAME = 'Add to Aturian'
 
   async function handleTagsChange(newIds: string[]) {
-    setAturianError(null)
+    edit.setAturianError(null)
     if (customer) {
       const addedIds = newIds.filter((tid) => !tagIds.includes(tid))
       if (addedIds.length > 0) {
@@ -266,7 +140,7 @@ export default function CustomerDetailPage() {
           if (!hasAPContact) missing.push('AP Contact (Accounting dept. contact with email)')
 
           if (missing.length > 0) {
-            setAturianError(
+            edit.setAturianError(
               `Cannot add "Add to Aturian" — complete these first: ${missing.join(', ')}`
             )
             return
@@ -312,63 +186,6 @@ export default function CustomerDetailPage() {
   useEffect(() => {
     if (customer?.billing_state && !taxState) setTaxState(customer.billing_state)
   }, [customer, taxState])
-
-  function startEdit() {
-    if (!customer) return
-    setEditForm({ ...customer })
-    setAturianError(null)
-    setEditing(true)
-  }
-
-  function cancelEdit() { setEditing(false); setEditForm({}); setAturianError(null) }
-
-  function handleEditChange(field: string, value: string) {
-    const formatted = field === 'phone' ? formatPhoneInput(value) : value
-    setEditForm((prev) => ({ ...prev, [field]: formatted || null }))
-  }
-
-  function handleEditBoolChange(field: string, value: boolean) {
-    setEditForm((prev) => ({ ...prev, [field]: value }))
-  }
-
-  async function handleAddContact(e: React.FormEvent) {
-    e.preventDefault()
-    if (!customer) return
-    if (!addContactForm.first_name.trim() || !addContactForm.last_name.trim()) {
-      setAddContactError('First name and last name are required')
-      return
-    }
-    setAddContactSaving(true)
-    setAddContactError(null)
-    try {
-      const res = await fetch('/api/marketing/contacts', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...addContactForm, customer_id: customer.id }),
-      })
-      const data = await res.json()
-      if (!res.ok) { setAddContactError(data.error ?? 'Failed to create contact'); return }
-      setCustomer((prev) => prev ? { ...prev, contacts: [...prev.contacts, data] } : prev)
-      setShowAddContact(false)
-      setAddContactForm({ first_name: '', last_name: '', email: '', phone: '', title: '', department: '' })
-    } finally { setAddContactSaving(false) }
-  }
-
-  async function saveEdit() {
-    if (!customer) return
-    setSaving(true)
-    try {
-      const res = await fetch(`/api/marketing/customers/${customer.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editForm),
-      })
-      const data = await res.json()
-      if (!res.ok) { alert(data.error ?? 'Save failed'); return }
-      setCustomer((prev) => prev ? { ...prev, ...data } : prev)
-      setEditing(false)
-    } finally { setSaving(false) }
-  }
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
@@ -687,7 +504,7 @@ export default function CustomerDetailPage() {
                         })
                         if (res.ok) {
                           tag = await res.json()
-                          setAllCrmTags((prev) => [...prev, tag!])
+                          setAllCrmTags((prev) => [...(prev ?? []), tag!])
                         }
                       }
                       if (tag && !createTagIds.includes(tag.id)) {
@@ -744,7 +561,7 @@ export default function CustomerDetailPage() {
   }
 
   // ── Detail page ─────────────────────────────────────────────────────────────
-  const ef = editForm as Partial<CustomerDetail>
+  const ef = edit.editForm as Partial<CustomerDetail>
 
   return (
     <div className="px-6 py-5">
@@ -779,7 +596,7 @@ export default function CustomerDetailPage() {
             key={tab}
             onClick={() => {
               setActiveTab(tab)
-              if (tab === 'artwork') loadArtwork()
+              if (tab === 'artwork') artworkHook.load()
               if (tab === 'specs') loadSpecs()
             }}
             className={`px-4 py-2 text-sm capitalize transition-colors border-b-2 -mb-px ${
@@ -792,8 +609,8 @@ export default function CustomerDetailPage() {
                 {customer.contacts.length + customer.opportunities.length + customer.files.length}
               </span>
             )}
-            {tab === 'artwork' && artworkLoaded && artwork.length > 0 && (
-              <span className="ml-1.5 text-xs opacity-70">{artwork.length}</span>
+            {tab === 'artwork' && artworkHook.loaded && artworkHook.artwork.length > 0 && (
+              <span className="ml-1.5 text-xs opacity-70">{artworkHook.artwork.length}</span>
             )}
             {tab === 'specs' && specsLoaded && specs.length > 0 && (
               <span className="ml-1.5 text-xs opacity-70">{specs.length}</span>
@@ -811,16 +628,16 @@ export default function CustomerDetailPage() {
               {/* Section header */}
               <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50">
                 <h2 className="text-sm font-semibold text-slate-700">Organization Info</h2>
-                {!editing ? (
-                  <button onClick={startEdit} className="px-3 py-1 text-xs font-semibold border border-slate-300 text-slate-600 rounded-lg hover:bg-white transition-colors">
+                {!edit.editing ? (
+                  <button onClick={edit.startEdit} className="px-3 py-1 text-xs font-semibold border border-slate-300 text-slate-600 rounded-lg hover:bg-white transition-colors">
                     Edit
                   </button>
                 ) : (
                   <div className="flex gap-2">
-                    <button onClick={saveEdit} disabled={saving} className="px-3 py-1 text-xs font-semibold bg-purple-700 text-white rounded-lg hover:bg-purple-800 disabled:opacity-60 transition-colors">
-                      {saving ? 'Saving…' : 'Save'}
+                    <button onClick={edit.saveEdit} disabled={edit.saving} className="px-3 py-1 text-xs font-semibold bg-purple-700 text-white rounded-lg hover:bg-purple-800 disabled:opacity-60 transition-colors">
+                      {edit.saving ? 'Saving…' : 'Save'}
                     </button>
-                    <button onClick={cancelEdit} className="px-3 py-1 text-xs font-semibold border border-slate-300 text-slate-600 rounded-lg hover:bg-white transition-colors">
+                    <button onClick={edit.cancelEdit} className="px-3 py-1 text-xs font-semibold border border-slate-300 text-slate-600 rounded-lg hover:bg-white transition-colors">
                       Cancel
                     </button>
                   </div>
@@ -828,16 +645,16 @@ export default function CustomerDetailPage() {
               </div>
 
               <div className="px-5 py-4 grid grid-cols-3 gap-3">
-                {editing ? (
+                {edit.editing ? (
                   <>
-                    <FieldInput label="Name" name="name" value={(ef.name as string) ?? ''} onChange={handleEditChange} />
-                    <FieldInput label="Phone" name="phone" value={(ef.phone as string) ?? ''} onChange={handleEditChange} type="tel" />
-                    <FieldInput label="Website" name="website" value={(ef.website as string) ?? ''} onChange={handleEditChange} type="url" />
-                    <FieldInput label="LinkedIn" name="linkedin" value={(ef.linkedin as string) ?? ''} onChange={handleEditChange} type="url" />
-                    <FieldInput label="Email Domains" name="email_domains" value={(ef.email_domains as string) ?? ''} onChange={handleEditChange} />
+                    <FieldInput label="Name" name="name" value={(ef.name as string) ?? ''} onChange={edit.handleEditChange} />
+                    <FieldInput label="Phone" name="phone" value={(ef.phone as string) ?? ''} onChange={edit.handleEditChange} type="tel" />
+                    <FieldInput label="Website" name="website" value={(ef.website as string) ?? ''} onChange={edit.handleEditChange} type="url" />
+                    <FieldInput label="LinkedIn" name="linkedin" value={(ef.linkedin as string) ?? ''} onChange={edit.handleEditChange} type="url" />
+                    <FieldInput label="Email Domains" name="email_domains" value={(ef.email_domains as string) ?? ''} onChange={edit.handleEditChange} />
                     <div>
                       <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Status</label>
-                      <select value={(ef.client_status as string) ?? ''} onChange={(e) => handleEditChange('client_status', e.target.value)}
+                      <select value={(ef.client_status as string) ?? ''} onChange={(e) => edit.handleEditChange('client_status', e.target.value)}
                         className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
                         <option value="">— Select —</option>
                         <option>Prospective</option>
@@ -847,7 +664,7 @@ export default function CustomerDetailPage() {
                     </div>
                     <div className="col-span-3">
                       <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Assigned To</label>
-                      <select value={(ef.assigned_to as string) ?? ''} onChange={(e) => handleEditChange('assigned_to', e.target.value)}
+                      <select value={(ef.assigned_to as string) ?? ''} onChange={(e) => edit.handleEditChange('assigned_to', e.target.value)}
                         className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
                         <option value="">— Unassigned —</option>
                         {crmUsers.map((u) => (
@@ -856,7 +673,7 @@ export default function CustomerDetailPage() {
                       </select>
                     </div>
                     <div className="col-span-3">
-                      <FieldInput label="Description" name="description" value={(ef.description as string) ?? ''} onChange={handleEditChange} textarea />
+                      <FieldInput label="Description" name="description" value={(ef.description as string) ?? ''} onChange={edit.handleEditChange} textarea />
                     </div>
                   </>
                 ) : (
@@ -873,7 +690,7 @@ export default function CustomerDetailPage() {
               </div>
 
               {/* Billing & Shipping Address — side by side */}
-              {(editing || customer.billing_address1 || customer.billing_city || customer.shipping_address1 || customer.shipping_city) && (
+              {(edit.editing || customer.billing_address1 || customer.billing_city || customer.shipping_address1 || customer.shipping_city) && (
                 <div className="border-t border-slate-100">
                   <div className="grid grid-cols-2 divide-x divide-slate-100">
                     {/* Billing */}
@@ -883,14 +700,14 @@ export default function CustomerDetailPage() {
                         <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Billing Address</h3>
                       </div>
                       <div className="px-5 py-4">
-                        {editing ? (
+                        {edit.editing ? (
                           <div className="grid grid-cols-2 gap-3">
-                            <div className="col-span-2"><FieldInput label="Address 1" name="billing_address1" value={(ef.billing_address1 as string) ?? ''} onChange={handleEditChange} /></div>
-                            <div className="col-span-2"><FieldInput label="Address 2" name="billing_address2" value={(ef.billing_address2 as string) ?? ''} onChange={handleEditChange} /></div>
-                            <FieldInput label="City" name="billing_city" value={(ef.billing_city as string) ?? ''} onChange={handleEditChange} />
-                            <FieldInput label="State" name="billing_state" value={(ef.billing_state as string) ?? ''} onChange={handleEditChange} />
-                            <FieldInput label="ZIP" name="billing_zip" value={(ef.billing_zip as string) ?? ''} onChange={handleEditChange} />
-                            <FieldInput label="Country" name="billing_country" value={(ef.billing_country as string) ?? ''} onChange={handleEditChange} />
+                            <div className="col-span-2"><FieldInput label="Address 1" name="billing_address1" value={(ef.billing_address1 as string) ?? ''} onChange={edit.handleEditChange} /></div>
+                            <div className="col-span-2"><FieldInput label="Address 2" name="billing_address2" value={(ef.billing_address2 as string) ?? ''} onChange={edit.handleEditChange} /></div>
+                            <FieldInput label="City" name="billing_city" value={(ef.billing_city as string) ?? ''} onChange={edit.handleEditChange} />
+                            <FieldInput label="State" name="billing_state" value={(ef.billing_state as string) ?? ''} onChange={edit.handleEditChange} />
+                            <FieldInput label="ZIP" name="billing_zip" value={(ef.billing_zip as string) ?? ''} onChange={edit.handleEditChange} />
+                            <FieldInput label="Country" name="billing_country" value={(ef.billing_country as string) ?? ''} onChange={edit.handleEditChange} />
                           </div>
                         ) : (
                           <div className="text-sm text-slate-800 leading-snug">
@@ -914,14 +731,14 @@ export default function CustomerDetailPage() {
                         <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Shipping Address</h3>
                       </div>
                       <div className="px-5 py-4">
-                        {editing ? (
+                        {edit.editing ? (
                           <div className="grid grid-cols-2 gap-3">
-                            <div className="col-span-2"><FieldInput label="Address 1" name="shipping_address1" value={(ef.shipping_address1 as string) ?? ''} onChange={handleEditChange} /></div>
-                            <div className="col-span-2"><FieldInput label="Address 2" name="shipping_address2" value={(ef.shipping_address2 as string) ?? ''} onChange={handleEditChange} /></div>
-                            <FieldInput label="City" name="shipping_city" value={(ef.shipping_city as string) ?? ''} onChange={handleEditChange} />
-                            <FieldInput label="State" name="shipping_state" value={(ef.shipping_state as string) ?? ''} onChange={handleEditChange} />
-                            <FieldInput label="ZIP" name="shipping_zip" value={(ef.shipping_zip as string) ?? ''} onChange={handleEditChange} />
-                            <FieldInput label="Country" name="shipping_country" value={(ef.shipping_country as string) ?? ''} onChange={handleEditChange} />
+                            <div className="col-span-2"><FieldInput label="Address 1" name="shipping_address1" value={(ef.shipping_address1 as string) ?? ''} onChange={edit.handleEditChange} /></div>
+                            <div className="col-span-2"><FieldInput label="Address 2" name="shipping_address2" value={(ef.shipping_address2 as string) ?? ''} onChange={edit.handleEditChange} /></div>
+                            <FieldInput label="City" name="shipping_city" value={(ef.shipping_city as string) ?? ''} onChange={edit.handleEditChange} />
+                            <FieldInput label="State" name="shipping_state" value={(ef.shipping_state as string) ?? ''} onChange={edit.handleEditChange} />
+                            <FieldInput label="ZIP" name="shipping_zip" value={(ef.shipping_zip as string) ?? ''} onChange={edit.handleEditChange} />
+                            <FieldInput label="Country" name="shipping_country" value={(ef.shipping_country as string) ?? ''} onChange={edit.handleEditChange} />
                           </div>
                         ) : (
                           <div className="text-sm text-slate-800 leading-snug">
@@ -948,12 +765,12 @@ export default function CustomerDetailPage() {
                   <h2 className="text-sm font-semibold text-slate-700">Arcon Program Data</h2>
                 </div>
                 <div className="px-5 py-4 grid grid-cols-2 gap-3">
-                  {editing ? (
+                  {edit.editing ? (
                     <>
-                      <FieldInput label="General Logo Color" name="general_logo_color" value={(ef.general_logo_color as string) ?? ''} onChange={handleEditChange} />
-                      <FieldInput label="Formal PMS Colors" name="formal_pms_colors" value={(ef.formal_pms_colors as string) ?? ''} onChange={handleEditChange} />
+                      <FieldInput label="General Logo Color" name="general_logo_color" value={(ef.general_logo_color as string) ?? ''} onChange={edit.handleEditChange} />
+                      <FieldInput label="Formal PMS Colors" name="formal_pms_colors" value={(ef.formal_pms_colors as string) ?? ''} onChange={edit.handleEditChange} />
                       <div className="col-span-2">
-                        <FieldInput label="Artwork Notes" name="artwork_notes" value={(ef.artwork_notes as string) ?? ''} onChange={handleEditChange} textarea rows={6} />
+                        <FieldInput label="Artwork Notes" name="artwork_notes" value={(ef.artwork_notes as string) ?? ''} onChange={edit.handleEditChange} textarea rows={6} />
                       </div>
                     </>
                   ) : (
@@ -979,11 +796,11 @@ export default function CustomerDetailPage() {
                     <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-0.5">Sales Consultant</div>
                     <div className="text-sm text-slate-800">{customer.assigned_user?.display_name ?? <span className="text-slate-400">—</span>}</div>
                   </div>
-                  {editing ? (
+                  {edit.editing ? (
                     <div>
                       <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Commissioned Client</label>
                       <select value={(ef.commissioned_client as string) ?? ''}
-                        onChange={(e) => handleEditChange('commissioned_client', e.target.value)}
+                        onChange={(e) => edit.handleEditChange('commissioned_client', e.target.value)}
                         className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
                         <option value="">— Select —</option>
                         <option>Standard</option>
@@ -994,21 +811,21 @@ export default function CustomerDetailPage() {
                   ) : (
                     <Field label="Commissioned Client" value={customer.commissioned_client} />
                   )}
-                  {editing ? (
+                  {edit.editing ? (
                     <div>
                       <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">Tax Exempt</label>
                       <div className="flex gap-4">
                         <label className="inline-flex items-center gap-2 cursor-pointer">
                           <input type="radio" name="edit_tax_exempt" value="yes"
                             checked={(ef.tax_exempt as boolean) === true}
-                            onChange={() => handleEditBoolChange('tax_exempt', true)}
+                            onChange={() => edit.handleEditBoolChange('tax_exempt', true)}
                             className="w-4 h-4 border-slate-300 text-purple-600 focus:ring-purple-400" />
                           <span className="text-sm text-slate-700">Yes</span>
                         </label>
                         <label className="inline-flex items-center gap-2 cursor-pointer">
                           <input type="radio" name="edit_tax_exempt" value="no"
                             checked={(ef.tax_exempt as boolean) === false}
-                            onChange={() => handleEditBoolChange('tax_exempt', false)}
+                            onChange={() => edit.handleEditBoolChange('tax_exempt', false)}
                             className="w-4 h-4 border-slate-300 text-purple-600 focus:ring-purple-400" />
                           <span className="text-sm text-slate-700">No</span>
                         </label>
@@ -1028,15 +845,15 @@ export default function CustomerDetailPage() {
               </div>
 
               {/* Notes */}
-              {(editing || customer.notes) && (
+              {(edit.editing || customer.notes) && (
                 <div className="border-t border-slate-100">
                   <div className="px-5 py-2 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
                     <div className="w-0.5 h-3.5 bg-purple-300 rounded-full" />
                     <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Additional Information</h3>
                   </div>
                   <div className="px-5 py-4">
-                    {editing
-                      ? <FieldInput label="Notes" name="notes" value={(ef.notes as string) ?? ''} onChange={handleEditChange} textarea rows={6} />
+                    {edit.editing
+                      ? <FieldInput label="Notes" name="notes" value={(ef.notes as string) ?? ''} onChange={edit.handleEditChange} textarea rows={6} />
                       : <Field label="Notes" value={customer.notes} multiline />
                     }
                   </div>
@@ -1054,7 +871,7 @@ export default function CustomerDetailPage() {
           {/* Sidebar — 25% */}
           <div className="space-y-3">
             {/* Tags card */}
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="bg-white border border-slate-200 rounded-2xl">
               <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">
                 <div className="flex items-center gap-2">
                   <svg className="w-3.5 h-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1066,9 +883,9 @@ export default function CustomerDetailPage() {
               </div>
               <div className="p-3">
                 <TagPicker value={tagIds} onChange={handleTagsChange} placeholder="Add tags…" />
-                {aturianError && (
+                {edit.aturianError && (
                   <div className="mt-2 p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 leading-relaxed">
-                    {aturianError}
+                    {edit.aturianError}
                   </div>
                 )}
               </div>
@@ -1256,10 +1073,7 @@ export default function CustomerDetailPage() {
           {/* Contacts */}
           <CustomerContactsList
             contacts={customer.contacts}
-            onAddClick={() => {
-              setShowAddContact(true)
-              setAddContactError(null)
-            }}
+            onAddClick={() => setShowAddContact(true)}
             onContactClick={(id) => router.push(`/marketing/contacts/${id}`)}
           />
 
@@ -1313,299 +1127,32 @@ export default function CustomerDetailPage() {
 
       {/* ── Artwork Tab ── */}
       {activeTab === 'artwork' && (
-        <div className="space-y-4">
-          {/* Header */}
-          <div className="flex items-center justify-between">
-            <h2 className="text-sm font-semibold text-slate-700">
-              Artwork{artworkLoaded ? ` (${artwork.length})` : ''}
-            </h2>
-            <button
-              onClick={() => { setShowArtworkModal(true); setArtworkError(null) }}
-              className="px-3 py-1.5 bg-purple-700 text-white text-sm font-semibold rounded-lg hover:bg-purple-800 transition-colors"
-            >
-              + Add Artwork
-            </button>
-          </div>
-
-          {/* Loading */}
-          {artworkLoading && (
-            <div className="text-center py-10 text-sm text-slate-400">Loading artwork…</div>
-          )}
-
-          {/* Empty state */}
-          {artworkLoaded && !artworkLoading && artwork.length === 0 && (
-            <div className="bg-white border border-slate-200 rounded-2xl p-10 text-center text-sm text-slate-400">
-              No artwork yet. Upload files or link Google Drive assets.
-            </div>
-          )}
-
-          {/* Grid */}
-          {artwork.length > 0 && (
-            <div className="grid grid-cols-3 gap-4">
-              {artwork.map((item) => {
-                const thumb = item.thumbnail_url ?? null
-                const ext = item.file_name?.split('.').pop()?.toUpperCase() ?? '?'
-                const date = new Date(item.created_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-
-                return (
-                  <div key={item.id} className="bg-white border border-slate-200 rounded-2xl overflow-hidden flex flex-col">
-                    {/* Preview area */}
-                    <a href={item.url} target="_blank" rel="noopener noreferrer" className="block">
-                      {item.is_drive_link ? (
-                        <div className="h-36 bg-slate-50 flex items-center justify-center">
-                          {/* Google Drive icon */}
-                          <svg className="w-14 h-14" viewBox="0 0 87.3 78" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M6.6 66.85l3.85 6.65c.8 1.4 1.95 2.5 3.3 3.3L27.5 50H0c0 1.55.4 3.1 1.2 4.5L6.6 66.85z" fill="#0066DA"/>
-                            <path d="M43.65 25L29.9 1.2c-1.35.8-2.5 1.9-3.3 3.3L1.2 45.5c-.8 1.4-1.2 2.95-1.2 4.5h27.5L43.65 25z" fill="#00AC47"/>
-                            <path d="M73.55 76.8c1.35-.8 2.5-1.9 3.3-3.3l1.6-2.75 7.65-13.25c.8-1.4 1.2-2.95 1.2-4.5H60.1l5.9 11.5 7.55 12.3z" fill="#EA4335"/>
-                            <path d="M43.65 25L57.4 1.2C56.05.4 54.5 0 52.9 0H34.4c-1.6 0-3.15.45-4.5 1.2L43.65 25z" fill="#00832D"/>
-                            <path d="M60.1 50H27.5L13.75 76.8c1.35.8 2.9 1.2 4.5 1.2h50.8c1.6 0 3.15-.45 4.5-1.2L60.1 50z" fill="#2684FC"/>
-                            <path d="M73.4 26.5l-12.85-22.3c-.8-1.4-1.95-2.5-3.3-3.3L43.65 25 60.1 50h27.45c0-1.55-.4-3.1-1.2-4.5L73.4 26.5z" fill="#FFBA00"/>
-                          </svg>
-                        </div>
-                      ) : item.dropbox_url && !item.is_dropbox_file ? (
-                        <div className="h-36 bg-slate-50 flex items-center justify-center">
-                          {/* Dropbox folder icon */}
-                          <svg className="w-14 h-14" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
-                            <path d="M3 5.25a1.5 1.5 0 011.5-1.5h6l1.5 1.5H18a1.5 1.5 0 011.5 1.5v11a1.5 1.5 0 01-1.5 1.5H4.5a1.5 1.5 0 01-1.5-1.5V5.25z" fill="#0061FF"/>
-                          </svg>
-                        </div>
-                      ) : thumb ? (
-                        <div className="h-36 bg-slate-100 overflow-hidden relative">
-                          <img src={thumb} alt={item.name} className="w-full h-full object-contain"
-                            onError={(e) => {
-                              const img = e.target as HTMLImageElement
-                              img.style.display = 'none'
-                              const fallback = img.nextElementSibling as HTMLElement | null
-                              if (fallback) fallback.style.display = 'flex'
-                            }}
-                          />
-                          <div className="absolute inset-0 hidden items-center justify-center bg-slate-50">
-                            <span className="text-2xl font-black text-slate-300">{ext}</span>
-                          </div>
-                        </div>
-                      ) : (
-                        <div className="h-36 bg-slate-50 flex items-center justify-center">
-                          <span className="text-2xl font-black text-slate-300">{ext}</span>
-                        </div>
-                      )}
-                    </a>
-
-                    {/* Metadata */}
-                    <div className="p-3 flex flex-col gap-1 flex-1">
-                      <div className="text-sm font-semibold text-slate-800 truncate" title={item.name}>{item.name}</div>
-                      {item.description && (
-                        <div className="text-xs text-slate-500 line-clamp-2">{item.description}</div>
-                      )}
-                      <div className="text-xs text-slate-400 mt-auto pt-1 space-y-0.5">
-                        {item.is_drive_link
-                          ? <span>Google Drive</span>
-                          : item.dropbox_url
-                          ? <span>{item.is_dropbox_file ? 'Dropbox File' : 'Dropbox Folder'}</span>
-                          : (
-                            <span>
-                              {item.mime_type?.split('/')[1]?.toUpperCase() ?? ext}
-                              {item.width && item.height ? ` · ${item.width}×${item.height}` : ''}
-                              {item.file_size ? ` · ${formatBytes(item.file_size)}` : ''}
-                            </span>
-                          )
-                        }
-                        <div>{date}</div>
-                      </div>
-                      <div className="mt-2 flex items-center gap-3">
-                        {!item.is_drive_link && !item.dropbox_url &&
-                          item.cloudinary_resource_type === 'image' &&
-                          (item.mime_type === 'image/png' || item.mime_type === 'image/jpeg') && (
-                          <button
-                            onClick={() => handleVectorize(item)}
-                            disabled={vectorizingIds.has(item.id)}
-                            className="text-xs text-purple-600 hover:text-purple-800 transition-colors disabled:opacity-50"
-                          >
-                            {vectorizingIds.has(item.id) ? 'Vectorizing…' : 'Vectorize → EPS'}
-                          </button>
-                        )}
-                        <button
-                          onClick={() => handleArtworkDelete(item.id)}
-                          className="text-xs text-red-500 hover:text-red-700 transition-colors"
-                        >
-                          Delete
-                        </button>
-                      </div>
-                    </div>
-                  </div>
-                )
-              })}
-            </div>
-          )}
-
-          {/* Upload Modal */}
-          {showArtworkModal && (
-            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-              <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
-                <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-                  <h3 className="text-base font-semibold text-slate-800">Add Artwork</h3>
-                  <button onClick={() => setShowArtworkModal(false)} className="text-slate-400 hover:text-slate-600">
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                    </svg>
-                  </button>
-                </div>
-                <form onSubmit={handleArtworkSubmit} className="p-6 space-y-4">
-                  {/* Mode toggle */}
-                  <div className="grid grid-cols-3 gap-2">
-                    <button type="button"
-                      onClick={() => setArtworkMode('upload')}
-                      className={`py-1.5 text-sm font-semibold rounded-lg border transition-colors ${artworkMode === 'upload' ? 'bg-purple-700 text-white border-purple-700' : 'text-slate-600 border-slate-200 hover:bg-slate-50'}`}
-                    >Upload File</button>
-                    <button type="button"
-                      onClick={() => setArtworkMode('drive')}
-                      className={`py-1.5 text-sm font-semibold rounded-lg border transition-colors ${artworkMode === 'drive' ? 'bg-purple-700 text-white border-purple-700' : 'text-slate-600 border-slate-200 hover:bg-slate-50'}`}
-                    >Google Drive</button>
-                    <button type="button"
-                      onClick={() => setArtworkMode('dropbox')}
-                      className={`py-1.5 text-sm font-semibold rounded-lg border transition-colors ${artworkMode === 'dropbox' ? 'bg-purple-700 text-white border-purple-700' : 'text-slate-600 border-slate-200 hover:bg-slate-50'}`}
-                    >Dropbox Link</button>
-                  </div>
-
-                  {artworkMode === 'upload' ? (
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1">File</label>
-                      <input type="file" required
-                        onChange={(e) => {
-                          const f = e.target.files?.[0] ?? null
-                          setArtworkFile(f)
-                          if (f && !artworkName) setArtworkName(f.name.replace(/\.[^.]+$/, ''))
-                        }}
-                        className="block w-full text-sm text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
-                      />
-                    </div>
-                  ) : artworkMode === 'drive' ? (
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1">Google Drive URL</label>
-                      <input type="url" required value={artworkDriveUrl} onChange={(e) => setArtworkDriveUrl(e.target.value)}
-                        placeholder="https://drive.google.com/..."
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
-                      />
-                    </div>
-                  ) : (
-                    <div>
-                      <label className="block text-xs font-semibold text-slate-600 mb-1">Dropbox URL</label>
-                      <input type="url" required value={artworkDropboxUrl} onChange={(e) => setArtworkDropboxUrl(e.target.value)}
-                        placeholder="https://www.dropbox.com/..."
-                        className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
-                      />
-                      <p className="text-xs text-slate-500 mt-1">Paste a link to a Dropbox file or folder. We'll detect which automatically.</p>
-                    </div>
-                  )}
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">Name <span className="text-red-400">*</span></label>
-                    <input type="text" required value={artworkName} onChange={(e) => setArtworkName(e.target.value)}
-                      placeholder="e.g. Primary Logo"
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300"
-                    />
-                  </div>
-
-                  <div>
-                    <label className="block text-xs font-semibold text-slate-600 mb-1">Description</label>
-                    <textarea value={artworkDesc} onChange={(e) => setArtworkDesc(e.target.value)}
-                      placeholder="Optional notes about this file…"
-                      rows={2}
-                      className="w-full px-3 py-2 border border-slate-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-purple-300 resize-none"
-                    />
-                  </div>
-
-                  {artworkError && (
-                    <p className="text-sm text-red-600 bg-red-50 rounded-lg px-3 py-2">{artworkError}</p>
-                  )}
-
-                  <div className="flex gap-2 pt-1">
-                    <button type="button" onClick={() => setShowArtworkModal(false)}
-                      className="flex-1 py-2 text-sm font-semibold text-slate-600 border border-slate-200 rounded-lg hover:bg-slate-50 transition-colors"
-                    >Cancel</button>
-                    <button type="submit" disabled={artworkUploading}
-                      className="flex-1 py-2 text-sm font-semibold text-white bg-purple-700 rounded-lg hover:bg-purple-800 disabled:opacity-50 transition-colors"
-                    >
-                      {artworkUploading ? 'Uploading…' : 'Save'}
-                    </button>
-                  </div>
-                </form>
-              </div>
-            </div>
-          )}
-        </div>
+        <CustomerArtworkGrid
+          artwork={artworkHook.artwork}
+          loaded={artworkHook.loaded}
+          loading={artworkHook.loading}
+          vectorizingIds={artworkHook.vectorizingIds}
+          onAdd={() => setShowArtworkModal(true)}
+          onVectorize={artworkHook.vectorize}
+          onDelete={artworkHook.remove}
+        />
       )}
 
-      {/* Quick-Create Contact Modal */}
-      {showAddContact && (
-        <div className="fixed inset-0 bg-black/40 flex items-center justify-center z-50" onClick={() => setShowAddContact(false)}>
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-md" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-base font-semibold text-slate-800 mb-4">Add Contact</h2>
-            <form onSubmit={handleAddContact} className="space-y-3">
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">First Name *</label>
-                  <input value={addContactForm.first_name} onChange={(e) => setAddContactForm(p => ({ ...p, first_name: e.target.value }))}
-                    className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Last Name *</label>
-                  <input value={addContactForm.last_name} onChange={(e) => setAddContactForm(p => ({ ...p, last_name: e.target.value }))}
-                    className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Email</label>
-                <input type="email" value={addContactForm.email} onChange={(e) => setAddContactForm(p => ({ ...p, email: e.target.value }))}
-                  className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
-              </div>
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Phone</label>
-                  <input value={addContactForm.phone} onChange={(e) => setAddContactForm(p => ({ ...p, phone: e.target.value }))}
-                    className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
-                </div>
-                <div>
-                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Title</label>
-                  <input value={addContactForm.title} onChange={(e) => setAddContactForm(p => ({ ...p, title: e.target.value }))}
-                    className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
-                </div>
-              </div>
-              <div>
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Department</label>
-                <select value={addContactForm.department} onChange={(e) => setAddContactForm(p => ({ ...p, department: e.target.value }))}
-                  className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                  <option value="">— None —</option>
-                  <option>Accounting</option>
-                  <option>C-Suite</option>
-                  <option>Customer Service</option>
-                  <option>Finance</option>
-                  <option>HR</option>
-                  <option>IT</option>
-                  <option>Legal</option>
-                  <option>Management</option>
-                  <option>Marketing</option>
-                  <option>Operations</option>
-                  <option>Purchasing</option>
-                  <option>Sales</option>
-                  <option>Other</option>
-                </select>
-              </div>
-              {addContactError && <div className="text-xs text-red-600">{addContactError}</div>}
-              <div className="flex gap-2 pt-1">
-                <button type="submit" disabled={addContactSaving}
-                  className="flex-1 py-2 text-sm font-semibold bg-purple-700 hover:bg-purple-800 disabled:opacity-50 text-white rounded-xl transition-colors">
-                  {addContactSaving ? 'Adding…' : 'Add Contact'}
-                </button>
-                <button type="button" onClick={() => setShowAddContact(false)}
-                  className="flex-1 py-2 text-sm font-semibold border border-slate-200 text-slate-600 hover:bg-slate-50 rounded-xl transition-colors">
-                  Cancel
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <ArtworkUploadModal
+        open={showArtworkModal}
+        customerId={customer?.id ?? ''}
+        onClose={() => setShowArtworkModal(false)}
+        onAdded={artworkHook.add}
+      />
+
+      <AddContactModal
+        open={showAddContact}
+        customerId={customer?.id ?? ''}
+        onClose={() => setShowAddContact(false)}
+        onContactAdded={(contact) => {
+          setCustomer((prev) => prev ? { ...prev, contacts: [...prev.contacts, contact as CustomerDetail['contacts'][0]] } : prev)
+        }}
+      />
       {/* ── Specs Tab ── */}
       {activeTab === 'specs' && (
         <div className="space-y-4">

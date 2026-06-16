@@ -9,6 +9,10 @@ import { CreateTaskModal } from '@/components/crm/CreateTaskModal'
 import { CrmDetailActions } from '@/components/crm/CrmDetailActions'
 import { TaskCreatedToast } from '@/components/crm/TaskCreatedToast'
 import { opportunityStatusBadge, taskStatusBadge } from '@/lib/badges'
+import { Field, FieldInput } from '@/components/ui'
+import { formatDate, formatDateTime } from '@/lib/format'
+import { CloseReasonModal } from '@/components/crm/opportunity/CloseReasonModal'
+import { PipelineBar, STAGES } from '@/components/crm/opportunity/PipelineBar'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -73,13 +77,6 @@ type CreateForm = {
 
 // ── Constants ─────────────────────────────────────────────────────────────────
 
-const STAGES: PipelineStage[] = [
-  'Send Quote',
-  'Follow Up on Quote',
-  'Quote Accepted',
-  'Send Thank You Email',
-]
-
 const CATEGORIES: OppCategory[] = [
   'Apparel', 'Packaging Product', 'Print Product',
   'Promotional Product', 'Signage', 'Store/Ecommerce Build',
@@ -90,199 +87,6 @@ const CATEGORIES: OppCategory[] = [
 function fmt$(val: number | null) {
   if (val == null) return '—'
   return '$' + val.toLocaleString('en-US', { minimumFractionDigits: 0 })
-}
-
-function fmtDate(iso: string | null) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function fmtDateTime(iso: string) {
-  return new Date(iso).toLocaleString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
-    hour: 'numeric', minute: '2-digit',
-  })
-}
-
-function Field({ label, value }: { label: string; value: string | null | undefined }) {
-  return (
-    <div>
-      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">{label}</div>
-      <div className="text-sm text-slate-800">{value || <span className="text-slate-300">—</span>}</div>
-    </div>
-  )
-}
-
-function FieldInput({
-  label, name, value, onChange, type = 'text', textarea = false, children,
-}: {
-  label: string; name: string; value: string; onChange: (n: string, v: string) => void
-  type?: string; textarea?: boolean; children?: React.ReactNode
-}) {
-  const cls = "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
-  return (
-    <div>
-      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">{label}</label>
-      {children ?? (
-        textarea
-          ? <textarea rows={3} value={value} onChange={(e) => onChange(name, e.target.value)} className={cls + ' resize-none'} />
-          : <input type={type} value={value} onChange={(e) => onChange(name, e.target.value)} className={cls} />
-      )}
-    </div>
-  )
-}
-
-// ── Close Reason Modal ────────────────────────────────────────────────────────
-
-function CloseReasonModal({
-  result,
-  onConfirm,
-  onCancel,
-}: {
-  result: 'won' | 'lost'
-  onConfirm: (reason: string) => void
-  onCancel: () => void
-}) {
-  const [reason, setReason] = useState('')
-  const isWon = result === 'won'
-
-  return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 p-6">
-        <h2 className="text-base font-bold text-slate-900 mb-1">
-          {isWon ? '🏆 Close as Won' : '❌ Close as Lost'}
-        </h2>
-        <p className="text-sm text-slate-500 mb-4">
-          {isWon
-            ? 'What led to winning this opportunity?'
-            : 'What was the reason for losing this opportunity?'}
-        </p>
-        <textarea
-          autoFocus
-          rows={3}
-          value={reason}
-          onChange={(e) => setReason(e.target.value)}
-          placeholder={isWon ? 'e.g. Customer accepted our quote' : 'e.g. Lost to competitor on price'}
-          className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none mb-4"
-        />
-        <div className="flex gap-3 justify-end">
-          <button
-            onClick={onCancel}
-            className="px-4 py-2 text-sm font-medium border border-slate-300 text-slate-600 rounded-xl hover:bg-slate-50 transition-colors"
-          >
-            Cancel
-          </button>
-          <button
-            onClick={() => onConfirm(reason.trim())}
-            className={`px-4 py-2 text-sm font-semibold rounded-xl text-white transition-colors ${
-              isWon ? 'bg-green-600 hover:bg-green-700' : 'bg-red-600 hover:bg-red-700'
-            }`}
-          >
-            {isWon ? 'Mark as Won' : 'Mark as Lost'}
-          </button>
-        </div>
-      </div>
-    </div>
-  )
-}
-
-// ── Pipeline Bar ──────────────────────────────────────────────────────────────
-
-function PipelineBar({
-  currentStage,
-  status,
-  onStageClick,
-  onClose,
-  disabled,
-}: {
-  currentStage: PipelineStage | null
-  status: OppStatus
-  onStageClick: (stage: PipelineStage) => void
-  onClose: (result: 'won' | 'lost') => void
-  disabled: boolean
-}) {
-  const isClosed = status === 'won' || status === 'lost'
-  const currentIdx = currentStage ? STAGES.indexOf(currentStage) : -1
-
-  return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-3">
-      <div className="flex items-center gap-2 mb-4">
-        <span className="text-sm font-semibold text-slate-700">Pipeline Stage</span>
-        {isClosed && (
-          <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${opportunityStatusBadge(status)}`}>
-            {status === 'won' ? '🏆 Won' : '❌ Lost'}
-          </span>
-        )}
-      </div>
-
-      {/* Stage steps */}
-      <div className="flex items-center gap-0 mb-4">
-        {STAGES.map((stage, idx) => {
-          const isActive = stage === currentStage
-          const isPast = currentIdx > idx
-          const isClickable = !disabled && !isClosed
-
-          return (
-            <div key={stage} className="flex items-center flex-1 min-w-0">
-              <button
-                onClick={() => isClickable && onStageClick(stage)}
-                disabled={!isClickable}
-                title={stage}
-                className={[
-                  'flex-1 px-2 py-2 text-xs font-medium text-center transition-colors rounded-none first:rounded-l-xl last:rounded-r-xl border',
-                  isActive
-                    ? 'bg-purple-700 text-white border-purple-700 shadow-sm'
-                    : isPast
-                    ? 'bg-purple-100 text-purple-700 border-purple-200'
-                    : 'bg-slate-50 text-slate-500 border-slate-200',
-                  isClickable && !isActive ? 'hover:bg-purple-50 hover:text-purple-700 hover:border-purple-300 cursor-pointer' : '',
-                  disabled ? 'cursor-default' : '',
-                ].join(' ')}
-              >
-                <span className="block truncate">{stage}</span>
-              </button>
-              {idx < STAGES.length - 1 && (
-                <div className={`w-0 h-0 border-t-[16px] border-b-[16px] border-l-[10px] border-t-transparent border-b-transparent z-10 -mx-0.5 flex-shrink-0 ${
-                  isPast || isActive ? 'border-l-purple-200' : 'border-l-slate-200'
-                }`} />
-              )}
-            </div>
-          )
-        })}
-      </div>
-
-      {/* Close Won / Close Lost */}
-      {!isClosed && (
-        <div className="flex gap-2">
-          <button
-            onClick={() => !disabled && onClose('won')}
-            disabled={disabled}
-            className="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-green-50 text-green-700 border border-green-200 hover:bg-green-100 disabled:opacity-50 transition-colors"
-          >
-            🏆 Close Won
-          </button>
-          <button
-            onClick={() => !disabled && onClose('lost')}
-            disabled={disabled}
-            className="flex-1 py-1.5 text-xs font-semibold rounded-lg bg-red-50 text-red-700 border border-red-200 hover:bg-red-100 disabled:opacity-50 transition-colors"
-          >
-            ❌ Close Lost
-          </button>
-        </div>
-      )}
-      {isClosed && (
-        <div className="flex gap-2">
-          <button
-            onClick={() => !disabled && onClose('won')}
-            disabled={disabled}
-            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-500 hover:bg-slate-50 disabled:opacity-50 transition-colors"
-          >
-            Re-open as Open
-          </button>
-        </div>
-      )}
-    </div>
-  )
 }
 
 // ── Main Component ────────────────────────────────────────────────────────────
@@ -662,9 +466,9 @@ export default function OpportunityDetailPage() {
             {opp.forecast_close_date && (
               <div className="mt-2 text-sm text-slate-500">
                 Forecast close: <span className={isClosed ? 'text-slate-700' : new Date(opp.forecast_close_date) < new Date() ? 'text-red-600 font-medium' : 'text-slate-700'}>
-                  {fmtDate(opp.forecast_close_date)}
+                  {formatDate(opp.forecast_close_date)}
                 </span>
-                {opp.closed_at && <span className="ml-3 text-slate-400">Closed: {fmtDate(opp.closed_at)}</span>}
+                {opp.closed_at && <span className="ml-3 text-slate-400">Closed: {formatDate(opp.closed_at)}</span>}
               </div>
             )}
           </div>
@@ -796,8 +600,8 @@ export default function OpportunityDetailPage() {
                 <Field label="Status" value={opp.status} />
                 <Field label="Value" value={opp.value != null ? fmt$(opp.value) : null} />
                 <Field label="Probability" value={opp.probability != null ? `${opp.probability}%` : null} />
-                <Field label="Forecast Close" value={fmtDate(opp.forecast_close_date)} />
-                <Field label="Closed At" value={opp.closed_at ? fmtDateTime(opp.closed_at) : null} />
+                <Field label="Forecast Close" value={formatDate(opp.forecast_close_date)} />
+                <Field label="Closed At" value={opp.closed_at ? formatDateTime(opp.closed_at) : null} />
                 {opp.status_reason && (
                   <div className="col-span-2">
                     <Field label="Status Reason" value={opp.status_reason} />
@@ -814,8 +618,8 @@ export default function OpportunityDetailPage() {
           </div>
 
           <div className="border-t border-slate-100 px-5 py-3 bg-slate-50 flex gap-6 text-xs text-slate-400">
-            <span>Created {fmtDate(opp.created_at)}</span>
-            <span>Updated {fmtDate(opp.updated_at)}</span>
+            <span>Created {formatDate(opp.created_at)}</span>
+            <span>Updated {formatDate(opp.updated_at)}</span>
           </div>
         </div>
           </div>
@@ -879,7 +683,7 @@ export default function OpportunityDetailPage() {
                       </td>
                       <td className="px-5 py-3 text-slate-600 hidden lg:table-cell">{fmt$(h.value)}</td>
                       <td className="px-5 py-3 text-slate-600">{h.changed_by_name ?? '—'}</td>
-                      <td className="px-5 py-3 text-slate-400">{fmtDateTime(h.changed_at)}</td>
+                      <td className="px-5 py-3 text-slate-400">{formatDateTime(h.changed_at)}</td>
                     </tr>
                   ))}
                 </tbody>
@@ -912,7 +716,7 @@ export default function OpportunityDetailPage() {
                     </span>
                     {t.due_date && (
                       <span className={`text-xs whitespace-nowrap ${new Date(t.due_date) < new Date() ? 'text-red-500 font-medium' : 'text-slate-400'}`}>
-                        {fmtDate(t.due_date)}
+                        {formatDate(t.due_date)}
                       </span>
                     )}
                   </div>

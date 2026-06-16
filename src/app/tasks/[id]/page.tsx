@@ -8,84 +8,19 @@ import { TaskAssignmentSelect } from '@/components/crm/TaskAssignmentSelect'
 import { TaskDescriptionEditor } from '@/components/crm/TaskDescriptionEditor'
 import { getTaskCategoryLabel } from '@/lib/task-constants'
 import { useAppUser } from '@/components/layout/AppShell'
+import { formatDate, formatDateTime, formatBytes } from '@/lib/format'
+import { useTask } from '@/hooks/useTask'
+import type { TaskPriority } from '@/hooks/useTask'
+import { TaskStatusBar, STATUSES } from '@/components/crm/task/TaskStatusBar'
+import { TaskNotesPreview } from '@/components/crm/task/TaskNotesPreview'
+import { CommentsTab } from '@/components/crm/task/CommentsTab'
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
-type TaskStatus = 'not_started' | 'in_progress' | 'completed' | 'waiting_on_approval' | 'waiting_on_client_approval' | 'need_changes'
-type TaskPriority = 'low' | 'medium' | 'high'
+// ── Local Types ───────────────────────────────────────────────────────────────
 
 type DropdownUser = { id: string; display_name: string; email: string }
 type DropdownContact = { id: string; first_name: string; last_name: string }
 
-type TaskAttachment = {
-  id: string; task_id: string; url: string
-  file_name: string | null; file_size: number | null; mime_type: string | null
-  uploaded_by: string; created_at: string
-}
-
-type Attachment = {
-  id: string; comment_id: string; label: string; url: string
-  file_name: string | null; file_size: number | null; mime_type: string | null
-  is_drive_link: boolean; uploaded_by: string; created_at: string
-}
-
-type Comment = {
-  id: string; task_id: string; user_id: string; comment: string
-  created_at: string; updated_at: string
-  attachments: Attachment[]
-  user: { display_name: string }
-}
-
-type HistoryEntry = {
-  id: string; task_id: string; user_id: string; field_changed: string
-  old_value: string | null; new_value: string | null; changed_at: string
-  user: { id: string; display_name: string }
-}
-
-type TaskDetail = {
-  id: string; title: string; assigned_to: string | null; task_owner: string | null
-  department: string | null; category: string | null; priority: TaskPriority; due_date: string | null
-  status: TaskStatus; progress: number; description: string | null
-  opportunity_id: string | null; customer_id: string | null
-  vendor_id: string | null; contact_id: string | null
-  created_by: string; created_at: string; updated_at: string
-  comments: Comment[]
-  history: HistoryEntry[]
-  opportunity: { id: string; name: string } | null
-  customer: { id: string; name: string } | null
-  vendor: { id: string; name: string } | null
-  contact: { id: string; first_name: string; last_name: string } | null
-  assigned_user: { id: string; display_name: string; email: string } | null
-  created_user: { id: string; display_name: string } | null
-  delegator_users: { id: string; display_name: string }[]
-  attachments: TaskAttachment[]
-  linked_spec: { id: string; item_name: string; status: string } | null
-}
-
-// ── Constants ─────────────────────────────────────────────────────────────────
-
-const STATUSES: { value: TaskStatus; label: string; cls: string }[] = [
-  { value: 'not_started', label: 'Not Started', cls: 'bg-slate-100 text-slate-600' },
-  { value: 'in_progress', label: 'In Progress', cls: 'bg-blue-100 text-blue-700' },
-  { value: 'completed', label: 'Completed', cls: 'bg-green-100 text-green-700' },
-  { value: 'waiting_on_approval', label: 'Waiting on Approval', cls: 'bg-yellow-100 text-yellow-700' },
-  { value: 'waiting_on_client_approval', label: 'Waiting on Client Approval', cls: 'bg-orange-100 text-orange-700' },
-  { value: 'need_changes', label: 'Need Changes', cls: 'bg-red-100 text-red-600' },
-]
-
-const STATUS_ORDER_VALUES = [
-  'not_started', 'in_progress', 'waiting_on_approval',
-  'waiting_on_client_approval', 'need_changes', 'completed',
-] as const
-
-const STATUS_COLORS: Record<string, string> = {
-  not_started: '#94a3b8',
-  in_progress: '#60a5fa',
-  waiting_on_approval: '#fbbf24',
-  waiting_on_client_approval: '#fb923c',
-  need_changes: '#f87171',
-  completed: '#4ade80',
-}
+// ── Local Constants ───────────────────────────────────────────────────────────
 
 const PRIORITY_BADGE: Record<TaskPriority, string> = {
   low: 'bg-slate-100 text-slate-500',
@@ -93,122 +28,7 @@ const PRIORITY_BADGE: Record<TaskPriority, string> = {
   high: 'bg-red-100 text-red-700',
 }
 
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function fmtDate(iso: string | null) {
-  if (!iso) return '—'
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-}
-
-function fmtDateTime(iso: string) {
-  return new Date(iso).toLocaleString('en-US', {
-    month: 'short', day: 'numeric', year: 'numeric',
-    hour: 'numeric', minute: '2-digit',
-  })
-}
-
-function StatusBar({
-  currentStatus,
-  onStatusClick,
-  disabled,
-}: {
-  currentStatus: string
-  onStatusClick: (status: string) => void
-  disabled: boolean
-}) {
-  const currentIdx = STATUS_ORDER_VALUES.indexOf(currentStatus as typeof STATUS_ORDER_VALUES[number])
-  return (
-    <div style={{ display: 'flex', alignItems: 'stretch', height: 36 }}>
-      {STATUS_ORDER_VALUES.map((s, idx) => {
-        const isActive = s === currentStatus
-        const isPast = currentIdx > idx
-        const isFirst = idx === 0
-        const isLast = idx === STATUS_ORDER_VALUES.length - 1
-        const statusLabel = STATUSES.find((st) => st.value === s)?.label ?? s
-        const isClickable = !disabled && !isActive
-        const bg = isActive ? STATUS_COLORS[s] : isPast ? '#ede9fe' : '#f8fafc'
-        const textColor = isActive ? '#fff' : isPast ? '#6d28d9' : '#94a3b8'
-        const triangleColor = isActive ? STATUS_COLORS[s] : isPast ? '#ddd6fe' : '#e2e8f0'
-        return (
-          <div key={s} style={{ display: 'flex', alignItems: 'stretch', flex: 1, minWidth: 0 }}>
-            <button
-              type="button"
-              onClick={() => isClickable && onStatusClick(s)}
-              disabled={!isClickable}
-              title={statusLabel}
-              style={{
-                flex: 1,
-                minWidth: 0,
-                background: bg,
-                color: textColor,
-                border: 'none',
-                cursor: isClickable ? 'pointer' : 'default',
-                fontSize: 11,
-                fontWeight: isActive ? 700 : 600,
-                padding: '0 6px',
-                transition: 'filter 0.12s',
-                overflow: 'hidden',
-                whiteSpace: 'nowrap',
-                textAlign: 'center',
-                borderRadius: isFirst ? '8px 0 0 8px' : isLast ? '0 8px 8px 0' : 0,
-              }}
-              onMouseEnter={(e) => { if (isClickable) (e.currentTarget as HTMLButtonElement).style.filter = 'brightness(0.88)' }}
-              onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.filter = '' }}
-            >
-              <span style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis' }}>
-                {statusLabel}
-              </span>
-            </button>
-            {!isLast && (
-              <div style={{
-                width: 0, height: 0, flexShrink: 0,
-                borderTop: '18px solid transparent',
-                borderBottom: '18px solid transparent',
-                borderLeft: `10px solid ${triangleColor}`,
-                zIndex: 2,
-              }} />
-            )}
-          </div>
-        )
-      })}
-    </div>
-  )
-}
-
-function statusBadge(status: string) {
-  const s = STATUSES.find((x) => x.value === status)
-  return (
-    <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${s?.cls ?? 'bg-slate-100 text-slate-600'}`}>
-      {s?.label ?? status}
-    </span>
-  )
-}
-
-function Field({ label, value }: { label: string; value: string | null | undefined }) {
-  return (
-    <div>
-      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">{label}</div>
-      <div className="text-sm text-slate-800">{value || <span className="text-slate-300">—</span>}</div>
-    </div>
-  )
-}
-
-function FieldInput({
-  label, name, value, onChange, type = 'text', textarea = false,
-}: {
-  label: string; name: string; value: string; onChange: (n: string, v: string) => void
-  type?: string; textarea?: boolean
-}) {
-  const cls = "w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
-  return (
-    <div>
-      <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">{label}</label>
-      {textarea
-        ? <textarea rows={3} value={value} onChange={(e) => onChange(name, e.target.value)} className={cls + ' resize-none'} />
-        : <input type={type} value={value} onChange={(e) => onChange(name, e.target.value)} className={cls} />}
-    </div>
-  )
-}
+// ── Local Helpers ─────────────────────────────────────────────────────────────
 
 function formatTaskAssignment(department: string | null, category: string | null) {
   if (department && category) return `${department} / ${getTaskCategoryLabel(category)}`
@@ -219,352 +39,15 @@ function isHtmlContent(str: string) {
   return str.trim().startsWith('<')
 }
 
+function isImageMime(mime: string | null) {
+  return mime?.startsWith('image/') ?? false
+}
+
 function PencilIcon() {
   return (
     <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
     </svg>
-  )
-}
-
-function fmtFileSize(bytes: number | null) {
-  if (!bytes) return ''
-  if (bytes < 1024) return `${bytes} B`
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
-  return `${(bytes / 1024 / 1024).toFixed(1)} MB`
-}
-
-function isImageMime(mime: string | null) {
-  return mime?.startsWith('image/') ?? false
-}
-
-// ── Helpers ───────────────────────────────────────────────────────────────────
-
-function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const min = Math.floor(diff / 60000)
-  if (min < 1) return 'just now'
-  if (min < 60) return `${min}m ago`
-  const hr = Math.floor(min / 60)
-  if (hr < 24) return `${hr}h ago`
-  const days = Math.floor(hr / 24)
-  if (days === 1) return 'yesterday'
-  if (days < 7) return `${days}d ago`
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-}
-
-// ── Notes Preview (Details tab) ───────────────────────────────────────────────
-
-function NotesPreview({
-  comments,
-  onViewAll,
-}: {
-  comments: Comment[]
-  onViewAll: () => void
-}) {
-  const latest = comments[comments.length - 1] ?? null
-  const extraCount = comments.length - 1
-
-  return (
-    <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-      <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
-        <h2 className="text-sm font-semibold text-slate-700">Notes</h2>
-        {comments.length > 0 && (
-          <button
-            onClick={onViewAll}
-            className="text-xs font-semibold text-purple-700 hover:underline"
-          >
-            View all ({comments.length})
-          </button>
-        )}
-      </div>
-      {!latest ? (
-        <div className="px-6 py-4 text-sm text-slate-400">No notes yet.</div>
-      ) : (
-        <div className="px-6 py-4">
-          <div className="flex items-center gap-1.5 mb-1">
-            <span className="text-xs font-semibold text-slate-700">{latest.user.display_name}</span>
-            <span className="text-xs text-slate-400">{relativeTime(latest.created_at)}</span>
-          </div>
-          <p className="text-sm text-slate-700 line-clamp-3 whitespace-pre-wrap">{latest.comment}</p>
-          {extraCount > 0 && (
-            <button
-              onClick={onViewAll}
-              className="mt-2 text-xs font-semibold text-purple-700 hover:underline"
-            >
-              {extraCount} more note{extraCount !== 1 ? 's' : ''} →
-            </button>
-          )}
-        </div>
-      )}
-    </div>
-  )
-}
-
-// ── Comments Tab ──────────────────────────────────────────────────────────────
-
-function CommentsTab({
-  taskId,
-  comments,
-  currentUserId,
-  isAdmin,
-  onRefresh,
-}: {
-  taskId: string
-  comments: Comment[]
-  currentUserId: string
-  isAdmin: boolean
-  onRefresh: () => void
-}) {
-  const [text, setText] = useState('')
-  const [submitting, setSubmitting] = useState(false)
-  const [driveUrl, setDriveUrl] = useState('')
-  const [driveLabel, setDriveLabel] = useState('')
-  const [showDriveForm, setShowDriveForm] = useState(false)
-  const [pendingCommentId, setPendingCommentId] = useState<string | null>(null)
-  const [uploadingCommentId, setUploadingCommentId] = useState<string | null>(null)
-  const fileInputRef = useRef<HTMLInputElement>(null)
-
-  async function submitComment() {
-    if (!text.trim()) return
-    setSubmitting(true)
-    try {
-      const res = await fetch(`/api/marketing/tasks/${taskId}/comments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ comment: text.trim() }),
-      })
-      if (res.ok) {
-        setText('')
-        onRefresh()
-      }
-    } finally {
-      setSubmitting(false)
-    }
-  }
-
-  async function deleteComment(cid: string) {
-    if (!confirm('Delete this comment?')) return
-    await fetch(`/api/marketing/tasks/${taskId}/comments/${cid}`, { method: 'DELETE' })
-    onRefresh()
-  }
-
-  async function addDriveLink(cid: string) {
-    if (!driveUrl.trim() || !driveLabel.trim()) return
-    await fetch(`/api/marketing/tasks/${taskId}/comments/${cid}/attachments`, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ url: driveUrl.trim(), label: driveLabel.trim(), is_drive_link: true }),
-    })
-    setDriveUrl('')
-    setDriveLabel('')
-    setShowDriveForm(false)
-    setPendingCommentId(null)
-    onRefresh()
-  }
-
-  async function uploadFile(cid: string, file: File) {
-    setUploadingCommentId(cid)
-    try {
-      const fd = new FormData()
-      fd.append('file', file)
-      const uploadRes = await fetch('/api/marketing/upload', { method: 'POST', body: fd })
-      if (!uploadRes.ok) { alert('Upload failed'); return }
-      const uploaded = await uploadRes.json()
-      await fetch(`/api/marketing/tasks/${taskId}/comments/${cid}/attachments`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          url: uploaded.url,
-          label: uploaded.file_name,
-          file_name: uploaded.file_name,
-          file_size: uploaded.file_size,
-          mime_type: uploaded.mime_type,
-          is_drive_link: false,
-        }),
-      })
-      onRefresh()
-    } finally {
-      setUploadingCommentId(null)
-    }
-  }
-
-  async function deleteAttachment(cid: string, aid: string) {
-    if (!confirm('Remove this attachment?')) return
-    await fetch(`/api/marketing/tasks/${taskId}/comments/${cid}/attachments/${aid}`, { method: 'DELETE' })
-    onRefresh()
-  }
-
-  return (
-    <div className="space-y-5">
-      {/* New comment */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5">
-        <div className="text-sm font-semibold text-slate-700 mb-3">Add Comment</div>
-        <textarea
-          rows={3}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder="Write a comment…"
-          className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none mb-3"
-        />
-        <div className="flex items-center gap-2">
-          <button
-            onClick={submitComment}
-            disabled={submitting || !text.trim()}
-            className="px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-lg disabled:opacity-60 transition-colors"
-          >
-            {submitting ? 'Posting…' : 'Post Comment'}
-          </button>
-        </div>
-      </div>
-
-      {/* Comment list */}
-      {comments.length === 0 && (
-        <div className="text-center text-sm text-slate-400 py-6">No comments yet. Be the first to comment!</div>
-      )}
-
-      {comments.map((c) => (
-        <div key={c.id} className="bg-white border border-slate-200 rounded-2xl p-5">
-          <div className="flex items-start justify-between gap-3 mb-3">
-            <div className="flex items-center gap-2">
-              <div className="w-7 h-7 rounded-full bg-purple-100 flex items-center justify-center text-xs font-bold text-purple-700 flex-shrink-0">
-                {c.user.display_name.charAt(0).toUpperCase()}
-              </div>
-              <span className="text-sm font-semibold text-slate-800">{c.user.display_name}</span>
-              <span className="text-xs text-slate-400">{fmtDateTime(c.created_at)}</span>
-            </div>
-            {(c.user_id === currentUserId || isAdmin) && (
-              <button
-                onClick={() => deleteComment(c.id)}
-                className="text-xs text-slate-400 hover:text-red-600 transition-colors flex-shrink-0"
-              >
-                Delete
-              </button>
-            )}
-          </div>
-
-          <p className="text-sm text-slate-700 whitespace-pre-wrap mb-3">{c.comment}</p>
-
-          {/* Attachments */}
-          {c.attachments.length > 0 && (
-            <div className="flex flex-wrap gap-2 mb-3">
-              {c.attachments.map((att) => (
-                <div key={att.id} className="group relative">
-                  {isImageMime(att.mime_type) ? (
-                    <a href={att.url} target="_blank" rel="noopener noreferrer"
-                      className="block w-20 h-20 rounded-lg overflow-hidden border border-slate-200 hover:border-purple-300 transition-colors">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={att.url} alt={att.label} className="w-full h-full object-cover" />
-                    </a>
-                  ) : (
-                    <a href={att.url} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-purple-700 hover:bg-purple-50 hover:border-purple-300 transition-colors">
-                      {att.is_drive_link ? (
-                        <svg className="w-3.5 h-3.5 text-blue-500 flex-shrink-0" viewBox="0 0 24 24" fill="currentColor">
-                          <path d="M6.19 2l4.5 7.79H2l4.19-7.79zM12 2l6.19 10.72H5.81L12 2zM22 14.39L17.81 22H6.19L2 14.39h20z" />
-                        </svg>
-                      ) : (
-                        <svg className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                        </svg>
-                      )}
-                      <span className="truncate max-w-[120px]">{att.label}</span>
-                      {att.file_size && <span className="text-slate-400 flex-shrink-0">{fmtFileSize(att.file_size)}</span>}
-                    </a>
-                  )}
-                  {(att.uploaded_by === currentUserId || isAdmin) && (
-                    <button
-                      onClick={() => deleteAttachment(c.id, att.id)}
-                      className="absolute -top-1.5 -right-1.5 hidden group-hover:flex w-5 h-5 bg-red-500 text-white rounded-full items-center justify-center text-xs leading-none"
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-
-          {/* Attach to this comment */}
-          <div className="flex items-center gap-2 flex-wrap">
-            <input
-              ref={c.id === pendingCommentId ? fileInputRef : undefined}
-              type="file"
-              className="hidden"
-              id={`file-input-${c.id}`}
-              onChange={async (e) => {
-                const file = e.target.files?.[0]
-                if (file) await uploadFile(c.id, file)
-                e.target.value = ''
-              }}
-            />
-            <label
-              htmlFor={`file-input-${c.id}`}
-              className="cursor-pointer text-xs text-slate-400 hover:text-purple-700 transition-colors flex items-center gap-1"
-            >
-              {uploadingCommentId === c.id ? (
-                <span>Uploading…</span>
-              ) : (
-                <>
-                  <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                  </svg>
-                  Attach file
-                </>
-              )}
-            </label>
-
-            <button
-              onClick={() => {
-                setPendingCommentId(c.id)
-                setShowDriveForm((prev) => !prev || pendingCommentId !== c.id)
-              }}
-              className="text-xs text-slate-400 hover:text-blue-600 transition-colors flex items-center gap-1"
-            >
-              <svg className="w-3.5 h-3.5" viewBox="0 0 24 24" fill="currentColor">
-                <path d="M6.19 2l4.5 7.79H2l4.19-7.79zM12 2l6.19 10.72H5.81L12 2zM22 14.39L17.81 22H6.19L2 14.39h20z" />
-              </svg>
-              Add Drive link
-            </button>
-          </div>
-
-          {/* Drive link inline form */}
-          {showDriveForm && pendingCommentId === c.id && (
-            <div className="mt-3 p-3 bg-blue-50 border border-blue-200 rounded-lg space-y-2">
-              <input
-                type="url"
-                value={driveUrl}
-                onChange={(e) => setDriveUrl(e.target.value)}
-                placeholder="Google Drive URL"
-                className="w-full px-3 py-1.5 text-sm border border-blue-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-              />
-              <input
-                type="text"
-                value={driveLabel}
-                onChange={(e) => setDriveLabel(e.target.value)}
-                placeholder="Label (e.g. Design Brief v2)"
-                className="w-full px-3 py-1.5 text-sm border border-blue-200 rounded focus:outline-none focus:ring-2 focus:ring-blue-400 bg-white"
-              />
-              <div className="flex gap-2">
-                <button
-                  onClick={() => addDriveLink(c.id)}
-                  disabled={!driveUrl.trim() || !driveLabel.trim()}
-                  className="px-3 py-1 text-xs font-semibold bg-blue-600 text-white rounded-lg hover:bg-blue-700 disabled:opacity-60 transition-colors"
-                >
-                  Add Link
-                </button>
-                <button
-                  onClick={() => { setShowDriveForm(false); setPendingCommentId(null) }}
-                  className="px-3 py-1 text-xs text-slate-600 border border-slate-300 rounded-lg hover:bg-white transition-colors"
-                >
-                  Cancel
-                </button>
-              </div>
-            </div>
-          )}
-        </div>
-      ))}
-    </div>
   )
 }
 
@@ -577,23 +60,20 @@ export default function TaskDetailPage() {
   const isNew = id === 'new'
   const { user: appUser } = useAppUser()
 
-  const [task, setTask] = useState<TaskDetail | null>(null)
-  const [loading, setLoading] = useState(!isNew)
-  const [error, setError] = useState<string | null>(null)
+  const { task, setTask, loading, error, refetch, load } = useTask(id)
+
   const [activeTab, setActiveTab] = useState<'details' | 'related' | 'comments'>('details')
   const [editingField, setEditingField] = useState<'title' | 'priority' | 'dept' | 'due_date' | 'assigned_to' | 'description' | null>(null)
   const descriptionDraftRef = useRef<string | null>(null)
   const dueDateRef = useRef<HTMLInputElement>(null)
-  // linked-record editing (Related tab)
   const [editingLinked, setEditingLinked] = useState(false)
-  const [linkedForm, setLinkedForm] = useState<Partial<TaskDetail>>({})
+  const [linkedForm, setLinkedForm] = useState<Record<string, unknown>>({})
   const [saving, setSaving] = useState(false)
   const [uploadingAttachment, setUploadingAttachment] = useState(false)
   const attachmentInputRef = useRef<HTMLInputElement>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
-  // Dropdown data
   const [crmUsers, setCrmUsers] = useState<DropdownUser[]>([])
   const [contacts, setContacts] = useState<DropdownContact[]>([])
 
@@ -607,20 +87,13 @@ export default function TaskDetailPage() {
     })
   }, [])
 
-  async function loadTask() {
-    const res = await fetch(`/api/marketing/tasks/${id}`)
-    const data = await res.json()
-    if (data.error) { setError(data.error); return }
-    setTask(data)
-  }
-
   useEffect(() => {
     if (isNew) {
       router.replace('/marketing/tasks')
       return
     }
-    setLoading(true)
-    loadTask().finally(() => setLoading(false))
+    load()
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isNew, router])
 
   async function saveFieldValues(fields: Record<string, unknown>) {
@@ -637,7 +110,7 @@ export default function TaskDetailPage() {
         alert(data.error ?? 'Save failed')
         return
       }
-      await loadTask()
+      await refetch()
     } finally {
       setSaving(false)
     }
@@ -647,7 +120,6 @@ export default function TaskDetailPage() {
     await saveFieldValues({ [field]: value })
   }
 
-  // linked-record editing helpers (Related tab)
   function startEditLinked() {
     if (!task) return
     setLinkedForm({ ...task })
@@ -676,7 +148,7 @@ export default function TaskDetailPage() {
       })
       const data = await res.json()
       if (!res.ok) { alert(data.error ?? 'Save failed'); return }
-      await loadTask()
+      await refetch()
       setEditingLinked(false)
     } finally {
       setSaving(false)
@@ -686,7 +158,7 @@ export default function TaskDetailPage() {
   async function quickUpdateStatus(newStatus: string) {
     if (!task) return
     const prev = task.status
-    setTask((t) => t ? { ...t, status: newStatus as TaskStatus } : t)
+    setTask((t) => t ? { ...t, status: newStatus as typeof task.status } : t)
     try {
       const res = await fetch(`/api/marketing/tasks/${task.id}`, {
         method: 'PATCH',
@@ -694,7 +166,7 @@ export default function TaskDetailPage() {
         body: JSON.stringify({ status: newStatus }),
       })
       if (!res.ok) setTask((t) => t ? { ...t, status: prev } : t)
-      else await loadTask()
+      else await refetch()
     } catch {
       setTask((t) => t ? { ...t, status: prev } : t)
     }
@@ -719,7 +191,7 @@ export default function TaskDetailPage() {
           mime_type: uploaded.mime_type,
         }),
       })
-      await loadTask()
+      await refetch()
     } finally {
       setUploadingAttachment(false)
     }
@@ -728,7 +200,7 @@ export default function TaskDetailPage() {
   async function deleteTaskAttachment(attachmentId: string) {
     if (!task || !confirm('Remove this attachment?')) return
     await fetch(`/api/marketing/tasks/${task.id}/attachments?attachment_id=${attachmentId}`, { method: 'DELETE' })
-    await loadTask()
+    await refetch()
   }
 
   async function deleteTask() {
@@ -747,11 +219,8 @@ export default function TaskDetailPage() {
     }
   }
 
-  if (isNew) {
-    return null
-  }
+  if (isNew) return null
 
-  // ── Loading / error ─────────────────────────────────────────────────────────
   if (loading) {
     return (
       <div className="max-w-4xl mx-auto px-6 py-8">
@@ -778,7 +247,6 @@ export default function TaskDetailPage() {
   const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'completed'
   const statusInfo = STATUSES.find((s) => s.value === task.status)
 
-  // Determine linked object
   const linkedObj = task.opportunity
     ? { type: 'opportunity', label: 'Opportunity', href: `/marketing/opportunities/${task.opportunity.id}`, name: task.opportunity.name, color: 'bg-purple-100 text-purple-700' }
     : task.customer
@@ -856,7 +324,7 @@ export default function TaskDetailPage() {
               </span>
               {task.due_date && (
                 <span className={`text-sm ${isOverdue ? 'text-red-600 font-semibold' : 'text-slate-500'}`}>
-                  {isOverdue ? '⚠️ ' : ''}Due {fmtDate(task.due_date)}
+                  {isOverdue ? '⚠️ ' : ''}Due {formatDate(task.due_date)}
                 </span>
               )}
               {task.assigned_user && (
@@ -895,7 +363,7 @@ export default function TaskDetailPage() {
         <div className="flex items-center gap-2 mb-3">
           <span className="text-sm font-semibold text-slate-700">Status</span>
         </div>
-        <StatusBar currentStatus={task.status} onStatusClick={quickUpdateStatus} disabled={false} />
+        <TaskStatusBar currentStatus={task.status} onStatusClick={quickUpdateStatus} disabled={false} />
       </div>
 
       {/* Tabs */}
@@ -919,7 +387,6 @@ export default function TaskDetailPage() {
       {/* ── Details Tab ── */}
       {activeTab === 'details' && (
         <div className="space-y-5">
-          {/* Task Details — inline per-field editing */}
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
               <h2 className="text-sm font-semibold text-slate-700">Task Details</h2>
@@ -1022,7 +489,7 @@ export default function TaskDetailPage() {
                 <div className="w-36 flex-shrink-0 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Due Date</div>
                 <div className="flex items-center gap-2">
                   <span className={`text-sm ${isOverdue ? 'text-red-600 font-semibold' : 'text-slate-800'}`}>
-                    {task.due_date ? fmtDate(task.due_date) : <span className="italic text-slate-400">No date</span>}
+                    {task.due_date ? formatDate(task.due_date) : <span className="italic text-slate-400">No date</span>}
                   </span>
                   <button
                     type="button"
@@ -1170,12 +637,12 @@ export default function TaskDetailPage() {
             </div>
 
             <div className="border-t border-slate-100 px-6 py-4 bg-slate-50 flex gap-6 text-xs text-slate-400">
-              <span>Created {fmtDate(task.created_at)}</span>
-              <span>Updated {fmtDate(task.updated_at)}</span>
+              <span>Created {formatDate(task.created_at)}</span>
+              <span>Updated {formatDate(task.updated_at)}</span>
             </div>
           </div>
 
-          <NotesPreview
+          <TaskNotesPreview
             comments={task.comments}
             onViewAll={() => setActiveTab('comments')}
           />
@@ -1228,7 +695,7 @@ export default function TaskDetailPage() {
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                         </svg>
                         <span className="truncate max-w-[160px]">{att.file_name ?? 'file'}</span>
-                        {att.file_size && <span className="text-slate-400 flex-shrink-0">{fmtFileSize(att.file_size)}</span>}
+                        {att.file_size && <span className="text-slate-400 flex-shrink-0">{formatBytes(att.file_size)}</span>}
                       </a>
                     )}
                     {(att.uploaded_by === appUser?.id || appUser?.is_admin) && (
@@ -1270,7 +737,7 @@ export default function TaskDetailPage() {
                           <> to <span className="font-mono bg-purple-50 text-purple-700 px-1 rounded">{h.new_value}</span></>
                         )}
                       </div>
-                      <div className="text-xs text-slate-400 mt-0.5">{fmtDateTime(h.changed_at)}</div>
+                      <div className="text-xs text-slate-400 mt-0.5">{formatDateTime(h.changed_at)}</div>
                     </div>
                   </div>
                 ))}
@@ -1384,10 +851,7 @@ export default function TaskDetailPage() {
           comments={task.comments}
           currentUserId={appUser.id}
           isAdmin={appUser.is_admin}
-          onRefresh={async () => {
-            const data = await fetch(`/api/marketing/tasks/${task.id}`).then((r) => r.json())
-            if (!data.error) setTask(data)
-          }}
+          onRefresh={refetch}
         />
       )}
     </div>
