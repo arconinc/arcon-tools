@@ -59,11 +59,37 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ document: data })
-  } else {
-    const { drive_url } = await req.json()
+  } else if (contentType.includes('application/json')) {
+    const body = await req.json()
+
+    // Pre-uploaded file path (client uploaded directly to Supabase storage)
+    if (body.storage_path) {
+      if (existing.storage_bucket && existing.storage_path) {
+        await adminClient.storage.from(existing.storage_bucket).remove([existing.storage_path])
+      }
+
+      const { data, error } = await adminClient
+        .from('documents')
+        .update({
+          storage_bucket: 'documents',
+          storage_path: body.storage_path,
+          drive_url: null,
+          drive_file_id: null,
+          version: (existing.version ?? 1) + 1,
+          updated_at: new Date().toISOString(),
+        })
+        .eq('id', id)
+        .select()
+        .single()
+
+      if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+      return NextResponse.json({ document: data })
+    }
+
+    // Drive URL replacement
+    const { drive_url } = body
     if (!drive_url?.trim()) return NextResponse.json({ error: 'drive_url is required' }, { status: 400 })
 
-    // Delete old stored file if switching to drive link
     if (existing.storage_bucket && existing.storage_path) {
       await adminClient.storage.from(existing.storage_bucket).remove([existing.storage_path])
     }
@@ -84,5 +110,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
     if (error) return NextResponse.json({ error: error.message }, { status: 500 })
     return NextResponse.json({ document: data })
+  } else {
+    return NextResponse.json({ error: 'Unsupported content type' }, { status: 415 })
   }
 }

@@ -31,7 +31,8 @@ function calcPricing(qty: number, colors: number, backImprint: boolean, backColo
   const base = qty * unitPrice
   const artSetup = setupFee(colors)
   const backSetup = backImprint ? setupFee(Math.max(1, backColors)) : 0
-  return { unitPrice, base, artSetup, backSetup, total: base + artSetup + backSetup }
+  const backLocationFee = backImprint ? qty : 0
+  return { unitPrice, base, artSetup, backSetup, backLocationFee, total: base + artSetup + backSetup + backLocationFee }
 }
 
 function fmt(n: number) {
@@ -281,7 +282,7 @@ export default function RapalaLureOrderPage() {
 
       <div style={{ minHeight: '100vh', background: '#fff', padding: '40px 16px' }}>
         {/* Branding */}
-        <div style={{ maxWidth: 760, margin: '0 auto', display: 'grid', gridTemplateColumns: '1fr 280px', gap: 24, alignItems: 'start' }}>
+        <div style={{ width: '100%', display: 'grid', gridTemplateColumns: '3fr 1fr', gap: 24, alignItems: 'start' }}>
 
           {/* ---- Main form card ---- */}
           <form onSubmit={handleSubmit}>
@@ -391,7 +392,7 @@ export default function RapalaLureOrderPage() {
                     style={{ width: 16, height: 16, accentColor: '#6b1e98', cursor: 'pointer' }}
                   />
                   <span style={{ fontSize: 14, color: '#374151', fontWeight: 500 }}>
-                    Include back imprint
+                    Include back imprint <span style={{ fontWeight: 400, color: '#9ca3af' }}>($1.00/unit additional location)</span>
                   </span>
                 </label>
 
@@ -714,6 +715,12 @@ export default function RapalaLureOrderPage() {
                       <span>Art setup ({colors} color{colors !== 1 ? 's' : ''})</span>
                       <span>{fmt(pricing.artSetup)}</span>
                     </div>
+                    {pricing.backLocationFee > 0 && (
+                      <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#374151', marginBottom: 6 }}>
+                        <span>Back imprint location ({qty.toLocaleString()} × $1.00)</span>
+                        <span>{fmt(pricing.backLocationFee)}</span>
+                      </div>
+                    )}
                     {pricing.backSetup > 0 && (
                       <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: 13, color: '#374151', marginBottom: 6 }}>
                         <span>Back setup ({Math.max(1, backColors)} color{Math.max(1, backColors) !== 1 ? 's' : ''})</span>

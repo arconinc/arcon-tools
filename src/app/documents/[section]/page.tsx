@@ -444,14 +444,37 @@ export default function SectionDocumentsPage() {
 
     if (docSource === 'upload') {
       if (!docFile) { setAddDocError('Please select a file.'); setAddDocLoading(false); return }
-      const form = new FormData()
-      form.append('file', docFile)
-      form.append('title', docTitle.trim())
-      form.append('folder_id', selectedFolderId)
-      if (docDescription.trim()) form.append('description', docDescription.trim())
-      const res = await fetch('/api/documents/manage/upload', { method: 'POST', body: form })
-      if (!res.ok) {
-        const { error } = await res.json().catch(() => ({ error: 'Upload failed' }))
+
+      // Step 1: get signed upload URL
+      const urlRes = await fetch('/api/documents/manage/signed-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folder_id: selectedFolderId, filename: docFile.name, content_type: docFile.type }),
+      })
+      if (!urlRes.ok) {
+        const { error } = await urlRes.json().catch(() => ({ error: 'Failed to initiate upload' }))
+        setAddDocError(error)
+        setAddDocLoading(false)
+        return
+      }
+      const { uploadUrl, storagePath } = await urlRes.json()
+
+      // Step 2: upload directly to Supabase storage
+      const putRes = await fetch(uploadUrl, { method: 'PUT', body: docFile, headers: { 'Content-Type': docFile.type } })
+      if (!putRes.ok) {
+        setAddDocError('File upload failed. Please try again.')
+        setAddDocLoading(false)
+        return
+      }
+
+      // Step 3: create DB record
+      const confirmRes = await fetch('/api/documents/manage/upload-confirm', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ folder_id: selectedFolderId, title: docTitle.trim(), description: docDescription.trim() || null, storage_path: storagePath }),
+      })
+      if (!confirmRes.ok) {
+        const { error } = await confirmRes.json().catch(() => ({ error: 'Failed to save document record' }))
         setAddDocError(error)
         setAddDocLoading(false)
         return
@@ -499,9 +522,35 @@ export default function SectionDocumentsPage() {
 
     if (replaceDocSource === 'upload') {
       if (!replaceDocFile) { setReplaceDocError('Please select a file.'); setReplaceDocLoading(false); return }
-      const form = new FormData()
-      form.append('file', replaceDocFile)
-      const res = await fetch(`/api/documents/manage/items/${replaceDocModal.id}/replace`, { method: 'POST', body: form })
+
+      // Step 1: get signed upload URL
+      const urlRes = await fetch('/api/documents/manage/signed-upload', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ item_id: replaceDocModal.id, filename: replaceDocFile.name, content_type: replaceDocFile.type }),
+      })
+      if (!urlRes.ok) {
+        const { error } = await urlRes.json().catch(() => ({ error: 'Failed to initiate upload' }))
+        setReplaceDocError(error)
+        setReplaceDocLoading(false)
+        return
+      }
+      const { uploadUrl, storagePath } = await urlRes.json()
+
+      // Step 2: upload directly to Supabase storage
+      const putRes = await fetch(uploadUrl, { method: 'PUT', body: replaceDocFile, headers: { 'Content-Type': replaceDocFile.type } })
+      if (!putRes.ok) {
+        setReplaceDocError('File upload failed. Please try again.')
+        setReplaceDocLoading(false)
+        return
+      }
+
+      // Step 3: update DB record
+      const res = await fetch(`/api/documents/manage/items/${replaceDocModal.id}/replace`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ storage_path: storagePath }),
+      })
       if (!res.ok) {
         const { error } = await res.json().catch(() => ({ error: 'Replace failed' }))
         setReplaceDocError(error)
