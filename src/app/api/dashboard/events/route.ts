@@ -30,14 +30,15 @@ export async function GET() {
 
   try {
     const { timeMin, timeMax } = getCalendarWindow()
-    const [googleEvents, dbBirthdays, dbAnniversaries] = await Promise.all([
+    const [googleEvents, dbBirthdays, dbAnniversaries, dbPto] = await Promise.all([
       getCachedCalendarEvents(timeMin, timeMax),
       fetchDbBirthdayEvents(timeMin, timeMax),
       fetchDbAnniversaryEvents(timeMin, timeMax),
+      fetchDbPtoEvents(timeMin, timeMax),
     ])
     const response: CompanyCalendarResponse = {
       eventTypes: COMPANY_CALENDAR_EVENT_TYPES,
-      events: [...googleEvents, ...dbBirthdays, ...dbAnniversaries],
+      events: [...googleEvents, ...dbBirthdays, ...dbAnniversaries, ...dbPto],
       cachedAt: new Date().toISOString(),
     }
 
@@ -134,6 +135,47 @@ async function fetchDbAnniversaryEvents(timeMin: string, timeMax: string): Promi
   }
 
   return events
+}
+
+async function fetchDbPtoEvents(timeMin: string, timeMax: string): Promise<CompanyCalendarEvent[]> {
+  const adminClient = createAdminClient()
+  const windowStart = timeMin.slice(0, 10)
+  const windowEnd = timeMax.slice(0, 10)
+
+  const { data: rows } = await adminClient
+    .from('pto_requests')
+    .select('id, user_id, start_date, end_date, start_half_day, end_half_day, users!user_id(display_name)')
+    .eq('status', 'approved')
+    .lte('start_date', windowEnd)
+    .gte('end_date', windowStart)
+
+  if (!rows) return []
+
+  return rows.map((row) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const displayName = (row.users as any)?.display_name ?? 'Employee'
+    const halfDay = row.start_half_day || row.end_half_day
+    const title = `${displayName} (PTO${halfDay ? ' ½' : ''})`
+
+    // FullCalendar all-day end is exclusive — add 1 day
+    const endDate = new Date(row.end_date)
+    endDate.setDate(endDate.getDate() + 1)
+    const endDateStr = endDate.toISOString().slice(0, 10)
+
+    return {
+      id: `pto-${row.id}`,
+      title,
+      type: 'pto' as const,
+      typeLabel: 'Time Off',
+      start: row.start_date,
+      end: endDateStr,
+      allDay: true,
+      description: null,
+      location: null,
+      htmlLink: null,
+      googleColorId: null,
+    }
+  })
 }
 
 function getCalendarWindow() {

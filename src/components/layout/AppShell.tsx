@@ -150,7 +150,9 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
       label: 'HR',
       items: [
         { href: '/documents/hr', label: 'Documents', icon: DocumentIcon, adminMatch: true },
-        { href: '/hr/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
+        { href: '/hr/pto', label: 'PTO Requests', icon: CalendarIcon, adminMatch: true },
+        { href: '/hr/pto/requests', label: 'Review PTO', icon: TaskCheckIcon, adminMatch: true, requiredRole: 'hr' },
+        { href: '/hr/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true, requiredRole: 'hr' },
       ],
     },
     {
@@ -500,10 +502,15 @@ export default function AppShell({ children, user, isImpersonating, impersonated
                           </button>
                         )
                       )}
-                      {!isLinkSection && !isSectionCollapsed && section.items.map((item) => {
+                      {!isLinkSection && !isSectionCollapsed && (() => {
+                        // Among adminMatch items, only the longest matching prefix wins.
+                        const bestAdminMatchHref = section.items
+                          .filter(i => i.adminMatch && i.href !== '#' && pathname.startsWith(i.href))
+                          .sort((a, b) => b.href.length - a.href.length)[0]?.href ?? null
+                        return section.items.map((item) => {
                         const active = item.href !== '#' && (
                           item.adminMatch
-                            ? pathname.startsWith(item.href)
+                            ? item.href === bestAdminMatchHref
                             : pathname === item.href
                         )
                         return (
@@ -517,7 +524,8 @@ export default function AppShell({ children, user, isImpersonating, impersonated
                             onHoverEnd={sidebarCollapsed ? () => setTooltip(null) : undefined}
                           />
                         )
-                      })}
+                      })
+                        })()}
                     </div>
                   </div>
                 )

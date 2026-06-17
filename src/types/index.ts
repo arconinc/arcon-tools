@@ -96,7 +96,7 @@ export interface BirthdayEvent {
 
 // ─── Company Calendar ────────────────────────────────────────────────────────
 
-export type CompanyCalendarEventTypeId = 'birthday' | 'anniversary' | 'company'
+export type CompanyCalendarEventTypeId = 'birthday' | 'anniversary' | 'company' | 'pto'
 
 export interface CompanyCalendarEventType {
   id: CompanyCalendarEventTypeId
@@ -1170,4 +1170,50 @@ export interface ExpenseReportComment {
   updated_at: string
   author?: { id: string; display_name: string; email: string; avatar_url?: string | null }
   replies?: ExpenseReportComment[]
+}
+
+// ─── PTO Requests ─────────────────────────────────────────────────────────────
+
+export type PtoRequestStatus = 'pending' | 'approved' | 'denied'
+
+export type PtoReason =
+  | 'vacation'
+  | 'personal_leave'
+  | 'funeral_bereavement'
+  | 'jury_duty'
+  | 'family_reasons'
+  | 'medical_leave'
+  | 'to_vote'
+  | 'other'
+
+export const PTO_REASON_LABELS: Record<PtoReason, string> = {
+  vacation: 'Vacation',
+  personal_leave: 'Personal Leave',
+  funeral_bereavement: 'Funeral / Bereavement',
+  jury_duty: 'Jury Duty',
+  family_reasons: 'Family Reasons',
+  medical_leave: 'Medical Leave',
+  to_vote: 'To Vote',
+  other: 'Other',
+}
+
+export interface PtoRequest {
+  id: string
+  user_id: string
+  start_date: string        // YYYY-MM-DD
+  end_date: string          // YYYY-MM-DD
+  start_half_day: boolean
+  end_half_day: boolean
+  reason: PtoReason
+  notes: string | null
+  signed_name: string
+  signed_at: string
+  status: PtoRequestStatus
+  reviewer_comment: string | null
+  reviewed_by: string | null
+  reviewed_at: string | null
+  task_id: string | null
+  created_at: string
+  updated_at: string
+  user?: { display_name: string; email: string; avatar_url: string | null }
 }

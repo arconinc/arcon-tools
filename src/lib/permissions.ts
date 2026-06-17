@@ -20,6 +20,10 @@ export const RESTRICTED_RESOURCES: Partial<Record<string, string>> = {
   'page:/hr/documents': 'hr',
   'section:dashboard:hr-documents': 'hr',
   'file:bucket:hr-documents': 'hr',
+
+  // HR-only pages
+  'page:/hr/tasks': 'hr',
+  'page:/hr/pto/requests': 'hr',
 }
 
 // Private Supabase Storage buckets — files are served via signed URL only.

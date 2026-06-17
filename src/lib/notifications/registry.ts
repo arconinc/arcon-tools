@@ -477,6 +477,94 @@ export const specFollowUpDue: NotificationDefinition<SpecFollowUpDuePayload> = {
   },
 }
 
+// ─── pto.submitted ───────────────────────────────────────────────────────────
+
+export interface PtoSubmittedPayload {
+  request_id: string
+  requester_name: string
+  start_date: string
+  end_date: string
+  reason: string
+}
+
+export const ptoSubmitted: NotificationDefinition<PtoSubmittedPayload> = {
+  type: 'pto.submitted',
+  label: 'PTO request submitted (HR)',
+  description: 'When an employee submits or resubmits a PTO request.',
+  defaultEmail: true,
+  render: (p) => ({
+    title: `${p.requester_name} submitted a PTO request`,
+    body: `${p.start_date} – ${p.end_date} · ${p.reason}`,
+    linkUrl: `/hr/pto/requests`,
+  }),
+  email: (p, recipient) => {
+    const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
+    return {
+      subject: `PTO request: ${p.requester_name} (${p.start_date} – ${p.end_date})`,
+      html: renderGenericEmail({
+        preheader: `${p.requester_name} submitted a PTO request`,
+        heading: 'PTO Request Submitted',
+        greeting: `Hi ${firstName},`,
+        bodyLines: [
+          `<strong>${p.requester_name}</strong> has submitted a PTO request and it is ready for review.`,
+          `<strong>Dates:</strong> ${p.start_date} – ${p.end_date}`,
+          `<strong>Reason:</strong> ${p.reason}`,
+        ],
+        ctaText: 'Review Request',
+        ctaUrl: `${appUrl()}/hr/pto/requests`,
+      }),
+    }
+  },
+}
+
+// ─── pto.reviewed ─────────────────────────────────────────────────────────────
+
+export interface PtoReviewedPayload {
+  request_id: string
+  status: 'approved' | 'denied'
+  reviewer_name: string
+  reviewer_comment: string | null
+  start_date: string
+  end_date: string
+}
+
+export const ptoReviewed: NotificationDefinition<PtoReviewedPayload> = {
+  type: 'pto.reviewed',
+  label: 'My PTO request was reviewed',
+  description: 'When HR approves or denies your PTO request.',
+  defaultEmail: true,
+  render: (p) => ({
+    title: p.status === 'approved'
+      ? `Your PTO request was approved`
+      : `Your PTO request was not approved`,
+    body: p.reviewer_comment ?? `Reviewed by ${p.reviewer_name}.`,
+    linkUrl: `/hr/pto`,
+  }),
+  email: (p, recipient) => {
+    const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
+    const approved = p.status === 'approved'
+    return {
+      subject: approved
+        ? `PTO approved: ${p.start_date} – ${p.end_date}`
+        : `PTO request update: ${p.start_date} – ${p.end_date}`,
+      html: renderGenericEmail({
+        preheader: approved ? 'Your PTO request has been approved' : 'Your PTO request was not approved',
+        heading: approved ? 'PTO Request Approved' : 'PTO Request Not Approved',
+        greeting: `Hi ${firstName},`,
+        bodyLines: [
+          approved
+            ? `Your PTO request for <strong>${p.start_date} – ${p.end_date}</strong> has been approved by <strong>${p.reviewer_name}</strong>.`
+            : `Your PTO request for <strong>${p.start_date} – ${p.end_date}</strong> was reviewed by <strong>${p.reviewer_name}</strong> and was not approved at this time.`,
+          ...(p.reviewer_comment ? [`Note: <em>${p.reviewer_comment}</em>`] : []),
+          ...(!approved ? [`You may edit and resubmit your request from the PTO Requests page.`] : []),
+        ],
+        ctaText: 'View My Requests',
+        ctaUrl: `${appUrl()}/hr/pto`,
+      }),
+    }
+  },
+}
+
 // ─── Registry ─────────────────────────────────────────────────────────────────
 //
 // To add a new notification type:
@@ -497,6 +585,8 @@ export const NOTIFICATION_REGISTRY = {
   'expense_report.submitted_to_payroll': expenseReportSubmittedToPayroll,
   'expense_report.comment_added': expenseReportCommentAdded,
   'spec.follow_up_due': specFollowUpDue,
+  'pto.submitted': ptoSubmitted,
+  'pto.reviewed': ptoReviewed,
 } as const
 
 export type NotificationType = keyof typeof NOTIFICATION_REGISTRY

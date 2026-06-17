@@ -49,7 +49,7 @@ export function DashboardTasksWidget() {
 
   useEffect(() => {
     if (!user) return
-    const params = new URLSearchParams({ assigned_to: user.id, limit: '50' })
+    const params = new URLSearchParams({ assigned_to: user.id, limit: '50', hide_completed: 'true' })
     fetch(`/api/marketing/tasks?${params}`)
       .then((r) => { if (!r.ok) throw new Error('Failed'); return r.json() })
       .then((data) => {

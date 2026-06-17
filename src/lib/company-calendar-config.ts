@@ -32,6 +32,14 @@ export const COMPANY_CALENDAR_EVENT_TYPES: CompanyCalendarEventType[] = [
     googleColorIds: ['7'],
     titlePrefixes: ['[Company]', 'Company:'],
   },
+  {
+    id: 'pto',
+    label: 'Time Off',
+    color: '#0d9488',
+    accentColor: '#f0fdfa',
+    googleColorIds: [],
+    titlePrefixes: ['[PTO]', 'PTO:'],
+  },
 ]
 
 export function getCompanyCalendarId() {

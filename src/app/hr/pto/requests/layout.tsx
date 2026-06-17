@@ -1,0 +1,30 @@
+import { redirect } from 'next/navigation'
+import { createAdminClient } from '@/lib/supabase/admin'
+import { createClient } from '@/lib/supabase/server'
+
+export default async function HrPtoRequestsLayout({ children }: { children: React.ReactNode }) {
+  const supabase = await createClient()
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) redirect('/login')
+
+  const adminClient = createAdminClient()
+  const { data: dbUser } = await adminClient
+    .from('users')
+    .select('id, is_admin')
+    .eq('google_id', user.id)
+    .single()
+
+  if (!dbUser) redirect('/login')
+
+  if (!dbUser.is_admin) {
+    const { data: userRoles } = await adminClient
+      .from('user_roles')
+      .select('roles(name)')
+      .eq('user_id', dbUser.id)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const isHr = (userRoles ?? []).some((r: any) => r.roles?.name === 'hr')
+    if (!isHr) redirect('/dashboard')
+  }
+
+  return <>{children}</>
+}
