@@ -184,7 +184,7 @@ export async function POST(request: Request) {
   const taxExemptFile = formData.get('taxExemptCert') as File | null
 
   // --- Validate ---
-  const LURE_NAMES: Record<string, string> = { bp: 'Blue Pearl', rh: 'Red Head' }
+  const LURE_NAMES: Record<string, string> = { bp: 'Black Pearl', rh: 'Red Head' }
   if (!lureType || !LURE_NAMES[lureType]) {
     return NextResponse.json({ error: 'Please select a valid lure style' }, { status: 400 })
   }
