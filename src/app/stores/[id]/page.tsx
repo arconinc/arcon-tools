@@ -142,7 +142,7 @@ export default function StoreDetailPage({ params }: { params: Promise<{ id: stri
   return (
     <>
       <style>{`
-        .store-detail { max-width: 900px; margin: 0 auto; }
+        .store-detail { max-width: 1200px; margin: 0 auto; }
         .tab-bar { display: flex; gap: 4px; border-bottom: 1px solid #e2e8f0; margin-bottom: 24px; }
         .tab-btn { padding: 8px 16px 10px; font-size: 14px; font-weight: 500; color: #64748b; border-bottom: 2px solid transparent; margin-bottom: -1px; transition: all 0.15s; white-space: nowrap; }
         .tab-btn:hover { color: #7c3aed; }

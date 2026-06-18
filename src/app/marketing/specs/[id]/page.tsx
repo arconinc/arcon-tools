@@ -186,7 +186,7 @@ export default function SpecDetailPage() {
     : null
 
   return (
-    <div style={{ padding: '32px 40px', maxWidth: 1100, margin: '0 auto' }}>
+    <div style={{ padding: '32px 40px', maxWidth: 1200, margin: '0 auto' }}>
       <style>{`
         .sd-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; color: #94a3b8; margin-bottom: 5px; }
         .sd-value { font-size: 14px; color: #1e293b; }

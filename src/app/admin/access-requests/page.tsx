@@ -48,7 +48,7 @@ export default function AdminAccessRequestsPage() {
   return (
     <>
       <style>{`
-        .ar-page { padding: 32px 24px; max-width: 860px; }
+        .ar-page { padding: 32px 24px; max-width: 1200px; margin: 0 auto; }
         .ar-header { margin-bottom: 24px; }
         .ar-title { font-size: 22px; font-weight: 700; color: #111827; margin: 0 0 4px; }
         .ar-sub { font-size: 14px; color: #6b7280; margin: 0; }

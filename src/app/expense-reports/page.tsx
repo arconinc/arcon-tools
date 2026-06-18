@@ -191,7 +191,7 @@ export default function ExpenseReportsPage() {
   }
 
   return (
-    <div style={{ width: '100%', padding: '32px 16px' }}>
+    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '32px 16px' }}>
       <style>{`
         .er-card { background: #fff; border: 1px solid #e9d5ff; border-radius: 14px; overflow: hidden; }
         .er-table { width: 100%; border-collapse: collapse; }

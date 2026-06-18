@@ -129,7 +129,7 @@ export default function MyProfilePage() {
   return (
     <>
       <style>{`
-        .my-prof { max-width: 720px; margin: 0 auto; padding: 2rem; }
+        .my-prof { max-width: 1200px; margin: 0 auto; padding: 2rem; }
         .my-prof-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.75rem; gap: 1rem; flex-wrap: wrap; }
         .my-prof-title { font-size: 1.25rem; font-weight: 700; color: #1e293b; }
         .my-prof-view-link { font-size: 0.875rem; color: #7c3aed; text-decoration: none; }

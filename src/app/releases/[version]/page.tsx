@@ -62,7 +62,7 @@ export default async function ReleaseDetailPage({
   return (
     <AppShell user={appUser}>
       <style>{`
-        .release-detail { max-width: 740px; margin: 0 auto; padding: 32px 24px 64px; }
+        .release-detail { max-width: 1200px; margin: 0 auto; padding: 32px 24px 64px; }
         .release-back { display: inline-flex; align-items: center; gap: 6px; color: #6b7280; font-size: 14px; text-decoration: none; margin-bottom: 24px; }
         .release-back:hover { color: #6b1e98; }
         .release-header { margin-bottom: 32px; }

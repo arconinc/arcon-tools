@@ -158,7 +158,7 @@ export default function FormsAdminPage() {
   return (
     <>
       <style>{`
-        .fa-page { max-width: 900px; margin: 0 auto; padding: 2rem 1.5rem; }
+        .fa-page { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem; }
         .fa-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.75rem; }
         .fa-header h1 { font-size: 1.6rem; font-weight: 700; color: #111; margin: 0; }
 

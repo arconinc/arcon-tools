@@ -64,7 +64,7 @@ export default function BirthdaysPage() {
   return (
     <>
       <style>{`
-        .bday-page { padding: 28px 32px; max-width: 760px; margin: 0 auto; }
+        .bday-page { padding: 28px 32px; max-width: 1200px; margin: 0 auto; }
         .bday-page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
         .bday-back { font-size: 12px; color: #6b1e98; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
         .bday-back:hover { text-decoration: underline; }

@@ -155,7 +155,7 @@ export default function AdminEmployeeEditPage({ params }: Props) {
   return (
     <>
       <style>{`
-        .emp-edit { max-width: 800px; margin: 0 auto; padding: 2rem; }
+        .emp-edit { max-width: 1200px; margin: 0 auto; padding: 2rem; }
         .emp-edit-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.5rem; gap: 1rem; flex-wrap: wrap; }
         .emp-edit-title { font-size: 1.25rem; font-weight: 700; color: #1e293b; }
         .emp-edit-subtitle { font-size: 0.875rem; color: #64748b; margin-top: 0.125rem; }

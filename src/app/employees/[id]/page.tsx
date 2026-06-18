@@ -96,7 +96,7 @@ export default async function EmployeeProfilePage({
   return (
     <>
       <style>{`
-        .prof-page { max-width: 860px; margin: 0 auto; padding: 2rem; }
+        .prof-page { max-width: 1200px; margin: 0 auto; padding: 2rem; }
         .prof-back { display: inline-flex; align-items: center; gap: 0.375rem; font-size: 0.875rem; color: #64748b; margin-bottom: 1.5rem; text-decoration: none; }
         .prof-back:hover { color: #7c3aed; }
         .prof-card { background: white; border: 1px solid #e2e8f0; border-radius: 1rem; overflow: hidden; }

@@ -72,7 +72,7 @@ export default function PtoRequestsPage() {
   return (
     <>
       <style>{`
-        .pto-page { padding: 28px 32px; max-width: 900px; }
+        .pto-page { padding: 28px 32px; max-width: 1200px; margin: 0 auto; }
         .pto-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 24px; }
         .pto-title { font-size: 22px; font-weight: 800; color: #111; }
         .btn-primary { background: #6b1e98; color: #fff; border: none; border-radius: 7px; padding: 9px 18px; font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none; display: inline-block; }
@@ -148,24 +148,31 @@ export default function PtoRequestsPage() {
                     </td>
                     <td>
                       <div className="pto-actions">
-                        {(r.status === 'pending' || r.status === 'denied') && (
-                          <>
-                            {r.status === 'denied' && (
-                              <button
-                                className="btn-sm btn-edit"
-                                onClick={() => router.push(`/hr/pto/edit/${r.id}`)}
-                              >
-                                Edit & Resubmit
-                              </button>
-                            )}
-                            <button
-                              className="btn-sm btn-delete"
-                              disabled={deletingId === r.id}
-                              onClick={() => handleDelete(r.id)}
-                            >
-                              {deletingId === r.id ? 'Deleting…' : 'Delete'}
-                            </button>
-                          </>
+                        {r.status === 'denied' && (
+                          <button
+                            className="btn-sm btn-edit"
+                            onClick={() => router.push(`/hr/pto/edit/${r.id}`)}
+                          >
+                            Edit & Resubmit
+                          </button>
+                        )}
+                        {r.status !== 'approved' ? (
+                          <button
+                            className="btn-sm btn-delete"
+                            disabled={deletingId === r.id}
+                            onClick={() => handleDelete(r.id)}
+                          >
+                            {deletingId === r.id ? 'Deleting…' : 'Delete'}
+                          </button>
+                        ) : (
+                          <button
+                            className="btn-sm btn-delete"
+                            disabled={deletingId === r.id}
+                            onClick={() => handleDelete(r.id)}
+                            title="This request was approved. Deleting it will cancel your time off."
+                          >
+                            {deletingId === r.id ? 'Deleting…' : 'Cancel Approval'}
+                          </button>
                         )}
                       </div>
                     </td>

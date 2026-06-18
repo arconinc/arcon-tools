@@ -180,7 +180,7 @@ export default function AdminSpecIdeaEditPage() {
   if (!idea) return <div style={{ padding: 48, color: '#ef4444', fontSize: 14 }}>Idea not found.</div>
 
   return (
-    <div style={{ padding: '28px 40px', maxWidth: 980, margin: '0 auto' }}>
+    <div style={{ padding: '28px 40px', maxWidth: 1200, margin: '0 auto' }}>
       <style>{`
         .ei-label { font-size: 12px; font-weight: 700; color: #374151; margin-bottom: 5px; display: block; }
         .ei-input { border: 1px solid #e2e8f0; border-radius: 8px; padding: 8px 12px; font-size: 14px; width: 100%; box-sizing: border-box; outline: none; }

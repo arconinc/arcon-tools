@@ -62,7 +62,7 @@ export default function AdminExpenseReportsPage() {
   )
 
   return (
-    <div style={{ maxWidth: 1000, margin: '0 auto', padding: '32px 16px' }}>
+    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '32px 16px' }}>
       <style>{`
         .er-table { width: 100%; border-collapse: collapse; }
         .er-table th { text-align: left; padding: 10px 14px; background: #f8f7ff; color: #6d28d9; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; border-bottom: 2px solid #ede9fe; }

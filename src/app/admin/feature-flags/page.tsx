@@ -88,7 +88,7 @@ export default function FeatureFlagsAdminPage() {
   }
 
   return (
-    <div style={{ padding: '32px 40px', maxWidth: 760 }}>
+    <div style={{ padding: '32px 40px', maxWidth: 1200, margin: '0 auto' }}>
       <style>{`
         .flag-row { display: flex; align-items: center; gap: 16px; padding: 14px 16px; border-radius: 8px; background: #fff; border: 1px solid #e5e7eb; margin-bottom: 8px; }
         .flag-key { font-family: monospace; font-size: 13px; color: #6b1e98; font-weight: 600; flex: 0 0 220px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

@@ -128,7 +128,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   return NextResponse.json({ request: updated })
 }
 
-// DELETE /api/hr/pto/[id] — delete (pending or denied only)
+// DELETE /api/hr/pto/[id] — delete (any status)
 export async function DELETE(_req: NextRequest, { params }: Params) {
   const { id } = await params
   const supabase = await createClient()
@@ -151,9 +151,6 @@ export async function DELETE(_req: NextRequest, { params }: Params) {
     .single()
 
   if (!existing) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  if (existing.status === 'approved') {
-    return NextResponse.json({ error: 'Approved requests cannot be deleted' }, { status: 400 })
-  }
 
   // Delete linked task
   if (existing.task_id) {
