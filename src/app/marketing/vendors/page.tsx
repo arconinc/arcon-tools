@@ -66,7 +66,7 @@ export default function VendorsPage() {
     <div className="w-full px-6 py-8">
       <div className="flex items-center justify-between mb-6">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Vendors</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Suppliers</h1>
           <p className="text-sm text-slate-500 mt-0.5">Supplier organizations and partners</p>
         </div>
         <button
@@ -90,7 +90,7 @@ export default function VendorsPage() {
             type="search"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search vendors…"
+            placeholder="Search suppliers…"
             className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
           />
         </div>

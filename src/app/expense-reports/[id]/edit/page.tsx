@@ -382,7 +382,7 @@ export default function ExpenseReportEditPage() {
                 <thead>
                   <tr>
                     <th>Date</th>
-                    <th>Vendor</th>
+                    <th>Supplier</th>
                     <th>Category</th>
                     <th>Description</th>
                     <th style={{ textAlign: 'right' }}>Amount</th>
@@ -404,7 +404,7 @@ export default function ExpenseReportEditPage() {
                           {canEdit ? (
                             <>
                               <td><input className="cell-input" type="date" defaultValue={item.expense_date ?? ''} onBlur={async e => { if (e.target.value !== (item.expense_date ?? '')) await fetch(`/api/expense-reports/${id}/line-items/${item.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ expense_date: e.target.value || null }) }) }} /></td>
-                              <td><input className="cell-input" type="text" defaultValue={item.vendor ?? ''} placeholder="Vendor…" onBlur={async e => { if (e.target.value !== (item.vendor ?? '')) await fetch(`/api/expense-reports/${id}/line-items/${item.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vendor: e.target.value || null }) }) }} /></td>
+                              <td><input className="cell-input" type="text" defaultValue={item.vendor ?? ''} placeholder="Supplier…" onBlur={async e => { if (e.target.value !== (item.vendor ?? '')) await fetch(`/api/expense-reports/${id}/line-items/${item.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ vendor: e.target.value || null }) }) }} /></td>
                               <td>
                                 <select className="cell-select" defaultValue={item.category ?? ''} onBlur={async e => { if (e.target.value !== (item.category ?? '')) await fetch(`/api/expense-reports/${id}/line-items/${item.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ category: e.target.value || null }) }) }}>
                                   <option value="">— select —</option>
@@ -541,7 +541,7 @@ export default function ExpenseReportEditPage() {
                         <input
                           className="cell-input"
                           type="text"
-                          placeholder="Vendor…"
+                          placeholder="Supplier…"
                           value={inlineNewRow.vendor ?? ''}
                           style={{ background: '#fdf4ff' }}
                           onChange={e => setInlineNewRow(r => ({ ...r!, vendor: e.target.value || null }))}

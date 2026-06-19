@@ -634,7 +634,7 @@ export default function AdminExpenseReportDetailPage() {
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: 12 }}>
               {[
                 { label: 'Date', field: 'expense_date', type: 'date' },
-                { label: 'Vendor', field: 'vendor', type: 'text' },
+                { label: 'Supplier', field: 'vendor', type: 'text' },
                 { label: 'Original Amount', field: 'original_amount', type: 'number' },
                 { label: 'Adjusted Amount', field: 'adjusted_amount', type: 'number' },
               ].map(f => (

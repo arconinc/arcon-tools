@@ -260,7 +260,7 @@ export default function ContactDetailPage() {
             value={createForm.vendor_id || null}
             displayName={null}
             onSelect={(id) => setCreateForm((p) => ({ ...p, vendor_id: id ?? '' }))}
-            placeholder="Search vendors…"
+            placeholder="Search suppliers…"
           />
           <div className="flex gap-3 pt-1">
             <button type="submit" disabled={creating}
@@ -541,7 +541,7 @@ export default function ContactDetailPage() {
                         value={(ef.vendor_id as string) || null}
                         displayName={editVendorName}
                         onSelect={(id, name) => { handleEditChange('vendor_id', id ?? ''); setEditVendorName(name) }}
-                        placeholder="Search vendors…"
+                        placeholder="Search suppliers…"
                       />
                       <div className="col-span-2">
                         <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Description</label>

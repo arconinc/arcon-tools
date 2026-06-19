@@ -361,7 +361,7 @@ export default function VendorDetailPage() {
       <div className="max-w-3xl mx-auto px-6 py-6">
         <Link href="/marketing/vendors" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-5">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-          Vendors
+          Suppliers
         </Link>
         <h1 className="text-xl font-bold text-slate-900 mb-4">New Vendor</h1>
         <form onSubmit={handleCreate} className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
@@ -431,7 +431,7 @@ export default function VendorDetailPage() {
   if (error || !vendor) {
     return (
       <div className="px-6 py-5">
-        <Link href="/marketing/vendors" className="text-sm text-slate-500 hover:text-slate-700">← Vendors</Link>
+        <Link href="/marketing/vendors" className="text-sm text-slate-500 hover:text-slate-700">← Suppliers</Link>
         <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">{error ?? 'Vendor not found'}</div>
       </div>
     )
@@ -443,7 +443,7 @@ export default function VendorDetailPage() {
     <div className="px-6 py-5">
       <Link href="/marketing/vendors" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-3">
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
-        Vendors
+        Suppliers
       </Link>
 
       {/* Header */}

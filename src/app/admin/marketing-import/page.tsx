@@ -170,7 +170,7 @@ export default function CrmImportPage() {
       <div className="mb-6">
         <h1 className="text-2xl font-bold text-slate-900">Marketing Import</h1>
         <p className="text-sm text-slate-500 mt-0.5">
-          Import organizations from an Insightly Excel export (.xlsx) into Customers and Vendors.
+          Import organizations from an Insightly Excel export (.xlsx) into Customers and Suppliers.
           Re-importing is safe — existing records update in place, nothing is deleted.
         </p>
       </div>

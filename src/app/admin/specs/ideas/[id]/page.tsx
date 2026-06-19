@@ -227,7 +227,7 @@ export default function AdminSpecIdeaEditPage() {
                 <input className="ei-input" value={itemNumber} onChange={e => setItemNumber(e.target.value)} placeholder="HP-1234" />
               </div>
               <div>
-                <label className="ei-label">Vendor *</label>
+                <label className="ei-label">Supplier *</label>
                 <VendorSearch
                   value={vendorOption}
                   onChange={v => {
@@ -236,7 +236,7 @@ export default function AdminSpecIdeaEditPage() {
                   }}
                 />
                 {!vendorOption && vendor && (
-                  <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Currently: {vendor} — search to link to CRM vendor</div>
+                  <div style={{ fontSize: 11, color: '#94a3b8', marginTop: 4 }}>Currently: {vendor} — search to link to CRM supplier</div>
                 )}
               </div>
               <div>
@@ -251,7 +251,7 @@ export default function AdminSpecIdeaEditPage() {
                 <input className="ei-input" value={priceRange} onChange={e => setPriceRange(e.target.value)} placeholder="$4.00 – $8.00" />
               </div>
               <div>
-                <label className="ei-label">Vendor URL</label>
+                <label className="ei-label">Supplier URL</label>
                 <input className="ei-input" type="url" value={vendorUrl} onChange={e => setVendorUrl(e.target.value)} placeholder="https://..." />
               </div>
             </div>

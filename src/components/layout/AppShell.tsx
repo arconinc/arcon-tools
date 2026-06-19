@@ -126,11 +126,19 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
       ],
     },
     {
+      label: 'Customers',
+      href: '/marketing/customers',
+      items: [],
+    },
+    {
+      label: 'Suppliers',
+      href: '/marketing/vendors',
+      items: [],
+    },
+    {
       label: 'Marketing',
       items: [
         { href: '/marketing', label: 'Dashboard', icon: CrmDashIcon },
-        { href: '/marketing/customers', label: 'Customers', icon: CrmCustomersIcon, adminMatch: true },
-        { href: '/marketing/vendors', label: 'Vendors', icon: BuildingIcon, adminMatch: true },
         { href: '/marketing/contacts', label: 'Contacts', icon: CrmContactsIcon, adminMatch: true },
         { href: '/marketing/opportunities', label: 'Opportunities', icon: CrmOppsIcon, adminMatch: true },
         { href: '/documents/marketing', label: 'Documents', icon: DocumentIcon, adminMatch: true },
@@ -478,7 +486,7 @@ export default function AppShell({ children, user, isImpersonating, impersonated
                               padding: '0 16px 6px', textDecoration: 'none',
                             }}
                           >
-                            <span style={{ color: isHomeActive ? '#c084fc' : '#9333ea', fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                            <span style={{ color: '#c084fc', fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
                               {section.label}
                             </span>
                           </Link>
@@ -490,7 +498,7 @@ export default function AppShell({ children, user, isImpersonating, impersonated
                               padding: '0 16px 6px', background: 'none', border: 'none', cursor: 'pointer',
                             }}
                           >
-                            <span style={{ color: '#9333ea', fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
+                            <span style={{ color: '#c084fc', fontSize: 12, fontWeight: 700, letterSpacing: '0.1em', textTransform: 'uppercase' }}>
                               {section.label}
                             </span>
                             <svg

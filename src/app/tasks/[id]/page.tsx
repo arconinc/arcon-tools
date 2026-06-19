@@ -252,7 +252,7 @@ export default function TaskDetailPage() {
     : task.customer
     ? { type: 'customer', label: 'Customer', href: `/marketing/customers/${task.customer.id}`, name: task.customer.name, color: 'bg-blue-100 text-blue-700' }
     : task.vendor
-    ? { type: 'vendor', label: 'Vendor', href: `/marketing/vendors/${task.vendor.id}`, name: task.vendor.name, color: 'bg-orange-100 text-orange-700' }
+    ? { type: 'vendor', label: 'Supplier', href: `/marketing/vendors/${task.vendor.id}`, name: task.vendor.name, color: 'bg-orange-100 text-orange-700' }
     : task.contact
     ? { type: 'contact', label: 'Contact', href: `/marketing/contacts/${task.contact.id}`, name: `${task.contact.first_name} ${task.contact.last_name}`, color: 'bg-teal-100 text-teal-700' }
     : null
@@ -797,7 +797,7 @@ export default function TaskDetailPage() {
                   placeholder="Search customers…"
                 />
                 <EntitySearchPicker
-                  label="Vendor"
+                  label="Supplier"
                   apiPath="/api/marketing/vendors"
                   resultsKey="vendors"
                   value={(linkedForm.vendor_id as string) ?? null}
@@ -805,7 +805,7 @@ export default function TaskDetailPage() {
                   onSelect={(id, name) =>
                     setLinkedForm((p) => ({ ...p, vendor_id: id ?? null, vendor: id ? { id, name: name! } : null }))
                   }
-                  placeholder="Search vendors…"
+                  placeholder="Search suppliers…"
                 />
                 <div>
                   <label className="block text-xs text-slate-500 mb-1">Contact</label>

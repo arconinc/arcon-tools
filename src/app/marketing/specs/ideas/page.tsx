@@ -94,7 +94,7 @@ function IdeaDrawer({ idea, onClose, onCreateSpec }: { idea: SpecIdea; onClose: 
               {[
                 ['Item Name', idea.item_name],
                 ['Item #', idea.item_number],
-                ['Vendor', idea.vendor],
+                ['Supplier', idea.vendor],
                 ['Price Range', idea.price_range],
                 ['Category', idea.category],
               ].map(([label, value]) => value ? (
@@ -221,10 +221,10 @@ export default function SpecIdeasLibrary() {
       <div style={{ width: 260, background: 'white', borderRight: '1px solid #e2e8f0', padding: '24px 20px', overflowY: 'auto', flexShrink: 0 }}>
         <div style={{ fontWeight: 700, fontSize: 16, color: '#1e293b', marginBottom: 20 }}>Filters</div>
 
-        {/* Vendor */}
+        {/* Supplier */}
         <div className="filter-section">
           <div className="filter-title">
-            <span>Vendor</span>
+            <span>Supplier</span>
             {selectedVendors.length > 0 && (
               <button onClick={() => setSelectedVendors([])} style={{ background: 'none', border: 'none', color: '#7c3aed', fontSize: 11, cursor: 'pointer', fontWeight: 600 }}>Clear</button>
             )}

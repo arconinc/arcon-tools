@@ -367,7 +367,7 @@ export default function ExpenseReportDetailPage() {
               <thead>
                 <tr>
                   <th>Date</th>
-                  <th>Vendor</th>
+                  <th>Supplier</th>
                   <th>Category</th>
                   <th>Description</th>
                   <th style={{ textAlign: 'right' }}>Amount</th>

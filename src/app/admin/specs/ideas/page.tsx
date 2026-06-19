@@ -88,7 +88,7 @@ export default function AdminSpecIdeasPage() {
           onChange={e => setVendorFilter(e.target.value)}
           style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 10px', fontSize: 13, outline: 'none', background: 'white' }}
         >
-          <option value="">All Vendors</option>
+          <option value="">All Suppliers</option>
           {vendors.map(v => <option key={v} value={v}>{v}</option>)}
         </select>
         <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#374151', cursor: 'pointer', userSelect: 'none' }}>
@@ -114,7 +114,7 @@ export default function AdminSpecIdeasPage() {
         <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden' }}>
           {/* Table header */}
           <div style={{ display: 'grid', gridTemplateColumns: '48px 1fr 160px 100px 120px 80px 60px', gap: 0, padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-            {['', 'Item', 'Vendor', 'Category', 'Price Range', 'Tags', ''].map((h, i) => (
+            {['', 'Item', 'Supplier', 'Category', 'Price Range', 'Tags', ''].map((h, i) => (
               <div key={i} style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.04em' }}>{h}</div>
             ))}
           </div>
