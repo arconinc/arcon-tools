@@ -39,7 +39,7 @@ function normalizeTaskAssignment(task: Record<string, unknown>) {
 }
 
 // GET /api/marketing/tasks
-// ?assigned_to=me|all|<uuid>|<uuid1>,<uuid2>  ?status=  ?category=  ?department=  ?delegated_by_me=true  ?due_before=  ?opportunity_id=  ?customer_id=  ?vendor_id=  ?page=1&limit=50
+// ?assigned_to=me|all|<uuid>|<uuid1>,<uuid2>  ?status=  ?category=  ?department=  ?delegated_by_me=true  ?due_before=  ?opportunity_id=  ?customer_id=  ?vendor_id=  ?order_by=created|due_date|sort_order  ?page=1&limit=50
 export async function GET(req: NextRequest) {
   const appUser = await requireUser()
   if (!appUser) return unauthorized()
@@ -55,6 +55,7 @@ export async function GET(req: NextRequest) {
   const opportunityId = searchParams.get('opportunity_id')
   const customerId = searchParams.get('customer_id')
   const vendorId = searchParams.get('vendor_id')
+  const orderBy = searchParams.get('order_by') ?? 'sort_order'
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
   const limit = Math.min(200, Math.max(1, parseInt(searchParams.get('limit') ?? '50', 10)))
   const from = (page - 1) * limit
@@ -130,8 +131,8 @@ export async function GET(req: NextRequest) {
       adminClient
         .from('crm_tasks')
         .select('id, title, assigned_to, task_owner, department, category, priority, due_date, status, progress, delegators, opportunity_id, customer_id, vendor_id, contact_id, sort_order, created_by, created_at, updated_at')
-        .order('sort_order', { ascending: true, nullsFirst: false })
-        .order('due_date', { ascending: true, nullsFirst: false })
+        .order(orderBy === 'created' ? 'created_at' : orderBy === 'due_date' ? 'due_date' : 'sort_order', { ascending: orderBy === 'created' ? false : true, nullsFirst: false })
+        .order(orderBy === 'created' ? 'due_date' : orderBy === 'due_date' ? 'sort_order' : 'due_date', { ascending: true, nullsFirst: false })
     ).range(from, to),
   ])
 
