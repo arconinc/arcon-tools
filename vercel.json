@@ -1,8 +1,17 @@
 {
-  "crons": [
+  "flags": [
     {
-      "path": "/api/cron/sync-orders",
-      "schedule": "0 6 * * *"
+      "key": "expense-reports",
+      "description": "Enable expense report feature",
+      "options": [
+        {
+          "id": "control",
+          "label": "Control",
+          "rollout": {
+            "percentage": 100
+          }
+        }
+      ]
     }
   ]
 }

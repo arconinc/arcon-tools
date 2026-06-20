@@ -17,7 +17,6 @@ const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 const _fetchCache: {
   stores?: { data: Store[]; at: number }
   countdown?: { data: CalendarCountdownEvent[]; at: number }
-  featureFlags?: { data: Record<string, boolean>; at: number }
 } = {}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -27,6 +26,7 @@ interface AppShellProps {
   user: { id: string; email: string; display_name: string; is_admin: boolean; avatar_url?: string | null; roles?: string[] }
   isImpersonating?: boolean
   impersonatedUserName?: string
+  evaluatedFlags?: Record<string, boolean>
 }
 
 type NavBadge = { text: string; variant: 'purple' | 'green' | 'muted' }
@@ -82,11 +82,6 @@ export function useAppUser() {
   return useContext(UserContext)
 }
 
-const FeatureFlagsContext = createContext<Record<string, boolean>>({})
-
-export function useFeatureFlags() {
-  return useContext(FeatureFlagsContext)
-}
 
 // ── Nav structure ─────────────────────────────────────────────────────────────
 
@@ -212,7 +207,6 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
         { href: '/admin/access-requests', label: 'Access Requests', icon: LockIcon, adminMatch: true },
         { href: '/releases', label: 'Release Notes', icon: ReleaseIcon, adminMatch: true },
         { href: '/admin/audit-log', label: 'Audit Log', icon: LogIcon, adminMatch: true },
-        { href: '/admin/feature-flags', label: 'Feature Flags', icon: FeatureFlagIcon, adminMatch: true },
       ],
     })
   }
@@ -225,13 +219,12 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
 
 // ── AppShell ──────────────────────────────────────────────────────────────────
 
-export default function AppShell({ children, user, isImpersonating, impersonatedUserName }: AppShellProps) {
+export default function AppShell({ children, user, isImpersonating, impersonatedUserName, evaluatedFlags = {} }: AppShellProps) {
   const pathname = usePathname()
   const router = useRouter()
   const supabase = createClient()
 
   const [selectedStore, setSelectedStore] = useState<Store | null>(null)
-  const [featureFlags, setFeatureFlags] = useState<Record<string, boolean>>({})
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false)
   const [tooltip, setTooltip] = useState<{ label: string; y: number } | null>(null)
@@ -358,22 +351,6 @@ export default function AppShell({ children, user, isImpersonating, impersonated
     return () => clearInterval(id)
   }, [countdownEvents.length])
 
-  useEffect(() => {
-    const cached = _fetchCache.featureFlags
-    if (cached && Date.now() - cached.at < CACHE_TTL) {
-      setFeatureFlags(cached.data)
-      return
-    }
-    fetch('/api/feature-flags')
-      .then(r => r.ok ? r.json() : null)
-      .then((data: { flags: Record<string, boolean> } | null) => {
-        if (data?.flags) {
-          _fetchCache.featureFlags = { data: data.flags, at: Date.now() }
-          setFeatureFlags(data.flags)
-        }
-      })
-      .catch(() => {})
-  }, [])
 
   // ── Analytics ──────────────────────────────────────────────────────────────
   useEffect(() => {
@@ -415,12 +392,11 @@ export default function AppShell({ children, user, isImpersonating, impersonated
     .toUpperCase()
     .slice(0, 2)
 
-  const navSections = buildNavSections(user.is_admin, user.roles ?? [], featureFlags)
+  const navSections = buildNavSections(user.is_admin, user.roles ?? [], evaluatedFlags)
   const sidebarWidth = sidebarCollapsed ? 52 : 228
 
   return (
     <UserContext.Provider value={{ user }}>
-      <FeatureFlagsContext.Provider value={featureFlags}>
       <StoreContext.Provider value={{ selectedStore, setSelectedStore }}>
         <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#f5f5f5' }}>
 
@@ -792,7 +768,6 @@ export default function AppShell({ children, user, isImpersonating, impersonated
 
         </div>
       </StoreContext.Provider>
-      </FeatureFlagsContext.Provider>
     </UserContext.Provider>
   )
 }
@@ -1036,10 +1011,6 @@ function LoginIcon({ className }: { className?: string }) {
 }
 function LockIcon({ className }: { className?: string }) {
   return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><rect x="3" y="11" width="18" height="11" rx="2" ry="2" strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 11V7a5 5 0 0 1 10 0v4" /></svg>
-}
-
-function FeatureFlagIcon({ className }: { className?: string }) {
-  return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3v18M3 5l14 4-14 4" /></svg>
 }
 
 function SpecSampleIcon({ className }: { className?: string }) {

@@ -2,6 +2,7 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getEvaluatedFlags } from '@/lib/flags'
 import AppShell from '@/components/layout/AppShell'
 import releasesData from '@/data/releases.json'
 import type { Release, ReleaseChange, ReleaseChangeCategory } from '@/types'
@@ -59,8 +60,10 @@ export default async function ReleaseDetailPage({
 
   const grouped = groupByCategory(release.changes)
 
+  const flags = await getEvaluatedFlags()
+
   return (
-    <AppShell user={appUser}>
+     evaluatedFlags={flags} user={appUser}>
       <style>{`
         .release-detail { max-width: 1200px; margin: 0 auto; padding: 32px 24px 64px; }
         .release-back { display: inline-flex; align-items: center; gap: 6px; color: #6b7280; font-size: 14px; text-decoration: none; margin-bottom: 24px; }
@@ -109,6 +112,8 @@ export default async function ReleaseDetailPage({
           const items = grouped[cat]
           if (!items || items.length === 0) return null
           const config = categoryConfig[cat]
+  const flags = await getEvaluatedFlags()
+
           return (
             <div key={cat} className={`change-section ${config.sectionClass}`}>
               <div className="section-heading">

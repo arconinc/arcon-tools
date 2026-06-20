@@ -1,14 +1,3 @@
-// ─── Feature Flags ───────────────────────────────────────────────────────────
-
-export interface FeatureFlag {
-  id: string
-  key: string
-  label: string
-  enabled: boolean
-  created_at: string
-  updated_at: string
-}
-
 // ─── App User ───────────────────────────────────────────────────────────────
 
 export type OfficeLocation = 'Remote' | 'Minnesota' | 'Arizona' | 'Colorado'
