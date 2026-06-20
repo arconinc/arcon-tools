@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getEvaluatedFlags } from '@/lib/flags'
 import AppShell from '@/components/layout/AppShell'
 import releasesData from '@/data/releases.json'
 import type { Release, ReleaseChangeCategory } from '@/types'
@@ -38,10 +37,9 @@ export default async function ReleasesPage() {
 
   if (!appUser) redirect('/login')
 
-  const flags = await getEvaluatedFlags()
 
   return (
-     evaluatedFlags={flags} user={appUser}>
+    <AppShell user={appUser}>
       <style>{`
         .releases-page { max-width: 1200px; margin: 0 auto; padding: 32px 24px 64px; }
         .releases-header { margin-bottom: 32px; }
@@ -85,7 +83,6 @@ export default async function ReleasesPage() {
               count: release.changes.filter((c) => c.category === cat).length,
             }))
 
-  const flags = await getEvaluatedFlags()
 
             return (
               <Link key={release.version} href={`/releases/${release.version}`} className="release-card">

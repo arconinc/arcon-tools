@@ -2,7 +2,6 @@ import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getEvaluatedFlags } from '@/lib/flags'
 import AppShell from '@/components/layout/AppShell'
 import { ArticleCard } from '@/components/news/ArticleCard'
 import { formatPublishDate } from '@/lib/news-utils'
@@ -47,10 +46,9 @@ export default async function NewsListingPage() {
   }))
 
   const avatarUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture || null
-  const flags = await getEvaluatedFlags()
 
   return (
-    <AppShell user={{ ...appUser, avatar_url: avatarUrl }} evaluatedFlags={flags}>
+    <AppShell user={{ ...appUser, avatar_url: avatarUrl }}>
       <div className="max-w-5xl mx-auto px-6 py-8">
         <div className="flex items-center justify-between mb-8">
           <div>

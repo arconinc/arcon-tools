@@ -126,7 +126,6 @@ export default function MyProfilePage() {
     return <div style={{ padding: '2rem', textAlign: 'center', color: '#94a3b8' }}>Loading…</div>
   }
 
-  const flags = await getEvaluatedFlags()
 
   return (
     <>

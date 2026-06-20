@@ -44,7 +44,6 @@ function storeUrgency(store: Store): 'ended' | 'closing-soon' | 'launching-soon'
   if (takedown) { const d = daysUntil(store.takedown_date); if (d !== null && d <= 30) return 'closing-soon' }
   if (launch && launch > today) {
     const d = daysUntil(store.launch_date)
-  const flags = await getEvaluatedFlags()
 
     return (d !== null && d <= 30) ? 'launching-soon' : 'future'
   }
@@ -170,7 +169,6 @@ const COLUMNS: ColDef[] = [
         progress = Math.max(0, Math.min(100, (elapsed / total) * 100))
       }
 
-  const flags = await getEvaluatedFlags()
 
       return (
         <div style={{ display: 'flex', flexDirection: 'column', gap: 3, width: '100%' }}>
@@ -282,7 +280,6 @@ function ColPicker({
       if (ref.current && !ref.current.contains(e.target as Node)) setOpen(false)
     }
     document.addEventListener('mousedown', handleClick)
-  const flags = await getEvaluatedFlags()
 
     return () => document.removeEventListener('mousedown', handleClick)
   }, [])
@@ -293,7 +290,6 @@ function ColPicker({
     onChange(next)
   }
 
-  const flags = await getEvaluatedFlags()
 
   return (
     <div ref={ref} className="relative">
@@ -368,7 +364,6 @@ function StoreTable({
       if (a === null && b === null) return 0
       if (a === null) return 1
       if (b === null) return -1
-  const flags = await getEvaluatedFlags()
 
       return (a - b) * dir
     }
@@ -388,14 +383,12 @@ function StoreTable({
         case 'launch_status': {
           const pa = URGENCY_PRIORITY[storeUrgency(a)] ?? 99
           const pb = URGENCY_PRIORITY[storeUrgency(b)] ?? 99
-  const flags = await getEvaluatedFlags()
 
           return (pa - pb) * dir
         }
         case 'domain':
           return strSort(a.domain, b.domain)
         case 'in_production':
-  const flags = await getEvaluatedFlags()
 
           return ((a.in_production ? 0 : 1) - (b.in_production ? 0 : 1)) * dir
         case 'store_types':
@@ -430,7 +423,6 @@ function StoreTable({
   const dataColsWidth = activeCols.reduce((a, c) => a + c.width, 0)
   const minWidth = Math.max(NAME_W + dataColsWidth, 1100)
 
-  const flags = await getEvaluatedFlags()
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
@@ -516,7 +508,6 @@ function StoreTable({
             const isEven = idx % 2 === 0
             const rowBg  = isEven ? '#ffffff' : '#fafafa'
 
-  const flags = await getEvaluatedFlags()
 
             return (
               <div
@@ -728,7 +719,6 @@ export default function StoresDashboardPage() {
     closing:   stores.filter(s => { const d = daysUntil(s.takedown_date); return d !== null && d >= 0 && d <= 30 }).length,
   }), [stores])
 
-  const flags = await getEvaluatedFlags()
 
   return (
     <>
@@ -879,7 +869,6 @@ export default function StoresDashboardPage() {
 }
 
 function LoadingSkeleton() {
-  const flags = await getEvaluatedFlags()
 
   return (
     <div className="bg-white border border-slate-200 rounded-2xl divide-y divide-slate-100">

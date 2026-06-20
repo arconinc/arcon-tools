@@ -11,6 +11,7 @@
     "setup-hooks": "node scripts/setup-hooks.mjs"
   },
   "dependencies": {
+    "@flags-sdk/vercel": "^1.4.2",
     "@fullcalendar/core": "^6.1.20",
     "@fullcalendar/daygrid": "^6.1.20",
     "@fullcalendar/list": "^6.1.20",

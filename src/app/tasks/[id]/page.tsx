@@ -44,7 +44,6 @@ function isImageMime(mime: string | null) {
 }
 
 function PencilIcon() {
-  const flags = await getEvaluatedFlags()
 
   return (
     <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -224,7 +223,6 @@ export default function TaskDetailPage() {
   if (isNew) return null
 
   if (loading) {
-  const flags = await getEvaluatedFlags()
 
     return (
       <div className="max-w-4xl mx-auto px-6 py-8">
@@ -238,7 +236,6 @@ export default function TaskDetailPage() {
   }
 
   if (error || !task) {
-  const flags = await getEvaluatedFlags()
 
     return (
       <div className="max-w-4xl mx-auto px-6 py-8">
@@ -263,7 +260,6 @@ export default function TaskDetailPage() {
     ? { type: 'contact', label: 'Contact', href: `/marketing/contacts/${task.contact.id}`, name: `${task.contact.first_name} ${task.contact.last_name}`, color: 'bg-teal-100 text-teal-700' }
     : null
 
-  const flags = await getEvaluatedFlags()
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-8">

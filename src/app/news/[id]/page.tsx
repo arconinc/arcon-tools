@@ -2,7 +2,6 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getEvaluatedFlags } from '@/lib/flags'
 import AppShell from '@/components/layout/AppShell'
 import { TiptapRenderer } from '@/components/news/TiptapRenderer'
 import { ArticleTypeBadge } from '@/components/news/ArticleTypeBadge'
@@ -44,10 +43,9 @@ export default async function ArticleReaderPage({ params }: PageProps) {
   const a = article as NewsArticle & { author: { display_name: string } }
   const avatarUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture || null
 
-  const flags = await getEvaluatedFlags()
 
   return (
-     evaluatedFlags={flags} user={{ ...appUser, avatar_url: avatarUrl }}>
+    <AppShell user={{ ...appUser, avatar_url: avatarUrl }}>
       <div className="max-w-3xl mx-auto px-6 py-8">
         {/* Back */}
         <Link href="/news" className="text-sm text-slate-400 hover:text-purple-600 flex items-center gap-1 mb-6 transition-colors">

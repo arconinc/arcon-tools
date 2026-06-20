@@ -1,6 +1,5 @@
 import type { NextConfig } from "next";
 import { withSentryConfig } from "@sentry/nextjs";
-import { defineFlags } from 'flags';
 
 const nextConfig: NextConfig = {
   // potrace and jimp are native CJS modules that use instanceof checks internally.
@@ -17,12 +16,6 @@ const nextConfig: NextConfig = {
     ],
   },
 };
-
-export const flags = defineFlags({
-  'expense-reports': {
-    description: 'Enable expense report feature',
-  },
-});
 
 export default withSentryConfig(nextConfig, {
   org: process.env.SENTRY_ORG,
