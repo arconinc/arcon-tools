@@ -351,14 +351,25 @@ export default function TaskDetailPage() {
               )}
             </div>
           </div>
-          {(appUser?.is_admin || task.created_by === appUser?.id || task.task_owner === appUser?.id) && (
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="flex-shrink-0 px-3 py-1.5 text-xs font-semibold text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
-            >
-              Delete
-            </button>
-          )}
+          <div className="flex-shrink-0 flex gap-2">
+            {task.created_by && (
+              <button
+                onClick={() => saveFieldValues({ assigned_to: task.created_by, status: 'waiting_on_approval' })}
+                disabled={saving}
+                className="px-3 py-1.5 text-xs font-semibold text-yellow-700 border border-yellow-300 bg-yellow-50 rounded-lg hover:bg-yellow-100 disabled:opacity-60 transition-colors"
+              >
+                Send for Approval
+              </button>
+            )}
+            {(appUser?.is_admin || task.created_by === appUser?.id || task.task_owner === appUser?.id) && (
+              <button
+                onClick={() => setShowDeleteConfirm(true)}
+                className="px-3 py-1.5 text-xs font-semibold text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
+              >
+                Delete
+              </button>
+            )}
+          </div>
         </div>
       </div>
 
