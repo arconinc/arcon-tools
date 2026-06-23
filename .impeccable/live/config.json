@@ -1,0 +1,7 @@
+{
+  "framework": "nextjs",
+  "files": ["src/app/**/*.tsx"],
+  "insertBefore": "export default",
+  "commentSyntax": "//",
+  "cspChecked": true
+}

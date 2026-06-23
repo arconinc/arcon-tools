@@ -1,0 +1,243 @@
+{
+  "schemaVersion": 2,
+  "generatedAt": "2026-06-23T11:24:41-05:00",
+  "title": "Design System: Arcon Tools App",
+  "extensions": {
+    "colorMeta": {
+      "arcon-purple": {
+        "role": "primary",
+        "displayName": "Arcon Purple",
+        "canonical": "#6b1e98",
+        "tonalRamp": ["#16051f", "#2d0d41", "#441463", "#5b1a84", "#6b1e98", "#8b3fbd", "#c084fc", "#f3e8ff"]
+      },
+      "workspace-bg": {
+        "role": "neutral",
+        "displayName": "Workspace Gray",
+        "canonical": "#f5f5f5",
+        "tonalRamp": ["#111111", "#374151", "#6b7280", "#9ca3af", "#d1d5db", "#e5e7eb", "#f3f4f6", "#f8fafc"]
+      },
+      "sidebar-bg": {
+        "role": "neutral",
+        "displayName": "Sidebar Black",
+        "canonical": "#111111",
+        "tonalRamp": ["#000000", "#111111", "#222222", "#2a2a2a", "#555555", "#777777", "#dddddd", "#ffffff"]
+      },
+      "danger-text": {
+        "role": "semantic",
+        "displayName": "Danger Red",
+        "canonical": "#dc2626",
+        "tonalRamp": ["#450a0a", "#7f1d1d", "#991b1b", "#dc2626", "#ef4444", "#fca5a5", "#fee2e2", "#fef2f2"]
+      },
+      "warning-text": {
+        "role": "semantic",
+        "displayName": "Attention Amber",
+        "canonical": "#92400e",
+        "tonalRamp": ["#451a03", "#78350f", "#92400e", "#d97706", "#f59e0b", "#fcd34d", "#fef3c7", "#fffbeb"]
+      },
+      "success-text": {
+        "role": "semantic",
+        "displayName": "Completion Green",
+        "canonical": "#15803d",
+        "tonalRamp": ["#052e16", "#14532d", "#166534", "#15803d", "#16a34a", "#86efac", "#dcfce7", "#f0fdf4"]
+      }
+    },
+    "typographyMeta": {
+      "display": {
+        "displayName": "Compact Display",
+        "purpose": "Page titles, dashboard hero captions, and major admin headings."
+      },
+      "headline": {
+        "displayName": "Panel Headline",
+        "purpose": "Modal headings and important panel titles."
+      },
+      "title": {
+        "displayName": "Widget Title",
+        "purpose": "Card titles, widget headers, and compact section titles."
+      },
+      "body": {
+        "displayName": "Operational Body",
+        "purpose": "Forms, rows, descriptions, and day-to-day task copy."
+      },
+      "label": {
+        "displayName": "Functional Label",
+        "purpose": "Table headers, form labels, nav section labels, and compact badges."
+      }
+    },
+    "shadows": [
+      {
+        "name": "hover-lift",
+        "value": "0 4px 6px rgba(15, 23, 42, 0.10)",
+        "purpose": "Light response for clickable cards."
+      },
+      {
+        "name": "popover",
+        "value": "0 4px 16px rgba(0,0,0,0.10)",
+        "purpose": "Notification panels, dropdowns, and compact floating surfaces."
+      },
+      {
+        "name": "modal",
+        "value": "0 20px 60px rgba(0,0,0,0.18)",
+        "purpose": "Dialogs and high-priority overlays."
+      }
+    ],
+    "motion": [
+      {
+        "name": "state-fast",
+        "value": "150ms ease",
+        "purpose": "Hover and focus color changes."
+      },
+      {
+        "name": "panel-standard",
+        "value": "200ms ease",
+        "purpose": "Sidebar width and disclosure transitions."
+      },
+      {
+        "name": "hero-slide",
+        "value": "700ms cubic-bezier(0.77,0,0.18,1)",
+        "purpose": "Dashboard hero carousel slide movement."
+      }
+    ],
+    "breakpoints": [
+      {
+        "name": "sm",
+        "value": "640px"
+      },
+      {
+        "name": "lg",
+        "value": "1024px"
+      }
+    ]
+  },
+  "components": [
+    {
+      "name": "Primary Button",
+      "kind": "button",
+      "refersTo": "button-primary",
+      "description": "Compact purple action button for saves, submits, and important workflow actions.",
+      "html": "<button class=\"ds-btn-primary\">Save Changes</button>",
+      "css": ".ds-btn-primary { background: #6b1e98; color: #fff; border: 0; border-radius: 8px; padding: 8px 16px; font: 700 13px/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; cursor: pointer; transition: background 150ms ease, transform 150ms ease; } .ds-btn-primary:hover { background: #5b21b6; } .ds-btn-primary:focus-visible { outline: 2px solid #a855f7; outline-offset: 2px; } .ds-btn-primary:active { transform: translateY(1px); } .ds-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; transform: none; }"
+    },
+    {
+      "name": "Secondary Button",
+      "kind": "button",
+      "refersTo": "button-secondary",
+      "description": "Neutral supporting action for cancel, back, and lower-risk choices.",
+      "html": "<button class=\"ds-btn-secondary\">Cancel</button>",
+      "css": ".ds-btn-secondary { background: #f3f4f6; color: #374151; border: 1px solid #e5e7eb; border-radius: 8px; padding: 8px 16px; font: 700 13px/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; cursor: pointer; transition: background 150ms ease, border-color 150ms ease; } .ds-btn-secondary:hover { background: #e5e7eb; } .ds-btn-secondary:focus-visible { outline: 2px solid #a855f7; outline-offset: 2px; }"
+    },
+    {
+      "name": "Text Field",
+      "kind": "input",
+      "refersTo": "input",
+      "description": "Standard compact form field with a visible purple focus treatment.",
+      "html": "<label class=\"ds-field\"><span class=\"ds-field-label\">Customer Name</span><input class=\"ds-input\" placeholder=\"Acme Co.\" /></label>",
+      "css": ".ds-field { display: grid; gap: 4px; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; } .ds-field-label { font-size: 12px; font-weight: 700; letter-spacing: 0.05em; text-transform: uppercase; color: #6b7280; } .ds-input { width: 100%; box-sizing: border-box; background: #fff; color: #111; border: 1px solid #d1d5db; border-radius: 8px; padding: 6px 10px; font: 400 14px/1.4 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; } .ds-input::placeholder { color: #6b7280; } .ds-input:focus { outline: 2px solid #a855f7; outline-offset: 0; border-color: #6b1e98; }"
+    },
+    {
+      "name": "Dashboard Card",
+      "kind": "card",
+      "refersTo": "card",
+      "description": "Flat-at-rest content container for widgets, tables, and dashboard modules.",
+      "html": "<section class=\"ds-card\"><header class=\"ds-card-header\"><h3>My Tasks</h3><a href=\"#\">View All</a></header><div class=\"ds-card-body\">No tasks assigned to you.</div></section>",
+      "css": ".ds-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; color: #111; } .ds-card-header { padding: 13px 16px; border-bottom: 1px solid #f3f4f6; display: flex; align-items: center; justify-content: space-between; gap: 12px; } .ds-card-header h3 { margin: 0; font-size: 13px; line-height: 1.35; font-weight: 700; color: #111; } .ds-card-header a { color: #6b1e98; font-size: 12px; font-weight: 600; text-decoration: none; } .ds-card-header a:hover { text-decoration: underline; } .ds-card-body { padding: 16px; color: #6b7280; font-size: 13px; }"
+    },
+    {
+      "name": "Selected Chip",
+      "kind": "chip",
+      "refersTo": "chip-selected",
+      "description": "Purple-tinted selected state for filters, departments, and compact tags.",
+      "html": "<span class=\"ds-chip-selected\">Marketing</span>",
+      "css": ".ds-chip-selected { display: inline-flex; align-items: center; border-radius: 999px; padding: 4px 10px; background: #f3e8ff; color: #5b21b6; font: 700 12px/1.2 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; }"
+    },
+    {
+      "name": "Sidebar Navigation Item",
+      "kind": "nav",
+      "refersTo": "navigation",
+      "description": "Dark navigation shell item with compact type and purple section language.",
+      "html": "<nav class=\"ds-sidebar\"><div class=\"ds-sidebar-label\">Company</div><a class=\"ds-sidebar-item ds-active\" href=\"#\">News & Announcements</a><a class=\"ds-sidebar-item\" href=\"#\">Documents</a></nav>",
+      "css": ".ds-sidebar { width: 228px; background: #111; padding: 12px 0; font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; } .ds-sidebar-label { color: #c084fc; font-size: 12px; font-weight: 700; letter-spacing: 0.1em; text-transform: uppercase; padding: 0 16px 6px; } .ds-sidebar-item { display: block; color: #ddd; text-decoration: none; padding: 8px 16px; font-size: 13px; font-weight: 500; transition: background 150ms ease, color 150ms ease; } .ds-sidebar-item:hover { background: #222; color: #fff; } .ds-sidebar-item.ds-active { background: #2a1438; color: #fff; } .ds-sidebar-item:focus-visible { outline: 2px solid #a855f7; outline-offset: -2px; }"
+    },
+    {
+      "name": "Status Badge",
+      "kind": "chip",
+      "refersTo": "status-badge",
+      "description": "Semantic state label with paired tint and readable text.",
+      "html": "<span class=\"ds-status ds-status-warning\">Waiting on Approval</span>",
+      "css": ".ds-status { display: inline-flex; align-items: center; border-radius: 4px; padding: 2px 8px; font: 700 12px/1.25 -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; white-space: nowrap; } .ds-status-warning { background: #fef3c7; color: #92400e; } .ds-status-success { background: #dcfce7; color: #15803d; } .ds-status-danger { background: #fee2e2; color: #dc2626; } .ds-status-info { background: #dbeafe; color: #1d4ed8; }"
+    }
+  ],
+  "narrative": {
+    "northStar": "The Helpful Operations Desk",
+    "overview": "The Arcon Tools App is a light, task-first internal workspace for busy employees moving between CRM work, documents, HR flows, announcements, dashboards, expense reports, and admin tools. The interface should feel like a competent colleague: organized, direct, and human without becoming playful at the expense of work.\n\nThe system is intentionally familiar product UI: system sans typography, compact controls, white content surfaces, a black navigation rail, and Arcon purple used as the signature action and selection color. It rejects generic SaaS polish, beige landing-page warmth, decorative dark mode, enterprise blue-gray stiffness, and rows of same-weight cards. Clarity comes first; delight appears in small brand moments like the Arc wordmark, the purple top stripe, company news, and the dashboard carousel.",
+    "keyCharacteristics": [
+      "Light workspace with dark persistent navigation.",
+      "Purple as identity, action, focus, and selected-state color.",
+      "Dense but readable pages with small type, clear labels, and strong dividers.",
+      "Flat surfaces by default, with shadows reserved for overlays and hover response.",
+      "Human internal language over marketing copy."
+    ],
+    "rules": [
+      {
+        "name": "The Purple Earns Its Place Rule",
+        "body": "Purple is for action, selection, focus, and identity. Do not use it as random decoration on inactive content.",
+        "section": "colors"
+      },
+      {
+        "name": "The Neutral Workspace Rule",
+        "body": "The app background is neutral gray, not beige, cream, paper, or blue-gray corporate wash.",
+        "section": "colors"
+      },
+      {
+        "name": "The Status Pair Rule",
+        "body": "Status color must pair a tinted background with readable text and a label. Never communicate status by color alone.",
+        "section": "colors"
+      },
+      {
+        "name": "The Product Sans Rule",
+        "body": "Use one system sans family across UI labels, buttons, data, and body text. Do not introduce display fonts into product surfaces.",
+        "section": "typography"
+      },
+      {
+        "name": "The Compact Hierarchy Rule",
+        "body": "Most UI text lives between 11px and 14px. Use weight, color, spacing, and borders before making text larger.",
+        "section": "typography"
+      },
+      {
+        "name": "The Uppercase Is Functional Rule",
+        "body": "Uppercase labels are allowed for table headers, nav sections, and compact labels. Do not add all-caps eyebrows to every content section.",
+        "section": "typography"
+      },
+      {
+        "name": "The Flat-By-Default Rule",
+        "body": "Cards at rest use a white surface plus a 1px border. If every card casts a shadow, the page loses hierarchy.",
+        "section": "elevation"
+      },
+      {
+        "name": "The Overlay Owns The Shadow Rule",
+        "body": "Strong shadows belong to modals, popovers, and dropdowns. Standard dashboard widgets should stay quiet.",
+        "section": "elevation"
+      }
+    ],
+    "dos": [
+      "Do use Arcon Purple for primary action, active selection, focus, progress, links, and identity accents.",
+      "Do keep the app background neutral gray and content surfaces white.",
+      "Do use system sans typography across product UI.",
+      "Do keep controls compact: 6-10px radius, 8-16px button padding, 13-14px body/control text.",
+      "Do use skeleton states inside content regions instead of centered spinners when rows or cards are loading.",
+      "Do make status chips self-describing with text plus color.",
+      "Do preserve the black sidebar and purple top stripe as core identity elements.",
+      "Do use inline page styles for dashboard/admin page-specific patterns when that matches the existing codebase."
+    ],
+    "donts": [
+      "Don't create \"SaaS generic\" beige-cream warm-neutral backgrounds or all-caps eyebrow headers on every section.",
+      "Don't use \"dark mode for its own sake\"; the product is a light workspace with a dark navigation shell.",
+      "Don't drift into \"Enterprise blue-gray corporate\" styling. The app should stay professional, warm, and efficient.",
+      "Don't let \"Flat / gray monoculture\" flatten hierarchy. Purple and semantic status color should carry meaning.",
+      "Don't build \"Cluttered card grids\" where every tile has the same weight. Vary hierarchy and density by task.",
+      "Don't use gradient text, decorative glassmorphism, or oversized card radii.",
+      "Don't pair a 1px bordered card with a broad decorative shadow. Pick a flat card or a purposeful overlay shadow.",
+      "Don't use colored side-stripe borders greater than 1px as a default card/list accent. Status should use labels, icons, text, or full-row tint instead.",
+      "Don't skip keyboard focus states or rely on color alone for status."
+    ]
+  }
+}

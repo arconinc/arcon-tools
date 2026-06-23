@@ -1,0 +1,52 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-labelledby="title desc">
+  <title id="title">The Arc icon</title>
+  <desc id="desc">A purple rounded-square icon with a white stylized A and arced lower cutout.</desc>
+  <defs>
+    <linearGradient id="bg" x1="70" y1="34" x2="445" y2="493" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#741CA3"/>
+      <stop offset=".48" stop-color="#6B1E98"/>
+      <stop offset="1" stop-color="#5D168D"/>
+    </linearGradient>
+    <radialGradient id="sheen" cx="118" cy="69" r="365" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFFFFF" stop-opacity=".16"/>
+      <stop offset=".42" stop-color="#FFFFFF" stop-opacity=".05"/>
+      <stop offset="1" stop-color="#FFFFFF" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="softShadow" x="-8%" y="-8%" width="116%" height="116%">
+      <feDropShadow dx="0" dy="8" stdDeviation="10" flood-color="#211F1C" flood-opacity=".16"/>
+    </filter>
+  </defs>
+
+  <rect width="512" height="512" fill="#FFFFFF"/>
+  <rect x="10" y="7" width="492" height="498" rx="63" fill="url(#bg)" filter="url(#softShadow)"/>
+  <rect x="10" y="7" width="492" height="498" rx="63" fill="url(#sheen)"/>
+
+  <path
+    fill="#FFFFFF"
+    d="M62 427
+       L214 90
+       H289
+       L443 427
+       C402 390 353 360 301 346
+       L256 167
+       L210 346
+       C156 361 104 391 62 427Z"
+  />
+
+  <path
+    fill="url(#bg)"
+    d="M183 313
+       L256 168
+       L330 313
+       C282 303 231 303 183 313Z"
+  />
+
+  <path
+    fill="url(#bg)"
+    d="M80 434
+       C120 366 185 325 256 325
+       C327 325 392 366 432 434
+       L432 512
+       H80Z"
+  />
+</svg>
