@@ -4,33 +4,52 @@ import { useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 
-// Dev-only: handles the magic-link hash redirect from /api/dev-login.
-// createBrowserClient automatically detects #access_token=... in the hash,
-// exchanges it for a session, and stores it in cookies for SSR compatibility.
+function getUrlParams() {
+  const searchParams = new URLSearchParams(window.location.search)
+  const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+  return { searchParams, hashParams }
+}
+
+// Dev-only: handles the magic-link redirect from /api/dev-login.
 export default function MagicCallbackPage() {
   const router = useRouter()
 
   useEffect(() => {
+    let cancelled = false
+    const initialParams = getUrlParams()
     const supabase = createClient()
 
-    // Wait for SIGNED_IN — the browser client processes #access_token from the hash
-    // asynchronously, so INITIAL_SESSION may fire before the session is ready.
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
+    async function completeMagicLogin() {
+      const { searchParams, hashParams } = initialParams
+      const code = searchParams.get('code')
+      const accessToken = hashParams.get('access_token')
+      const refreshToken = hashParams.get('refresh_token')
+
+      if (code) {
+        await supabase.auth.exchangeCodeForSession(code)
+      } else if (accessToken && refreshToken) {
+        await supabase.auth.setSession({
+          access_token: accessToken,
+          refresh_token: refreshToken,
+        })
+      }
+
+      const { data: { session } } = await supabase.auth.getSession()
+      if (cancelled) return
+
       if (session) {
         router.replace('/dashboard')
+      } else {
+        router.replace('/login?error=auth_failed')
       }
+    }
+
+    completeMagicLogin().catch(() => {
+      if (!cancelled) router.replace('/login?error=auth_failed')
     })
 
-    // Fallback: if no session within 10s, redirect to login with error
-    const timeout = setTimeout(() => {
-      supabase.auth.getSession().then(({ data: { session } }) => {
-        if (!session) router.replace('/login?error=auth_failed')
-      })
-    }, 10000)
-
     return () => {
-      subscription.unsubscribe()
-      clearTimeout(timeout)
+      cancelled = true
     }
   }, [router])
 
