@@ -48,3 +48,5 @@ next-env.d.ts
 /homepage.png
 .env.sentry-build-plugin
 /playwright-report/
+/timesheet-data.json
+/timesheet-scan.js

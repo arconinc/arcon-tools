@@ -12,9 +12,9 @@
   ],
   "gmail": {
     "name": "The Arc",
-    "logoUrl": "https://thearc.arconinc.com/favicon.ico",
-    "primaryColor": "#7c3aed",
-    "secondaryColor": "#5b21b6",
+    "logoUrl": "https://thearc.arconinc.com/the-arc-icon.png",
+    "primaryColor": "#6b1e98",
+    "secondaryColor": "#f3e8ff",
     "contextualTriggers": [
       {
         "unconditional": {},

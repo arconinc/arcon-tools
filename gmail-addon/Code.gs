@@ -7,7 +7,7 @@
  *
  * Action handlers (registered as callback functions):
  *   showCreateTaskForm(e)  — renders the task creation form
- *   handleCreateTask(e)    — submits the form to create a CRM task
+ *   handleCreateTask(e)    — submits the form to create a task
  *   handleBack(e)          — returns to the home card
  *
  * To add a new Gmail action in the future:
@@ -77,23 +77,45 @@ function buildHomePage(e) {
 function buildHomeCard(subject, senderName, senderEmail, bodySnippet, threadUrl) {
   var hasEmail = subject !== '';
 
-  var section = CardService.newCardSection();
+  var card = CardService.newCardBuilder();
 
+  // ── Header ────────────────────────────────────────────────────────────────
+  card.setHeader(
+    CardService.newCardHeader()
+      .setTitle('The Arc')
+      .setSubtitle('Arcon Tools — Email CRM Integration')
+      .setImageUrl('https://thearc.arconinc.com/the-arc-icon.png')
+      .setImageStyle(CardService.ImageStyle.CIRCLE)
+  );
+
+  // ── Email Context Section ─────────────────────────────────────────────────
   if (hasEmail) {
-    section.addWidget(
+    var emailSection = CardService.newCardSection()
+      .setHeader('Email Context');
+
+    emailSection.addWidget(
       CardService.newDecoratedText()
-        .setTopLabel('Email subject')
+        .setTopLabel('Subject')
         .setText(subject || '(no subject)')
         .setWrapText(true)
     );
-  } else {
-    section.addWidget(
-      CardService.newTextParagraph()
-        .setText('<b>The Arc</b> — Open an email to get started, or use the actions below.')
-    );
+
+    if (senderName || senderEmail) {
+      emailSection.addWidget(
+        CardService.newDecoratedText()
+          .setTopLabel('From')
+          .setText((senderName ? senderName + ' — ' : '') + senderEmail)
+          .setWrapText(true)
+      );
+    }
+
+    card.addSection(emailSection);
   }
 
-  // ── ACTION: Create CRM Task ──────────────────────────────────────────────
+  // ── Actions Section ──────────────────────────────────────────────────────
+  var actionSection = CardService.newCardSection()
+    .setHeader(hasEmail ? 'Create from This Email' : 'Quick Actions');
+
   var createTaskAction = CardService.newAction()
     .setFunctionName('showCreateTaskForm')
     .setParameters({
@@ -104,31 +126,44 @@ function buildHomeCard(subject, senderName, senderEmail, bodySnippet, threadUrl)
       threadUrl:   threadUrl
     });
 
-  section.addWidget(
+  // Create Task button (styled primary action)
+  actionSection.addWidget(
     CardService.newTextButton()
-      .setText('📋  Create CRM Task')
-      .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+      .setText('📋  Create Task')
+      .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED)
       .setOnClickAction(createTaskAction)
   );
 
-  // ── Future actions go here ────────────────────────────────────────────────
-  // Example:
-  // section.addWidget(
-  //   CardService.newTextButton()
-  //     .setText('🔗  Link to Opportunity')
-  //     .setOnClickAction(CardService.newAction().setFunctionName('showLinkOpportunityForm')...)
-  // );
+  if (!hasEmail) {
+    actionSection.addWidget(
+      CardService.newTextParagraph()
+        .setText('<font color="#666"><i>Open an email to create a task from it, or use the button above to create a task from scratch.</i></font>')
+    );
+  }
 
-  return CardService.newCardBuilder()
-    .setHeader(
-      CardService.newCardHeader()
-        .setTitle('The Arc')
-        .setSubtitle('Arcon Tools CRM')
-        .setImageUrl('https://thearc.arconinc.com/favicon.ico')
-        .setImageStyle(CardService.ImageStyle.CIRCLE)
-    )
-    .addSection(section)
-    .build();
+  card.addSection(actionSection);
+
+  // ── Help Section ──────────────────────────────────────────────────────────
+  var helpSection = CardService.newCardSection()
+    .setHeader('About The Arc');
+
+  helpSection.addWidget(
+    CardService.newTextParagraph()
+      .setText(
+        '<b>The Arc</b> connects your email to Arcon\'s CRM. Create tasks, link them to opportunities, ' +
+        'and organize your work — all from Gmail.<br><br>' +
+        '<b>Features:</b><br>' +
+        '• Create Tasks with email context (subject, sender, body snippet)<br>' +
+        '• Auto-assigned to you with 3-day due date<br>' +
+        '• Link tasks to opportunities and customers<br>' +
+        '• View and manage from The Arc dashboard<br><br>' +
+        'Questions? Visit <b>The Arc</b> dashboard at thearc.arconinc.com'
+      )
+  );
+
+  card.addSection(helpSection);
+
+  return card.build();
 }
 
 
@@ -217,38 +252,53 @@ function showCreateTaskForm(e) {
   // Back button
   var backAction = CardService.newAction().setFunctionName('handleBack');
 
-  var formSection = CardService.newCardSection()
-    .setHeader('New CRM Task')
-    .addWidget(
-      CardService.newTextInput()
-        .setTitle('Title')
-        .setFieldName('title')
-        .setValue(subject || '')
-        .setHint('Task title (required)')
-    )
-    .addWidget(
-      CardService.newTextInput()
-        .setTitle('Description')
-        .setFieldName('description')
-        .setValue(defaultDescription)
-        .setMultiline(true)
-    )
-    .addWidget(assigneeDropdown)
-    .addWidget(categoryDropdown)
-    .addWidget(priorityDropdown)
-    .addWidget(
-      CardService.newTextInput()
-        .setTitle('Due Date')
-        .setFieldName('due_date')
-        .setValue(defaultDueDate)
-        .setHint('YYYY-MM-DD')
-    );
+  // Task Details Section
+  var detailsSection = CardService.newCardSection()
+    .setHeader('Task Details');
 
+  detailsSection.addWidget(
+    CardService.newTextInput()
+      .setTitle('Title')
+      .setFieldName('title')
+      .setValue(subject || '')
+      .setHint('Task title (required)')
+  );
+
+  detailsSection.addWidget(
+    CardService.newTextInput()
+      .setTitle('Description')
+      .setFieldName('description')
+      .setValue(defaultDescription)
+      .setMultiline(true)
+      .setHint('Add context, notes, or links')
+  );
+
+  // Organization Section
+  var orgSection = CardService.newCardSection()
+    .setHeader('Organization');
+
+  orgSection.addWidget(assigneeDropdown);
+  orgSection.addWidget(categoryDropdown);
+  orgSection.addWidget(priorityDropdown);
+
+  // Timeline Section
+  var timeSection = CardService.newCardSection()
+    .setHeader('Timeline');
+
+  timeSection.addWidget(
+    CardService.newTextInput()
+      .setTitle('Due Date')
+      .setFieldName('due_date')
+      .setValue(defaultDueDate)
+      .setHint('YYYY-MM-DD format')
+  );
+
+  // Action Buttons
   var buttonSet = CardService.newButtonSet()
     .addButton(
       CardService.newTextButton()
-        .setText('Create Task')
-        .setTextButtonStyle(CardService.TextButtonStyle.FILLED)
+        .setText('✓ Create Task')
+        .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED)
         .setOnClickAction(submitAction)
     )
     .addButton(
@@ -257,15 +307,21 @@ function showCreateTaskForm(e) {
         .setOnClickAction(backAction)
     );
 
-  formSection.addWidget(buttonSet);
+  var actionSection = CardService.newCardSection();
+  actionSection.addWidget(buttonSet);
 
   return CardService.newCardBuilder()
     .setHeader(
       CardService.newCardHeader()
-        .setTitle('Create CRM Task')
-        .setSubtitle('The Arc')
+        .setTitle('Create Task')
+        .setSubtitle('The Arc — Arcon Tools')
+        .setImageUrl('https://thearc.arconinc.com/the-arc-icon.png')
+        .setImageStyle(CardService.ImageStyle.CIRCLE)
     )
-    .addSection(formSection)
+    .addSection(detailsSection)
+    .addSection(orgSection)
+    .addSection(timeSection)
+    .addSection(actionSection)
     .build();
 }
 
@@ -313,51 +369,66 @@ function handleCreateTask(e) {
     var successSection = CardService.newCardSection()
       .addWidget(
         CardService.newDecoratedText()
-          .setTopLabel('Task created')
+          .setTopLabel('✓ Task Created Successfully')
           .setText(task.title)
           .setWrapText(true)
           .setStartIcon(CardService.newIconImage().setIcon(CardService.Icon.CONFIRMATION_NUMBER_ICON))
-      )
-      .addWidget(
-        CardService.newButtonSet()
-          .addButton(
-            CardService.newTextButton()
-              .setText('View in The Arc')
-              .setOpenLink(
-                CardService.newOpenLink()
-                  .setUrl(ARC_BASE_URL + '/crm/tasks/' + task.id)
-                  .setOpenAs(CardService.OpenAs.FULL_SIZE)
-              )
-          )
-          .addButton(
-            CardService.newTextButton()
-              .setText('Create Another')
-              .setOnClickAction(
-                CardService.newAction()
-                  .setFunctionName('showCreateTaskForm')
-                  .setParameters({
-                    subject:     '',
-                    senderName:  params.senderName  || '',
-                    senderEmail: params.senderEmail || '',
-                    bodySnippet: params.bodySnippet || '',
-                    threadUrl:   params.threadUrl   || ''
-                  })
-              )
-          )
-          .addButton(
-            CardService.newTextButton()
-              .setText('Done')
-              .setOnClickAction(CardService.newAction().setFunctionName('handleBack'))
-          )
       );
+
+    var actionSection = CardService.newCardSection();
+    actionSection.addWidget(
+      CardService.newTextParagraph()
+        .setText('<font color="#666"><i>Your task is now in The Arc. You can view it, link it to opportunities, and manage it with your team.</i></font>')
+    );
+
+    var nextStepsSection = CardService.newCardSection()
+      .setHeader('What\'s Next?');
+
+    var buttonSet = CardService.newButtonSet()
+      .addButton(
+        CardService.newTextButton()
+          .setText('📂 View Task')
+          .setTextButtonStyle(CardService.TextButtonStyle.OUTLINED)
+          .setOpenLink(
+            CardService.newOpenLink()
+              .setUrl(ARC_BASE_URL + '/crm/tasks/' + task.id)
+              .setOpenAs(CardService.OpenAs.FULL_SIZE)
+          )
+      )
+      .addButton(
+        CardService.newTextButton()
+          .setText('➕ Create Another')
+          .setOnClickAction(
+            CardService.newAction()
+              .setFunctionName('showCreateTaskForm')
+              .setParameters({
+                subject:     '',
+                senderName:  params.senderName  || '',
+                senderEmail: params.senderEmail || '',
+                bodySnippet: params.bodySnippet || '',
+                threadUrl:   params.threadUrl   || ''
+              })
+          )
+      )
+      .addButton(
+        CardService.newTextButton()
+          .setText('✕ Done')
+          .setOnClickAction(CardService.newAction().setFunctionName('handleBack'))
+      );
+
+    nextStepsSection.addWidget(buttonSet);
 
     var successCard = CardService.newCardBuilder()
       .setHeader(
         CardService.newCardHeader()
           .setTitle('Task Created!')
-          .setSubtitle('The Arc CRM')
+          .setSubtitle('The Arc — Arcon Tools')
+          .setImageUrl('https://thearc.arconinc.com/the-arc-icon.png')
+          .setImageStyle(CardService.ImageStyle.CIRCLE)
       )
       .addSection(successSection)
+      .addSection(actionSection)
+      .addSection(nextStepsSection)
       .build();
 
     return CardService.newActionResponseBuilder()
