@@ -2,7 +2,7 @@ import { Page } from '@playwright/test'
 
 /**
  * Log in to the app using the dev-login route.
- * Requires NODE_ENV=development and DEV_LOGIN_EMAIL set in the Next.js server env.
+ * Requires localhost and DEV_LOGIN_EMAIL set in the Next.js server env.
  * Set DEV_LOGIN_SECRET in .env.test and .env.local if you want secret protection.
  */
 export async function login(page: Page) {

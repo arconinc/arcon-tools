@@ -268,6 +268,12 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
     syncUrl({ view: v === 'kanban' ? null : v })
   }
 
+  function handleDisclosureKey(e: React.KeyboardEvent<HTMLElement>, toggle: () => void) {
+    if (e.key !== 'Enter' && e.key !== ' ') return
+    e.preventDefault()
+    toggle()
+  }
+
   // ── Kanban reorder ─────────────────────────────────────────────────────────
 
   async function handleReorder(updates: { id: string; sort_order: number; status?: string }[]) {
@@ -341,10 +347,14 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
   return (
     <div style={{ display: 'flex', flexDirection: 'column', height: '100%', overflow: 'hidden' }}>
       <style>{`
-        .tb-sort-btn { display:flex;align-items:center;gap:5px;padding:5px 11px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:transparent;color:#666;transition:background 0.1s,color 0.1s; }
-        .tb-sort-btn.active { background:#fff;color:#111;box-shadow:0 1px 3px rgba(0,0,0,0.12); }
+        .tb-sort-btn { display:flex;align-items:center;gap:5px;padding:5px 11px;border-radius:7px;font-size:12px;font-weight:600;cursor:pointer;border:none;background:transparent;color:#666;transition:background 0.15s,color 0.15s,box-shadow 0.15s; }
+        .tb-sort-btn.active { background:#fff;color:#111;box-shadow:0 1px 3px rgba(0,0,0,0.10); }
         .tb-sort-btn:not(.active):hover { color:#333; }
-        .tb-select-box { display:flex;align-items:center;min-height:36px;background:#fff;border:1.5px solid #e5e7eb;border-radius:9px;cursor:pointer;transition:border-color 0.12s;position:relative;user-select:none; }
+        .tb-action-btn { display:flex;align-items:center;gap:7px;padding:8px 16px;background:#6b1e98;color:#fff;border:none;border-radius:8px;font-size:13px;font-weight:700;cursor:pointer;transition:background 0.15s,transform 0.15s; }
+        .tb-action-btn:hover { background:#5b21b6; }
+        .tb-action-btn:active { transform:translateY(1px); }
+        .tb-focusable:focus-visible,.tb-sort-btn:focus-visible,.tb-dd-opt:focus-visible,.tb-action-btn:focus-visible,.tb-chip-rm:focus-visible,.tb-switch:focus-visible { outline:2px solid #a855f7;outline-offset:2px; }
+        .tb-select-box { display:flex;align-items:center;min-height:36px;background:#fff;border:1.5px solid #e5e7eb;border-radius:8px;cursor:pointer;transition:border-color 0.15s,box-shadow 0.15s;position:relative;user-select:none; }
         .tb-select-box:hover,.tb-select-box.open { border-color:#9333ea; }
         .tb-chips { flex:1;display:flex;flex-wrap:wrap;gap:5px;padding:5px 8px;min-width:0; }
         .tb-chip { display:inline-flex;align-items:center;gap:4px;padding:2px 6px 2px 4px;background:#ede9fe;color:#5b21b6;border-radius:20px;font-size:11px;font-weight:600;white-space:nowrap;max-width:130px; }
@@ -360,6 +370,9 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
         .tb-check.on { background:#6b1e98;border-color:#6b1e98; }
         .tb-divider { height:1px;background:#f3f4f6;margin:4px 0; }
         .tb-scroll { max-height:240px;overflow-y:auto;overscroll-behavior:contain; }
+        @media (prefers-reduced-motion: reduce) {
+          .tb-sort-btn,.tb-action-btn,.tb-select-box,.tb-check,.tb-chip-rm { transition:none !important; }
+        }
       `}</style>
 
       {/* Header */}
@@ -399,9 +412,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
             </div>
             <button
               onClick={() => setCreateTaskOpen(true)}
-              style={{ display: 'flex', alignItems: 'center', gap: 7, padding: '8px 16px', background: '#6b1e98', color: '#fff', border: 'none', borderRadius: 9, fontSize: 13, fontWeight: 700, cursor: 'pointer' }}
-              onMouseEnter={e => { e.currentTarget.style.background = '#581c87' }}
-              onMouseLeave={e => { e.currentTarget.style.background = '#6b1e98' }}
+              className="tb-action-btn"
             >
               <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
@@ -420,6 +431,11 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
               <div
                 className={`tb-select-box${deptDropdownOpen ? ' open' : ''}`}
                 onClick={() => { setDeptDropdownOpen((o) => !o); setAssigneeDropdownOpen(false) }}
+                onKeyDown={(e) => handleDisclosureKey(e, () => { setDeptDropdownOpen((o) => !o); setAssigneeDropdownOpen(false) })}
+                role="button"
+                tabIndex={0}
+                aria-haspopup="listbox"
+                aria-expanded={deptDropdownOpen}
                 style={{ minWidth: 160 }}
               >
                 <div className="tb-chips">
@@ -468,7 +484,8 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
             <select
               value={category}
               onChange={(e) => handleCategoryChange(e.target.value)}
-              style={{ padding: '0 12px', height: 36, border: '1.5px solid #e5e7eb', borderRadius: 9, fontSize: 13, background: '#fff', color: category ? '#111' : '#888', cursor: 'pointer', outline: 'none' }}
+              className="tb-focusable"
+              style={{ padding: '0 12px', height: 36, border: '1.5px solid #e5e7eb', borderRadius: 8, fontSize: 13, background: '#fff', color: category ? '#111' : '#888', cursor: 'pointer', outline: 'none' }}
               onFocus={e => { e.currentTarget.style.borderColor = '#9333ea' }}
               onBlur={e => { e.currentTarget.style.borderColor = '#e5e7eb' }}
             >
@@ -482,11 +499,12 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
           {/* Delegated tasks toggle */}
           <button
             onClick={handleToggleDelegated}
+            className="tb-focusable"
             style={{
               display: 'flex', alignItems: 'center', gap: 6,
               padding: '0 12px', height: 36,
               border: `1.5px solid ${showDelegated ? '#9333ea' : '#e5e7eb'}`,
-              borderRadius: 9, fontSize: 12, fontWeight: 600,
+              borderRadius: 8, fontSize: 12, fontWeight: 600,
               background: showDelegated ? '#f3e8ff' : '#fff',
               color: showDelegated ? '#6b1e98' : '#666',
               cursor: 'pointer',
@@ -507,6 +525,11 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
             <div
               className={`tb-select-box${assigneeDropdownOpen ? ' open' : ''}`}
               onClick={() => { setAssigneeDropdownOpen((o) => !o); setDeptDropdownOpen(false) }}
+              onKeyDown={(e) => handleDisclosureKey(e, () => { setAssigneeDropdownOpen((o) => !o); setDeptDropdownOpen(false) })}
+              role="button"
+              tabIndex={0}
+              aria-haspopup="listbox"
+              aria-expanded={assigneeDropdownOpen}
             >
               <div className="tb-chips">
                 {selectedUserIds === 'all'
@@ -581,7 +604,8 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
               value={search}
               onChange={(e) => handleSearchChange(e.target.value)}
               placeholder="Search tasks…"
-              style={{ width: '100%', boxSizing: 'border-box', paddingLeft: 32, paddingRight: 12, paddingTop: 7, paddingBottom: 7, border: '1.5px solid #e5e7eb', borderRadius: 9, fontSize: 13, color: '#333', background: '#fff', outline: 'none' }}
+              className="tb-focusable"
+              style={{ width: '100%', boxSizing: 'border-box', paddingLeft: 32, paddingRight: 12, paddingTop: 7, paddingBottom: 7, border: '1.5px solid #e5e7eb', borderRadius: 8, fontSize: 13, color: '#333', background: '#fff', outline: 'none' }}
               onFocus={e => { e.currentTarget.style.borderColor = '#9333ea' }}
               onBlur={e => { e.currentTarget.style.borderColor = '#e5e7eb' }}
             />
@@ -604,12 +628,19 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
           )}
 
           {/* Hide completed */}
-          <div onClick={() => handleHideCompleted(!hideCompleted)} style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', userSelect: 'none' }}>
+          <button
+            type="button"
+            role="switch"
+            aria-checked={hideCompleted}
+            onClick={() => handleHideCompleted(!hideCompleted)}
+            className="tb-switch"
+            style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', userSelect: 'none', border: 'none', background: 'transparent', padding: '8px 2px', minHeight: 36 }}
+          >
             <div style={{ width: 36, height: 20, borderRadius: 10, background: hideCompleted ? '#6b1e98' : '#d1d5db', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
               <div style={{ position: 'absolute', top: 2, left: hideCompleted ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
             </div>
             <span style={{ fontSize: 12, color: '#666', fontWeight: 500 }}>Hide completed</span>
-          </div>
+          </button>
         </div>
 
         {/* Quick-add */}

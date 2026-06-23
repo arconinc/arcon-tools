@@ -1,6 +1,6 @@
 'use client'
 
-import type { MouseEvent } from 'react'
+import type { KeyboardEvent, MouseEvent } from 'react'
 import type { KanbanTask } from './TaskKanbanView'
 import { DEPARTMENT_DISPLAY_NAMES } from '@/lib/task-constants'
 import type { CrmTaskDepartment } from '@/types'
@@ -85,22 +85,29 @@ export function TaskTableView({ tasks, loading, total, page, search, onPageChang
   const rangeFrom = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
   const rangeTo = Math.min(page * PAGE_SIZE, total)
 
+  function handleRowKeyDown(e: KeyboardEvent<HTMLTableRowElement>, taskId: string) {
+    if (e.key !== 'Enter' && e.key !== ' ') return
+    e.preventDefault()
+    onRowClick(taskId)
+  }
+
   return (
     <div className="px-6 pb-8">
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 border-b border-slate-200">
-            <tr>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Task</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Dept / Category</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Priority</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Due Date</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden xl:table-cell">Assigned To</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden xl:table-cell">Linked To</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
+      <div className="overflow-hidden rounded-[10px] border border-slate-200 bg-white">
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[760px] text-sm">
+            <thead className="bg-slate-50 border-b border-slate-200">
+              <tr>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Task</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Dept / Category</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Priority</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Due Date</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden xl:table-cell">Assigned To</th>
+                <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden xl:table-cell">Linked To</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-slate-100">
             {loading && Array.from({ length: 6 }).map((_, i) => (
               <tr key={i}>
                 {[...Array(7)].map((_, j) => (
@@ -123,10 +130,13 @@ export function TaskTableView({ tasks, loading, total, page, search, onPageChang
                 <tr
                   key={t.id}
                   onClick={() => onRowClick(t.id)}
+                  onKeyDown={(e) => handleRowKeyDown(e, t.id)}
                   onContextMenu={(e) => onRowContextMenu(e, t.id)}
-                  className="cursor-pointer transition-colors"
+                  className="cursor-pointer transition-colors focus:outline-none focus:ring-2 focus:ring-purple-400 focus:ring-inset"
+                  role="button"
+                  tabIndex={0}
+                  aria-label={`Open task ${t.title}`}
                   style={{
-                    boxShadow: t.priority === 'high' ? 'inset 3px 0 0 #fca5a5' : t.priority === 'low' ? 'inset 3px 0 0 #93c5fd' : undefined,
                     background: t.priority === 'high' ? '#fffbfb' : t.priority === 'low' ? '#f8fbff' : undefined,
                   }}
                   onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.filter = 'brightness(0.97)' }}
@@ -190,8 +200,9 @@ export function TaskTableView({ tasks, loading, total, page, search, onPageChang
                 </tr>
               )
             })}
-          </tbody>
-        </table>
+            </tbody>
+          </table>
+        </div>
         {!loading && total > 0 && (
           <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between gap-4 flex-wrap">
             <span className="text-xs text-slate-400">

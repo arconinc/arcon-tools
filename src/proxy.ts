@@ -1,6 +1,7 @@
 import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { RESTRICTED_RESOURCES } from '@/lib/permissions'
+import { isLocalDevUrl } from '@/lib/auth/dev-login'
 import * as Sentry from '@sentry/nextjs'
 
 // Pre-compute the set of restricted page prefixes for fast lookup in middleware
@@ -41,6 +42,13 @@ export async function proxy(request: NextRequest) {
   }
 
   const pathname = request.nextUrl.pathname
+
+  if (pathname === '/api/dev-login') {
+    if (!isLocalDevUrl(request.nextUrl)) {
+      return NextResponse.json({ error: 'Not available' }, { status: 404 })
+    }
+    return supabaseResponse
+  }
 
   // Public paths
   if (

@@ -1,7 +1,8 @@
 'use client'
 
 import { createClient } from '@/lib/supabase/client'
-import { useState } from 'react'
+import { isLocalDevHost } from '@/lib/auth/dev-login'
+import { useEffect, useState } from 'react'
 import { useSearchParams } from 'next/navigation'
 
 // Prevent static prerendering — this page requires runtime env vars
@@ -10,15 +11,23 @@ export const dynamic = 'force-dynamic'
 const ERROR_MESSAGES: Record<string, string> = {
   unauthorized_domain: 'Access is restricted to @arconinc.com accounts. Please sign in with your Arcon Google Workspace account.',
   auth_failed: 'Authentication failed. Please try again.',
+  dev_login_forbidden: 'Dev login is only available on localhost, and the secret must match if configured.',
 }
 
 export default function LoginPage() {
   const [loading, setLoading] = useState(false)
+  const [devLoading, setDevLoading] = useState(false)
+  const [showDevLogin, setShowDevLogin] = useState(false)
+  const [devSecret, setDevSecret] = useState('')
   const [error, setError] = useState<string | null>(null)
   const supabase = createClient()
   const searchParams = useSearchParams()
   const urlError = searchParams.get('error')
   const displayError = error ?? (urlError ? (ERROR_MESSAGES[urlError] ?? 'An error occurred. Please try again.') : null)
+
+  useEffect(() => {
+    setShowDevLogin(isLocalDevHost(window.location.hostname))
+  }, [])
 
   async function handleGoogleLogin() {
     setLoading(true)
@@ -33,6 +42,13 @@ export default function LoginPage() {
       setError(error.message)
       setLoading(false)
     }
+  }
+
+  function handleDevLogin() {
+    setDevLoading(true)
+    setError(null)
+    const secretQuery = devSecret.trim() ? `?secret=${encodeURIComponent(devSecret.trim())}` : ''
+    window.location.href = `/api/dev-login${secretQuery}`
   }
 
   return (
@@ -84,6 +100,25 @@ export default function LoginPage() {
             )}
             {loading ? 'Signing in…' : 'Continue with Google'}
           </button>
+
+          {showDevLogin && (
+            <div className="mt-4 pt-4 border-t border-slate-200">
+              <input
+                type="password"
+                value={devSecret}
+                onChange={(event) => setDevSecret(event.target.value)}
+                placeholder="Dev secret, if configured"
+                className="w-full mb-3 px-3 py-2 border border-slate-300 rounded-lg text-sm text-slate-700"
+              />
+              <button
+                onClick={handleDevLogin}
+                disabled={devLoading}
+                className="w-full px-4 py-3 rounded-xl bg-purple-700 hover:bg-purple-800 disabled:opacity-60 disabled:cursor-not-allowed text-sm font-medium text-white shadow-sm transition-colors"
+              >
+                {devLoading ? 'Signing in…' : 'Dev login'}
+              </button>
+            </div>
+          )}
 
           <p className="text-xs text-slate-400 text-center mt-5">
             Access is restricted to Arcon Google Workspace accounts only.

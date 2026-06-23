@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { isLocalDevUrl } from '@/lib/auth/dev-login'
 
 export async function GET(req: NextRequest) {
-  if (process.env.NODE_ENV !== 'development') {
+  if (!isLocalDevUrl(req.nextUrl)) {
     return NextResponse.json({ error: 'Not available' }, { status: 404 })
   }
 
