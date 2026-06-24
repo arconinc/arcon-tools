@@ -47,14 +47,14 @@ export default function DocumentsPage() {
         .docs-overview { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem; }
         .docs-overview-header { margin-bottom: 2rem; }
         .docs-overview-header h1 { font-size: 1.75rem; font-weight: 700; color: #111; margin: 0 0 0.25rem; }
-        .docs-overview-header p { color: #666; margin: 0; font-size: 0.9rem; }
+        .docs-overview-header p { color: #6b7280; margin: 0; font-size: 0.9rem; }
 
         .sections-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
 
         .section-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; padding: 1.25rem 1.375rem; text-decoration: none; color: inherit; display: flex; flex-direction: column; gap: 0.75rem; transition: all 0.15s; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
         .section-card:hover { border-color: #7c3aed; box-shadow: 0 4px 12px rgba(124,58,237,0.12); transform: translateY(-1px); }
 
-        .section-card-icon { width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #7c3aed, #6d28d9); display: flex; align-items: center; justify-content: center; }
+        .section-card-icon { width: 38px; height: 38px; border-radius: 10px; background: linear-gradient(135deg, #7c3aed, #5b21b6); display: flex; align-items: center; justify-content: center; }
         .section-card-icon svg { width: 18px; height: 18px; color: #fff; }
 
         .section-card-name { font-size: 1rem; font-weight: 700; color: #111; margin: 0; }
@@ -62,11 +62,8 @@ export default function DocumentsPage() {
         .section-card-stat { font-size: 0.8rem; color: #9ca3af; display: flex; align-items: center; gap: 0.3rem; }
         .section-card-stat svg { width: 13px; height: 13px; }
 
-        .loading-dots { display: flex; gap: 0.4rem; justify-content: center; padding: 4rem; }
-        .loading-dots span { width: 8px; height: 8px; border-radius: 50%; background: #7c3aed; animation: bounce 0.8s infinite; }
-        .loading-dots span:nth-child(2) { animation-delay: 0.15s; }
-        .loading-dots span:nth-child(3) { animation-delay: 0.3s; }
-        @keyframes bounce { 0%, 80%, 100% { transform: translateY(0); } 40% { transform: translateY(-8px); } }
+        .section-card-skeleton { background: #f3e8ff; border-radius: 10px; height: 100px; animation: skpulse 1.5s ease-in-out infinite; }
+        @keyframes skpulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 
         .empty-state { text-align: center; padding: 4rem; color: #9ca3af; font-size: 0.875rem; }
       `}</style>
@@ -78,7 +75,9 @@ export default function DocumentsPage() {
         </div>
 
         {loading ? (
-          <div className="loading-dots"><span /><span /><span /></div>
+          <div className="sections-grid">
+            {[...Array(4)].map((_, i) => <div key={i} className="section-card-skeleton" />)}
+          </div>
         ) : sections.length === 0 ? (
           <div className="empty-state">No documents have been added yet.</div>
         ) : (

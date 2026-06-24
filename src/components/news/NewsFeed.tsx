@@ -11,7 +11,7 @@ const PAGE_SIZE = 30
 function SkeletonCard() {
   return (
     <div
-      className="bg-white rounded-2xl border border-slate-200 p-4 animate-pulse flex-shrink-0"
+      className="bg-white rounded-[10px] border border-slate-200 p-4 animate-pulse flex-shrink-0"
       style={{ width: 'calc(33.333% - 11px)', minWidth: 240 }}
     >
       <div className="flex gap-2 mb-3">
@@ -62,7 +62,7 @@ export function NewsFeed() {
     return (
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">News & Announcements</h2>
+          <h2 className="text-[13px] font-bold text-slate-900">News & Announcements</h2>
         </div>
         <div className="flex gap-4 overflow-hidden">
           {[1, 2, 3].map((n) => <SkeletonCard key={n} />)}
@@ -75,9 +75,9 @@ export function NewsFeed() {
     return (
       <div>
         <div className="flex items-center justify-between mb-4">
-          <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">News & Announcements</h2>
+          <h2 className="text-[13px] font-bold text-slate-900">News & Announcements</h2>
         </div>
-        <div className="bg-white rounded-2xl border border-slate-200 p-8 text-center text-slate-400 text-sm">
+        <div className="bg-white rounded-[10px] border border-slate-200 p-8 text-center text-slate-500 text-sm">
           No announcements yet.
         </div>
       </div>
@@ -87,8 +87,8 @@ export function NewsFeed() {
   return (
     <div>
       <div className="flex items-center justify-between mb-4">
-        <h2 className="text-sm font-semibold text-slate-500 uppercase tracking-wider">News & Announcements</h2>
-        <Link href="/news" className="text-xs text-purple-600 hover:text-purple-800 font-medium">
+        <h2 className="text-[13px] font-bold text-slate-900">News & Announcements</h2>
+        <Link href="/news" className="text-xs text-purple-700 hover:text-purple-900 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-400 rounded font-semibold">
           View All →
         </Link>
       </div>
@@ -98,9 +98,9 @@ export function NewsFeed() {
         <div className="flex flex-wrap gap-2 mb-4">
           <button
             onClick={() => handleTypeChange('all')}
-            className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors ${
+            className={`text-xs px-3 py-1.5 rounded-full font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-400 ${
               activeType === 'all'
-                ? 'bg-slate-800 text-white'
+                ? 'bg-purple-100 text-purple-800'
                 : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
             }`}
           >
@@ -110,7 +110,7 @@ export function NewsFeed() {
             <button
               key={type}
               onClick={() => handleTypeChange(type)}
-              className={`text-xs px-3 py-1.5 rounded-full font-medium transition-colors ${
+              className={`text-xs px-3 py-1.5 rounded-full font-semibold transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-400 ${
                 activeType === type
                   ? `${ARTICLE_TYPE_BADGE[type].bg} ${ARTICLE_TYPE_BADGE[type].text}`
                   : 'bg-slate-100 text-slate-600 hover:bg-slate-200'

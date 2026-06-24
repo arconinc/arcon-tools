@@ -12,6 +12,7 @@ import {
   CompanyCalendarEventTypeId,
   CompanyCalendarResponse,
 } from '@/types'
+import { FilterPill } from '@/components/ui'
 
 export default function DashboardCalendar() {
   const [companyEvents, setCompanyEvents] = useState<CompanyCalendarEvent[]>([])
@@ -127,23 +128,21 @@ export default function DashboardCalendar() {
         </a>
       </div>
       <div className="events-tools">
-        <button
-          type="button"
-          className={`event-filter${activeTypeIds.length === eventTypes.length && eventTypes.length > 0 ? ' active' : ''}`}
+        <FilterPill
+          value="all"
+          label="All"
+          active={activeTypeIds.length === eventTypes.length && eventTypes.length > 0}
           onClick={showAllTypes}
-        >
-          All
-        </button>
+        />
         {eventTypes.map((type) => (
-          <button
+          <FilterPill
             key={type.id}
-            type="button"
-            className={`event-filter${activeTypeIds.includes(type.id) ? ' active' : ''}`}
+            value={type.id}
+            label={type.label}
+            active={activeTypeIds.includes(type.id)}
             onClick={() => toggleType(type.id)}
-          >
-            <span className="event-filter-dot" style={{ background: type.color }} />
-            {type.label}
-          </button>
+            icon={<span style={{ width: 7, height: 7, borderRadius: '50%', background: type.color, display: 'inline-block' }} />}
+          />
         ))}
       </div>
       {eventsLoading ? (

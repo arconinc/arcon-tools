@@ -37,8 +37,9 @@ const FALLBACK_SLIDES: BannerSlide[] = [
 
 export default function DashboardPage() {
   const { user } = useAppUser()
-  const [slides, setSlides] = useState<BannerSlide[]>([])
+  const [slides, setSlides] = useState<BannerSlide[]>(FALLBACK_SLIDES)
   const [current, setCurrent] = useState(0)
+  const [isCarouselPaused, setIsCarouselPaused] = useState(false)
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const [bannerItems, setBannerItems] = useState<BannerStripItem[]>([])
 
@@ -62,26 +63,28 @@ export default function DashboardPage() {
 
   // Auto-advance carousel
   useEffect(() => {
+    if (timerRef.current) clearInterval(timerRef.current)
+    timerRef.current = null
+    if (isCarouselPaused) return
     if (slides.length <= 1) return
     timerRef.current = setInterval(() => {
       setCurrent((c) => (c + 1) % slides.length)
     }, 4800)
     return () => { if (timerRef.current) clearInterval(timerRef.current) }
-  }, [slides.length])
+  }, [isCarouselPaused, slides.length])
 
   function goTo(i: number) {
+    if (slides.length === 0) return
     const next = ((i % slides.length) + slides.length) % slides.length
     setCurrent(next)
-    if (timerRef.current) clearInterval(timerRef.current)
-    timerRef.current = setInterval(() => setCurrent((c) => (c + 1) % slides.length), 4800)
   }
 
   return (
     <>
       <style>{`
         /* ── Hero Carousel ── */
-        .hero { position: relative; height: 480px; overflow: hidden; flex-shrink: 0; }
-        .hero-slides { display: flex; height: 100%; transition: transform 0.7s cubic-bezier(0.77,0,0.18,1); }
+        .hero { position: relative; height: 340px; overflow: hidden; flex-shrink: 0; background: #16051f; }
+        .hero-slides { display: flex; height: 100%; transition: transform 0.55s cubic-bezier(0.22,1,0.36,1); }
         .hero-slide { min-width: 100%; height: 100%; position: relative; display: flex; align-items: flex-end; overflow: hidden; background-size: cover; background-position: center; }
         .hs-1 { background: linear-gradient(135deg, #1a0a2e 0%, #4a1575 40%, #7c3aed 70%, #a855f7 100%); }
         .hs-2 { background: linear-gradient(135deg, #0c2340 0%, #1e4d8c 40%, #2563eb 70%, #60a5fa 100%); }
@@ -90,21 +93,24 @@ export default function DashboardPage() {
         .hs-5 { background: linear-gradient(135deg, #1a1a2e 0%, #16213e 40%, #0f3460 70%, #533483 100%); }
         .hero-slide::before { content: ''; position: absolute; inset: 0; background: radial-gradient(ellipse 60% 60% at 75% 40%, rgba(255,255,255,0.08) 0%, transparent 70%), radial-gradient(ellipse 40% 50% at 20% 60%, rgba(255,255,255,0.05) 0%, transparent 60%); }
         .hero-slide::after { content: ''; position: absolute; inset: 0; background: linear-gradient(to top, rgba(0,0,0,0.65) 0%, rgba(0,0,0,0.1) 50%, transparent 100%); }
-        .hero-caption { position: relative; z-index: 10; padding: 0 28px 22px; width: 100%; }
-        .hero-eyebrow { font-size: 10px; font-weight: 700; letter-spacing: 0.14em; text-transform: uppercase; color: rgba(255,255,255,0.6); margin-bottom: 4px; }
-        .hero-title { font-size: 22px; font-weight: 800; color: #fff; line-height: 1.2; margin-bottom: 4px; text-shadow: 0 1px 4px rgba(0,0,0,0.4); }
-        .hero-sub { font-size: 13px; color: rgba(255,255,255,0.75); font-weight: 500; }
-        .hero-arrow { position: absolute; top: 50%; transform: translateY(-50%); z-index: 20; width: 36px; height: 36px; background: rgba(0,0,0,0.35); border: 1px solid rgba(255,255,255,0.2); border-radius: 50%; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #fff; backdrop-filter: blur(4px); }
-        .hero-arrow:hover { background: rgba(107,30,152,0.7); }
+        .hero-caption { position: relative; z-index: 10; padding: 0 28px 22px; width: 100%; max-width: 780px; }
+        .hero-eyebrow { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.74); margin-bottom: 5px; }
+        .hero-title { font-size: 22px; font-weight: 800; color: #fff; line-height: 1.2; margin-bottom: 4px; text-shadow: 0 1px 4px rgba(0,0,0,0.4); text-wrap: balance; }
+        .hero-sub { font-size: 13px; color: rgba(255,255,255,0.84); font-weight: 500; max-width: 68ch; text-wrap: pretty; }
+        .hero-arrow { position: absolute; top: 50%; transform: translateY(-50%); z-index: 20; width: 36px; height: 36px; background: rgba(0,0,0,0.38); border: 1px solid rgba(255,255,255,0.32); border-radius: 999px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #fff; transition: background 150ms ease, border-color 150ms ease; }
+        .hero-arrow:hover { background: rgba(107,30,152,0.82); border-color: rgba(255,255,255,0.46); }
+        .hero-arrow:focus-visible, .hero-dot:focus-visible, .banner-edit:focus-visible, .card-action:focus-visible { outline: 2px solid #c084fc; outline-offset: 2px; }
         .hero-prev { left: 14px; }
         .hero-next { right: 14px; }
         .hero-dots { position: absolute; bottom: 14px; right: 24px; display: flex; gap: 6px; z-index: 20; }
-        .hero-dot { width: 6px; height: 6px; border-radius: 3px; background: rgba(255,255,255,0.35); cursor: pointer; transition: 0.2s background, 0.3s width; }
+        .hero-dot { width: 8px; height: 8px; border: 0; padding: 0; border-radius: 999px; background: rgba(255,255,255,0.42); cursor: pointer; transition: 150ms background ease, 150ms transform ease; }
+        .hero-dot:hover { background: rgba(255,255,255,0.72); }
         .hero-dot.active { background: #fff; width: 18px; }
 
         /* ── Banner Strip ── */
         .banner-strip { background: linear-gradient(90deg, #6b1e98, #7c3aed, #9333ea, #6b1e98); background-size: 300% 100%; animation: gradientShift 8s ease infinite; height: 36px; overflow: hidden; flex-shrink: 0; display: flex; align-items: center; position: relative; }
         @keyframes gradientShift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
+        .banner-strip:hover .banner-inner, .banner-strip:focus-within .banner-inner { animation-play-state: paused; }
         .banner-inner { display: flex; align-items: center; white-space: nowrap; animation: marquee 28s linear infinite; }
         @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
         .banner-item { display: inline-flex; align-items: center; gap: 8px; padding: 0 28px; font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.92); letter-spacing: 0.01em; }
@@ -117,17 +123,14 @@ export default function DashboardPage() {
         .card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
         .card-header { padding: 13px 16px; border-bottom: 1px solid #f3f4f6; display: flex; align-items: center; justify-content: space-between; }
         .card-title { font-size: 13px; font-weight: 700; color: #111; }
-        .card-action { font-size: 12px; color: #6b1e98; cursor: pointer; font-weight: 600; }
+        .card-action { font-size: 12px; color: #6b1e98; cursor: pointer; font-weight: 600; border-radius: 4px; }
         .card-body { padding: 12px 16px; }
 
         /* ── Events Calendar ── */
         .events-card .card-body { padding: 0; }
         .events-tools { padding: 10px 14px; display: flex; flex-wrap: wrap; gap: 7px; border-bottom: 1px solid #f3f4f6; }
-        .event-filter { border: 1px solid #e5e7eb; border-radius: 999px; padding: 5px 10px; background: #fff; color: #555; font-size: 11px; font-weight: 700; cursor: pointer; line-height: 1; }
-        .event-filter.active { border-color: #6b1e98; background: #f3e8ff; color: #6b1e98; }
-        .event-filter-dot { width: 7px; height: 7px; border-radius: 50%; display: inline-block; margin-right: 6px; }
-        .calendar-shell { padding: 12px 14px 14px; }
-        .calendar-empty, .calendar-error { font-size: 12px; color: #999; padding: 20px 14px; text-align: center; }
+.calendar-shell { padding: 12px 14px 14px; }
+        .calendar-empty, .calendar-error { font-size: 12px; color: #6b7280; padding: 20px 14px; text-align: center; }
         .calendar-error { color: #b91c1c; background: #fef2f2; border-top: 1px solid #fee2e2; }
         .calendar-skeleton { padding: 14px; }
         .calendar-skeleton-row { height: 18px; background: #f5f5f5; border-radius: 5px; margin-bottom: 9px; }
@@ -147,7 +150,7 @@ export default function DashboardPage() {
         .arc-cal-time { opacity: 0.85; flex-shrink: 0; }
         .arc-cal-title { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .event-detail { border-top: 1px solid #f3f4f6; padding: 12px 14px; background: #fafafa; }
-        .event-detail-label { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #aaa; margin-bottom: 5px; }
+        .event-detail-label { font-size: 9px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; color: #6b7280; margin-bottom: 5px; }
         .event-detail-title { font-size: 14px; font-weight: 800; color: #111; margin-bottom: 4px; }
         .event-detail-meta { font-size: 11px; color: #777; display: flex; flex-wrap: wrap; gap: 7px; align-items: center; }
         .event-type-pill { display: inline-flex; align-items: center; gap: 5px; border-radius: 999px; padding: 3px 8px; font-size: 10px; font-weight: 800; }
@@ -157,7 +160,7 @@ export default function DashboardPage() {
         .dash-content { padding: 22px 28px 28px; }
 
         @media (max-width: 1023px) {
-          .hero { height: 320px; }
+          .hero { height: 280px; }
           .dash-content { padding: 18px 20px 24px; }
         }
 
@@ -172,10 +175,21 @@ export default function DashboardPage() {
           .arc-calendar .fc .fc-daygrid-day-frame { min-height: 58px; }
           .arc-cal-time { display: none; }
         }
+
+        @media (prefers-reduced-motion: reduce) {
+          .hero-slides, .hero-dot, .hero-arrow, .event-filter { transition: none; }
+          .banner-strip, .banner-inner { animation: none; }
+        }
       `}</style>
 
       {/* ── Hero Carousel ── */}
-      <div className="hero">
+      <div
+        className="hero"
+        onMouseEnter={() => setIsCarouselPaused(true)}
+        onMouseLeave={() => setIsCarouselPaused(false)}
+        onFocus={() => setIsCarouselPaused(true)}
+        onBlur={() => setIsCarouselPaused(false)}
+      >
         <div
           className="hero-slides"
           style={{ transform: `translateX(-${current * 100}%)` }}
@@ -202,28 +216,41 @@ export default function DashboardPage() {
 
         {/* Prev arrow */}
         {slides.length > 1 && (
-          <div className="hero-arrow hero-prev" onClick={() => goTo(current - 1)}>
+          <button
+            type="button"
+            className="hero-arrow hero-prev"
+            onClick={() => goTo(current - 1)}
+            aria-label="Show previous dashboard announcement"
+          >
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
             </svg>
-          </div>
+          </button>
         )}
         {/* Next arrow */}
         {slides.length > 1 && (
-          <div className="hero-arrow hero-next" onClick={() => goTo(current + 1)}>
+          <button
+            type="button"
+            className="hero-arrow hero-next"
+            onClick={() => goTo(current + 1)}
+            aria-label="Show next dashboard announcement"
+          >
             <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2.5}>
               <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
             </svg>
-          </div>
+          </button>
         )}
         {/* Dots */}
         {slides.length > 1 && (
-          <div className="hero-dots">
+          <div className="hero-dots" aria-label="Dashboard announcement slides">
             {slides.map((_, i) => (
-              <div
+              <button
+                type="button"
                 key={i}
                 className={`hero-dot${i === current ? ' active' : ''}`}
                 onClick={() => goTo(i)}
+                aria-label={`Show dashboard announcement ${i + 1}`}
+                aria-current={i === current ? 'true' : undefined}
               />
             ))}
           </div>

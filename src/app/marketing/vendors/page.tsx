@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { DataTable, type DataTableColumn, FilterPillGroup, type FilterPillOption } from '@/components/ui'
 
 const PAGE_SIZE = 50
 
@@ -20,6 +21,31 @@ type VendorListItem = {
   updated_at: string
 }
 
+type PremierFilter = '' | 'premier'
+
+const PREMIER_OPTIONS: FilterPillOption<PremierFilter>[] = [
+  {
+    value: '',
+    label: 'All',
+    color: 'purple',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="8" cy="12" r="4" /><circle cx="16" cy="12" r="4" />
+      </svg>
+    ),
+  },
+  {
+    value: 'premier',
+    label: 'Premier',
+    color: 'purple',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z" />
+      </svg>
+    ),
+  },
+]
+
 export default function VendorsPage() {
   const router = useRouter()
   const [vendors, setVendors] = useState<VendorListItem[]>([])
@@ -28,6 +54,7 @@ export default function VendorsPage() {
   const [allTags, setAllTags] = useState<TagOption[]>([])
   const [search, setSearch] = useState('')
   const [tagFilter, setTagFilter] = useState('')
+  const [premierFilter, setPremierFilter] = useState<PremierFilter>('')
   const [page, setPage] = useState(1)
 
   useEffect(() => {
@@ -39,6 +66,7 @@ export default function VendorsPage() {
     const params = new URLSearchParams()
     if (search) params.set('search', search)
     if (tagFilter) params.set('tag_id', tagFilter)
+    if (premierFilter === 'premier') params.set('premier', 'true')
     params.set('page', String(currentPage))
     params.set('limit', String(PAGE_SIZE))
     try {
@@ -49,9 +77,9 @@ export default function VendorsPage() {
     } finally {
       setLoading(false)
     }
-  }, [search, tagFilter])
+  }, [search, tagFilter, premierFilter])
 
-  useEffect(() => { setPage(1) }, [search, tagFilter])
+  useEffect(() => { setPage(1) }, [search, tagFilter, premierFilter])
 
   useEffect(() => {
     const t = setTimeout(() => fetchVendors(page), 300)
@@ -59,8 +87,87 @@ export default function VendorsPage() {
   }, [fetchVendors, page])
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
-  const rangeFrom = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
-  const rangeTo = Math.min(page * PAGE_SIZE, total)
+  const vendorColumns: DataTableColumn<VendorListItem>[] = [
+    {
+      key: 'logo',
+      header: '',
+      render: (v) => v.logo_url ? (
+        <img
+          src={v.logo_url}
+          alt=""
+          className="h-8 w-8 rounded-md border border-purple-100 bg-white object-cover"
+          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+        />
+      ) : (
+        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-purple-100 text-[10px] font-bold text-purple-800">
+          {v.name.slice(0, 2).toUpperCase()}
+        </div>
+      ),
+      className: 'w-12 pr-1',
+      skeletonWidth: '32px',
+    },
+    {
+      key: 'name',
+      header: 'Name',
+      render: (v) => <span className="font-semibold text-slate-950">{v.name}</span>,
+      sortValue: (v) => v.name,
+      skeletonWidth: '55%',
+    },
+    {
+      key: 'product_line',
+      header: 'Product Line',
+      render: (v) => <span className="text-slate-600">{v.product_line ?? '—'}</span>,
+      sortValue: (v) => v.product_line ?? '',
+      className: 'hidden md:table-cell',
+    },
+    {
+      key: 'phone',
+      header: 'Phone',
+      render: (v) => <span className="text-slate-600">{v.phone ?? '—'}</span>,
+      sortValue: (v) => v.phone ?? '',
+      className: 'hidden md:table-cell',
+    },
+    {
+      key: 'tags',
+      header: 'Tags',
+      render: (v) => (
+        <div className="flex flex-wrap gap-1">
+          {v.tags.length > 0
+            ? v.tags.map((t) => (
+                <span key={t.id} className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold text-white" style={{ backgroundColor: t.color }}>
+                  {t.name}
+                </span>
+              ))
+            : <span className="text-slate-400">—</span>
+          }
+        </div>
+      ),
+      sortValue: (v) => v.tags.map((tag) => tag.name).join(', '),
+      className: 'hidden lg:table-cell',
+    },
+    {
+      key: 'website',
+      header: 'Website',
+      render: (v) => v.website
+        ? (
+          <a href={v.website} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="font-medium text-purple-700 hover:underline">
+            {v.website.replace(/^https?:\/\//, '')}
+          </a>
+        )
+        : <span className="text-slate-400">—</span>,
+      sortValue: (v) => v.website ?? '',
+      className: 'hidden lg:table-cell',
+    },
+    {
+      key: 'premier',
+      header: 'Premier',
+      render: (v) => v.premier_group_member
+        ? <span className="inline-flex items-center rounded-md border border-purple-200 bg-purple-50 px-2.5 py-0.5 text-xs font-bold text-purple-700">Premier</span>
+        : <span className="text-slate-400">—</span>,
+      sortValue: (v) => v.premier_group_member,
+      className: 'hidden lg:table-cell',
+    },
+  ]
 
   return (
     <div className="w-full px-6 py-8">
@@ -80,140 +187,56 @@ export default function VendorsPage() {
         </button>
       </div>
 
-      <div className="flex gap-3 mb-5 flex-wrap">
-        <div className="relative flex-1 max-w-sm">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <circle cx="11" cy="11" r="8" strokeWidth={2} />
-            <path strokeLinecap="round" strokeWidth={2} d="M21 21l-4.35-4.35" />
-          </svg>
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search suppliers…"
-            className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
-          />
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <FilterPillGroup
+          options={PREMIER_OPTIONS}
+          value={premierFilter}
+          onChange={setPremierFilter}
+          label="Filter by tier"
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          {allTags.length > 0 && (
+            <select
+              value={tagFilter}
+              onChange={(e) => setTagFilter(e.target.value)}
+              aria-label="Filter by tag"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300"
+            >
+              <option value="">All Tags</option>
+              {allTags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          )}
+          <div className="relative">
+            <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="11" cy="11" r="8" strokeWidth={2} />
+              <path strokeLinecap="round" strokeWidth={2} d="M21 21l-4.35-4.35" />
+            </svg>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search suppliers…"
+              className="h-[34px] min-w-[220px] rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-300"
+            />
+          </div>
         </div>
-        {allTags.length > 0 && (
-          <select
-            value={tagFilter}
-            onChange={(e) => setTagFilter(e.target.value)}
-            className="px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
-          >
-            <option value="">All Tags</option>
-            {allTags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-        )}
       </div>
 
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 border-b border-slate-200">
-            <tr>
-              <th className="px-3 py-3 w-10"></th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Product Line</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Phone</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Tags</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Website</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Premier</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {loading && Array.from({ length: 5 }).map((_, i) => (
-              <tr key={i}>
-                {[...Array(7)].map((_, j) => (
-                  <td key={j} className="px-5 py-3.5">
-                    <div className="h-4 bg-slate-100 rounded animate-pulse" style={{ width: j === 0 ? '28px' : j === 1 ? '55%' : '35%' }} />
-                  </td>
-                ))}
-              </tr>
-            ))}
-            {!loading && vendors.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-400">
-                  {search || tagFilter ? 'No vendors match your filters.' : 'No vendors yet. Create one to get started.'}
-                </td>
-              </tr>
-            )}
-            {!loading && vendors.map((v) => (
-              <tr
-                key={v.id}
-                onClick={() => router.push(`/marketing/vendors/${v.id}`)}
-                className="hover:bg-slate-50 cursor-pointer transition-colors"
-              >
-                <td className="px-3 py-3.5">
-                  {v.logo_url ? (
-                    <img
-                      src={v.logo_url}
-                      alt=""
-                      className="h-7 w-7 rounded object-cover bg-white border border-slate-100"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                    />
-                  ) : (
-                    <div className="h-7 w-7 rounded bg-purple-100 flex items-center justify-center text-purple-700 font-bold text-[10px] flex-shrink-0">
-                      {v.name.slice(0, 2).toUpperCase()}
-                    </div>
-                  )}
-                </td>
-                <td className="px-5 py-3.5 font-medium text-slate-900">{v.name}</td>
-                <td className="px-5 py-3.5 text-slate-600 hidden md:table-cell">{v.product_line ?? '—'}</td>
-                <td className="px-5 py-3.5 text-slate-600 hidden md:table-cell">{v.phone ?? '—'}</td>
-                <td className="px-5 py-3.5 hidden lg:table-cell">
-                  <div className="flex flex-wrap gap-1">
-                    {v.tags.length > 0
-                      ? v.tags.map((t) => (
-                          <span key={t.id} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold text-white" style={{ backgroundColor: t.color }}>
-                            {t.name}
-                          </span>
-                        ))
-                      : <span className="text-slate-300">—</span>
-                    }
-                  </div>
-                </td>
-                <td className="px-5 py-3.5 hidden lg:table-cell">
-                  {v.website
-                    ? <a href={v.website} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="text-purple-700 hover:underline">{v.website.replace(/^https?:\/\//, '')}</a>
-                    : <span className="text-slate-400">—</span>
-                  }
-                </td>
-                <td className="px-5 py-3.5 hidden lg:table-cell">
-                  {v.premier_group_member
-                    ? <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-purple-100 text-purple-800">Premier</span>
-                    : <span className="text-slate-400">—</span>
-                  }
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {!loading && total > 0 && (
-          <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between gap-4 flex-wrap">
-            <span className="text-xs text-slate-400">
-              Showing {rangeFrom}–{rangeTo} of {total} vendor{total !== 1 ? 's' : ''}
-            </span>
-            {totalPages > 1 && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="px-3 py-1.5 text-xs font-semibold border border-slate-200 rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  Previous
-                </button>
-                <span className="text-xs text-slate-500 px-1">Page {page} of {totalPages}</span>
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className="px-3 py-1.5 text-xs font-semibold border border-slate-200 rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      <DataTable
+        rows={vendors}
+        columns={vendorColumns}
+        loading={loading}
+        emptyMessage={search || tagFilter || premierFilter ? 'No vendors match your filters.' : 'No vendors yet. Create one to get started.'}
+        getRowKey={(vendor) => vendor.id}
+        onRowClick={(vendor) => router.push(`/marketing/vendors/${vendor.id}`)}
+        pagination={{
+          page,
+          total,
+          pageSize: PAGE_SIZE,
+          itemName: 'vendor',
+          onPageChange: (nextPage) => setPage(Math.min(totalPages, Math.max(1, nextPage))),
+        }}
+      />
     </div>
   )
 }

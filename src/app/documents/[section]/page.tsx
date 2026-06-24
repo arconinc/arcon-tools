@@ -3,10 +3,12 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import Script from 'next/script'
 import { useParams, useSearchParams } from 'next/navigation'
+import Link from 'next/link'
 import type { DocSectionWithTree, DocFolderNode, DriveDocument } from '@/types'
 import { PermissionModal } from '@/components/documents/PermissionModal'
 import { FolderTreeNode } from '@/components/documents/FolderTreeNode'
-import { DocumentRow } from '@/components/documents/DocumentRow'
+import { DocumentNameCell, DocumentActionsCell } from '@/components/documents/DocumentRow'
+import { DataTable, type DataTableColumn } from '@/components/ui'
 
 declare global {
   interface Window {
@@ -182,6 +184,12 @@ export default function SectionDocumentsPage() {
   // Permission modal
   const [permModal, setPermModal] = useState<DriveDocument | null>(null)
 
+  // Confirm modal (replaces native confirm())
+  const [confirmModal, setConfirmModal] = useState<{ title: string; message: string; onConfirm: () => void } | null>(null)
+
+  // Move folder inline error
+  const [moveFolderError, setMoveFolderError] = useState<string | null>(null)
+
   // Google Drive Picker
   const [gapiReady, setGapiReady] = useState(false)
   const [gisReady, setGisReady] = useState(false)
@@ -242,6 +250,10 @@ export default function SectionDocumentsPage() {
   function showToast(msg: string) {
     setToastMsg(msg)
     setTimeout(() => setToastMsg(null), 2500)
+  }
+
+  function askConfirm(title: string, message: string, onConfirm: () => void) {
+    setConfirmModal({ title, message, onConfirm })
   }
 
   function toggleExpand(id: string) {
@@ -344,16 +356,22 @@ export default function SectionDocumentsPage() {
     setReorderingId(null)
   }
 
-  async function handleDeleteFolder(node: DocFolderNode) {
+  function handleDeleteFolder(node: DocFolderNode) {
+    function countDocs(n: DocFolderNode): number {
+      return n.documents.length + n.children.reduce((sum, c) => sum + countDocs(c), 0)
+    }
+    const totalDocs = countDocs(node)
     const hasChildren = node.children.length > 0
     const msg = hasChildren
-      ? `Delete folder "${node.name}" and all its sub-folders and documents? This cannot be undone.`
-      : `Delete folder "${node.name}" and all its documents? This cannot be undone.`
-    if (!confirm(msg)) return
-    await fetch(`/api/documents/manage/folders/${node.id}`, { method: 'DELETE' })
-    if (selectedFolderId === node.id) setSelectedFolderId(null)
-    await reload()
-    showToast('Folder deleted')
+      ? `Delete "${node.name}" and its ${node.children.length} subfolder${node.children.length !== 1 ? 's' : ''} and ${totalDocs} document${totalDocs !== 1 ? 's' : ''}? This cannot be undone.`
+      : `Delete "${node.name}" and ${totalDocs} document${totalDocs !== 1 ? 's' : ''}? This cannot be undone.`
+    askConfirm('Delete Folder', msg, async () => {
+      setConfirmModal(null)
+      await fetch(`/api/documents/manage/folders/${node.id}`, { method: 'DELETE' })
+      if (selectedFolderId === node.id) setSelectedFolderId(null)
+      await reload()
+      showToast('Folder deleted')
+    })
   }
 
   function openMoveFolder(node: DocFolderNode) {
@@ -365,6 +383,7 @@ export default function SectionDocumentsPage() {
   async function handleMoveFolder() {
     if (!moveFolderModal) return
     setMoveFolderLoading(true)
+    setMoveFolderError(null)
     const res = await fetch(`/api/documents/manage/folders/${moveFolderModal.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
@@ -372,11 +391,12 @@ export default function SectionDocumentsPage() {
     })
     if (res.ok) {
       setMoveFolderModal(null)
+      setMoveFolderError(null)
       await reload()
       showToast('Folder moved')
     } else {
       const { error } = await res.json().catch(() => ({ error: 'Move failed' }))
-      alert(error ?? 'Could not move folder.')
+      setMoveFolderError(error ?? 'Could not move folder.')
     }
     setMoveFolderLoading(false)
   }
@@ -500,11 +520,13 @@ export default function SectionDocumentsPage() {
     setAddDocLoading(false)
   }
 
-  async function handleDeleteDoc(doc: DriveDocument) {
-    if (!confirm(`Delete "${doc.title}"? This cannot be undone.`)) return
-    await fetch(`/api/documents/manage/items/${doc.id}`, { method: 'DELETE' })
-    await reload()
-    showToast('Document deleted')
+  function handleDeleteDoc(doc: DriveDocument) {
+    askConfirm('Delete Document', `Delete "${doc.title}"? This cannot be undone.`, async () => {
+      setConfirmModal(null)
+      await fetch(`/api/documents/manage/items/${doc.id}`, { method: 'DELETE' })
+      await reload()
+      showToast('Document deleted')
+    })
   }
 
   function openReplaceDoc(doc: DriveDocument) {
@@ -630,8 +652,11 @@ export default function SectionDocumentsPage() {
   if (loading) {
     return (
       <>
-        <style>{`.sp { padding: 2rem 1.5rem; } .ld { display:flex;gap:.4rem;justify-content:center;padding:4rem;} .ld span{width:8px;height:8px;border-radius:50%;background:#7c3aed;animation:bounce .8s infinite;} .ld span:nth-child(2){animation-delay:.15s;} .ld span:nth-child(3){animation-delay:.3s;} @keyframes bounce{0%,80%,100%{transform:translateY(0)}40%{transform:translateY(-8px)}}`}</style>
-        <div className="sp"><div className="ld"><span/><span/><span/></div></div>
+        <style>{`@keyframes skpulse{0%,100%{opacity:1}50%{opacity:0.45}}.sk{animation:skpulse 1.5s ease-in-out infinite;background:#f3e8ff;border-radius:8px;}`}</style>
+        <div style={{ padding: '2rem 1.5rem' }}>
+          <div className="sk" style={{ height: '28px', width: '220px', marginBottom: '1.5rem' }} />
+          <div className="sk" style={{ height: '400px', borderRadius: '10px' }} />
+        </div>
       </>
     )
   }
@@ -662,9 +687,9 @@ export default function SectionDocumentsPage() {
 
         .docs-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.5rem; gap: 1rem; }
         .docs-header h1 { font-size: 1.75rem; font-weight: 700; color: #111; margin: 0 0 0.25rem; }
-        .docs-header p { color: #666; margin: 0; font-size: 0.9rem; }
+        .docs-header p { color: #6b7280; margin: 0; font-size: 0.9rem; }
 
-        .two-panel { display: flex; gap: 0; border: 1px solid #e5e7eb; border-radius: 12px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06); min-height: 400px; }
+        .two-panel { display: flex; gap: 0; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06); min-height: 400px; }
 
         /* ── Sidebar ── */
         .sidebar { flex-shrink: 0; border-right: none; background: #fafafa; display: flex; flex-direction: column; overflow: hidden; }
@@ -679,18 +704,18 @@ export default function SectionDocumentsPage() {
         .folder-row { display: flex; align-items: center; gap: 0.375rem; padding: 0.375rem 0.75rem 0.375rem 0; cursor: pointer; border-radius: 0; transition: background 0.1s; position: relative; min-height: 32px; }
         .folder-row:hover { background: #f3f4f6; }
         .folder-row.selected { background: #ede9fe; }
-        .folder-row.selected .folder-name { color: #6d28d9; font-weight: 600; }
+        .folder-row.selected .folder-name { color: #7c3aed; font-weight: 600; }
         .folder-row.selected .folder-icon { color: #7c3aed; }
         .folder-chevron { width: 14px; flex-shrink: 0; display: flex; align-items: center; justify-content: center; color: #9ca3af; }
         .folder-icon { width: 15px; height: 15px; flex-shrink: 0; color: #f59e0b; }
         .folder-row.selected .folder-icon { color: #7c3aed; }
         .folder-name { font-size: 0.85rem; color: #374151; flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
         .folder-count { font-size: 0.7rem; color: #9ca3af; flex-shrink: 0; background: #f3f4f6; border-radius: 8px; padding: 0.1rem 0.4rem; }
-        .folder-row.selected .folder-count { background: #ddd6fe; color: #6d28d9; }
+        .folder-row.selected .folder-count { background: #ede9fe; color: #7c3aed; }
 
         .folder-row.reordering { opacity: 0.6; pointer-events: none; }
-        .folder-spinner { animation: spin 0.7s linear infinite; color: #7c3aed; }
-        @keyframes spin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
+        .folder-spinner { animation: docspin 0.7s linear infinite; color: #7c3aed; }
+        @keyframes docspin { from { transform: rotate(0deg); } to { transform: rotate(360deg); } }
 
         .ctx-menu { position: fixed; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.14); min-width: 190px; z-index: 9999; overflow: hidden; padding: 0.25rem 0; }
         .ctx-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.55rem 0.875rem; font-size: 0.85rem; color: #374151; cursor: pointer; border: none; background: none; width: 100%; text-align: left; }
@@ -705,15 +730,15 @@ export default function SectionDocumentsPage() {
         .add-folder-label { font-size: 0.72rem; color: #6b7280; font-weight: 600; }
         .add-folder-input { padding: 0.35rem 0.5rem; border: 1.5px solid #7c3aed; border-radius: 6px; font-size: 0.825rem; outline: none; width: 100%; box-sizing: border-box; }
         .add-folder-btns { display: flex; gap: 0.375rem; }
-        .btn-xs { padding: 0.25rem 0.625rem; font-size: 0.775rem; border-radius: 5px; cursor: pointer; border: 1px solid transparent; font-weight: 500; }
+        .btn-xs { padding: 0.25rem 0.625rem; font-size: 0.775rem; border-radius: 6px; cursor: pointer; border: 1px solid transparent; font-weight: 500; }
         .btn-xs-primary { background: #7c3aed; color: #fff; border-color: #7c3aed; }
-        .btn-xs-primary:hover:not(:disabled) { background: #6d28d9; }
+        .btn-xs-primary:hover:not(:disabled) { background: #5b21b6; }
         .btn-xs-primary:disabled { opacity: 0.6; cursor: not-allowed; }
         .btn-xs-secondary { background: #fff; color: #374151; border-color: #e5e7eb; }
         .btn-xs-secondary:hover { background: #f9fafb; }
 
         .sidebar-new-root { margin: 0.375rem 0.75rem 0.5rem; }
-        .sidebar-new-root-btn { width: 100%; padding: 0.375rem 0.625rem; font-size: 0.8rem; border: 1.5px dashed #d1d5db; border-radius: 7px; background: none; color: #6b7280; cursor: pointer; text-align: left; }
+        .sidebar-new-root-btn { width: 100%; padding: 0.375rem 0.625rem; font-size: 0.8rem; border: 1.5px dashed #d1d5db; border-radius: 8px; background: none; color: #6b7280; cursor: pointer; text-align: left; }
         .sidebar-new-root-btn:hover { border-color: #7c3aed; color: #7c3aed; background: #faf5ff; }
 
         .sidebar-empty { padding: 1.5rem 0.875rem; font-size: 0.8rem; color: #9ca3af; text-align: center; }
@@ -725,14 +750,7 @@ export default function SectionDocumentsPage() {
         .content-doc-count { font-size: 0.8rem; color: #9ca3af; }
         .content-body { flex: 1; overflow-y: auto; }
 
-        .table { width: 100%; border-collapse: collapse; }
-        .table th { padding: 0.75rem 1.25rem; text-align: left; font-weight: 600; font-size: 0.775rem; color: #6b7280; background: #fafafa; border-bottom: 1px solid #e5e7eb; text-transform: uppercase; letter-spacing: 0.04em; }
-        .table td { padding: 0.75rem 1.25rem; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
-        .table tr:last-child td { border-bottom: none; }
-        .table tbody tr:hover { background: #fafafa; }
-        .table tbody tr.highlighted { background: #fef3c7; }
-
-        .doc-link { display: flex; align-items: flex-start; gap: 0.5rem; cursor: pointer; text-decoration: none; }
+.doc-link { display: flex; align-items: flex-start; gap: 0.5rem; cursor: pointer; text-decoration: none; }
         .doc-link:hover .doc-title { color: #7c3aed; text-decoration: underline; }
         .doc-icon { width: 15px; height: 15px; color: #9ca3af; flex-shrink: 0; margin-top: 2px; }
         .doc-link:hover .doc-icon { color: #7c3aed; }
@@ -740,7 +758,7 @@ export default function SectionDocumentsPage() {
         .doc-subtitle { font-size: 0.775rem; color: #9ca3af; margin-top: 0.15rem; }
         .version-badge { font-size: 0.68rem; color: #c4b5fd; font-weight: 500; }
         .perm-badge { display: inline-block; font-size: 0.68rem; color: #7c3aed; background: #ede9fe; border-radius: 10px; padding: 0.1rem 0.4rem; margin-top: 0.2rem; }
-        .perm-badge.open { color: #065f46; background: #d1fae5; }
+        .perm-badge.open { color: #15803d; background: #dcfce7; }
 
         /* ── Actions dropdown ── */
         .actions-cell { position: relative; text-align: right; }
@@ -760,18 +778,18 @@ export default function SectionDocumentsPage() {
         .empty-state p { margin: 0; font-size: 0.875rem; }
 
         /* ── Buttons ── */
-        .btn-sm { padding: 0.4rem 0.875rem; font-size: 0.825rem; border-radius: 7px; cursor: pointer; border: 1px solid transparent; font-weight: 500; }
+        .btn-sm { padding: 0.4rem 0.875rem; font-size: 0.825rem; border-radius: 8px; cursor: pointer; border: 1px solid transparent; font-weight: 500; }
         .btn-primary { background: #7c3aed; color: #fff; border-color: #7c3aed; }
-        .btn-primary:hover:not(:disabled) { background: #6d28d9; }
+        .btn-primary:hover:not(:disabled) { background: #5b21b6; }
         .btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
         .btn-secondary { background: #fff; color: #374151; border-color: #e5e7eb; }
         .btn-secondary:hover { background: #f9fafb; }
 
-        .toast { position: fixed; bottom: 2rem; right: 2rem; background: #10b981; color: #fff; padding: 0.875rem 1.25rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); animation: slideIn 0.3s ease-out; z-index: 2000; font-size: 0.875rem; }
-        @keyframes slideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
+        .toast { position: fixed; bottom: 2rem; right: 2rem; background: #059669; color: #fff; padding: 0.875rem 1.25rem; border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.15); animation: docslideIn 0.3s ease-out; z-index: 2000; font-size: 0.875rem; }
+        @keyframes docslideIn { from { transform: translateX(400px); opacity: 0; } to { transform: translateX(0); opacity: 1; } }
 
         .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); display: flex; align-items: center; justify-content: center; z-index: 1000; padding: 1rem; }
-        .modal { background: #fff; border-radius: 14px; width: 100%; max-width: 480px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+        .modal { background: #fff; border-radius: 16px; width: 100%; max-width: 480px; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
         .modal-header { display: flex; align-items: center; justify-content: space-between; padding: 1.25rem 1.5rem 1rem; border-bottom: 1px solid #e5e7eb; }
         .modal-header h3 { font-size: 1rem; font-weight: 700; color: #111; margin: 0; }
         .modal-close { background: none; border: none; cursor: pointer; color: #9ca3af; font-size: 1.25rem; padding: 0.25rem; }
@@ -792,6 +810,11 @@ export default function SectionDocumentsPage() {
       `}</style>
 
       <div className="sp">
+        <div style={{ fontSize: '0.8rem', color: '#9ca3af', marginBottom: '1rem' }}>
+          <Link href="/documents" style={{ color: '#7c3aed', textDecoration: 'none', fontWeight: 500 }}>Documents</Link>
+          <span style={{ margin: '0 0.375rem' }}>{'/'}</span>
+          <span style={{ color: '#374151' }}>{section.name}</span>
+        </div>
         <div className="docs-header">
           <div>
             <h1>{section.name} Documents</h1>
@@ -903,39 +926,49 @@ export default function SectionDocumentsPage() {
                   <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" /></svg>
                   <p>Select a folder to view documents.</p>
                 </div>
-              ) : selectedFolder.documents.length === 0 ? (
-                <div className="empty-state">
-                  <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
-                  <p>No documents in this folder.{canManage ? ' Click "+ Add Document" to add one.' : ''}</p>
-                </div>
               ) : (
-                <table className="table">
-                  <thead>
-                    <tr>
-                      <th>Name</th>
-                      <th style={{ width: '80px' }}></th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {selectedFolder.documents.map(doc => (
-                      <DocumentRow
-                        key={doc.id}
-                        doc={doc}
-                        sectionSlug={sectionSlug}
-                        folderId={selectedFolder.id}
-                        isHighlighted={highlightedDocId === doc.id}
-                        canManage={canManage}
-                        permBadge={permBadgeText(doc.id)}
-                        onEdit={() => { setEditDocModal(doc); setEditDocTitle(doc.title); setEditDocDescription(doc.description ?? '') }}
-                        onReplace={() => openReplaceDoc(doc)}
-                        onDelete={() => handleDeleteDoc(doc)}
-                        onPermissions={() => setPermModal(doc)}
-                        onMove={() => openMoveDoc(doc)}
-                        onShareCopied={() => showToast('Link copied to clipboard')}
-                      />
-                    ))}
-                  </tbody>
-                </table>
+                <DataTable
+                  rows={selectedFolder.documents}
+                  columns={[
+                    {
+                      key: 'name',
+                      header: 'Name',
+                      sortValue: (doc) => doc.title,
+                      render: (doc) => (
+                        <DocumentNameCell
+                          doc={doc}
+                          canManage={canManage}
+                          permBadge={permBadgeText(doc.id)}
+                          isHighlighted={highlightedDocId === doc.id}
+                        />
+                      ),
+                    },
+                    {
+                      key: 'actions',
+                      header: '',
+                      className: 'w-16',
+                      skeletonWidth: '40px',
+                      render: (doc) => (
+                        <DocumentActionsCell
+                          doc={doc}
+                          canManage={canManage}
+                          sectionSlug={sectionSlug}
+                          folderId={selectedFolder.id}
+                          onEdit={() => { setEditDocModal(doc); setEditDocTitle(doc.title); setEditDocDescription(doc.description ?? '') }}
+                          onReplace={() => openReplaceDoc(doc)}
+                          onDelete={() => handleDeleteDoc(doc)}
+                          onPermissions={() => setPermModal(doc)}
+                          onMove={() => openMoveDoc(doc)}
+                          onShareCopied={() => showToast('Link copied to clipboard')}
+                        />
+                      ),
+                    },
+                  ]}
+                  loading={false}
+                  emptyMessage={canManage ? 'No documents in this folder. Click "+ Add Document" to add one.' : 'No documents in this folder.'}
+                  getRowKey={(doc) => doc.id}
+                  minWidth="400px"
+                />
               )}
             </div>
           </div>
@@ -1203,8 +1236,9 @@ export default function SectionDocumentsPage() {
                   </select>
                 </div>
               </div>
+              {moveFolderError && <p className="error-msg" style={{ margin: 0 }}>{moveFolderError}</p>}
               <div className="modal-footer">
-                <button className="btn-sm btn-secondary" onClick={() => setMoveFolderModal(null)}>Cancel</button>
+                <button className="btn-sm btn-secondary" onClick={() => { setMoveFolderModal(null); setMoveFolderError(null) }}>Cancel</button>
                 <button
                   className="btn-sm btn-primary"
                   onClick={handleMoveFolder}
@@ -1217,6 +1251,31 @@ export default function SectionDocumentsPage() {
           </div>
         )
       })()}
+
+      {/* Confirm Modal */}
+      {confirmModal && (
+        <div className="modal-overlay" onClick={e => { if (e.target === e.currentTarget) setConfirmModal(null) }}>
+          <div className="modal">
+            <div className="modal-header">
+              <h3>{confirmModal.title}</h3>
+              <button className="modal-close" aria-label="Close" onClick={() => setConfirmModal(null)}>✕</button>
+            </div>
+            <div className="modal-body">
+              <p style={{ margin: 0, fontSize: '0.875rem', color: '#374151' }}>{confirmModal.message}</p>
+            </div>
+            <div className="modal-footer">
+              <button className="btn-sm btn-secondary" onClick={() => setConfirmModal(null)}>Cancel</button>
+              <button
+                className="btn-sm"
+                style={{ background: '#dc2626', color: '#fff', borderColor: '#dc2626' }}
+                onClick={() => confirmModal.onConfirm()}
+              >
+                Delete
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* Permission Modal */}
       {permModal && (

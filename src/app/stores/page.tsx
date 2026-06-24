@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { Store } from '@/types'
 import { useAppUser } from '@/components/layout/AppShell'
 import { CredentialPrompt } from '@/components/stores/CredentialPrompt'
+import { FilterPillGroup, type FilterPillOption } from '@/components/ui/FilterPill'
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
@@ -724,8 +725,7 @@ export default function StoresDashboardPage() {
     <>
       <style>{`
         .stores-page { padding: 22px 28px 28px; }
-        .stat-card { background: white; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px 20px; cursor: pointer; text-align: left; transition: all 0.15s; }
-        .stat-card:hover { border-color: #cbd5e1; box-shadow: 0 1px 4px rgba(0,0,0,0.06); }
+        .stat-card { background: white; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px 20px; text-align: left; }
         .stat-val { font-size: 26px; font-weight: 700; color: #1e293b; line-height: 1; }
         .stat-lbl { font-size: 11px; color: #94a3b8; margin-top: 4px; font-weight: 500; }
       `}</style>
@@ -799,22 +799,33 @@ export default function StoresDashboardPage() {
         </div>
 
         {/* Stats */}
-        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-5">
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-3 mb-4">
           {([
-            { key: 'all',        val: stats.active,    label: 'Active Stores',       color: '' },
-            { key: 'production', val: stats.inProd,    label: 'In Production',       color: 'text-purple-700' },
-            { key: 'launching',  val: stats.launching, label: 'Launching ≤ 30 days', color: 'text-amber-600' },
-            { key: 'closing',    val: stats.closing,   label: 'Closing ≤ 30 days',   color: 'text-orange-500' },
-          ] as const).map(s => (
-            <button
-              key={s.key}
-              onClick={() => setFilter(f => f === s.key ? 'all' : s.key)}
-              className={`stat-card ${filter === s.key ? 'ring-2 ring-purple-500' : ''}`}
-            >
+            { val: stats.active,    label: 'Active Stores',       color: '' },
+            { val: stats.inProd,    label: 'In Production',       color: 'text-purple-700' },
+            { val: stats.launching, label: 'Launching ≤ 30 days', color: 'text-amber-600' },
+            { val: stats.closing,   label: 'Closing ≤ 30 days',   color: 'text-orange-500' },
+          ]).map(s => (
+            <div key={s.label} className="stat-card">
               <div className={`stat-val ${s.color}`}>{s.val}</div>
               <div className="stat-lbl">{s.label}</div>
-            </button>
+            </div>
           ))}
+        </div>
+
+        {/* Filters */}
+        <div className="mb-4">
+          <FilterPillGroup<'all' | 'production' | 'launching' | 'closing'>
+            label="Filter stores"
+            value={filter}
+            onChange={setFilter}
+            options={[
+              { value: 'all',        label: 'All Active',      color: 'purple', count: stats.active },
+              { value: 'production', label: 'In Production',   color: 'purple', count: stats.inProd },
+              { value: 'launching',  label: 'Launching Soon',  color: 'amber',  count: stats.launching },
+              { value: 'closing',    label: 'Closing Soon',    color: 'amber',  count: stats.closing },
+            ]}
+          />
         </div>
 
         {/* Search */}

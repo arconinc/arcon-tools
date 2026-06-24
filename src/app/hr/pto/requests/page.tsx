@@ -1,7 +1,11 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useMemo, useState, useEffect } from 'react'
 import { PtoRequest, PTO_REASON_LABELS } from '@/types'
+import { DataTable, type DataTableColumn, FilterPillGroup, type FilterPillOption } from '@/components/ui'
+
+type Filter = 'all' | PtoRequest['status']
+type RequestWithUser = PtoRequest & { users?: { display_name: string; email: string; avatar_url: string | null } }
 
 function formatDate(d: string) {
   const [y, m, day] = d.split('-')
@@ -9,53 +13,58 @@ function formatDate(d: string) {
   return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
-type Filter = 'all' | 'pending' | 'approved' | 'denied'
+function dayCount(request: Pick<PtoRequest, 'start_date' | 'end_date' | 'start_half_day' | 'end_half_day'>) {
+  const start = new Date(`${request.start_date}T00:00:00`)
+  const end = new Date(`${request.end_date}T00:00:00`)
+  const raw = Math.round((end.getTime() - start.getTime()) / 86400000) + 1
+  return Math.max(raw - (request.start_half_day ? 0.5 : 0) - (request.end_half_day && request.end_date !== request.start_date ? 0.5 : 0), 0.5)
+}
 
-const STAT_CARDS: { key: Filter; label: string; bg: string; color: string; subtitle: (count: number) => string }[] = [
-  { key: 'pending',  label: 'Pending',      bg: '#fef9c3', color: '#854d0e', subtitle: (n) => n === 1 ? 'Awaiting review' : 'Awaiting review' },
-  { key: 'approved', label: 'Approved',     bg: '#dcfce7', color: '#166534', subtitle: () => 'Time off approved' },
-  { key: 'denied',   label: 'Not Approved', bg: '#fee2e2', color: '#991b1b', subtitle: () => 'Requests denied' },
-]
+function formatDays(days: number) {
+  return Number.isInteger(days) ? `${days}` : days.toFixed(1)
+}
+
+function Icon({ type, className = 'h-5 w-5' }: {
+  type: 'clock' | 'check' | 'x' | 'people' | 'search' | 'circles'
+  className?: string
+}) {
+  const props = { width: 24, height: 24, viewBox: '0 0 24 24', fill: 'none', stroke: 'currentColor', strokeWidth: 2, strokeLinecap: 'round' as const, strokeLinejoin: 'round' as const, className, 'aria-hidden': true as const }
+  if (type === 'check')   return <svg {...props}><path d="M20 6 9 17l-5-5" /></svg>
+  if (type === 'x')       return <svg {...props}><path d="M18 6 6 18M6 6l12 12" /></svg>
+  if (type === 'search')  return <svg {...props}><circle cx="11" cy="11" r="8" /><path d="m21 21-4.35-4.35" /></svg>
+  if (type === 'circles') return <svg {...props}><circle cx="8" cy="12" r="4" /><circle cx="16" cy="12" r="4" /></svg>
+  if (type === 'people')  return <svg {...props}><path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" /><path d="M22 21v-2a4 4 0 0 0-3-3.87M16 3.13a4 4 0 0 1 0 7.75" /></svg>
+  return <svg {...props}><circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" /></svg>
+}
 
 function Avatar({ user }: { user?: { display_name: string; avatar_url?: string | null } }) {
   if (user?.avatar_url) {
-    return (
-      <img
-        src={user.avatar_url}
-        alt=""
-        referrerPolicy="no-referrer"
-        style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
-      />
-    )
+    return <img src={user.avatar_url} alt="" referrerPolicy="no-referrer" className="h-10 w-10 shrink-0 rounded-full object-cover" />
   }
   const initials = (user?.display_name ?? '?').split(' ').map(s => s[0]).join('').slice(0, 2).toUpperCase()
   return (
-    <div style={{ width: 32, height: 32, borderRadius: '50%', background: '#6b1e98', color: '#fff', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 12, fontWeight: 800, flexShrink: 0 }}>
+    <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-purple-700 text-xs font-bold text-white">
       {initials}
     </div>
   )
 }
 
 function StatusBadge({ status }: { status: PtoRequest['status'] }) {
-  const cfg: Record<string, { bg: string; color: string; label: string }> = {
-    pending:  { bg: '#fef9c3', color: '#854d0e', label: 'Pending' },
-    approved: { bg: '#dcfce7', color: '#166534', label: 'Approved' },
-    denied:   { bg: '#fee2e2', color: '#991b1b', label: 'Not Approved' },
+  const cfg: Record<PtoRequest['status'], { cls: string; label: string }> = {
+    pending:  { cls: 'bg-amber-50 text-amber-700 border-amber-200',  label: 'Pending' },
+    approved: { cls: 'bg-green-50  text-green-700  border-green-200', label: 'Approved' },
+    denied:   { cls: 'bg-red-50    text-red-700    border-red-200',   label: 'Denied' },
   }
-  const c = cfg[status] ?? { bg: '#f3f4f6', color: '#374151', label: status }
-  return (
-    <span style={{ background: c.bg, color: c.color, padding: '2px 10px', borderRadius: 999, fontSize: 12, fontWeight: 600, whiteSpace: 'nowrap' }}>
-      {c.label}
-    </span>
-  )
+  const { cls, label } = cfg[status]
+  return <span className={`inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-bold ${cls}`}>{label}</span>
 }
-
-type RequestWithUser = PtoRequest & { users?: { display_name: string; email: string; avatar_url: string | null } }
 
 export default function HrPtoRequestsPage() {
   const [requests, setRequests] = useState<RequestWithUser[]>([])
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<Filter>('pending')
+  const [query, setQuery] = useState('')
+  const [year, setYear] = useState(String(new Date().getFullYear()))
   const [modal, setModal] = useState<{ id: string; action: 'approve' | 'deny'; title: string } | null>(null)
   const [comment, setComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -69,13 +78,35 @@ export default function HrPtoRequestsPage() {
       .finally(() => setLoading(false))
   }, [])
 
-  const filtered = filter === 'all' ? requests : requests.filter(r => r.status === filter)
-  const counts: Record<Filter, number> = {
+  const years = useMemo(() => {
+    const requestYears = requests.flatMap(r => [r.start_date.slice(0, 4), r.end_date.slice(0, 4)])
+    return Array.from(new Set([String(new Date().getFullYear()), ...requestYears])).sort((a, b) => Number(b) - Number(a))
+  }, [requests])
+
+  const counts = useMemo(() => ({
     all:      requests.length,
     pending:  requests.filter(r => r.status === 'pending').length,
     approved: requests.filter(r => r.status === 'approved').length,
     denied:   requests.filter(r => r.status === 'denied').length,
-  }
+  }), [requests])
+
+  const filtered = useMemo(() => {
+    const normalized = query.trim().toLowerCase()
+    return requests.filter(r => {
+      const user = r.users
+      const haystack = [user?.display_name ?? '', user?.email ?? '', PTO_REASON_LABELS[r.reason], r.notes ?? '', r.status, r.reviewer_comment ?? ''].join(' ').toLowerCase()
+      return (filter === 'all' || r.status === filter)
+        && (r.start_date.startsWith(year) || r.end_date.startsWith(year))
+        && (!normalized || haystack.includes(normalized))
+    })
+  }, [filter, query, requests, year])
+
+  const filterOptions: FilterPillOption<Filter>[] = useMemo(() => [
+    { value: 'pending',  label: 'Pending',  icon: <Icon type="clock" />,   color: 'amber',  count: counts.pending },
+    { value: 'all',      label: 'All',      icon: <Icon type="circles" />, color: 'purple', count: counts.all },
+    { value: 'approved', label: 'Approved', icon: <Icon type="check" />,   color: 'green',  count: counts.approved },
+    { value: 'denied',   label: 'Denied',   icon: <Icon type="x" />,       color: 'red',    count: counts.denied },
+  ], [counts])
 
   function openModal(id: string, action: 'approve' | 'deny', name: string) {
     setModal({ id, action, title: name })
@@ -98,10 +129,7 @@ export default function HrPtoRequestsPage() {
         body: JSON.stringify({ action: modal.action, reviewer_comment: comment.trim() || null }),
       })
       const data = await res.json()
-      if (!res.ok) {
-        setModalError(data.error ?? 'Failed')
-        return
-      }
+      if (!res.ok) { setModalError(data.error ?? 'Failed to save review'); return }
       setRequests(prev => prev.map(r => r.id === modal.id ? { ...r, ...data.request } : r))
       setModal(null)
     } finally {
@@ -109,169 +137,221 @@ export default function HrPtoRequestsPage() {
     }
   }
 
+  const columns: DataTableColumn<RequestWithUser>[] = [
+    {
+      key: 'employee',
+      header: 'Employee',
+      sortValue: (r) => r.users?.display_name ?? '',
+      render: (r) => (
+        <div className="flex items-center gap-3">
+          <Avatar user={r.users} />
+          <div>
+            <div className="font-semibold text-slate-900">{r.users?.display_name ?? 'Unknown Employee'}</div>
+            <div className="mt-0.5 text-xs text-slate-500">{r.users?.email ?? 'No email available'}</div>
+          </div>
+        </div>
+      ),
+      skeletonWidth: '70%',
+    },
+    {
+      key: 'dates',
+      header: 'Dates',
+      sortValue: (r) => r.start_date,
+      render: (r) => (
+        <div>
+          <div className="font-semibold text-slate-900">
+            {formatDate(r.start_date)}{r.start_date !== r.end_date ? ` – ${formatDate(r.end_date)}` : ''}
+          </div>
+          <div className="mt-0.5 text-xs text-slate-500">
+            {formatDays(dayCount(r))} {dayCount(r) === 1 ? 'day' : 'days'}
+            {r.start_half_day && ' · half day start'}
+            {r.end_half_day && r.end_date !== r.start_date && ' · half day end'}
+          </div>
+        </div>
+      ),
+    },
+    {
+      key: 'reason',
+      header: 'Reason',
+      sortValue: (r) => PTO_REASON_LABELS[r.reason],
+      render: (r) => (
+        <div>
+          <div className="font-semibold text-slate-900">{PTO_REASON_LABELS[r.reason]}</div>
+          {r.notes && <div className="mt-0.5 text-xs text-slate-500">{r.notes}</div>}
+        </div>
+      ),
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      sortValue: (r) => r.status,
+      render: (r) => (
+        <div>
+          <StatusBadge status={r.status} />
+          {r.reviewer_comment && <div className="mt-1 text-xs text-slate-500">{r.reviewer_comment}</div>}
+        </div>
+      ),
+    },
+    {
+      key: 'actions',
+      header: '',
+      render: (r) => r.status === 'pending' ? (
+        <div className="flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => openModal(r.id, 'approve', r.users?.display_name ?? 'this employee')}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-green-200 bg-green-50 px-3 py-1.5 text-xs font-bold text-green-700 transition-colors hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-green-300"
+          >
+            <Icon type="check" className="h-3 w-3" />
+            Approve
+          </button>
+          <button
+            type="button"
+            onClick={() => openModal(r.id, 'deny', r.users?.display_name ?? 'this employee')}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-bold text-red-600 transition-colors hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-200"
+          >
+            <Icon type="x" className="h-3 w-3" />
+            Deny
+          </button>
+        </div>
+      ) : (
+        <span className="text-xs text-slate-400">No action needed</span>
+      ),
+    },
+  ]
+
   return (
     <>
-      <style>{`
-        .pto-table { width: 100%; border-collapse: collapse; }
-        .pto-table th { text-align: left; padding: 10px 14px; background: #f8f7ff; color: #6d28d9; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; border-bottom: 2px solid #ede9fe; }
-        .pto-table td { padding: 12px 14px; border-bottom: 1px solid #f3f4f6; vertical-align: middle; }
-        .pto-table tr:last-child td { border-bottom: none; }
-        .pto-table tr:hover td { background: #faf5ff; }
-        .btn-approve { background: #dcfce7; color: #166534; border: 1px solid #86efac; border-radius: 6px; padding: 5px 12px; font-size: 12px; font-weight: 700; cursor: pointer; }
-        .btn-approve:hover { background: #bbf7d0; }
-        .btn-deny { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; border-radius: 6px; padding: 5px 12px; font-size: 12px; font-weight: 700; cursor: pointer; }
-        .btn-deny:hover { background: #fecaca; }
-        .stat-card { border-radius: 14px; padding: 20px 22px; cursor: pointer; transition: box-shadow .15s, filter .15s; }
-        .stat-card:hover { filter: brightness(.96); box-shadow: 0 2px 10px rgba(0,0,0,.08); }
-        .form-input { border: 1.5px solid #d1d5db; border-radius: 8px; padding: 8px 12px; font-size: 14px; box-sizing: border-box; }
-        .form-input:focus { outline: none; border-color: #7c3aed; }
-        .btn-secondary { background: #ede9fe; color: #5b21b6; border: none; padding: 7px 14px; border-radius: 8px; font-size: 13px; font-weight: 600; cursor: pointer; }
-        .btn-secondary:hover { background: #ddd6fe; }
-        .modal-overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 1000; display: flex; align-items: center; justify-content: center; }
-        .modal-box { background: #fff; border-radius: 12px; padding: 24px; width: 420px; max-width: 95vw; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
-        .modal-title { font-size: 16px; font-weight: 800; color: #111; margin-bottom: 8px; }
-        .modal-desc { font-size: 13px; color: #555; margin-bottom: 16px; line-height: 1.5; }
-        .modal-textarea { width: 100%; box-sizing: border-box; border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 10px; font-size: 13px; resize: vertical; min-height: 80px; }
-        .modal-textarea:focus { outline: 2px solid #6b1e98; border-color: #6b1e98; }
-        .modal-actions { display: flex; gap: 10px; margin-top: 14px; justify-content: flex-end; }
-        .modal-error { background: #fee2e2; border: 1px solid #fca5a5; border-radius: 6px; color: #991b1b; font-size: 12px; padding: 8px 12px; margin-top: 8px; }
-        .btn-confirm-approve { background: #16a34a; color: #fff; border: none; border-radius: 7px; padding: 9px 18px; font-size: 13px; font-weight: 700; cursor: pointer; }
-        .btn-confirm-approve:hover:not(:disabled) { background: #15803d; }
-        .btn-confirm-deny { background: #dc2626; color: #fff; border: none; border-radius: 7px; padding: 9px 18px; font-size: 13px; font-weight: 700; cursor: pointer; }
-        .btn-confirm-deny:hover:not(:disabled) { background: #b91c1c; }
-        .btn-cancel-modal { background: #f3f4f6; color: #555; border: 1px solid #e5e7eb; border-radius: 7px; padding: 9px 16px; font-size: 13px; font-weight: 700; cursor: pointer; }
-        .btn-cancel-modal:hover { background: #e5e7eb; }
-        button:disabled { opacity: 0.6; cursor: not-allowed; }
-      `}</style>
+      <div className="mx-auto max-w-[1440px] px-8 py-9">
 
-      <div style={{ maxWidth: 1200, margin: '0 auto', padding: '32px 16px' }}>
-        <div style={{ marginBottom: 28 }}>
-          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: '#1e1b4b' }}>PTO Requests</h1>
-          <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: 14 }}>Review and action employee time-off requests.</p>
-        </div>
+        {/* Header */}
+        <header className="mb-8">
+          <h1 className="text-[1.75rem] font-extrabold tracking-tight text-slate-900" style={{ textWrap: 'balance' }}>
+            Review PTO Requests
+          </h1>
+          <p className="mt-2 text-sm text-slate-500">
+            Review employee time off requests, approve clean submissions, and leave clear denial notes when needed.
+          </p>
+        </header>
 
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 28 }}>
-          {STAT_CARDS.map(({ key, label, bg, color, subtitle }) => {
-            const count = counts[key]
-            const isActive = filter === key
-            return (
-              <div key={key} className="stat-card" style={{ background: bg, outline: isActive ? `2.5px solid ${color}` : 'none' }} onClick={() => setFilter(isActive ? 'all' : key)}>
-                <div style={{ fontSize: 32, fontWeight: 800, color, lineHeight: 1 }}>{count}</div>
-                <div style={{ fontSize: 14, fontWeight: 700, color, marginTop: 8 }}>{label}</div>
-                <div style={{ fontSize: 12, color, opacity: .7, marginTop: 3 }}>{subtitle(count)}</div>
+        {/* Stat cards */}
+        <section className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="PTO review summary">
+          {[
+            { icon: 'clock'   as const, label: 'Pending Requests', value: counts.pending,  note: 'Awaiting HR review' },
+            { icon: 'check'   as const, label: 'Approved',          value: counts.approved, note: 'Approved request history' },
+            { icon: 'x'       as const, label: 'Denied',            value: counts.denied,   note: 'Returned with comments' },
+            { icon: 'people'  as const, label: 'Total Requests',    value: counts.all,      note: 'All visible PTO requests' },
+          ].map(({ icon, label, value, note }) => (
+            <div key={label} className="flex min-h-[112px] items-center gap-5 rounded-lg border border-slate-200 bg-white p-5 shadow-sm">
+              <div className="flex h-14 w-14 shrink-0 items-center justify-center rounded-full bg-gradient-to-br from-purple-50 to-purple-100 text-purple-700">
+                <Icon type={icon} className="h-[26px] w-[26px]" />
               </div>
-            )
-          })}
-        </div>
+              <div>
+                <div className="text-[11px] font-bold uppercase tracking-widest text-slate-500">{label}</div>
+                <div className="mt-2 text-[1.55rem] font-extrabold leading-none text-purple-700">{value}</div>
+                <div className="mt-2 text-xs leading-snug text-slate-500">{note}</div>
+              </div>
+            </div>
+          ))}
+        </section>
 
-        <div style={{ display: 'flex', gap: 12, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
-          <select className="form-input" style={{ minWidth: 180 }} value={filter} onChange={e => setFilter(e.target.value as Filter)}>
-            <option value="all">All Statuses</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="denied">Not Approved</option>
-          </select>
-          {filter !== 'all' && (
-            <button className="btn-secondary" onClick={() => setFilter('all')}>Clear</button>
-          )}
-        </div>
-
-        {loading ? (
-          <p style={{ color: '#9ca3af', textAlign: 'center', padding: 40 }}>Loading…</p>
-        ) : filtered.length === 0 ? (
-          <div style={{ textAlign: 'center', padding: '60px 0', color: '#9ca3af' }}>No requests found.</div>
-        ) : (
-          <div style={{ background: '#fff', border: '1px solid #e9d5ff', borderRadius: 12, overflow: 'hidden' }}>
-            <table className="pto-table">
-              <thead>
-                <tr>
-                  <th>Employee</th>
-                  <th>Dates</th>
-                  <th>Reason</th>
-                  <th>Status</th>
-                  <th>Actions</th>
-                </tr>
-              </thead>
-              <tbody>
-                {filtered.map(r => {
-                  const u = r.users
-                  return (
-                    <tr key={r.id}>
-                      <td>
-                        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                          <Avatar user={u} />
-                          <div>
-                            <div style={{ fontWeight: 600, color: '#1e1b4b' }}>{u?.display_name ?? '—'}</div>
-                            <div style={{ fontSize: 12, color: '#9ca3af' }}>{u?.email ?? ''}</div>
-                          </div>
-                        </div>
-                      </td>
-                      <td>
-                        <div style={{ fontWeight: 600, color: '#374151' }}>
-                          {formatDate(r.start_date)}
-                          {r.start_date !== r.end_date ? ` – ${formatDate(r.end_date)}` : ''}
-                        </div>
-                        {(r.start_half_day || r.end_half_day) && (
-                          <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 2 }}>
-                            {r.start_half_day && 'Half day start'}
-                            {r.start_half_day && r.end_half_day && ' · '}
-                            {r.end_half_day && 'Half day end'}
-                          </div>
-                        )}
-                      </td>
-                      <td style={{ color: '#374151', fontSize: 13 }}>
-                        {PTO_REASON_LABELS[r.reason]}
-                        {r.notes && (
-                          <div style={{ fontSize: 12, color: '#9ca3af', marginTop: 3, fontStyle: 'italic' }}>{r.notes}</div>
-                        )}
-                      </td>
-                      <td>
-                        <StatusBadge status={r.status} />
-                        {r.reviewer_comment && (
-                          <div style={{ fontSize: 11, color: '#9ca3af', marginTop: 4, fontStyle: 'italic' }}>{r.reviewer_comment}</div>
-                        )}
-                      </td>
-                      <td>
-                        {r.status === 'pending' && (
-                          <div style={{ display: 'flex', gap: 8 }}>
-                            <button className="btn-approve" onClick={() => openModal(r.id, 'approve', u?.display_name ?? 'this employee')}>Approve</button>
-                            <button className="btn-deny" onClick={() => openModal(r.id, 'deny', u?.display_name ?? 'this employee')}>Deny</button>
-                          </div>
-                        )}
-                      </td>
-                    </tr>
-                  )
-                })}
-              </tbody>
-            </table>
+        {/* Table section */}
+        <section aria-label="PTO requests for review">
+          {/* Toolbar */}
+          <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+            <FilterPillGroup
+              options={filterOptions}
+              value={filter}
+              onChange={setFilter}
+              label="Filter by status"
+            />
+            <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={year}
+                onChange={e => setYear(e.target.value)}
+                aria-label="Filter by year"
+                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300"
+              >
+                {years.map(y => <option key={y} value={y}>{y}</option>)}
+              </select>
+              <div className="relative">
+                <Icon type="search" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+                <input
+                  type="search"
+                  value={query}
+                  onChange={e => setQuery(e.target.value)}
+                  placeholder="Search employees or requests…"
+                  aria-label="Search PTO requests"
+                  className="h-[34px] min-w-[240px] rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-300"
+                />
+              </div>
+            </div>
           </div>
-        )}
+
+          <DataTable
+            rows={filtered}
+            columns={columns}
+            loading={loading}
+            emptyMessage={requests.length === 0 ? 'No PTO requests have been submitted yet.' : 'No requests match these filters.'}
+            getRowKey={r => r.id}
+            minWidth="980px"
+          />
+
+          {!loading && requests.length > 0 && (
+            <p className="mt-2 text-right text-xs text-slate-400">
+              Showing {filtered.length} of {requests.length} requests · {year}
+            </p>
+          )}
+        </section>
       </div>
 
+      {/* Review modal */}
       {modal && (
-        <div className="modal-overlay" onClick={() => setModal(null)}>
-          <div className="modal-box" onClick={e => e.stopPropagation()}>
-            <div className="modal-title">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-5"
+          onClick={() => setModal(null)}
+        >
+          <div
+            className="w-full max-w-[440px] rounded-[10px] border border-slate-200 bg-white p-6 shadow-[0_20px_60px_rgba(0,0,0,0.18)]"
+            onClick={e => e.stopPropagation()}
+          >
+            <h2 className="text-base font-extrabold text-slate-900">
               {modal.action === 'approve' ? 'Approve PTO Request' : 'Deny PTO Request'}
-            </div>
-            <div className="modal-desc">
+            </h2>
+            <p className="mt-2 mb-4 text-sm leading-relaxed text-slate-500">
               {modal.action === 'approve'
                 ? `Approve the PTO request for ${modal.title}? They will be notified.`
-                : `Deny the PTO request for ${modal.title}. A comment is required.`}
-            </div>
+                : `Deny the PTO request for ${modal.title}. A comment is required and will be visible to the employee.`}
+            </p>
             <textarea
-              className="modal-textarea"
+              className="w-full resize-y rounded-lg border border-slate-200 p-3 text-sm leading-relaxed text-slate-900 placeholder:text-slate-400 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-300"
+              style={{ minHeight: 96 }}
               placeholder={modal.action === 'approve' ? 'Optional comment…' : 'Reason for denial (required)…'}
               value={comment}
               onChange={e => setComment(e.target.value)}
             />
-            {modalError && <div className="modal-error">{modalError}</div>}
-            <div className="modal-actions">
-              <button className="btn-cancel-modal" onClick={() => setModal(null)}>Cancel</button>
+            {modalError && (
+              <div className="mt-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2.5 text-xs font-bold text-red-700">
+                {modalError}
+              </div>
+            )}
+            <div className="mt-4 flex justify-end gap-2.5">
               <button
-                className={modal.action === 'approve' ? 'btn-confirm-approve' : 'btn-confirm-deny'}
+                type="button"
+                onClick={() => setModal(null)}
+                className="rounded-lg border border-slate-200 bg-white px-4 py-2 text-sm font-bold text-slate-700 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-purple-300"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
                 disabled={submitting}
                 onClick={submitReview}
+                className={`rounded-lg px-4 py-2 text-sm font-bold text-white transition-colors focus:outline-none focus:ring-2 focus:ring-offset-1 disabled:cursor-not-allowed disabled:opacity-60 ${
+                  modal.action === 'approve'
+                    ? 'bg-green-700 hover:bg-green-800 focus:ring-green-400'
+                    : 'bg-red-600 hover:bg-red-700 focus:ring-red-400'
+                }`}
               >
                 {submitting ? 'Saving…' : modal.action === 'approve' ? 'Approve' : 'Deny'}
               </button>

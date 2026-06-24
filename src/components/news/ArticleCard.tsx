@@ -13,8 +13,8 @@ export function ArticleCard({ article }: Props) {
   return (
     <Link
       href={`/news/${article.id}`}
-      className={`block bg-white rounded-2xl border border-slate-200 hover:shadow-md hover:border-slate-300 transition-all overflow-hidden group ${
-        article.pinned ? 'border-l-4 border-l-purple-500' : ''
+      className={`block bg-white rounded-[10px] border border-slate-200 hover:shadow-sm hover:border-slate-300 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-400 transition-all overflow-hidden group ${
+        article.pinned ? 'bg-purple-50/40 border-purple-200' : ''
       }`}
     >
       {article.cover_image_url && (
@@ -31,7 +31,7 @@ export function ArticleCard({ article }: Props) {
         <div className="flex items-center gap-2 mb-2">
           <ArticleTypeBadge type={article.type} size="sm" />
           {article.pinned && (
-            <span className="text-xs text-purple-600 font-medium flex items-center gap-1">
+            <span className="text-xs text-purple-700 font-semibold flex items-center gap-1">
               📌 Pinned
             </span>
           )}

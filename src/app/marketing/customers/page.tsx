@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
+import { DataTable, type DataTableColumn, FilterPillGroup, type FilterPillOption } from '@/components/ui'
 
 const PAGE_SIZE = 50
 
@@ -23,15 +24,64 @@ type CustomerListItem = {
 function statusBadge(status: CustomerListItem['client_status']) {
   if (!status) return null
   const styles: Record<string, string> = {
-    Active: 'bg-green-100 text-green-800',
-    Prospective: 'bg-slate-100 text-slate-700',
-    Former: 'bg-red-100 text-red-700',
+    Active:      'bg-green-50  text-green-700  border-green-200',
+    Prospective: 'bg-slate-50  text-slate-600  border-slate-200',
+    Former:      'bg-red-50    text-red-700    border-red-200',
   }
   return (
-    <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${styles[status] ?? 'bg-slate-100 text-slate-600'}`}>
+    <span className={`inline-flex items-center rounded-md border px-2.5 py-0.5 text-xs font-bold ${styles[status] ?? 'bg-slate-50 text-slate-600 border-slate-200'}`}>
       {status}
     </span>
   )
+}
+
+type StatusFilter = '' | 'Active' | 'Prospective' | 'Former'
+
+const STATUS_OPTIONS: FilterPillOption<StatusFilter>[] = [
+  {
+    value: '',
+    label: 'All',
+    color: 'purple',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="8" cy="12" r="4" /><circle cx="16" cy="12" r="4" />
+      </svg>
+    ),
+  },
+  {
+    value: 'Active',
+    label: 'Active',
+    color: 'green',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M20 6 9 17l-5-5" />
+      </svg>
+    ),
+  },
+  {
+    value: 'Prospective',
+    label: 'Prospective',
+    color: 'slate',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <circle cx="12" cy="12" r="9" /><path d="M12 7v5l3 2" />
+      </svg>
+    ),
+  },
+  {
+    value: 'Former',
+    label: 'Former',
+    color: 'red',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M18 6 6 18M6 6l12 12" />
+      </svg>
+    ),
+  },
+]
+
+function formatDate(iso: string) {
+  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
 }
 
 export default function CustomersPage() {
@@ -41,7 +91,7 @@ export default function CustomersPage() {
   const [loading, setLoading] = useState(true)
   const [allTags, setAllTags] = useState<TagOption[]>([])
   const [search, setSearch] = useState('')
-  const [status, setStatus] = useState('Active')
+  const [status, setStatus] = useState<StatusFilter>('Active')
   const [tagFilter, setTagFilter] = useState('')
   const [page, setPage] = useState(1)
 
@@ -79,8 +129,78 @@ export default function CustomersPage() {
   }, [fetchCustomers, page])
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
-  const rangeFrom = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
-  const rangeTo = Math.min(page * PAGE_SIZE, total)
+  const customerColumns: DataTableColumn<CustomerListItem>[] = [
+    {
+      key: 'logo',
+      header: '',
+      render: (c) => c.logo_url ? (
+        <img
+          src={c.logo_url}
+          alt=""
+          className="h-8 w-8 rounded-md border border-purple-100 bg-white object-cover"
+          onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
+        />
+      ) : (
+        <div className="flex h-8 w-8 flex-shrink-0 items-center justify-center rounded-md bg-purple-100 text-[10px] font-bold text-purple-800">
+          {c.name.slice(0, 2).toUpperCase()}
+        </div>
+      ),
+      className: 'w-12 pr-1',
+      skeletonWidth: '32px',
+    },
+    {
+      key: 'name',
+      header: 'Name',
+      render: (c) => <span className="font-semibold text-slate-950">{c.name}</span>,
+      sortValue: (c) => c.name,
+      skeletonWidth: '60%',
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (c) => statusBadge(c.client_status) ?? <span className="text-slate-400">—</span>,
+      sortValue: (c) => c.client_status ?? '',
+    },
+    {
+      key: 'phone',
+      header: 'Phone',
+      render: (c) => <span className="text-slate-600">{c.phone ?? '—'}</span>,
+      sortValue: (c) => c.phone ?? '',
+      className: 'hidden md:table-cell',
+    },
+    {
+      key: 'tags',
+      header: 'Tags',
+      render: (c) => (
+        <div className="flex flex-wrap gap-1">
+          {c.tags.length > 0
+            ? c.tags.map((t) => (
+                <span key={t.id} className="inline-flex items-center rounded-full px-2 py-0.5 text-xs font-semibold text-white" style={{ backgroundColor: t.color }}>
+                  {t.name}
+                </span>
+              ))
+            : <span className="text-slate-400">—</span>
+          }
+        </div>
+      ),
+      sortValue: (c) => c.tags.map((tag) => tag.name).join(', '),
+      className: 'hidden lg:table-cell',
+    },
+    {
+      key: 'owner',
+      header: 'Owner',
+      render: (c) => <span className="text-slate-600">{c.assigned_user_name ?? '—'}</span>,
+      sortValue: (c) => c.assigned_user_name ?? '',
+      className: 'hidden lg:table-cell',
+    },
+    {
+      key: 'updated',
+      header: 'Updated',
+      render: (c) => <span className="text-slate-500">{formatDate(c.updated_at)}</span>,
+      sortValue: (c) => new Date(c.updated_at),
+      className: 'hidden lg:table-cell',
+    },
+  ]
 
   return (
     <div className="w-full px-6 py-8">
@@ -102,147 +222,56 @@ export default function CustomersPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3 mb-5 flex-wrap">
-        <div className="relative flex-1 max-w-sm">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <circle cx="11" cy="11" r="8" strokeWidth={2} />
-            <path strokeLinecap="round" strokeWidth={2} d="M21 21l-4.35-4.35" />
-          </svg>
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search customers…"
-            className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
-          />
-        </div>
-        <select
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <FilterPillGroup
+          options={STATUS_OPTIONS}
           value={status}
-          onChange={(e) => setStatus(e.target.value)}
-          className="px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
-        >
-          <option value="">All Statuses</option>
-          <option value="Prospective">Prospective</option>
-          <option value="Active">Active</option>
-          <option value="Former">Former</option>
-        </select>
-        {allTags.length > 0 && (
-          <select
-            value={tagFilter}
-            onChange={(e) => setTagFilter(e.target.value)}
-            className="px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
-          >
-            <option value="">All Tags</option>
-            {allTags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
-        )}
-      </div>
-
-      {/* Table */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 border-b border-slate-200">
-            <tr>
-              <th className="px-3 py-3 w-10"></th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Phone</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Tags</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Owner</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Updated</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {loading && (
-              Array.from({ length: 5 }).map((_, i) => (
-                <tr key={i}>
-                  {[...Array(7)].map((_, j) => (
-                    <td key={j} className="px-5 py-3.5">
-                      <div className="h-4 bg-slate-100 rounded animate-pulse" style={{ width: j === 0 ? '28px' : j === 1 ? '60%' : '40%' }} />
-                    </td>
-                  ))}
-                </tr>
-              ))
-            )}
-            {!loading && customers.length === 0 && (
-              <tr>
-                <td colSpan={7} className="px-5 py-12 text-center text-sm text-slate-400">
-                  {search || status || tagFilter ? 'No customers match your filters.' : 'No customers yet. Create one to get started.'}
-                </td>
-              </tr>
-            )}
-            {!loading && customers.map((c) => (
-              <tr
-                key={c.id}
-                onClick={() => router.push(`/marketing/customers/${c.id}`)}
-                className="hover:bg-slate-50 cursor-pointer transition-colors"
-              >
-                <td className="px-3 py-3.5">
-                  {c.logo_url ? (
-                    <img
-                      src={c.logo_url}
-                      alt=""
-                      className="h-7 w-7 rounded object-cover bg-white border border-slate-100"
-                      onError={(e) => { (e.target as HTMLImageElement).style.display = 'none' }}
-                    />
-                  ) : (
-                    <div className="h-7 w-7 rounded bg-purple-100 flex items-center justify-center text-purple-700 font-bold text-[10px] flex-shrink-0">
-                      {c.name.slice(0, 2).toUpperCase()}
-                    </div>
-                  )}
-                </td>
-                <td className="px-5 py-3.5 font-medium text-slate-900">{c.name}</td>
-                <td className="px-5 py-3.5">{statusBadge(c.client_status)}</td>
-                <td className="px-5 py-3.5 text-slate-600 hidden md:table-cell">{c.phone ?? '—'}</td>
-                <td className="px-5 py-3.5 hidden lg:table-cell">
-                  <div className="flex flex-wrap gap-1">
-                    {c.tags.length > 0
-                      ? c.tags.map((t) => (
-                          <span key={t.id} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold text-white" style={{ backgroundColor: t.color }}>
-                            {t.name}
-                          </span>
-                        ))
-                      : <span className="text-slate-300">—</span>
-                    }
-                  </div>
-                </td>
-                <td className="px-5 py-3.5 text-slate-600 hidden lg:table-cell">{c.assigned_user_name ?? '—'}</td>
-                <td className="px-5 py-3.5 text-slate-400 hidden lg:table-cell">
-                  {new Date(c.updated_at).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-
-        {/* Footer: count + pagination */}
-        {!loading && total > 0 && (
-          <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between gap-4 flex-wrap">
-            <span className="text-xs text-slate-400">
-              Showing {rangeFrom}–{rangeTo} of {total} customer{total !== 1 ? 's' : ''}
-            </span>
-            {totalPages > 1 && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="px-3 py-1.5 text-xs font-semibold border border-slate-200 rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  Previous
-                </button>
-                <span className="text-xs text-slate-500 px-1">Page {page} of {totalPages}</span>
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className="px-3 py-1.5 text-xs font-semibold border border-slate-200 rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  Next
-                </button>
-              </div>
-            )}
+          onChange={setStatus}
+          label="Filter by status"
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          {allTags.length > 0 && (
+            <select
+              value={tagFilter}
+              onChange={(e) => setTagFilter(e.target.value)}
+              aria-label="Filter by tag"
+              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300"
+            >
+              <option value="">All Tags</option>
+              {allTags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
+            </select>
+          )}
+          <div className="relative">
+            <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+              <circle cx="11" cy="11" r="8" strokeWidth={2} />
+              <path strokeLinecap="round" strokeWidth={2} d="M21 21l-4.35-4.35" />
+            </svg>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search customers…"
+              className="h-[34px] min-w-[220px] rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-300"
+            />
           </div>
-        )}
+        </div>
       </div>
+
+      <DataTable
+        rows={customers}
+        columns={customerColumns}
+        loading={loading}
+        emptyMessage={search || status || tagFilter ? 'No customers match your filters.' : 'No customers yet. Create one to get started.'}
+        getRowKey={(customer) => customer.id}
+        onRowClick={(customer) => router.push(`/marketing/customers/${customer.id}`)}
+        pagination={{
+          page,
+          total,
+          pageSize: PAGE_SIZE,
+          itemName: 'customer',
+          onPageChange: (nextPage) => setPage(Math.min(totalPages, Math.max(1, nextPage))),
+        }}
+      />
     </div>
   )
 }

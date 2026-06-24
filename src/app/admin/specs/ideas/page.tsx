@@ -1,16 +1,65 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { SpecIdea } from '@/types'
+import { DataTable, FilterPillGroup, type DataTableColumn, type FilterPillOption } from '@/components/ui'
+
+type StatusFilter = 'active' | 'archived'
+
+const STATUS_OPTIONS: FilterPillOption<StatusFilter>[] = [
+  {
+    value: 'active',
+    label: 'Active',
+    color: 'green',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M5 13l4 4L19 7" />
+      </svg>
+    ),
+  },
+  {
+    value: 'archived',
+    label: 'Archived',
+    color: 'slate',
+    icon: (
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round">
+        <path d="M21 8v13H3V8" />
+        <path d="M1 3h22v5H1z" />
+        <path d="M10 12h4" />
+      </svg>
+    ),
+  },
+]
+
+function SearchIcon() {
+  return (
+    <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+      <circle cx="11" cy="11" r="8" strokeWidth={2} />
+      <path strokeLinecap="round" strokeWidth={2} d="M21 21l-4.35-4.35" />
+    </svg>
+  )
+}
+
+function ImagePlaceholder() {
+  return (
+    <div className="flex h-10 w-10 items-center justify-center rounded-md border border-purple-100 bg-purple-50 text-purple-200">
+      <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5} aria-hidden="true">
+        <rect x="3" y="3" width="18" height="18" rx="2" />
+        <circle cx="8.5" cy="8.5" r="1.5" />
+        <path d="M21 15l-5-5L5 21" />
+      </svg>
+    </div>
+  )
+}
 
 export default function AdminSpecIdeasPage() {
   const router = useRouter()
   const [ideas, setIdeas] = useState<SpecIdea[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
-  const [showArchived, setShowArchived] = useState(false)
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('active')
   const [vendors, setVendors] = useState<string[]>([])
   const [vendorFilter, setVendorFilter] = useState('')
   const [creating, setCreating] = useState(false)
@@ -19,17 +68,20 @@ export default function AdminSpecIdeasPage() {
     setLoading(true)
     const params = new URLSearchParams({ limit: '500' })
     if (search) params.set('q', search)
-    params.set('active_only', showArchived ? 'false' : '1')
+    params.set('active_only', statusFilter === 'archived' ? 'false' : '1')
     if (vendorFilter) params.set('vendor', vendorFilter)
-    const res = await fetch(`/api/marketing/spec-ideas?${params}`)
-    const data = await res.json()
-    if (Array.isArray(data)) {
-      setIdeas(data)
-      const vs = [...new Set(data.map((d: SpecIdea) => d.vendor).filter(Boolean))].sort() as string[]
-      setVendors(vs)
+    try {
+      const res = await fetch(`/api/marketing/spec-ideas?${params}`)
+      const data = await res.json()
+      if (Array.isArray(data)) {
+        setIdeas(data)
+        const vs = [...new Set(data.map((d: SpecIdea) => d.vendor).filter(Boolean))].sort() as string[]
+        setVendors(vs)
+      }
+    } finally {
+      setLoading(false)
     }
-    setLoading(false)
-  }, [search, showArchived, vendorFilter])
+  }, [search, statusFilter, vendorFilter])
 
   useEffect(() => { fetchIdeas() }, [fetchIdeas])
 
@@ -45,124 +97,184 @@ export default function AdminSpecIdeasPage() {
     if (idea?.id) router.push(`/admin/specs/ideas/${idea.id}`)
   }
 
-  const filtered = ideas.filter(i => showArchived ? !i.is_active : i.is_active)
+  const filtered = useMemo(
+    () => ideas.filter((idea) => statusFilter === 'archived' ? !idea.is_active : idea.is_active),
+    [ideas, statusFilter],
+  )
+
+  const hasFilters = Boolean(search || vendorFilter || statusFilter !== 'active')
+
+  const columns: DataTableColumn<SpecIdea>[] = [
+    {
+      key: 'image',
+      header: '',
+      render: (idea) => idea.image_url ? (
+        <img
+          src={idea.image_url}
+          alt=""
+          className="h-10 w-10 rounded-md border border-purple-100 object-cover"
+        />
+      ) : <ImagePlaceholder />,
+      className: 'w-14 pr-1',
+      skeletonWidth: '40px',
+    },
+    {
+      key: 'item',
+      header: 'Item',
+      render: (idea) => (
+        <div className="min-w-0">
+          <div className="truncate font-semibold text-slate-950">{idea.item_name}</div>
+          <div className="mt-0.5 flex flex-wrap items-center gap-1.5 text-xs text-slate-500">
+            {idea.item_number ? <span>#{idea.item_number}</span> : <span>No item number</span>}
+            {!idea.is_active && (
+              <span className="inline-flex rounded-md border border-slate-200 bg-slate-50 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
+                Archived
+              </span>
+            )}
+          </div>
+        </div>
+      ),
+      sortValue: (idea) => idea.item_name,
+      skeletonWidth: '65%',
+    },
+    {
+      key: 'vendor',
+      header: 'Supplier',
+      render: (idea) => <span className="font-semibold text-purple-700">{idea.vendor}</span>,
+      sortValue: (idea) => idea.vendor,
+    },
+    {
+      key: 'category',
+      header: 'Category',
+      render: (idea) => <span className="text-slate-600">{idea.category ?? '—'}</span>,
+      sortValue: (idea) => idea.category ?? '',
+      className: 'hidden md:table-cell',
+    },
+    {
+      key: 'price',
+      header: 'Price Range',
+      render: (idea) => <span className="font-semibold text-slate-700">{idea.price_range ?? '—'}</span>,
+      sortValue: (idea) => idea.price_range ?? '',
+      className: 'hidden lg:table-cell',
+    },
+    {
+      key: 'tags',
+      header: 'Tags',
+      render: (idea) => {
+        const tags = idea.tags ?? []
+        if (tags.length === 0) return <span className="text-slate-400">—</span>
+        return (
+          <div className="flex flex-wrap gap-1">
+            {tags.slice(0, 2).map((tag) => (
+              <span key={tag} className="inline-flex rounded-full bg-purple-50 px-2 py-0.5 text-xs font-semibold text-purple-700">
+                {tag}
+              </span>
+            ))}
+            {tags.length > 2 && <span className="text-xs font-semibold text-slate-400">+{tags.length - 2}</span>}
+          </div>
+        )
+      },
+      sortValue: (idea) => (idea.tags ?? []).join(', '),
+      className: 'hidden xl:table-cell',
+    },
+    {
+      key: 'updated',
+      header: 'Updated',
+      render: (idea) => (
+        <span className="text-xs text-slate-500">
+          {new Date(idea.updated_at).toLocaleDateString()}
+        </span>
+      ),
+      sortValue: (idea) => new Date(idea.updated_at),
+      className: 'hidden lg:table-cell',
+    },
+    {
+      key: 'actions',
+      header: '',
+      render: (idea) => (
+        <Link
+          href={`/admin/specs/ideas/${idea.id}`}
+          onClick={(e) => e.stopPropagation()}
+          className="inline-flex rounded-md border border-purple-100 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 transition-colors hover:bg-purple-50 hover:text-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-300"
+        >
+          Edit
+        </Link>
+      ),
+      className: 'w-20 text-right',
+      headerClassName: 'text-right',
+      skeletonWidth: '42px',
+    },
+  ]
 
   return (
-    <div style={{ padding: '32px 40px' }}>
-      <style>{`
-        .ai-row { display: flex; align-items: center; gap: 12px; padding: 12px 16px; border-bottom: 1px solid #f1f5f9; cursor: pointer; }
-        .ai-row:last-child { border-bottom: none; }
-        .ai-row:hover { background: #faf9ff; }
-        .tag-pill { display: inline-flex; align-items: center; background: #f3f0ff; color: #7c3aed; border-radius: 10px; padding: 2px 8px; font-size: 11px; font-weight: 600; }
-      `}</style>
-
-      {/* Header */}
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: 24 }}>
+    <div className="w-full px-6 py-8">
+      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1e293b', margin: '0 0 4px' }}>Spec Ideas</h1>
-          <p style={{ color: '#64748b', fontSize: 14, margin: 0 }}>Manage the product catalog for spec sample creation.</p>
+          <h1 className="text-2xl font-bold text-slate-900">Spec Ideas</h1>
+          <p className="mt-0.5 text-sm text-slate-500">Manage the product catalog for spec sample creation.</p>
         </div>
         <button
           onClick={handleCreate}
           disabled={creating}
-          style={{ background: '#7c3aed', color: 'white', border: 'none', borderRadius: 10, padding: '10px 22px', fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: creating ? .6 : 1 }}
+          className="inline-flex items-center justify-center gap-2 rounded-xl bg-purple-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-800 disabled:cursor-not-allowed disabled:opacity-60"
         >
-          {creating ? 'Creating…' : '+ New Idea'}
+          <span aria-hidden="true">+</span>
+          {creating ? 'Creating...' : 'New Idea'}
         </button>
       </div>
 
-      {/* Filters */}
-      <div style={{ display: 'flex', gap: 10, marginBottom: 20, flexWrap: 'wrap', alignItems: 'center' }}>
-        <div style={{ position: 'relative', flex: 1, minWidth: 200 }}>
-          <svg style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#94a3b8' }} width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}><circle cx="11" cy="11" r="8"/><path strokeLinecap="round" d="M21 21l-4.35-4.35"/></svg>
-          <input
-            type="text"
-            placeholder="Search ideas…"
-            value={search}
-            onChange={e => setSearch(e.target.value)}
-            style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 10px 8px 30px', fontSize: 13, width: '100%', boxSizing: 'border-box', outline: 'none' }}
-          />
-        </div>
-        <select
-          value={vendorFilter}
-          onChange={e => setVendorFilter(e.target.value)}
-          style={{ border: '1px solid #e2e8f0', borderRadius: 8, padding: '8px 10px', fontSize: 13, outline: 'none', background: 'white' }}
-        >
-          <option value="">All Suppliers</option>
-          {vendors.map(v => <option key={v} value={v}>{v}</option>)}
-        </select>
-        <label style={{ display: 'flex', alignItems: 'center', gap: 6, fontSize: 13, color: '#374151', cursor: 'pointer', userSelect: 'none' }}>
-          <input type="checkbox" checked={showArchived} onChange={e => setShowArchived(e.target.checked)} style={{ accentColor: '#7c3aed' }} />
-          Show Archived
-        </label>
-      </div>
-
-      {loading ? (
-        <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 14, padding: '40px', textAlign: 'center', color: '#94a3b8', fontSize: 14 }}>Loading…</div>
-      ) : filtered.length === 0 ? (
-        <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 14, padding: '48px', textAlign: 'center' }}>
-          <div style={{ fontSize: 14, color: '#94a3b8', marginBottom: 12 }}>
-            {ideas.length === 0 ? 'No spec ideas yet.' : 'No ideas match your filters.'}
+      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+        <FilterPillGroup
+          options={STATUS_OPTIONS}
+          value={statusFilter}
+          onChange={setStatusFilter}
+          label="Filter by status"
+        />
+        <div className="flex flex-wrap items-center gap-2">
+          <select
+            value={vendorFilter}
+            onChange={e => setVendorFilter(e.target.value)}
+            aria-label="Filter by supplier"
+            className="h-[34px] rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300"
+          >
+            <option value="">All Suppliers</option>
+            {vendors.map(v => <option key={v} value={v}>{v}</option>)}
+          </select>
+          <div className="relative">
+            <SearchIcon />
+            <input
+              type="search"
+              placeholder="Search ideas..."
+              value={search}
+              onChange={e => setSearch(e.target.value)}
+              className="h-[34px] min-w-[220px] rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-300"
+            />
           </div>
-          {ideas.length === 0 && (
-            <button onClick={handleCreate} style={{ background: '#7c3aed', color: 'white', border: 'none', borderRadius: 8, padding: '9px 20px', fontSize: 13, fontWeight: 600, cursor: 'pointer' }}>
-              Create the first idea
+          {hasFilters && (
+            <button
+              type="button"
+              onClick={() => {
+                setSearch('')
+                setVendorFilter('')
+                setStatusFilter('active')
+              }}
+              className="text-xs font-semibold text-purple-700 hover:underline focus:outline-none focus:ring-2 focus:ring-purple-300"
+            >
+              Clear filters
             </button>
           )}
         </div>
-      ) : (
-        <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden' }}>
-          {/* Table header */}
-          <div style={{ display: 'grid', gridTemplateColumns: '48px 1fr 160px 100px 120px 80px 60px', gap: 0, padding: '10px 16px', background: '#f8fafc', borderBottom: '1px solid #e2e8f0' }}>
-            {['', 'Item', 'Supplier', 'Category', 'Price Range', 'Tags', ''].map((h, i) => (
-              <div key={i} style={{ fontSize: 11, fontWeight: 700, color: '#94a3b8', textTransform: 'uppercase', letterSpacing: '.04em' }}>{h}</div>
-            ))}
-          </div>
-          {filtered.map(idea => (
-            <div
-              key={idea.id}
-              className="ai-row"
-              style={{ display: 'grid', gridTemplateColumns: '48px 1fr 160px 100px 120px 80px 60px' }}
-              onClick={() => router.push(`/admin/specs/ideas/${idea.id}`)}
-            >
-              {/* Thumbnail */}
-              <div>
-                {idea.image_url ? (
-                  <img src={idea.image_url} alt="" style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'cover', border: '1px solid #e2e8f0' }} />
-                ) : (
-                  <div style={{ width: 40, height: 40, borderRadius: 6, background: '#f1f5f9', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                    <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#cbd5e1" strokeWidth={1.5}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-                  </div>
-                )}
-              </div>
-              {/* Item info */}
-              <div>
-                <div style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>{idea.item_name}</div>
-                {idea.item_number && <div style={{ fontSize: 11, color: '#94a3b8' }}>#{idea.item_number}</div>}
-                {!idea.is_active && <span style={{ fontSize: 10, fontWeight: 700, background: '#fef2f2', color: '#b91c1c', borderRadius: 8, padding: '1px 5px', marginTop: 2, display: 'inline-block' }}>Archived</span>}
-              </div>
-              <div style={{ fontSize: 13, color: '#7c3aed', fontWeight: 600 }}>{idea.vendor}</div>
-              <div style={{ fontSize: 13, color: '#374151' }}>{idea.category ?? '—'}</div>
-              <div style={{ fontSize: 13, color: '#374151', fontWeight: 600 }}>{idea.price_range ?? '—'}</div>
-              <div style={{ display: 'flex', flexWrap: 'wrap', gap: 3 }}>
-                {idea.tags.slice(0, 2).map(t => (
-                  <span key={t} className="tag-pill">{t}</span>
-                ))}
-                {idea.tags.length > 2 && <span style={{ fontSize: 11, color: '#94a3b8' }}>+{idea.tags.length - 2}</span>}
-              </div>
-              <div style={{ display: 'flex', justifyContent: 'flex-end', gap: 6 }}>
-                <Link
-                  href={`/admin/specs/ideas/${idea.id}`}
-                  onClick={e => e.stopPropagation()}
-                  style={{ padding: '4px 10px', border: '1px solid #e2e8f0', borderRadius: 6, fontSize: 12, color: '#374151', textDecoration: 'none', fontWeight: 600, background: 'white' }}
-                >
-                  Edit
-                </Link>
-              </div>
-            </div>
-          ))}
-        </div>
-      )}
+      </div>
+
+      <DataTable
+        rows={filtered}
+        columns={columns}
+        loading={loading}
+        emptyMessage={hasFilters ? 'No spec ideas match your filters.' : 'No active spec ideas yet. Create one to get started.'}
+        getRowKey={(idea) => idea.id}
+        onRowClick={(idea) => router.push(`/admin/specs/ideas/${idea.id}`)}
+        minWidth="980px"
+      />
     </div>
   )
 }

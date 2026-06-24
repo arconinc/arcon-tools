@@ -1,9 +1,9 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useMemo } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
-import { LoadingState, EmptyState } from '@/components/ui'
+import { LoadingState, DataTable, FilterPillGroup, type DataTableColumn, type FilterPillOption } from '@/components/ui'
 
 type SpecListItem = {
   id: string
@@ -81,6 +81,21 @@ function relDate(d: string | null) {
 
 const PAGE_SIZE = 50
 
+type StatusFilter = '' | 'not_contacted' | 'artwork' | 'ordered' | 'in_production' | 'shipped' | 'delivered' | 'approved' | 'declined' | 'no_response'
+
+const STATUS_OPTIONS: FilterPillOption<StatusFilter>[] = [
+  { value: '', label: 'All' },
+  { value: 'not_contacted', label: 'Prospect Contacted', color: 'slate' },
+  { value: 'artwork', label: 'Artwork', color: 'purple' },
+  { value: 'ordered', label: 'Ordered', color: 'blue' },
+  { value: 'in_production', label: 'In Production', color: 'amber' },
+  { value: 'shipped', label: 'Shipped', color: 'amber' },
+  { value: 'delivered', label: 'Delivered', color: 'blue' },
+  { value: 'approved', label: 'Approved', color: 'green' },
+  { value: 'declined', label: 'Declined', color: 'red' },
+  { value: 'no_response', label: 'No Response', color: 'red' },
+]
+
 export default function SpecSamplesDashboard() {
   const router = useRouter()
   const [activeTab, setActiveTab] = useState<'log' | 'proactive'>('log')
@@ -94,7 +109,7 @@ export default function SpecSamplesDashboard() {
   // Filters
   const [month, setMonth] = useState('')
   const [csrFilter, setCsrFilter] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('')
   const [vendorFilter, setVendorFilter] = useState('')
 
   useEffect(() => {
@@ -139,6 +154,88 @@ export default function SpecSamplesDashboard() {
 
   const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
 
+  const columns = useMemo((): DataTableColumn<SpecListItem>[] => [
+    {
+      key: 'item',
+      header: 'Item',
+      render: (spec) => (
+        <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+          {spec.item_image_url ? (
+            <img src={spec.item_image_url} alt="" className="spec-item-img" />
+          ) : (
+            <div className="spec-item-img" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#cbd5e1" strokeWidth={1.5}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path strokeLinecap="round" d="M21 15l-5-5L5 21"/></svg>
+            </div>
+          )}
+          <span style={{ fontWeight: 500, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{spec.item_name}</span>
+        </div>
+      ),
+      sortValue: (spec) => spec.item_name,
+    },
+    {
+      key: 'customer',
+      header: 'Customer',
+      render: (spec) => spec.customer_name ?? <span style={{ color: '#94a3b8' }}>—</span>,
+      sortValue: (spec) => spec.customer_name,
+    },
+    {
+      key: 'contact',
+      header: 'Contact',
+      render: (spec) => <span style={{ color: '#64748b' }}>{spec.contact_name ?? '—'}</span>,
+      sortValue: (spec) => spec.contact_name,
+    },
+    {
+      key: 'vendor',
+      header: 'Vendor',
+      render: (spec) => <span style={{ color: '#64748b' }}>{spec.vendor ?? '—'}</span>,
+      sortValue: (spec) => spec.vendor,
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (spec) => <StatusPill status={spec.status} />,
+      sortValue: (spec) => spec.status,
+    },
+    {
+      key: 'date_sent',
+      header: 'Date Sent',
+      render: (spec) => <span style={{ color: '#64748b', whiteSpace: 'nowrap' }}>{fmtDate(spec.date_sent)}</span>,
+      sortValue: (spec) => spec.date_sent,
+    },
+    {
+      key: 'csr',
+      header: 'CSR',
+      render: (spec) => <span style={{ color: '#64748b' }}>{spec.csr_name ?? '—'}</span>,
+      sortValue: (spec) => spec.csr_name,
+    },
+    {
+      key: 'follow_up',
+      header: 'Follow-up',
+      render: (spec) => {
+        if (!spec.follow_up_date) return <span style={{ color: '#94a3b8' }}>—</span>
+        const rel = relDate(spec.follow_up_date)
+        const isOverdue = rel?.includes('overdue')
+        const isToday = rel === 'Due today'
+        return (
+          <div>
+            <div style={{ fontSize: 13, color: '#374151', whiteSpace: 'nowrap' }}>{fmtDate(spec.follow_up_date)}</div>
+            {rel && (
+              <div className={`followup-badge ${isOverdue ? 'followup-overdue' : isToday ? 'followup-today' : 'followup-soon'}`}>{rel}</div>
+            )}
+          </div>
+        )
+      },
+      sortValue: (spec) => spec.follow_up_date,
+    },
+    {
+      key: 'actions',
+      header: '',
+      render: (spec) => (
+        <Link href={`/marketing/specs/${spec.id}`} className="action-link" onClick={e => e.stopPropagation()}>View</Link>
+      ),
+    },
+  ], [])
+
   return (
     <div style={{ padding: '32px', maxWidth: '100%' }}>
       <style>{`
@@ -154,11 +251,6 @@ export default function SpecSamplesDashboard() {
         .filter-row { display: flex; gap: 12px; align-items: center; flex-wrap: wrap; margin-bottom: 16px; }
         .filter-input { border: 1px solid #e2e8f0; border-radius: 8px; padding: 7px 12px; font-size: 14px; color: #1e293b; background: white; outline: none; }
         .filter-input:focus { border-color: #7c3aed; }
-        .specs-table { width: 100%; border-collapse: collapse; background: white; border-radius: 12px; overflow: hidden; border: 1px solid #e2e8f0; }
-        .specs-table th { background: #f8fafc; padding: 12px 16px; text-align: left; font-size: 12px; font-weight: 600; color: #64748b; text-transform: uppercase; letter-spacing: .04em; border-bottom: 1px solid #e2e8f0; white-space: nowrap; }
-        .specs-table td { padding: 12px 16px; border-bottom: 1px solid #f1f5f9; font-size: 14px; color: #1e293b; vertical-align: middle; }
-        .specs-table tr:last-child td { border-bottom: none; }
-        .specs-table tr:hover td { background: #fafbff; }
         .spec-item-img { width: 36px; height: 36px; border-radius: 6px; object-fit: cover; background: #f1f5f9; flex-shrink: 0; }
         .action-link { color: #7c3aed; font-size: 13px; font-weight: 500; text-decoration: none; }
         .action-link:hover { text-decoration: underline; }
@@ -173,12 +265,6 @@ export default function SpecSamplesDashboard() {
         .proactive-item { font-size: 13px; color: #64748b; margin-bottom: 8px; }
         .btn-send { background: #7c3aed; color: white; border: none; border-radius: 7px; padding: 6px 14px; font-size: 13px; font-weight: 600; cursor: pointer; text-decoration: none; display: inline-block; }
         .btn-send:hover { background: #6d28d9; }
-        .pagination { display: flex; align-items: center; gap: 8px; justify-content: flex-end; margin-top: 16px; }
-        .pg-btn { border: 1px solid #e2e8f0; background: white; color: #374151; border-radius: 7px; padding: 6px 12px; font-size: 14px; cursor: pointer; }
-        .pg-btn:hover:not(:disabled) { background: #f8fafc; }
-        .pg-btn:disabled { opacity: .45; cursor: default; }
-        .pg-active { background: #7c3aed; color: white; border-color: #7c3aed; }
-        .empty-state { text-align: center; padding: 48px 24px; color: #94a3b8; }
       `}</style>
 
       {/* Header */}
@@ -240,7 +326,17 @@ export default function SpecSamplesDashboard() {
 
       {activeTab === 'log' && (
         <>
-          {/* Filters */}
+          {/* Status filter pills */}
+          <div style={{ marginBottom: 16 }}>
+            <FilterPillGroup
+              options={STATUS_OPTIONS}
+              value={statusFilter}
+              onChange={setStatusFilter}
+              label="Filter by status"
+            />
+          </div>
+
+          {/* Text filters */}
           <div className="filter-row">
             <input
               type="month"
@@ -249,10 +345,6 @@ export default function SpecSamplesDashboard() {
               onChange={e => setMonth(e.target.value)}
               style={{ width: 160 }}
             />
-            <select className="filter-input" value={statusFilter} onChange={e => setStatusFilter(e.target.value)}>
-              <option value="">All Statuses</option>
-              {Object.entries(STATUS_LABELS).map(([v, l]) => <option key={v} value={v}>{l}</option>)}
-            </select>
             <input
               className="filter-input"
               placeholder="Search vendor..."
@@ -263,89 +355,21 @@ export default function SpecSamplesDashboard() {
             <span style={{ color: '#94a3b8', fontSize: 13 }}>{total} spec{total !== 1 ? 's' : ''}</span>
           </div>
 
-          {loading ? (
-            <LoadingState label="Loading specs…" />
-          ) : specs.length === 0 ? (
-            <div className="empty-state">
-              <p style={{ marginBottom: 12 }}>No specs found for these filters.</p>
-              <Link href="/marketing/specs/new" className="btn-send">Create First Spec</Link>
-            </div>
-          ) : (
-            <>
-              <table className="specs-table">
-                <thead>
-                  <tr>
-                    <th>Item</th>
-                    <th>Customer</th>
-                    <th>Contact</th>
-                    <th>Vendor</th>
-                    <th>Status</th>
-                    <th>Date Sent</th>
-                    <th>CSR</th>
-                    <th>Follow-up</th>
-                    <th>Actions</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {specs.map(spec => {
-                    const rel = relDate(spec.follow_up_date)
-                    const isOverdue = rel?.includes('overdue')
-                    const isToday = rel === 'Due today'
-                    return (
-                      <tr key={spec.id} style={{ cursor: 'pointer' }} onClick={() => router.push(`/marketing/specs/${spec.id}`)}>
-                        <td>
-                          <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
-                            {spec.item_image_url ? (
-                              <img src={spec.item_image_url} alt="" className="spec-item-img" />
-                            ) : (
-                              <div className="spec-item-img" style={{ display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#cbd5e1" strokeWidth={1.5}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path strokeLinecap="round" d="M21 15l-5-5L5 21"/></svg>
-                              </div>
-                            )}
-                            <span style={{ fontWeight: 500, maxWidth: 200, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{spec.item_name}</span>
-                          </div>
-                        </td>
-                        <td>{spec.customer_name ?? <span style={{ color: '#94a3b8' }}>—</span>}</td>
-                        <td style={{ color: '#64748b' }}>{spec.contact_name ?? '—'}</td>
-                        <td style={{ color: '#64748b' }}>{spec.vendor ?? '—'}</td>
-                        <td><StatusPill status={spec.status} /></td>
-                        <td style={{ color: '#64748b', whiteSpace: 'nowrap' }}>{fmtDate(spec.date_sent)}</td>
-                        <td style={{ color: '#64748b' }}>{spec.csr_name ?? '—'}</td>
-                        <td>
-                          {spec.follow_up_date ? (
-                            <div>
-                              <div style={{ fontSize: 13, color: '#374151', whiteSpace: 'nowrap' }}>{fmtDate(spec.follow_up_date)}</div>
-                              {rel && (
-                                <div className={`followup-badge ${isOverdue ? 'followup-overdue' : isToday ? 'followup-today' : 'followup-soon'}`}>{rel}</div>
-                              )}
-                            </div>
-                          ) : <span style={{ color: '#94a3b8' }}>—</span>}
-                        </td>
-                        <td onClick={e => e.stopPropagation()}>
-                          <Link href={`/marketing/specs/${spec.id}`} className="action-link">View</Link>
-                        </td>
-                      </tr>
-                    )
-                  })}
-                </tbody>
-              </table>
-
-              {totalPages > 1 && (
-                <div className="pagination">
-                  <button className="pg-btn" disabled={page === 1} onClick={() => setPage(p => p - 1)}>←</button>
-                  {Array.from({ length: Math.min(5, totalPages) }, (_, i) => {
-                    const p = i + 1
-                    return (
-                      <button key={p} className={`pg-btn ${page === p ? 'pg-active' : ''}`} onClick={() => setPage(p)}>{p}</button>
-                    )
-                  })}
-                  {totalPages > 5 && page < totalPages && <span style={{ color: '#94a3b8' }}>…</span>}
-                  <button className="pg-btn" disabled={page === totalPages} onClick={() => setPage(p => p + 1)}>→</button>
-                  <span style={{ fontSize: 13, color: '#94a3b8' }}>Page {page} of {totalPages}</span>
-                </div>
-              )}
-            </>
-          )}
+          <DataTable
+            rows={specs}
+            columns={columns}
+            loading={loading}
+            emptyMessage="No specs found for these filters."
+            getRowKey={(spec) => spec.id}
+            onRowClick={(spec) => router.push(`/marketing/specs/${spec.id}`)}
+            pagination={{
+              page,
+              total,
+              pageSize: PAGE_SIZE,
+              itemName: 'spec',
+              onPageChange: setPage,
+            }}
+          />
         </>
       )}
 

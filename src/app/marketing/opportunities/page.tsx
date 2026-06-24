@@ -3,6 +3,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { opportunityStatusBadge } from '@/lib/badges'
+import { DataTable, type DataTableColumn } from '@/components/ui/DataTable'
+import { FilterPillGroup, type FilterPillOption } from '@/components/ui/FilterPill'
 
 const PAGE_SIZE = 50
 
@@ -25,7 +27,17 @@ type OppListItem = {
   tags: TagOption[]
 }
 
+type StatusFilter = '' | 'open' | 'won' | 'lost' | 'stalled'
+
 const STAGES = ['Send Quote', 'Follow Up on Quote', 'Quote Accepted', 'Send Thank You Email']
+
+const STATUS_OPTIONS: FilterPillOption<StatusFilter>[] = [
+  { value: '', label: 'All', color: 'slate' },
+  { value: 'open', label: 'Open', color: 'blue' },
+  { value: 'won', label: 'Won', color: 'green' },
+  { value: 'lost', label: 'Lost', color: 'red' },
+  { value: 'stalled', label: 'Stalled', color: 'amber' },
+]
 
 function PipelineMini({ stage, status }: { stage: string | null; status: string }) {
   const isClosed = status === 'won' || status === 'lost'
@@ -93,7 +105,7 @@ export default function OpportunitiesPage() {
   const [loading, setLoading] = useState(true)
   const [allTags, setAllTags] = useState<TagOption[]>([])
   const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState('')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>('')
   const [stageFilter, setStageFilter] = useState('')
   const [ownerFilter, setOwnerFilter] = useState('')
   const [tagFilter, setTagFilter] = useState('')
@@ -121,7 +133,6 @@ export default function OpportunitiesPage() {
     }
   }, [statusFilter, stageFilter, tagFilter])
 
-  // Reset to page 1 on server-side filter change
   useEffect(() => { setPage(1) }, [statusFilter, stageFilter, tagFilter])
 
   useEffect(() => {
@@ -161,9 +172,79 @@ export default function OpportunitiesPage() {
 
   const activeFilters = !!(search || statusFilter || stageFilter || ownerFilter || tagFilter)
 
-  const totalPages = Math.max(1, Math.ceil(total / PAGE_SIZE))
-  const rangeFrom = total === 0 ? 0 : (page - 1) * PAGE_SIZE + 1
-  const rangeTo = Math.min(page * PAGE_SIZE, total)
+  const columns: DataTableColumn<OppListItem>[] = [
+    {
+      key: 'name',
+      header: 'Name',
+      sortValue: (o) => o.name,
+      render: (o) => <span className="font-medium text-slate-900">{o.name}</span>,
+    },
+    {
+      key: 'customer',
+      header: 'Customer',
+      sortValue: (o) => o.customer_name,
+      render: (o) => <span className="text-slate-600">{o.customer_name ?? '—'}</span>,
+      className: 'hidden md:table-cell',
+    },
+    {
+      key: 'value',
+      header: 'Value',
+      sortValue: (o) => o.value,
+      render: (o) => <span className="font-semibold text-slate-700">{fmt$(o.value)}</span>,
+    },
+    {
+      key: 'pipeline',
+      header: 'Pipeline',
+      render: (o) => <PipelineMini stage={o.pipeline_stage} status={o.status} />,
+      className: 'hidden lg:table-cell',
+      skeletonWidth: '180px',
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      sortValue: (o) => o.status,
+      render: (o) => (
+        <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold capitalize ${opportunityStatusBadge(o.status) ?? 'bg-slate-100 text-slate-600'}`}>
+          {o.status}
+        </span>
+      ),
+    },
+    {
+      key: 'tags',
+      header: 'Tags',
+      render: (o) => (
+        <div className="flex flex-wrap gap-1">
+          {o.tags.length > 0
+            ? o.tags.map((t) => (
+                <span key={t.id} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold text-white" style={{ backgroundColor: t.color }}>
+                  {t.name}
+                </span>
+              ))
+            : <span className="text-slate-300">—</span>
+          }
+        </div>
+      ),
+      className: 'hidden xl:table-cell',
+    },
+    {
+      key: 'forecast_close_date',
+      header: 'Forecast Close',
+      sortValue: (o) => o.forecast_close_date ? new Date(o.forecast_close_date) : null,
+      render: (o) => (
+        <span className={o.forecast_close_date && isOverdue(o.forecast_close_date) && o.status === 'open' ? 'text-red-600 font-medium' : 'text-slate-500'}>
+          {fmtDate(o.forecast_close_date)}
+        </span>
+      ),
+      className: 'hidden xl:table-cell',
+    },
+    {
+      key: 'owner',
+      header: 'Owner',
+      sortValue: (o) => o.assigned_user_name,
+      render: (o) => <span className="text-slate-500">{o.assigned_user_name ?? '—'}</span>,
+      className: 'hidden xl:table-cell',
+    },
+  ]
 
   return (
     <div className="w-full px-6 py-8">
@@ -201,7 +282,7 @@ export default function OpportunitiesPage() {
       </div>
 
       {/* Filters */}
-      <div className="flex gap-3 mb-5 flex-wrap">
+      <div className="flex gap-3 mb-5 flex-wrap items-center">
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <circle cx="11" cy="11" r="8" strokeWidth={2} />
@@ -215,17 +296,12 @@ export default function OpportunitiesPage() {
             className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
           />
         </div>
-        <select
+        <FilterPillGroup
+          options={STATUS_OPTIONS}
           value={statusFilter}
-          onChange={(e) => setStatusFilter(e.target.value)}
-          className="px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
-        >
-          <option value="">All Statuses</option>
-          <option value="open">Open</option>
-          <option value="won">Won</option>
-          <option value="lost">Lost</option>
-          <option value="stalled">Stalled</option>
-        </select>
+          onChange={setStatusFilter}
+          label="Status filter"
+        />
         <select
           value={stageFilter}
           onChange={(e) => setStageFilter(e.target.value)}
@@ -254,106 +330,22 @@ export default function OpportunitiesPage() {
         )}
       </div>
 
-      {/* Table */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-        <table className="w-full text-sm">
-          <thead className="bg-slate-50 border-b border-slate-200">
-            <tr>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Name</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden md:table-cell">Customer</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Value</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden lg:table-cell">Pipeline</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide">Status</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden xl:table-cell">Tags</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden xl:table-cell">Forecast Close</th>
-              <th className="text-left px-5 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide hidden xl:table-cell">Owner</th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-slate-100">
-            {loading && Array.from({ length: 5 }).map((_, i) => (
-              <tr key={i}>
-                {[...Array(8)].map((_, j) => (
-                  <td key={j} className="px-5 py-3.5">
-                    <div className="h-4 bg-slate-100 rounded animate-pulse" style={{ width: j === 0 ? '60%' : '40%' }} />
-                  </td>
-                ))}
-              </tr>
-            ))}
-            {!loading && opps.length === 0 && (
-              <tr>
-                <td colSpan={8} className="px-5 py-12 text-center text-sm text-slate-400">
-                  {activeFilters
-                    ? 'No opportunities match your filters.'
-                    : 'No opportunities yet. Create one to get started.'}
-                </td>
-              </tr>
-            )}
-            {!loading && opps.map((o) => (
-              <tr
-                key={o.id}
-                onClick={() => router.push(`/marketing/opportunities/${o.id}`)}
-                className="hover:bg-slate-50 cursor-pointer transition-colors"
-              >
-                <td className="px-5 py-3.5 font-medium text-slate-900">{o.name}</td>
-                <td className="px-5 py-3.5 text-slate-600 hidden md:table-cell">{o.customer_name ?? '—'}</td>
-                <td className="px-5 py-3.5 font-semibold text-slate-700">{fmt$(o.value)}</td>
-                <td className="px-5 py-3.5 hidden lg:table-cell">
-                  <PipelineMini stage={o.pipeline_stage} status={o.status} />
-                </td>
-                <td className="px-5 py-3.5">
-                  <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold capitalize ${opportunityStatusBadge(o.status) ?? 'bg-slate-100 text-slate-600'}`}>
-                    {o.status}
-                  </span>
-                </td>
-                <td className="px-5 py-3.5 hidden xl:table-cell">
-                  <div className="flex flex-wrap gap-1">
-                    {o.tags.length > 0
-                      ? o.tags.map((t) => (
-                          <span key={t.id} className="inline-flex items-center px-1.5 py-0.5 rounded text-xs font-semibold text-white" style={{ backgroundColor: t.color }}>
-                            {t.name}
-                          </span>
-                        ))
-                      : <span className="text-slate-300">—</span>
-                    }
-                  </div>
-                </td>
-                <td className="px-5 py-3.5 hidden xl:table-cell">
-                  <span className={o.forecast_close_date && isOverdue(o.forecast_close_date) && o.status === 'open' ? 'text-red-600 font-medium' : 'text-slate-500'}>
-                    {fmtDate(o.forecast_close_date)}
-                  </span>
-                </td>
-                <td className="px-5 py-3.5 text-slate-500 hidden xl:table-cell">{o.assigned_user_name ?? '—'}</td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
-        {!loading && total > 0 && (
-          <div className="px-5 py-3 border-t border-slate-100 flex items-center justify-between gap-4 flex-wrap">
-            <span className="text-xs text-slate-400">
-              Showing {rangeFrom}–{rangeTo} of {total} opportunit{total !== 1 ? 'ies' : 'y'}
-            </span>
-            {totalPages > 1 && (
-              <div className="flex items-center gap-2">
-                <button
-                  onClick={() => setPage((p) => Math.max(1, p - 1))}
-                  disabled={page === 1}
-                  className="px-3 py-1.5 text-xs font-semibold border border-slate-200 rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  Previous
-                </button>
-                <span className="text-xs text-slate-500 px-1">Page {page} of {totalPages}</span>
-                <button
-                  onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
-                  disabled={page === totalPages}
-                  className="px-3 py-1.5 text-xs font-semibold border border-slate-200 rounded-lg bg-white text-slate-600 hover:bg-slate-50 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
-                >
-                  Next
-                </button>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
+      <DataTable
+        rows={opps}
+        columns={columns}
+        loading={loading}
+        emptyMessage={activeFilters ? 'No opportunities match your filters.' : 'No opportunities yet. Create one to get started.'}
+        getRowKey={(o) => o.id}
+        onRowClick={(o) => router.push(`/marketing/opportunities/${o.id}`)}
+        pagination={{
+          page,
+          total,
+          pageSize: PAGE_SIZE,
+          itemName: 'opportunit',
+          onPageChange: setPage,
+        }}
+        minWidth="900px"
+      />
     </div>
   )
 }

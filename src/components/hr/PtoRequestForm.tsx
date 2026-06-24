@@ -9,15 +9,15 @@ interface Props {
   existing?: PtoRequest
 }
 
-const REASON_TILES: { value: PtoReason; label: string; icon: string }[] = [
-  { value: 'vacation',            label: 'Vacation',    icon: '🧳' },
-  { value: 'personal_leave',      label: 'Personal',    icon: '🙋' },
-  { value: 'medical_leave',       label: 'Medical',     icon: '🏥' },
-  { value: 'funeral_bereavement', label: 'Bereavement', icon: '🕊️' },
-  { value: 'family_reasons',      label: 'Family',      icon: '👨‍👩‍👧' },
-  { value: 'jury_duty',           label: 'Jury Duty',   icon: '⚖️' },
-  { value: 'to_vote',             label: 'To Vote',     icon: '🗳️' },
-  { value: 'other',               label: 'Other',       icon: '📋' },
+const REASON_TILES: { value: PtoReason; label: string }[] = [
+  { value: 'vacation',            label: 'Vacation' },
+  { value: 'personal_leave',      label: 'Personal' },
+  { value: 'medical_leave',       label: 'Medical' },
+  { value: 'funeral_bereavement', label: 'Bereavement' },
+  { value: 'family_reasons',      label: 'Family' },
+  { value: 'jury_duty',           label: 'Jury Duty' },
+  { value: 'to_vote',             label: 'To Vote' },
+  { value: 'other',               label: 'Other' },
 ]
 
 const MONTHS = ['January','February','March','April','May','June','July','August','September','October','November','December']
@@ -246,50 +246,179 @@ export function PtoRequestForm({ existing }: Props) {
   return (
     <>
       <style>{`
-        .pto-form-page { padding: 28px 32px; max-width: 1200px; margin: 0 auto; }
-        .pto-form-inner { max-width: 640px; }
-        .pto-form-title { font-size: 22px; font-weight: 800; color: #111; margin-bottom: 24px; }
-        .form-section { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 20px 22px; margin-bottom: 16px; }
-        .form-section-title { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.07em; color: #888; margin-bottom: 14px; }
+        .pto-form-page {
+          --pto-purple: #6b1e98;
+          --pto-purple-dark: #581580;
+          --pto-purple-soft: #f4ecff;
+          --pto-purple-softer: #fbf8ff;
+          --pto-ink: #111827;
+          --pto-muted: #6b7280;
+          --pto-border: #e5e7eb;
+          padding: 36px 32px 48px;
+          max-width: 1440px;
+          margin: 0 auto;
+        }
+        .pto-form-hero {
+          display: flex;
+          justify-content: space-between;
+          align-items: flex-start;
+          gap: 24px;
+          margin-bottom: 30px;
+        }
+        .pto-form-title {
+          margin: 0;
+          color: var(--pto-ink);
+          font-size: 1.75rem;
+          line-height: 1.15;
+          font-weight: 800;
+          letter-spacing: -0.01em;
+          text-wrap: balance;
+        }
+        .pto-form-subtitle {
+          margin: 10px 0 0;
+          color: var(--pto-muted);
+          font-size: 0.95rem;
+          line-height: 1.5;
+          max-width: 68ch;
+        }
+        .pto-form-layout {
+          display: grid;
+          grid-template-columns: minmax(0, 1fr) 320px;
+          gap: 18px;
+          align-items: start;
+        }
+        .pto-form-inner { min-width: 0; }
+        .pto-form-aside {
+          position: sticky;
+          top: 20px;
+          background: #fff;
+          border: 1px solid var(--pto-border);
+          border-radius: 8px;
+          padding: 20px;
+          box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        }
+        .pto-aside-icon {
+          width: 56px;
+          height: 56px;
+          display: grid;
+          place-items: center;
+          border-radius: 50%;
+          color: var(--pto-purple);
+          background: radial-gradient(circle at 35% 30%, #fbf8ff 0%, #f0e3ff 100%);
+          margin-bottom: 16px;
+        }
+        .pto-aside-title {
+          color: var(--pto-ink);
+          font-size: 0.95rem;
+          font-weight: 800;
+          margin-bottom: 8px;
+        }
+        .pto-aside-copy {
+          color: var(--pto-muted);
+          font-size: 0.84rem;
+          line-height: 1.55;
+          margin: 0 0 16px;
+        }
+        .pto-aside-list {
+          margin: 0;
+          padding: 0;
+          list-style: none;
+          display: grid;
+          gap: 10px;
+          color: var(--pto-muted);
+          font-size: 0.82rem;
+          line-height: 1.45;
+        }
+        .pto-aside-list li {
+          display: grid;
+          grid-template-columns: 18px minmax(0, 1fr);
+          gap: 8px;
+        }
+        .pto-aside-list span {
+          color: var(--pto-purple);
+          font-weight: 900;
+        }
+        .form-section {
+          background: #fff;
+          border: 1px solid var(--pto-border);
+          border-radius: 8px;
+          padding: 22px;
+          margin-bottom: 16px;
+          box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+        }
+        .form-section-title { font-size: 12px; font-weight: 800; text-transform: uppercase; letter-spacing: 0.07em; color: var(--pto-purple); margin-bottom: 16px; }
         .form-group { display: flex; flex-direction: column; gap: 5px; margin-bottom: 14px; }
         .form-group:last-child { margin-bottom: 0; }
-        .form-label { font-size: 12px; font-weight: 700; color: #444; }
-        .form-input, .form-textarea { border: 1px solid #d1d5db; border-radius: 6px; padding: 8px 10px; font-size: 13px; color: #111; background: #fff; width: 100%; box-sizing: border-box; }
-        .form-input:focus, .form-textarea:focus { outline: 2px solid #6b1e98; border-color: #6b1e98; }
+        .form-label { font-size: 12px; font-weight: 800; color: #374151; }
+        .form-input, .form-textarea { border: 1px solid #d7dce3; border-radius: 8px; padding: 9px 11px; font-size: 13px; color: var(--pto-ink); background: #fff; width: 100%; box-sizing: border-box; }
+        .form-input:focus, .form-textarea:focus { outline: 3px solid rgba(107, 30, 152, 0.22); outline-offset: 2px; border-color: #a855f7; }
         .form-textarea { resize: vertical; min-height: 80px; }
         .form-checkbox-row { display: flex; align-items: center; gap: 7px; }
-        .form-checkbox-row input { width: 15px; height: 15px; cursor: pointer; accent-color: #6b1e98; }
-        .form-checkbox-row label { font-size: 12px; color: #555; cursor: pointer; }
-        .signature-box { background: #fafafa; border: 1px solid #e5e7eb; border-radius: 8px; padding: 16px; margin-top: 4px; }
-        .signature-agreement { font-size: 12px; color: #555; line-height: 1.6; margin-bottom: 14px; }
-        .signature-date { font-size: 11px; color: #888; margin-top: 8px; }
+        .form-checkbox-row input { width: 15px; height: 15px; cursor: pointer; accent-color: var(--pto-purple); }
+        .form-checkbox-row label { font-size: 12px; color: #4b5563; cursor: pointer; }
+        .signature-box { background: var(--pto-purple-softer); border: 1px solid #eadcff; border-radius: 8px; padding: 16px; margin-top: 4px; }
+        .signature-agreement { font-size: 12px; color: #4b5563; line-height: 1.6; margin-bottom: 14px; }
+        .signature-date { font-size: 11px; color: var(--pto-muted); margin-top: 8px; }
         .form-error { background: #fee2e2; border: 1px solid #fca5a5; border-radius: 7px; color: #991b1b; font-size: 13px; padding: 10px 14px; margin-bottom: 14px; }
         .form-actions { display: flex; gap: 10px; margin-top: 4px; }
-        .btn-submit { background: #6b1e98; color: #fff; border: none; border-radius: 7px; padding: 10px 22px; font-size: 13px; font-weight: 700; cursor: pointer; }
-        .btn-submit:hover:not(:disabled) { background: #581580; }
+        .btn-submit { background: linear-gradient(180deg, #7c2fd0 0%, var(--pto-purple) 100%); color: #fff; border: 1px solid #6420a6; border-radius: 8px; padding: 10px 22px; font-size: 13px; font-weight: 800; cursor: pointer; min-height: 42px; }
+        .btn-submit:hover:not(:disabled) { background: linear-gradient(180deg, #7227bf 0%, var(--pto-purple-dark) 100%); }
         .btn-submit:disabled { opacity: 0.6; cursor: not-allowed; }
-        .btn-cancel { background: #f3f4f6; color: #555; border: 1px solid #e5e7eb; border-radius: 7px; padding: 10px 18px; font-size: 13px; font-weight: 700; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; }
+        .btn-cancel { background: #fff; color: #374151; border: 1px solid #d7dce3; border-radius: 8px; padding: 10px 18px; font-size: 13px; font-weight: 800; cursor: pointer; text-decoration: none; display: inline-flex; align-items: center; min-height: 42px; box-sizing: border-box; }
         .btn-cancel:hover { background: #e5e7eb; }
         .reason-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(130px, 1fr)); gap: 10px; }
-        .reason-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 6px; padding: 14px 10px; border: 2px solid #e5e7eb; border-radius: 10px; background: #fff; cursor: pointer; transition: border-color .15s, background .15s; font-size: 12px; font-weight: 600; color: #444; text-align: center; line-height: 1.3; }
+        .reason-tile { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 8px; min-height: 86px; padding: 14px 10px; border: 1px solid #d7dce3; border-radius: 8px; background: #fff; cursor: pointer; transition: border-color .15s, background .15s, box-shadow .15s; font-size: 12px; font-weight: 800; color: #374151; text-align: center; line-height: 1.3; }
         .reason-tile:hover { border-color: #a855f7; background: #faf5ff; }
-        .reason-tile.selected { border-color: #6b1e98; background: #f3e8ff; color: #6b1e98; }
-        .reason-tile .reason-icon { font-size: 22px; line-height: 1; }
+        .reason-tile.selected { border-color: var(--pto-purple); background: var(--pto-purple-soft); color: var(--pto-purple); box-shadow: inset 0 0 0 1px var(--pto-purple); }
+        .reason-tile .reason-icon { width: 26px; height: 26px; border-radius: 50%; display: grid; place-items: center; background: #f4ecff; color: var(--pto-purple); font-size: 12px; line-height: 1; font-weight: 900; }
         .cal-nav { display: flex; align-items: center; justify-content: space-between; margin-bottom: 14px; }
-        .cal-nav-btn { background: #f3f4f6; border: 1px solid #e5e7eb; border-radius: 6px; width: 30px; height: 30px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; }
+        .cal-nav-btn { background: #fff; border: 1px solid #d7dce3; border-radius: 8px; width: 34px; height: 34px; cursor: pointer; font-size: 14px; display: flex; align-items: center; justify-content: center; }
         .cal-nav-btn:hover { background: #e5e7eb; }
         .cal-months { display: flex; gap: 32px; flex-wrap: wrap; }
-        .cal-summary { display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 12px 14px; background: #f3e8ff; border-radius: 8px; font-size: 13px; color: #5b21b6; font-weight: 600; flex-wrap: wrap; }
+        .cal-summary { display: flex; align-items: center; gap: 10px; margin-top: 16px; padding: 12px 14px; background: var(--pto-purple-soft); border-radius: 8px; font-size: 13px; color: #5b21b6; font-weight: 700; flex-wrap: wrap; }
         .cal-summary-arrow { color: #a855f7; font-size: 16px; }
         .cal-half-row { display: flex; gap: 24px; margin-top: 14px; flex-wrap: wrap; }
-        .cal-hint { font-size: 12px; color: #9ca3af; margin-top: 10px; }
-        @media (max-width: 600px) { .pto-form-page { padding: 18px 16px; } .reason-grid { grid-template-columns: repeat(auto-fill, minmax(100px, 1fr)); } .cal-months { gap: 20px; } }
+        .cal-hint { font-size: 12px; color: var(--pto-muted); margin-top: 10px; }
+        .btn-submit:focus-visible,
+        .btn-cancel:focus-visible,
+        .reason-tile:focus-visible,
+        .cal-nav-btn:focus-visible {
+          outline: 3px solid rgba(107, 30, 152, 0.22);
+          outline-offset: 2px;
+        }
+        @media (prefers-reduced-motion: reduce) {
+          .reason-tile,
+          .btn-submit,
+          .btn-cancel { transition: none; }
+        }
+        @media (max-width: 980px) {
+          .pto-form-layout { grid-template-columns: 1fr; }
+          .pto-form-aside { position: static; order: -1; }
+        }
+        @media (max-width: 600px) {
+          .pto-form-page { padding: 24px 16px 36px; }
+          .pto-form-title { font-size: 1.45rem; }
+          .form-section { padding: 18px; }
+          .reason-grid { grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); }
+          .cal-months { gap: 20px; }
+          .form-actions { flex-direction: column; }
+          .btn-submit,
+          .btn-cancel { justify-content: center; width: 100%; }
+        }
       `}</style>
 
       <div className="pto-form-page">
-        <div className="pto-form-inner">
-          <div className="pto-form-title">{existing ? 'Edit PTO Request' : 'Request Time Off'}</div>
+        <header className="pto-form-hero">
+          <div>
+            <h1 className="pto-form-title">{existing ? 'Edit PTO Request' : 'Request Time Off'}</h1>
+            <p className="pto-form-subtitle">
+              Choose your dates, tell HR what kind of leave this is, and sign the acknowledgment before submitting.
+            </p>
+          </div>
+        </header>
 
+        <div className="pto-form-layout">
+          <div className="pto-form-inner">
           <form onSubmit={handleSubmit}>
             {/* Date Range Picker */}
             <div className="form-section">
@@ -367,7 +496,7 @@ export function PtoRequestForm({ existing }: Props) {
                       className={`reason-tile${reason === t.value ? ' selected' : ''}`}
                       onClick={() => setReason(t.value)}
                     >
-                      <span className="reason-icon">{t.icon}</span>
+                      <span className="reason-icon" aria-hidden="true">{t.label.slice(0, 1)}</span>
                       {t.label}
                     </button>
                   ))}
@@ -418,6 +547,21 @@ export function PtoRequestForm({ existing }: Props) {
               <a href="/hr/pto" className="btn-cancel">Cancel</a>
             </div>
           </form>
+          </div>
+          <aside className="pto-form-aside" aria-label="PTO request guidance">
+            <div className="pto-aside-icon" aria-hidden="true">
+              <svg width="26" height="26" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 2v4M16 2v4M3 10h18M5 5h14a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V7a2 2 0 0 1 2-2Z" />
+              </svg>
+            </div>
+            <div className="pto-aside-title">Before you submit</div>
+            <p className="pto-aside-copy">Requests are routed to HR for review. Add a short note when the reason needs context.</p>
+            <ul className="pto-aside-list">
+              <li><span>1</span><div>Select a continuous date range.</div></li>
+              <li><span>2</span><div>Mark half days when only part of a day applies.</div></li>
+              <li><span>3</span><div>Type your full name exactly as shown to enable submission.</div></li>
+            </ul>
+          </aside>
         </div>
       </div>
     </>
