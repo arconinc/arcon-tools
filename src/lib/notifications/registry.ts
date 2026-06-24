@@ -565,6 +565,52 @@ export const ptoReviewed: NotificationDefinition<PtoReviewedPayload> = {
   },
 }
 
+// ─── contact_form.submitted ───────────────────────────────────────────────────
+
+export interface ContactFormSubmittedPayload {
+  task_id: string
+  task_title: string
+  source: string
+  fields: Array<{ label: string; value: string }>
+}
+
+export const contactFormSubmitted: NotificationDefinition<ContactFormSubmittedPayload> = {
+  type: 'contact_form.submitted',
+  label: 'Website contact form submitted',
+  description: 'When a visitor submits a contact form on the public website.',
+  defaultEmail: true,
+  render: (p) => ({
+    title: `New contact form: ${p.task_title}`,
+    body: `Via ${p.source}`,
+    linkUrl: `/marketing/tasks/${p.task_id}`,
+  }),
+  email: (p, recipient) => {
+    const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
+    const fieldRows = p.fields
+      .map(
+        f =>
+          `<tr><td style="padding:6px 12px 6px 0;font-size:14px;color:#64748b;white-space:nowrap;vertical-align:top"><strong>${f.label}</strong></td><td style="padding:6px 0;font-size:14px;color:#1e293b;vertical-align:top">${f.value}</td></tr>`
+      )
+      .join('')
+    const tableHtml = `<table cellpadding="0" cellspacing="0" style="width:100%;border-collapse:collapse;margin:4px 0 0">${fieldRows}</table>`
+    return {
+      subject: `[Contact Form] ${p.task_title}`,
+      html: renderGenericEmail({
+        preheader: `New contact form submission: ${p.task_title}`,
+        heading: 'Website Contact Form',
+        greeting: `Hi ${firstName},`,
+        bodyLines: [
+          `A visitor submitted a contact form on <strong>${p.source}</strong>.`,
+          `<strong style="font-size:16px;color:#1e293b">${p.task_title}</strong>`,
+          tableHtml,
+        ],
+        ctaText: 'View Task',
+        ctaUrl: `${appUrl()}/marketing/tasks/${p.task_id}`,
+      }),
+    }
+  },
+}
+
 // ─── Registry ─────────────────────────────────────────────────────────────────
 //
 // To add a new notification type:
@@ -587,6 +633,7 @@ export const NOTIFICATION_REGISTRY = {
   'spec.follow_up_due': specFollowUpDue,
   'pto.submitted': ptoSubmitted,
   'pto.reviewed': ptoReviewed,
+  'contact_form.submitted': contactFormSubmitted,
 } as const
 
 export type NotificationType = keyof typeof NOTIFICATION_REGISTRY
