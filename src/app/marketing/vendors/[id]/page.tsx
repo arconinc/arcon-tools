@@ -6,12 +6,14 @@ import Link from 'next/link'
 import TagPicker from '@/components/crm/TagPicker'
 import { CreateTaskModal } from '@/components/crm/CreateTaskModal'
 import { CrmDetailActions } from '@/components/crm/CrmDetailActions'
+import { PlacesCompanyAutocomplete } from '@/components/crm/PlacesCompanyAutocomplete'
 import { TaskCreatedToast } from '@/components/crm/TaskCreatedToast'
 import { useAppUser } from '@/components/layout/AppShell'
 import { useCrmTags } from '@/hooks'
 import { formatPhoneInput } from '@/lib/phone'
 import { CrmForm } from '@/types'
 import { recommendTaxForms, US_STATES } from '@/lib/forms-utils'
+import type { PlacesDetails } from '@/lib/google-places'
 
 type TagOption = { id: string; name: string; color: string }
 
@@ -413,9 +415,28 @@ export default function VendorDetailPage() {
   const fieldCls = 'w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400'
   const labelCls = 'block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5'
   const sectionCls = 'bg-white border border-slate-200 rounded-2xl overflow-hidden'
+  const overlaySectionCls = 'bg-white border border-slate-200 rounded-2xl overflow-visible'
   const sectionHeadCls = 'px-5 py-3 bg-slate-50 border-b border-slate-100'
   const sectionBodyCls = 'px-5 py-4 space-y-3'
   function cf(field: string, value: string) { setCreateForm((p) => ({ ...p, [field]: value })) }
+  function applyPlaceToCreateForm(place: PlacesDetails) {
+    setCreateForm((prev) => ({
+      ...prev,
+      name: place.name ?? prev.name,
+      phone: place.phone ? formatPhoneInput(place.phone) : prev.phone,
+      website: place.website ?? prev.website,
+      shipping_address1: place.address.address1 ?? prev.shipping_address1,
+      shipping_address2: place.address.address2 ?? prev.shipping_address2,
+      shipping_city: place.address.city ?? prev.shipping_city,
+      shipping_state: place.address.state ?? prev.shipping_state,
+      shipping_zip: place.address.postalCode ?? prev.shipping_zip,
+      billing_address1: place.address.address1 ?? prev.billing_address1,
+      billing_address2: place.address.address2 ?? prev.billing_address2,
+      billing_city: place.address.city ?? prev.billing_city,
+      billing_state: place.address.state ?? prev.billing_state,
+      billing_zip: place.address.postalCode ?? prev.billing_zip,
+    }))
+  }
 
   if (isNew) {
 
@@ -430,13 +451,18 @@ export default function VendorDetailPage() {
           {createError && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{createError}</div>}
 
           {/* Basic Info */}
-          <div className={sectionCls}>
-            <div className={sectionHeadCls}><h2 className="text-sm font-semibold text-slate-700">Basic Info</h2></div>
+          <div className={overlaySectionCls}>
+            <div className={`${sectionHeadCls} rounded-t-2xl`}><h2 className="text-sm font-semibold text-slate-700">Basic Info</h2></div>
             <div className={sectionBodyCls}>
               <div>
-                <label className={labelCls}>Company Name <span className="text-red-500">*</span></label>
-                  <p className="text-xs text-slate-400 italic mb-1">Full Corporate Company Name</p>
-                  <input type="text" value={createForm.name} onChange={(e) => cf('name', e.target.value)} required className={fieldCls} />
+                <PlacesCompanyAutocomplete
+                  value={createForm.name}
+                  onChange={(value) => cf('name', value)}
+                  onPlaceSelect={applyPlaceToCreateForm}
+                  inputClassName={fieldCls}
+                  labelClassName={labelCls}
+                  required
+                />
               </div>
               <div className="grid grid-cols-2 gap-3">
                 <div>

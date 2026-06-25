@@ -5,6 +5,7 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import TagPicker from '@/components/crm/TagPicker'
 import { CreateTaskModal } from '@/components/crm/CreateTaskModal'
+import { PlacesCompanyAutocomplete } from '@/components/crm/PlacesCompanyAutocomplete'
 import { TaskCreatedToast } from '@/components/crm/TaskCreatedToast'
 import { Modal, Field, FieldInput, SocialIcon } from '@/components/ui'
 import { CustomerHeader } from '@/components/crm/customer/CustomerHeader'
@@ -20,6 +21,7 @@ import { CrmForm } from '@/types'
 import { getCustomerFormsByState, getGeneralForms, US_STATES } from '@/lib/forms-utils'
 import { buildCompanySummary } from '@/lib/customer/helpers'
 import { useCustomer, useCrmUsers, useCrmTags, useArtwork, useCustomerEdit, type CustomerDetail, type BrandDataLocal, type TagOption } from '@/hooks'
+import type { PlacesDetails } from '@/lib/google-places'
 
 type DropdownUser = { id: string; display_name: string; email: string }
 
@@ -187,6 +189,25 @@ export default function CustomerDetailPage() {
     if (customer?.billing_state && !taxState) setTaxState(customer.billing_state)
   }, [customer, taxState])
 
+  function applyPlaceToCreateForm(place: PlacesDetails) {
+    setCreateForm((prev) => ({
+      ...prev,
+      name: place.name ?? prev.name,
+      phone: place.phone ? formatPhoneInput(place.phone) : prev.phone,
+      website: place.website ?? prev.website,
+      billing_address1: place.address.address1 ?? prev.billing_address1,
+      billing_city: place.address.city ?? prev.billing_city,
+      billing_state: place.address.state ?? prev.billing_state,
+      billing_zip: place.address.postalCode ?? prev.billing_zip,
+    }))
+    clearCreateError('name')
+    clearCreateError('phone')
+    clearCreateError('billing_address1')
+    clearCreateError('billing_city')
+    clearCreateError('billing_state')
+    clearCreateError('billing_zip')
+  }
+
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
 
@@ -293,17 +314,20 @@ export default function CustomerDetailPage() {
           {createError && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{createError}</div>}
 
           {/* Company Info */}
-          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-            <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-visible">
+            <div className="px-5 py-3 bg-slate-50 border-b border-slate-100 rounded-t-2xl">
               <h2 className="text-sm font-semibold text-slate-700">Company Information</h2>
             </div>
             <div className="px-5 py-4 grid grid-cols-3 gap-4">
               <div className="col-span-3">
-                <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">Company Name <span className="text-red-500">*</span></label>
-                <p className="text-xs text-slate-400 italic mb-1">Full Corporate Company Name</p>
-                <input type="text" value={createForm.name}
-                  onChange={(e) => { setCreateForm((p) => ({ ...p, name: e.target.value })); clearCreateError('name') }}
-                  className={inputCls(createErrors.name)} />
+                <PlacesCompanyAutocomplete
+                  value={createForm.name}
+                  onChange={(value) => { setCreateForm((p) => ({ ...p, name: value })); clearCreateError('name') }}
+                  onPlaceSelect={applyPlaceToCreateForm}
+                  inputClassName={inputCls(createErrors.name)}
+                  labelClassName="block text-xs font-semibold text-slate-500 uppercase tracking-wide"
+                  required
+                />
                 <FieldError error={createErrors.name} />
               </div>
               <div className="col-span-2">
