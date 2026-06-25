@@ -8,6 +8,7 @@ import { CreateTaskModal } from '@/components/crm/CreateTaskModal'
 import { CrmDetailActions } from '@/components/crm/CrmDetailActions'
 import { TaskCreatedToast } from '@/components/crm/TaskCreatedToast'
 import { useAppUser } from '@/components/layout/AppShell'
+import { useCrmTags } from '@/hooks'
 import { formatPhoneInput } from '@/lib/phone'
 import { CrmForm } from '@/types'
 import { recommendTaxForms, US_STATES } from '@/lib/forms-utils'
@@ -219,6 +220,8 @@ export default function VendorDetailPage() {
   const router = useRouter()
   const params = useParams<{ id: string }>()
   const { user } = useAppUser()
+  const { data: allCrmTagsData, setData: setAllCrmTags } = useCrmTags()
+  const allCrmTags = allCrmTagsData ?? []
   const id = params.id
   const isNew = id === 'new'
   const isAdmin = !!user?.is_admin
@@ -308,11 +311,12 @@ export default function VendorDetailPage() {
 
   const [createForm, setCreateForm] = useState({
     name: '', phone: '', website: '', linkedin: '', description: '', product_line: '', specialty: '',
-    rush_art_cutoff: '',
-    billing_address1: '', billing_address2: '', billing_city: '', billing_state: '', billing_zip: '', billing_country: '',
-    shipping_address1: '', shipping_address2: '', shipping_city: '', shipping_state: '', shipping_zip: '', shipping_country: '',
+    orders_email: '', artwork_email: '', ap_email: '', sales_rep_name: '', sales_rep_email: '',
+    billing_address1: '', billing_address2: '', billing_city: '', billing_state: '', billing_zip: '',
+    shipping_address1: '', shipping_address2: '', shipping_city: '', shipping_state: '', shipping_zip: '',
     notes: '',
   })
+  const [createTagIds, setCreateTagIds] = useState<string[]>([])
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
 
@@ -350,7 +354,20 @@ export default function VendorDetailPage() {
 
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
-    if (!createForm.name.trim()) { setCreateError('Name is required'); return }
+    if (!createForm.name.trim()) { setCreateError('Company name is required'); return }
+    const aturianTag = allCrmTags.find((t) => t.name.trim().toLowerCase() === 'add to aturian')
+    const aturianActive = !!(aturianTag && createTagIds.includes(aturianTag.id))
+    if (aturianActive) {
+      const missing: string[] = []
+      if (!createForm.phone.trim()) missing.push('Phone')
+      if (!createForm.billing_address1.trim()) missing.push('Billing Address')
+      if (!createForm.billing_city.trim()) missing.push('Billing City')
+      if (!createForm.billing_state.trim()) missing.push('Billing State')
+      if (!createForm.billing_zip.trim()) missing.push('Billing ZIP')
+      if (!createForm.orders_email.trim()) missing.push('Orders Email')
+      if (!createForm.ap_email.trim()) missing.push('AP Email')
+      if (missing.length > 0) { setCreateError(`Required for Aturian: ${missing.join(', ')}`); return }
+    }
     setCreating(true); setCreateError(null)
     try {
       const res = await fetch('/api/marketing/vendors', {
@@ -358,9 +375,30 @@ export default function VendorDetailPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           name: createForm.name.trim(),
-          phone: createForm.phone || null, website: createForm.website || null,
-          linkedin: createForm.linkedin || null, description: createForm.description || null,
-          product_line: createForm.product_line || null, specialty: createForm.specialty || null,
+          phone: createForm.phone || null,
+          website: createForm.website || null,
+          linkedin: createForm.linkedin || null,
+          description: createForm.description || null,
+          product_line: createForm.product_line || null,
+          specialty: createForm.specialty || null,
+          orders_email: createForm.orders_email || null,
+          artwork_email: createForm.artwork_email || null,
+          ap_email: createForm.ap_email || null,
+          sales_rep_name: createForm.sales_rep_name || null,
+          sales_rep_email: createForm.sales_rep_email || null,
+          billing_address1: createForm.billing_address1 || null,
+          billing_address2: createForm.billing_address2 || null,
+          billing_city: createForm.billing_city || null,
+          billing_state: createForm.billing_state || null,
+          billing_zip: createForm.billing_zip || null,
+          shipping_address1: createForm.shipping_address1 || null,
+          shipping_address2: createForm.shipping_address2 || null,
+          shipping_city: createForm.shipping_city || null,
+          shipping_state: createForm.shipping_state || null,
+          shipping_zip: createForm.shipping_zip || null,
+          notes: createForm.notes || null,
+          tag_ids: createTagIds,
+          add_to_aturian: aturianActive,
         }),
       })
       const data = await res.json()
@@ -369,59 +407,220 @@ export default function VendorDetailPage() {
     } finally { setCreating(false) }
   }
 
+  const aturianTagId = allCrmTags.find((t) => t.name.trim().toLowerCase() === 'add to aturian')?.id
+  const aturianActive = !!(aturianTagId && createTagIds.includes(aturianTagId))
+
+  const fieldCls = 'w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400'
+  const labelCls = 'block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5'
+  const sectionCls = 'bg-white border border-slate-200 rounded-2xl overflow-hidden'
+  const sectionHeadCls = 'px-5 py-3 bg-slate-50 border-b border-slate-100'
+  const sectionBodyCls = 'px-5 py-4 space-y-3'
+  function cf(field: string, value: string) { setCreateForm((p) => ({ ...p, [field]: value })) }
+
   if (isNew) {
 
     return (
-      <div className="max-w-3xl mx-auto px-6 py-6">
+      <div className="max-w-4xl mx-auto px-6 py-6">
         <Link href="/marketing/vendors" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-5">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
           Suppliers
         </Link>
-        <h1 className="text-xl font-bold text-slate-900 mb-4">New Vendor</h1>
-        <form onSubmit={handleCreate} className="bg-white border border-slate-200 rounded-2xl p-5 space-y-3">
+        <h1 className="text-xl font-bold text-slate-900 mb-4">New Supplier</h1>
+        <form onSubmit={handleCreate} className="space-y-3">
           {createError && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{createError}</div>}
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Name <span className="text-red-500">*</span></label>
-            <input type="text" value={createForm.name} onChange={(e) => setCreateForm((p) => ({ ...p, name: e.target.value }))} required
-              className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
+
+          {/* Basic Info */}
+          <div className={sectionCls}>
+            <div className={sectionHeadCls}><h2 className="text-sm font-semibold text-slate-700">Basic Info</h2></div>
+            <div className={sectionBodyCls}>
+              <div>
+                <label className={labelCls}>Company Name <span className="text-red-500">*</span></label>
+                  <p className="text-xs text-slate-400 italic mb-1">Full Corporate Company Name</p>
+                  <input type="text" value={createForm.name} onChange={(e) => cf('name', e.target.value)} required className={fieldCls} />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Phone {aturianActive && <span className="text-red-500">*</span>}</label>
+                  <input type="tel" value={createForm.phone} onChange={(e) => cf('phone', formatPhoneInput(e.target.value))} className={fieldCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Website</label>
+                  <input type="url" value={createForm.website} onChange={(e) => cf('website', e.target.value)} className={fieldCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Product Line</label>
+                  <select value={createForm.product_line} onChange={(e) => cf('product_line', e.target.value)} className={fieldCls + ' bg-white'}>
+                    <option value="">—</option>
+                    {PRODUCT_LINE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>Specialty</label>
+                  <select value={createForm.specialty} onChange={(e) => cf('specialty', e.target.value)} className={fieldCls + ' bg-white'}>
+                    <option value="">—</option>
+                    {SPECIALTY_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
+                  </select>
+                </div>
+              </div>
+            </div>
           </div>
-          <div className="grid grid-cols-2 gap-3">
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Phone</label>
-              <input type="tel" value={createForm.phone} onChange={(e) => setCreateForm((p) => ({ ...p, phone: formatPhoneInput(e.target.value) }))}
-                className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Website</label>
-              <input type="url" value={createForm.website} onChange={(e) => setCreateForm((p) => ({ ...p, website: e.target.value }))}
-                className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400" />
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Product Line</label>
-              <select value={createForm.product_line} onChange={(e) => setCreateForm((p) => ({ ...p, product_line: e.target.value }))}
-                className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                <option value="">—</option>
-                {PRODUCT_LINE_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Specialty</label>
-              <select value={createForm.specialty} onChange={(e) => setCreateForm((p) => ({ ...p, specialty: e.target.value }))}
-                className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                <option value="">—</option>
-                {SPECIALTY_OPTIONS.map((o) => <option key={o} value={o}>{o}</option>)}
-              </select>
+
+          {/* Mailing Address */}
+          <div className={sectionCls}>
+            <div className={sectionHeadCls}><h2 className="text-sm font-semibold text-slate-700">Mailing Address</h2></div>
+            <div className={sectionBodyCls}>
+              <div>
+                <label className={labelCls}>Street Address</label>
+                <input type="text" value={createForm.shipping_address1} onChange={(e) => cf('shipping_address1', e.target.value)} className={fieldCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Address Line 2</label>
+                <input type="text" value={createForm.shipping_address2} onChange={(e) => cf('shipping_address2', e.target.value)} className={fieldCls} />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-1">
+                  <label className={labelCls}>City</label>
+                  <input type="text" value={createForm.shipping_city} onChange={(e) => cf('shipping_city', e.target.value)} className={fieldCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>State</label>
+                  <select value={createForm.shipping_state} onChange={(e) => cf('shipping_state', e.target.value)} className={fieldCls + ' bg-white'}>
+                    <option value="">—</option>
+                    {Object.keys(US_STATES).map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>ZIP</label>
+                  <input type="text" value={createForm.shipping_zip} onChange={(e) => cf('shipping_zip', e.target.value)} className={fieldCls} />
+                </div>
+              </div>
             </div>
           </div>
-          <div>
-            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Description</label>
-            <textarea rows={3} value={createForm.description} onChange={(e) => setCreateForm((p) => ({ ...p, description: e.target.value }))}
-              className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none" />
+
+          {/* Billing Address */}
+          <div className={sectionCls}>
+            <div className={sectionHeadCls}>
+              <h2 className="text-sm font-semibold text-slate-700">Billing Address <span className="text-xs font-normal text-slate-400">(where checks are mailed to)</span></h2>
+            </div>
+            <div className={sectionBodyCls}>
+              <div>
+                <label className={labelCls}>Street Address {aturianActive && <span className="text-red-500">*</span>}</label>
+                <input type="text" value={createForm.billing_address1} onChange={(e) => cf('billing_address1', e.target.value)} className={fieldCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Address Line 2</label>
+                <input type="text" value={createForm.billing_address2} onChange={(e) => cf('billing_address2', e.target.value)} className={fieldCls} />
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                <div className="col-span-1">
+                  <label className={labelCls}>City {aturianActive && <span className="text-red-500">*</span>}</label>
+                  <input type="text" value={createForm.billing_city} onChange={(e) => cf('billing_city', e.target.value)} className={fieldCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>State {aturianActive && <span className="text-red-500">*</span>}</label>
+                  <select value={createForm.billing_state} onChange={(e) => cf('billing_state', e.target.value)} className={fieldCls + ' bg-white'}>
+                    <option value="">—</option>
+                    {Object.keys(US_STATES).map((s) => <option key={s} value={s}>{s}</option>)}
+                  </select>
+                </div>
+                <div>
+                  <label className={labelCls}>ZIP {aturianActive && <span className="text-red-500">*</span>}</label>
+                  <input type="text" value={createForm.billing_zip} onChange={(e) => cf('billing_zip', e.target.value)} className={fieldCls} />
+                </div>
+              </div>
+            </div>
           </div>
+
+          {/* Email Contacts */}
+          <div className={sectionCls}>
+            <div className={sectionHeadCls}><h2 className="text-sm font-semibold text-slate-700">Email Contacts</h2></div>
+            <div className={sectionBodyCls}>
+              <div>
+                <label className={labelCls}>AP Email — Accounting Questions {aturianActive && <span className="text-red-500">*</span>}</label>
+                <input type="email" value={createForm.ap_email} onChange={(e) => cf('ap_email', e.target.value)} className={fieldCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Orders Email {aturianActive && <span className="text-red-500">*</span>}</label>
+                <input type="email" value={createForm.orders_email} onChange={(e) => cf('orders_email', e.target.value)} className={fieldCls} />
+              </div>
+              <div>
+                <label className={labelCls}>Art Email</label>
+                <input type="email" value={createForm.artwork_email} onChange={(e) => cf('artwork_email', e.target.value)} className={fieldCls} />
+              </div>
+            </div>
+          </div>
+
+          {/* Sales Rep */}
+          <div className={sectionCls}>
+            <div className={sectionHeadCls}><h2 className="text-sm font-semibold text-slate-700">Sales Rep</h2></div>
+            <div className={sectionBodyCls}>
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className={labelCls}>Rep Name</label>
+                  <input type="text" value={createForm.sales_rep_name} onChange={(e) => cf('sales_rep_name', e.target.value)} className={fieldCls} />
+                </div>
+                <div>
+                  <label className={labelCls}>Rep Email</label>
+                  <input type="email" value={createForm.sales_rep_email} onChange={(e) => cf('sales_rep_email', e.target.value)} className={fieldCls} />
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Tags / Add to Aturian */}
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="px-5 py-3 bg-slate-50 border-b border-slate-100"><h2 className="text-sm font-semibold text-slate-700">Tags</h2></div>
+            <div className="px-5 py-4 space-y-3">
+              <div className="flex items-start gap-3 p-3.5 bg-purple-50 border border-purple-200 rounded-xl">
+                <svg className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm text-purple-800">
+                    If this supplier needs to be added to Aturian, click the button below. This will require additional fields to be filled out completely before saving.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={async () => {
+                      let tag = allCrmTags.find((t) => t.name.trim().toLowerCase() === 'add to aturian')
+                      if (!tag) {
+                        const res = await fetch('/api/marketing/tags', {
+                          method: 'POST',
+                          headers: { 'Content-Type': 'application/json' },
+                          body: JSON.stringify({ name: 'Add to Aturian' }),
+                        })
+                        if (res.ok) {
+                          tag = await res.json()
+                          setAllCrmTags((prev) => [...(prev ?? []), tag!])
+                        }
+                      }
+                      if (tag && !createTagIds.includes(tag.id)) {
+                        setCreateTagIds((prev) => [...prev, tag!.id])
+                      }
+                    }}
+                    disabled={!!allCrmTags.find((t) => t.name.trim().toLowerCase() === 'add to aturian') && createTagIds.includes(allCrmTags.find((t) => t.name.trim().toLowerCase() === 'add to aturian')!.id)}
+                    className="mt-2.5 px-3 py-1.5 text-xs font-semibold bg-purple-700 hover:bg-purple-800 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
+                  >
+                    {allCrmTags.find((t) => t.name.trim().toLowerCase() === 'add to aturian') && createTagIds.includes(allCrmTags.find((t) => t.name.trim().toLowerCase() === 'add to aturian')!.id)
+                      ? '✓ "Add to Aturian" tag added'
+                      : 'Add "Add to Aturian" Tag'}
+                  </button>
+                </div>
+              </div>
+              <TagPicker value={createTagIds} onChange={setCreateTagIds} placeholder="Add tags…" />
+            </div>
+          </div>
+
+          {/* Notes */}
+          <div className={sectionCls}>
+            <div className={sectionHeadCls}><h2 className="text-sm font-semibold text-slate-700">Notes</h2></div>
+            <div className={sectionBodyCls}>
+              <textarea rows={3} value={createForm.notes} onChange={(e) => cf('notes', e.target.value)} className={fieldCls + ' resize-none'} />
+            </div>
+          </div>
+
           <div className="flex gap-3 pt-1">
             <button type="submit" disabled={creating}
               className="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl disabled:opacity-60 transition-colors">
-              {creating ? 'Creating…' : 'Create Vendor'}
+              {creating ? 'Creating…' : 'Create Supplier'}
             </button>
             <Link href="/marketing/vendors" className="px-5 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors">
               Cancel

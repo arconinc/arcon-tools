@@ -90,7 +90,7 @@ export default function AdminSpecIdeasPage() {
     const res = await fetch('/api/marketing/spec-ideas', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ vendor: 'New Vendor', item_name: 'New Item' }),
+      body: JSON.stringify({ vendor: 'New Supplier', item_name: 'New Item' }),
     })
     const idea = await res.json()
     setCreating(false)

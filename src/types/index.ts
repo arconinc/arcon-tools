@@ -622,6 +622,9 @@ export interface CrmVendor {
   arcon_username: string | null
   arcon_password: string | null
   customer_service_email: string | null
+  ap_email: string | null
+  sales_rep_name: string | null
+  sales_rep_email: string | null
   orders_email: string | null
   orders_cutoff: string | null
   rush_order_email: string | null

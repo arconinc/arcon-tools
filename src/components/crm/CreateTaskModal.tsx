@@ -453,7 +453,7 @@ export function TaskFormModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4 py-6" onClick={handleClose}>
-      <div className="w-full max-w-3xl h-[90vh] flex flex-col rounded-2xl bg-white shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div className="w-full max-w-4xl h-[90vh] flex flex-col rounded-2xl bg-white shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
 
         {/* Header */}
         <div className="flex-shrink-0 flex items-center justify-between gap-3 border-b border-slate-100 bg-white px-6 py-4">

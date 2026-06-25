@@ -200,7 +200,7 @@ export default function ContactDetailPage() {
 
   if (isNew) {
     return (
-      <div className="max-w-2xl mx-auto px-6 py-6">
+      <div className="max-w-4xl mx-auto px-6 py-6">
         <Link href="/marketing/contacts" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-5">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
           Contacts

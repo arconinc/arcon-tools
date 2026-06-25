@@ -46,7 +46,7 @@ export default async function ArticleReaderPage({ params }: PageProps) {
 
   return (
     <AppShell user={{ ...appUser, avatar_url: avatarUrl }}>
-      <div className="max-w-3xl mx-auto px-6 py-8">
+      <div className="max-w-4xl mx-auto px-6 py-8">
         {/* Back */}
         <Link href="/news" className="text-sm text-slate-400 hover:text-purple-600 flex items-center gap-1 mb-6 transition-colors">
           ← Back to News

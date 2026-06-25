@@ -176,7 +176,7 @@ export default function BannerStripAdminPage() {
 
   if (loading) {
     return (
-      <div className="max-w-3xl mx-auto px-8 py-10">
+      <div className="max-w-4xl mx-auto px-8 py-10">
         <div className="animate-pulse space-y-4">
           {[1, 2, 3].map((n) => <div key={n} className="h-24 bg-slate-100 rounded-2xl" />)}
         </div>
@@ -185,7 +185,7 @@ export default function BannerStripAdminPage() {
   }
 
   return (
-    <div className="max-w-3xl mx-auto px-8 py-8 space-y-6">
+    <div className="max-w-4xl mx-auto px-8 py-8 space-y-6">
 
       {/* Header */}
       <div className="flex items-center justify-between">

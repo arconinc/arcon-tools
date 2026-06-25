@@ -611,6 +611,93 @@ export const contactFormSubmitted: NotificationDefinition<ContactFormSubmittedPa
   },
 }
 
+// ─── supplier.added_to_aturian ────────────────────────────────────────────────
+
+export interface SupplierAturianPayload {
+  vendor_id: string
+  vendor_name: string
+  requestor_name: string
+  ap_email: string | null
+  phone: string | null
+  orders_email: string | null
+}
+
+export const supplierAddedToAturian: NotificationDefinition<SupplierAturianPayload> = {
+  type: 'supplier.added_to_aturian',
+  label: 'New supplier needs Aturian setup',
+  description: 'When a new supplier is submitted with "Add to Aturian" checked.',
+  defaultEmail: true,
+  render: (p) => ({
+    title: `New supplier to add to Aturian: ${p.vendor_name}`,
+    body: `Requested by ${p.requestor_name}`,
+    linkUrl: `/marketing/vendors/${p.vendor_id}`,
+  }),
+  email: (p, recipient) => {
+    const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
+    return {
+      subject: `New supplier for Aturian: ${p.vendor_name}`,
+      html: renderGenericEmail({
+        preheader: `${p.vendor_name} needs to be added to Aturian`,
+        heading: 'New Supplier — Add to Aturian',
+        greeting: `Hi ${firstName},`,
+        bodyLines: [
+          `<strong>${p.requestor_name}</strong> submitted a new supplier that needs to be added to Aturian.`,
+          `<strong style="font-size:16px;color:#1e293b">${p.vendor_name}</strong>`,
+          ...(p.phone ? [`<strong>Phone:</strong> ${p.phone}`] : []),
+          ...(p.ap_email ? [`<strong>AP Email:</strong> ${p.ap_email}`] : []),
+          ...(p.orders_email ? [`<strong>Orders Email:</strong> ${p.orders_email}`] : []),
+        ],
+        ctaText: 'View Supplier',
+        ctaUrl: `${appUrl()}/marketing/vendors/${p.vendor_id}`,
+      }),
+    }
+  },
+}
+
+// ─── customer.added_to_aturian ────────────────────────────────────────────────
+
+export interface CustomerAturianPayload {
+  customer_id: string
+  customer_name: string
+  requestor_name: string
+  phone: string | null
+  billing_address1: string | null
+  billing_city: string | null
+  billing_state: string | null
+}
+
+export const customerAddedToAturian: NotificationDefinition<CustomerAturianPayload> = {
+  type: 'customer.added_to_aturian',
+  label: 'New customer needs Aturian setup',
+  description: 'When a new customer is submitted with "Add to Aturian" checked.',
+  defaultEmail: true,
+  render: (p) => ({
+    title: `New customer to add to Aturian: ${p.customer_name}`,
+    body: `Requested by ${p.requestor_name}`,
+    linkUrl: `/marketing/customers/${p.customer_id}`,
+  }),
+  email: (p, recipient) => {
+    const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
+    const addr = [p.billing_address1, p.billing_city, p.billing_state].filter(Boolean).join(', ')
+    return {
+      subject: `New customer for Aturian: ${p.customer_name}`,
+      html: renderGenericEmail({
+        preheader: `${p.customer_name} needs to be added to Aturian`,
+        heading: 'New Customer — Add to Aturian',
+        greeting: `Hi ${firstName},`,
+        bodyLines: [
+          `<strong>${p.requestor_name}</strong> submitted a new customer that needs to be added to Aturian.`,
+          `<strong style="font-size:16px;color:#1e293b">${p.customer_name}</strong>`,
+          ...(p.phone ? [`<strong>Phone:</strong> ${p.phone}`] : []),
+          ...(addr ? [`<strong>Billing Address:</strong> ${addr}`] : []),
+        ],
+        ctaText: 'View Customer',
+        ctaUrl: `${appUrl()}/marketing/customers/${p.customer_id}`,
+      }),
+    }
+  },
+}
+
 // ─── Registry ─────────────────────────────────────────────────────────────────
 //
 // To add a new notification type:
@@ -634,6 +721,8 @@ export const NOTIFICATION_REGISTRY = {
   'pto.submitted': ptoSubmitted,
   'pto.reviewed': ptoReviewed,
   'contact_form.submitted': contactFormSubmitted,
+  'supplier.added_to_aturian': supplierAddedToAturian,
+  'customer.added_to_aturian': customerAddedToAturian,
 } as const
 
 export type NotificationType = keyof typeof NOTIFICATION_REGISTRY
