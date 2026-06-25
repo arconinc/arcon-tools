@@ -5,6 +5,7 @@ import { unauthorized, badRequest, serverError, created, ok } from '@/lib/api/re
 import { stripReadOnly } from '@/lib/api/sanitize'
 import { dispatchNotification } from '@/lib/notifications/dispatch'
 import { customerAddedToAturian } from '@/lib/notifications/registry'
+import { resolveAturianAssignee } from '@/lib/crm/aturian-assignees'
 
 // GET /api/marketing/customers?search=&status=&assigned_to=&tag_id=&page=1&limit=50
 export async function GET(req: NextRequest) {
@@ -142,12 +143,14 @@ export async function POST(req: NextRequest) {
         data.phone ? `Phone: ${data.phone}` : null,
         data.billing_address1 ? `Billing Address: ${[data.billing_address1, data.billing_city, data.billing_state, data.billing_zip].filter(Boolean).join(', ')}` : null,
       ].filter(Boolean).join('\n')
+      const assignee = await resolveAturianAssignee(adminClient, 'customer')
 
       const { data: task } = await adminClient
         .from('crm_tasks')
         .insert({
           title: `Add ${name.trim()} to Aturian`,
           department: 'Accounting',
+          assigned_to: assignee?.id ?? null,
           description: descLines || null,
           status: 'not_started',
           priority: 'medium',
@@ -171,7 +174,7 @@ export async function POST(req: NextRequest) {
               billing_city: data.billing_city ?? null,
               billing_state: data.billing_state ?? null,
             },
-            recipientSpec: { department: 'Accounting' },
+            recipientSpec: assignee ? { userId: assignee.id } : { department: 'Accounting' },
             suppressUserIds: [appUser.id],
           })
         } catch (err) {

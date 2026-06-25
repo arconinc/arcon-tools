@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 import { dispatchNotification } from '@/lib/notifications/dispatch'
 import { supplierAddedToAturian } from '@/lib/notifications/registry'
+import { resolveAturianAssignee } from '@/lib/crm/aturian-assignees'
 
 // GET /api/marketing/vendors?search=&tag_id=&page=1&limit=50
 export async function GET(req: NextRequest) {
@@ -132,12 +133,14 @@ export async function POST(req: NextRequest) {
       data.billing_address1 ? `Billing Address: ${[data.billing_address1, data.billing_city, data.billing_state, data.billing_zip].filter(Boolean).join(', ')}` : null,
       data.sales_rep_name ? `Sales Rep: ${data.sales_rep_name}${data.sales_rep_email ? ` (${data.sales_rep_email})` : ''}` : null,
     ].filter(Boolean).join('\n')
+    const assignee = await resolveAturianAssignee(adminClient, 'supplier')
 
     const { data: task } = await adminClient
       .from('crm_tasks')
       .insert({
         title: `Add ${name.trim()} to Aturian`,
         department: 'Accounting',
+        assigned_to: assignee?.id ?? null,
         description: descLines || null,
         status: 'not_started',
         priority: 'medium',
@@ -160,7 +163,7 @@ export async function POST(req: NextRequest) {
             phone: data.phone ?? null,
             orders_email: data.orders_email ?? null,
           },
-          recipientSpec: { department: 'Accounting' },
+          recipientSpec: assignee ? { userId: assignee.id } : { department: 'Accounting' },
           suppressUserIds: [appUser.id],
         })
       } catch (err) {
