@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { ConfirmButton } from '@/components/ui/ConfirmButton'
 
 type Tag = { id: string; name: string; color: string; created_at: string; usage_count?: number }
 
@@ -79,8 +80,7 @@ export default function CrmTagsPage() {
     }
   }
 
-  async function deleteTag(id: string, name: string) {
-    if (!confirm(`Delete tag "${name}"? This will remove it from all entities.`)) return
+  async function deleteTag(id: string) {
     setDeleting(id)
     try {
       const res = await fetch(`/api/marketing/tags/${id}`, { method: 'DELETE' })
@@ -247,13 +247,14 @@ export default function CrmTagsPage() {
                       >
                         Edit
                       </button>
-                      <button
-                        onClick={() => deleteTag(tag.id, tag.name)}
+                      <ConfirmButton
+                        idleLabel="Delete"
+                        confirmLabel="Yes, delete?"
+                        onConfirm={() => deleteTag(tag.id)}
+                        variant="red"
+                        size="sm"
                         disabled={deleting === tag.id}
-                        className="px-2.5 py-1 text-xs font-medium text-red-500 hover:text-red-700 border border-red-200 rounded-lg hover:bg-red-50 transition-colors disabled:opacity-60"
-                      >
-                        {deleting === tag.id ? '…' : 'Delete'}
-                      </button>
+                      />
                     </div>
                   </>
                 )}

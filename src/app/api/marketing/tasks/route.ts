@@ -141,8 +141,11 @@ export async function GET(req: NextRequest) {
   const total = countRes.count ?? 0
   const rows = (dataRes.data as any[]) ?? []
 
-  // Batch-enrich: user names for assigned_to
-  const userIds = [...new Set(rows.map((t: any) => t.assigned_to).filter(Boolean))]
+  // Batch-enrich: user names for assigned_to and created_by
+  const userIds = [...new Set([
+    ...rows.map((t: any) => t.assigned_to),
+    ...rows.map((t: any) => t.created_by),
+  ].filter(Boolean))]
   const oppIds = [...new Set(rows.map((t: any) => t.opportunity_id).filter(Boolean))]
   const custIds = [...new Set(rows.map((t: any) => t.customer_id).filter(Boolean))]
   const vendIds = [...new Set(rows.map((t: any) => t.vendor_id).filter(Boolean))]
@@ -180,6 +183,7 @@ export async function GET(req: NextRequest) {
   const enriched = rows.map((t: any) => ({
     ...t,
     assigned_user_name: t.assigned_to ? (usersMap[t.assigned_to] ?? null) : null,
+    created_by_name: t.created_by ? (usersMap[t.created_by] ?? null) : null,
     linked_to_name: t.opportunity_id
       ? oppsMap[t.opportunity_id] ?? null
       : t.customer_id

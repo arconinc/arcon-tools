@@ -1,6 +1,8 @@
 'use client'
 
-import { useState, useRef } from 'react'
+import { useState, useRef, useEffect } from 'react'
+import { createPortal } from 'react-dom'
+import Image from 'next/image'
 import { DEPARTMENT_DISPLAY_NAMES } from '@/lib/task-constants'
 import type { CrmTaskDepartment } from '@/types'
 
@@ -35,6 +37,7 @@ export type KanbanTask = {
   vendor_id: string | null
   contact_id: string | null
   created_by: string | null
+  created_by_name: string | null
   delegators: string[]
 }
 
@@ -112,10 +115,12 @@ export function PriorityIcon({ priority }: { priority: KanbanPriority }) {
 export function UserAvatar({ name, avatarUrl, size = 20 }: { name: string; avatarUrl: string | null; size?: number }) {
   if (avatarUrl) {
     return (
-      <img
+      <Image
         src={avatarUrl}
         alt={name}
-        style={{ width: size, height: size, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
+        width={size}
+        height={size}
+        style={{ borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
       />
     )
   }
@@ -132,7 +137,144 @@ export function UserAvatar({ name, avatarUrl, size = 20 }: { name: string; avata
   )
 }
 
+// ── Card action icons ─────────────────────────────────────────────────────────
+
+function CardIconApproval() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <circle cx="12" cy="12" r="10" />
+      <polyline points="12 6 12 12 16 14" />
+    </svg>
+  )
+}
+
+function CardIconComplete() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="20 6 9 17 4 12" />
+    </svg>
+  )
+}
+
+function CardIconConfirm() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+      <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+      <line x1="12" y1="17" x2="12.01" y2="17" />
+    </svg>
+  )
+}
+
+// Two-click confirm button for kanban cards — same pattern as ConfirmIconButton
+// in TaskTableView but inlined here to keep the file self-contained.
+function CardConfirmButton({
+  idleIcon,
+  idleLabel,
+  confirmLabel,
+  onConfirm,
+  confirmColor,
+  disabled = false,
+}: {
+  idleIcon: React.ReactNode
+  idleLabel: string
+  confirmLabel: string
+  onConfirm: () => void
+  confirmColor: 'yellow' | 'green'
+  disabled?: boolean
+}) {
+  const [pending, setPending] = useState(false)
+  const [hovered, setHovered] = useState(false)
+  const [tooltipStyle, setTooltipStyle] = useState<React.CSSProperties>({})
+  const btnRef = useRef<HTMLButtonElement>(null)
+  const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null)
+
+  function reset() {
+    setPending(false)
+    if (timerRef.current) { clearTimeout(timerRef.current); timerRef.current = null }
+  }
+
+  useEffect(() => () => { if (timerRef.current) clearTimeout(timerRef.current) }, [])
+
+  function handleMouseEnter() {
+    if (!btnRef.current) return
+    const rect = btnRef.current.getBoundingClientRect()
+    setTooltipStyle({
+      position: 'fixed',
+      top: rect.top - 6,
+      left: rect.left + rect.width / 2,
+      transform: 'translate(-50%, -100%)',
+      zIndex: 9999,
+    })
+    setHovered(true)
+  }
+
+  function handleClick(e: React.MouseEvent) {
+    e.stopPropagation()
+    if (disabled) return
+    if (!pending) {
+      setPending(true)
+      timerRef.current = setTimeout(reset, 3000)
+    } else {
+      reset()
+      onConfirm()
+    }
+  }
+
+  const idleBg = confirmColor === 'green' ? 'rgba(22,163,74,0.10)' : 'rgba(217,119,6,0.10)'
+  const idleColor = confirmColor === 'green' ? '#15803d' : '#b45309'
+  const pendingBg = confirmColor === 'green' ? 'rgba(22,163,74,0.18)' : 'rgba(217,119,6,0.18)'
+  const pendingBorder = confirmColor === 'green' ? '#86efac' : '#fcd34d'
+
+  return (
+    <>
+      <button
+        ref={btnRef}
+        type="button"
+        disabled={disabled}
+        aria-label={pending ? confirmLabel : idleLabel}
+        onClick={handleClick}
+        onMouseEnter={handleMouseEnter}
+        onMouseLeave={() => { setHovered(false) }}
+        style={{
+          display: 'flex', alignItems: 'center', justifyContent: 'center',
+          width: 26, height: 26, borderRadius: 6, border: 'none',
+          cursor: disabled ? 'not-allowed' : 'pointer',
+          opacity: disabled ? 0.35 : 1,
+          background: pending ? pendingBg : idleBg,
+          color: idleColor,
+          outline: pending ? `2px solid ${pendingBorder}` : 'none',
+          outlineOffset: 0,
+          transition: 'background 0.12s, outline 0.12s',
+          flexShrink: 0,
+        }}
+      >
+        {pending ? <CardIconConfirm /> : idleIcon}
+      </button>
+      {hovered && typeof document !== 'undefined' && createPortal(
+        <span
+          style={{
+            ...tooltipStyle,
+            pointerEvents: 'none',
+            whiteSpace: 'nowrap',
+            borderRadius: 6,
+            background: '#1e293b',
+            padding: '3px 8px',
+            fontSize: 11,
+            fontWeight: 500,
+            color: '#fff',
+          }}
+        >
+          {pending ? confirmLabel : idleLabel}
+        </span>,
+        document.body
+      )}
+    </>
+  )
+}
+
 // ── KanbanCard ────────────────────────────────────────────────────────────────
+
+export type KanbanCardAction = 'send_for_approval' | 'mark_completed'
 
 function KanbanCard({
   task,
@@ -148,6 +290,7 @@ function KanbanCard({
   onContextMenu,
   onAssignToMe,
   showAssignToMe,
+  onCardAction,
 }: {
   task: KanbanTask
   isUpdating: boolean
@@ -162,8 +305,18 @@ function KanbanCard({
   onContextMenu: (e: React.MouseEvent, taskId: string) => void
   onAssignToMe?: (taskId: string) => void
   showAssignToMe?: boolean
+  onCardAction?: (taskId: string, action: KanbanCardAction) => Promise<void>
 }) {
   const [isDragging, setIsDragging] = useState(false)
+  const [cardHovered, setCardHovered] = useState(false)
+  const [actionLoading, setActionLoading] = useState(false)
+
+  async function handleAction(action: KanbanCardAction) {
+    if (!onCardAction) return
+    setActionLoading(true)
+    try { await onCardAction(task.id, action) }
+    finally { setActionLoading(false) }
+  }
   const overdue = isTaskOverdue(task.due_date, task.status)
   const dateStr = fmtDate(task.due_date)
   const href = linkedHref(task)
@@ -188,6 +341,8 @@ function KanbanCard({
         onClick(task.id)
       }}
       onContextMenu={(e) => onContextMenu(e, task.id)}
+      onMouseEnter={() => setCardHovered(true)}
+      onMouseLeave={() => setCardHovered(false)}
       role="button"
       tabIndex={0}
       aria-label={`Open task ${task.title}`}
@@ -195,9 +350,6 @@ function KanbanCard({
     >
       {/* Title row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7, marginBottom: 8 }}>
-        <div style={{ paddingTop: 1 }}>
-          <PriorityIcon priority={task.priority} />
-        </div>
         <span style={{ fontSize: 13, fontWeight: 600, color: '#111', lineHeight: 1.4, flex: 1 }}>
           {task.title}
         </span>
@@ -297,6 +449,52 @@ function KanbanCard({
           </button>
         )}
       </div>
+
+      {/* Action buttons — absolutely positioned top-right, no height change */}
+      {onCardAction && (cardHovered || actionLoading) && (
+        <div
+          onClick={(e) => e.stopPropagation()}
+          style={{
+            position: 'absolute',
+            top: 6,
+            right: 6,
+            display: 'flex',
+            alignItems: 'center',
+            gap: 2,
+            background: '#fff',
+            borderRadius: 8,
+            padding: '2px 3px',
+            boxShadow: '0 1px 4px rgba(0,0,0,0.10)',
+          }}
+        >
+          {actionLoading ? (
+            <span style={{
+              display: 'inline-block', width: 16, height: 16,
+              border: '2px solid #e2e8f0', borderTopColor: '#7c3aed',
+              borderRadius: '50%', animation: 'kanban-spin 0.7s linear infinite',
+            }} />
+          ) : (
+            <>
+              <CardConfirmButton
+                idleIcon={<CardIconApproval />}
+                idleLabel="Send for Approval"
+                confirmLabel="Confirm approval?"
+                onConfirm={() => handleAction('send_for_approval')}
+                confirmColor="yellow"
+                disabled={task.status === 'waiting_on_approval' || task.status === 'completed' || task.assigned_to === task.created_by}
+              />
+              <CardConfirmButton
+                idleIcon={<CardIconComplete />}
+                idleLabel="Mark as Completed"
+                confirmLabel="Confirm complete?"
+                onConfirm={() => handleAction('mark_completed')}
+                confirmColor="green"
+                disabled={task.status === 'completed'}
+              />
+            </>
+          )}
+        </div>
+      )}
     </div>
   )
 }
@@ -322,6 +520,7 @@ function KanbanColumn({
   onCardClick,
   onCardContextMenu,
   onAssignToMe,
+  onCardAction,
 }: {
   col: { id: KanbanStatus; label: string; color: string; bg: string; dotColor: string }
   tasks: KanbanTask[]
@@ -341,24 +540,25 @@ function KanbanColumn({
   onCardClick: (id: string) => void
   onCardContextMenu: (e: React.MouseEvent, taskId: string) => void
   onAssignToMe?: (taskId: string) => void
+  onCardAction?: (taskId: string, action: KanbanCardAction) => Promise<void>
 }) {
   return (
-    <div
-      onDragOver={onColumnDragOver}
-      onDragLeave={onColumnDragLeave}
-      onDrop={onDrop}
-      style={{
-        width: 272, minWidth: 272, flexShrink: 0,
-        background: isDragOver ? '#faf5ff' : col.bg,
-        borderRadius: 12,
-        border: `1px solid ${isDragOver ? '#9333ea' : '#e5e7eb'}`,
-        display: 'flex',
-        flexDirection: 'column',
-        maxHeight: 'calc(100vh - 200px)',
-        overflow: 'hidden',
-        transition: 'background 0.15s, border-color 0.15s',
-      }}
-    >
+      <div
+        onDragOver={onColumnDragOver}
+        onDragLeave={onColumnDragLeave}
+        onDrop={onDrop}
+        style={{
+          width: 272, minWidth: 272, flexShrink: 0,
+          background: isDragOver ? '#faf5ff' : col.bg,
+          borderRadius: 12,
+          border: `1px solid ${isDragOver ? '#9333ea' : '#e5e7eb'}`,
+          display: 'flex',
+          flexDirection: 'column',
+          maxHeight: '100%',
+          overflow: 'hidden',
+          transition: 'background 0.15s, border-color 0.15s',
+        }}
+      >
       <div style={{
         padding: '12px 14px 10px',
         display: 'flex',
@@ -411,6 +611,7 @@ function KanbanColumn({
             onClick={onCardClick}
             onContextMenu={onCardContextMenu}
             onAssignToMe={onAssignToMe}
+            onCardAction={onCardAction}
           />
         ))}
       </div>
@@ -433,6 +634,7 @@ interface TaskKanbanViewProps {
   onCardContextMenu: (e: React.MouseEvent, taskId: string) => void
   onReorder: (updates: { id: string; sort_order: number; status?: string }[]) => Promise<void>
   onAssignToMe?: (taskId: string) => void
+  onCardAction?: (taskId: string, action: KanbanCardAction) => Promise<void>
 }
 
 export function TaskKanbanView({
@@ -448,6 +650,7 @@ export function TaskKanbanView({
   onCardContextMenu,
   onReorder,
   onAssignToMe,
+  onCardAction,
 }: TaskKanbanViewProps) {
   const dragTaskId = useRef<string | null>(null)
   const dragFromColumn = useRef<KanbanStatus | null>(null)
@@ -618,12 +821,13 @@ export function TaskKanbanView({
         .kanban-card:focus-visible { outline: 2px solid #a855f7; outline-offset: 2px; }
         .kanban-card.dragging { opacity: 0.35; transform: scale(0.97); }
         .kanban-card.updating { opacity: 0.6; }
-        .kanban-card.priority-high { border-color: #fecaca; background: #fffbfb; }
-        .kanban-card.priority-low { border-color: #bfdbfe; background: #f8fbff; }
+        .kanban-card.priority-high { border-color: #fde8e8; background: #fff7f7; }
+        .kanban-card.priority-low { border-color: #dbeafe; background: #f5f9ff; }
         .insert-before::before { content: ''; display: block; position: absolute; top: -5px; left: 0; right: 0; height: 2px; background: #7c3aed; border-radius: 2px; pointer-events: none; }
         .insert-before::after { content: ''; display: block; position: absolute; top: -9px; left: 0; width: 8px; height: 8px; border-radius: 50%; background: #7c3aed; pointer-events: none; }
         .insert-after::before { content: ''; display: block; position: absolute; bottom: -5px; left: 0; right: 0; height: 2px; background: #7c3aed; border-radius: 2px; pointer-events: none; }
         .insert-after::after { content: ''; display: block; position: absolute; bottom: -9px; left: 0; width: 8px; height: 8px; border-radius: 50%; background: #7c3aed; pointer-events: none; }
+        @keyframes kanban-spin { to { transform: rotate(360deg); } }
         @media (prefers-reduced-motion: reduce) {
           .kanban-card { transition: none !important; }
           .kanban-card.dragging { transform: none; }
@@ -669,6 +873,7 @@ export function TaskKanbanView({
               onCardClick={onCardClick}
               onCardContextMenu={onCardContextMenu}
               onAssignToMe={onAssignToMe}
+              onCardAction={onCardAction}
             />
           ))
         )}

@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { ExpenseReportLineItem, ExpenseReportVersion, ExpenseReportComment } from '@/types'
+import { ConfirmButton } from '@/components/ui/ConfirmButton'
 
 interface ReportDetail {
   id: string
@@ -184,7 +185,7 @@ export default function ExpenseReportDetailPage() {
   const [canEdit, setCanEdit] = useState(false)
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
-  const [showSubmitConfirm, setShowSubmitConfirm] = useState(false)
+
   const [newComment, setNewComment] = useState('')
   const [postingComment, setPostingComment] = useState(false)
 
@@ -214,8 +215,7 @@ export default function ExpenseReportDetailPage() {
     setSubmitError(null)
     const res = await fetch(`/api/expense-reports/${id}/submit`, { method: 'POST' })
     const data = await res.json()
-    if (res.ok) {
-      setShowSubmitConfirm(false)
+      if (res.ok) {
       load()
     } else {
       setSubmitError(data.error ?? 'Submission failed')
@@ -296,9 +296,13 @@ export default function ExpenseReportDetailPage() {
         </div>
         <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
           {canSubmit && (
-            <button className="btn-submit" onClick={() => { setSubmitError(null); setShowSubmitConfirm(true) }}>
-              {report.status === 'needs_changes' ? '↩ Resubmit for Review' : '📤 Submit for Review'}
-            </button>
+            <ConfirmButton
+              idleLabel={report.status === 'needs_changes' ? '↩ Resubmit for Review' : '📤 Submit for Review'}
+              confirmLabel="Yes, submit?"
+              onConfirm={() => { setSubmitError(null); handleSubmit() }}
+              variant="green"
+              disabled={submitting}
+            />
           )}
           {canEdit && (
             <Link href={`/expense-reports/${id}/edit`} style={{ textDecoration: 'none' }}>
@@ -478,28 +482,7 @@ export default function ExpenseReportDetailPage() {
         </div>
       </div>
 
-      {/* Submit confirmation modal */}
-      {showSubmitConfirm && (
-        <div className="modal-backdrop" onClick={e => { if (e.target === e.currentTarget) setShowSubmitConfirm(false) }}>
-          <div className="modal">
-            <h2 style={{ margin: '0 0 8px', fontSize: 20, fontWeight: 700, color: '#1e1b4b' }}>Submit for Review?</h2>
-            <p style={{ margin: '0 0 20px', fontSize: 14, color: '#6b7280', lineHeight: 1.5 }}>
-              Your <strong>{formatMonth(report.period_month)}</strong> expense report ({lineItems.length} items) will be sent to the reviewer. You won&apos;t be able to edit it until they respond.
-            </p>
-            {submitError && (
-              <div style={{ background: '#fef2f2', border: '1px solid #fca5a5', borderRadius: 8, padding: '10px 14px', color: '#dc2626', fontSize: 14, marginBottom: 14 }}>
-                {submitError}
-              </div>
-            )}
-            <div style={{ display: 'flex', gap: 10 }}>
-              <button className="btn-secondary" style={{ flex: 1 }} onClick={() => setShowSubmitConfirm(false)}>Cancel</button>
-              <button disabled={submitting} onClick={handleSubmit} style={{ flex: 2, background: '#16a34a', color: '#fff', border: 'none', padding: '10px 20px', borderRadius: 8, fontSize: 14, fontWeight: 700, cursor: 'pointer', opacity: submitting ? 0.6 : 1 }}>
-                {submitting ? 'Submitting…' : 'Submit'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   )
 }

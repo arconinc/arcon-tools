@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react'
 import { formatDateTime, formatBytes } from '@/lib/format'
 import type { Comment } from '@/hooks/useTask'
+import { ConfirmButton } from '@/components/ui/ConfirmButton'
 
 function isImageMime(mime: string | null) {
   return mime?.startsWith('image/') ?? false
@@ -27,6 +28,7 @@ export function CommentsTab({
   const [driveLabel, setDriveLabel] = useState('')
   const [showDriveForm, setShowDriveForm] = useState(false)
   const [pendingCommentId, setPendingCommentId] = useState<string | null>(null)
+  const [confirmingAttachmentId, setConfirmingAttachmentId] = useState<string | null>(null)
   const [uploadingCommentId, setUploadingCommentId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
@@ -49,7 +51,6 @@ export function CommentsTab({
   }
 
   async function deleteComment(cid: string) {
-    if (!confirm('Delete this comment?')) return
     await fetch(`/api/marketing/tasks/${taskId}/comments/${cid}`, { method: 'DELETE' })
     onRefresh()
   }
@@ -95,7 +96,6 @@ export function CommentsTab({
   }
 
   async function deleteAttachment(cid: string, aid: string) {
-    if (!confirm('Remove this attachment?')) return
     await fetch(`/api/marketing/tasks/${taskId}/comments/${cid}/attachments/${aid}`, { method: 'DELETE' })
     onRefresh()
   }
@@ -139,12 +139,13 @@ export function CommentsTab({
               <span className="text-xs text-slate-400">{formatDateTime(c.created_at)}</span>
             </div>
             {(c.user_id === currentUserId || isAdmin) && (
-              <button
-                onClick={() => deleteComment(c.id)}
-                className="text-xs text-slate-400 hover:text-red-600 transition-colors flex-shrink-0"
-              >
-                Delete
-              </button>
+              <ConfirmButton
+                idleLabel="Delete"
+                confirmLabel="Yes, delete?"
+                onConfirm={() => deleteComment(c.id)}
+                variant="red"
+                size="sm"
+              />
             )}
           </div>
 
@@ -179,10 +180,22 @@ export function CommentsTab({
                   )}
                   {(att.uploaded_by === currentUserId || isAdmin) && (
                     <button
-                      onClick={() => deleteAttachment(c.id, att.id)}
-                      className="absolute -top-1.5 -right-1.5 hidden group-hover:flex w-5 h-5 bg-red-500 text-white rounded-full items-center justify-center text-xs leading-none"
+                      onClick={() => {
+                        if (confirmingAttachmentId === att.id) {
+                          setConfirmingAttachmentId(null)
+                          deleteAttachment(c.id, att.id)
+                        } else {
+                          setConfirmingAttachmentId(att.id)
+                          setTimeout(() => setConfirmingAttachmentId(null), 3000)
+                        }
+                      }}
+                      className={`absolute -top-1.5 -right-1.5 hidden group-hover:flex items-center justify-center text-xs leading-none rounded-full transition-colors ${
+                        confirmingAttachmentId === att.id
+                          ? 'bg-red-700 text-white w-auto px-1.5 py-0.5'
+                          : 'bg-red-500 text-white w-5 h-5'
+                      }`}
                     >
-                      ×
+                      {confirmingAttachmentId === att.id ? '?' : '×'}
                     </button>
                   )}
                 </div>

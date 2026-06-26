@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { opportunityStatusBadge } from '@/lib/badges'
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable'
 import { FilterPillGroup, type FilterPillOption } from '@/components/ui/FilterPill'
+import { SavedFiltersMenu } from '@/components/ui/SavedFiltersMenu'
 
 const PAGE_SIZE = 50
 
@@ -110,6 +111,7 @@ export default function OpportunitiesPage() {
   const [ownerFilter, setOwnerFilter] = useState('')
   const [tagFilter, setTagFilter] = useState('')
   const [page, setPage] = useState(1)
+  const [activeFilterId, setActiveFilterId] = useState<string | null>(null)
 
   useEffect(() => {
     fetch('/api/marketing/tags').then((r) => r.json()).then((d) => { if (Array.isArray(d)) setAllTags(d) })
@@ -171,6 +173,25 @@ export default function OpportunitiesPage() {
     .reduce((s, o) => s + (o.value ?? 0), 0)
 
   const activeFilters = !!(search || statusFilter || stageFilter || ownerFilter || tagFilter)
+
+  function getCurrentFilterConfig(): Record<string, unknown> {
+    return {
+      search: search || null,
+      statusFilter: statusFilter || null,
+      stageFilter: stageFilter || null,
+      ownerFilter: ownerFilter || null,
+      tagFilter: tagFilter || null,
+    }
+  }
+
+  function handleLoadFilter(config: Record<string, unknown>) {
+    setSearch((config.search as string | null) ?? '')
+    setStatusFilter(((config.statusFilter as StatusFilter | null) ?? '') as StatusFilter)
+    setStageFilter((config.stageFilter as string | null) ?? '')
+    setOwnerFilter((config.ownerFilter as string | null) ?? '')
+    setTagFilter((config.tagFilter as string | null) ?? '')
+    setPage(1)
+  }
 
   const columns: DataTableColumn<OppListItem>[] = [
     {
@@ -254,15 +275,24 @@ export default function OpportunitiesPage() {
           <h1 className="text-2xl font-bold text-slate-900">Opportunities</h1>
           <p className="text-sm text-slate-500 mt-0.5">Track deals and pipeline progress</p>
         </div>
-        <button
-          onClick={() => router.push('/marketing/opportunities/new')}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-          </svg>
-          New Opportunity
-        </button>
+        <div className="flex items-center gap-3">
+          <SavedFiltersMenu
+            pageKey="marketing/opportunities"
+            currentConfig={getCurrentFilterConfig()}
+            onLoad={handleLoadFilter}
+            activeFilterId={activeFilterId}
+            onActiveFilterIdChange={setActiveFilterId}
+          />
+          <button
+            onClick={() => router.push('/marketing/opportunities/new')}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+            </svg>
+            New Opportunity
+          </button>
+        </div>
       </div>
 
       {/* Pipeline summary */}

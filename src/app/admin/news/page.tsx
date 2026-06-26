@@ -6,6 +6,7 @@ import { useRouter } from 'next/navigation'
 import { ArticleTypeBadge } from '@/components/news/ArticleTypeBadge'
 import { formatPublishDate, ARTICLE_TYPES, ARTICLE_TYPE_BADGE } from '@/lib/news-utils'
 import type { NewsArticleWithAuthor, ArticleStatus, ArticleType } from '@/types'
+import { ConfirmButton } from '@/components/ui/ConfirmButton'
 
 const STATUS_TABS: { label: string; value: ArticleStatus | 'all' }[] = [
   { label: 'All', value: 'all' },
@@ -42,8 +43,6 @@ export default function NewsAdminPage() {
   const [statusFilter, setStatusFilter] = useState<ArticleStatus | 'all'>('all')
   const [typeFilter, setTypeFilter] = useState<ArticleType | 'all'>('all')
   const [searchQuery, setSearchQuery] = useState('')
-  const [deleteTarget, setDeleteTarget] = useState<string | null>(null)
-  const [deleting, setDeleting] = useState(false)
   const [mutating, setMutating] = useState<string | null>(null)
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null)
 
@@ -97,12 +96,8 @@ export default function NewsAdminPage() {
     fetchArticles(searchQuery)
   }
 
-  async function deleteArticle() {
-    if (!deleteTarget) return
-    setDeleting(true)
-    await fetch(`/api/admin/news/${deleteTarget}`, { method: 'DELETE' })
-    setDeleting(false)
-    setDeleteTarget(null)
+  async function deleteArticle(id: string) {
+    await fetch(`/api/admin/news/${id}`, { method: 'DELETE' })
     fetchArticles(searchQuery)
   }
 
@@ -295,12 +290,13 @@ export default function NewsAdminPage() {
                         <option value="archived">Archived</option>
                       </select>
 
-                      <button
-                        onClick={() => setDeleteTarget(article.id)}
-                        className="px-2.5 py-1 text-xs font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
-                      >
-                        Delete
-                      </button>
+                      <ConfirmButton
+                        idleLabel="Delete"
+                        confirmLabel="Yes, delete?"
+                        onConfirm={() => deleteArticle(article.id)}
+                        variant="red"
+                        size="sm"
+                      />
                     </div>
                   </td>
                 </tr>
@@ -310,30 +306,7 @@ export default function NewsAdminPage() {
         </div>
       )}
 
-      {/* Delete confirmation modal */}
-      {deleteTarget && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
-            <h3 className="font-semibold text-slate-900 mb-2">Delete article?</h3>
-            <p className="text-sm text-slate-500 mb-5">This cannot be undone.</p>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setDeleteTarget(null)}
-                className="px-4 py-2 text-sm border border-slate-300 rounded-xl hover:bg-slate-50"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={deleteArticle}
-                disabled={deleting}
-                className="px-4 py-2 text-sm bg-red-600 text-white rounded-xl hover:bg-red-700 disabled:opacity-50"
-              >
-                {deleting ? 'Deleting...' : 'Delete'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   )
 }

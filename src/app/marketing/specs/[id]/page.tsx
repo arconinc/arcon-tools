@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { SpecSampleStatus } from '@/types'
+import { ConfirmButton } from '@/components/ui/ConfirmButton'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -143,7 +144,6 @@ export default function SpecDetailPage() {
   }
 
   async function handleDelete() {
-    if (!confirm('Delete this spec? This cannot be undone.')) return
     setDeletingSpec(true)
     await fetch(`/api/marketing/specs/${id}`, { method: 'DELETE' })
     router.push('/marketing/specs')
@@ -547,13 +547,14 @@ export default function SpecDetailPage() {
 
           {/* Danger zone */}
           <div style={{ background: 'white', border: '1px solid #fecaca', borderRadius: 14, padding: '14px 18px' }}>
-            <button
-              onClick={handleDelete}
+            <ConfirmButton
+              idleLabel="Delete Spec"
+              confirmLabel="Yes, delete it?"
+              onConfirm={handleDelete}
+              variant="red"
+              size="sm"
               disabled={deletingSpec}
-              style={{ background: 'none', border: 'none', color: '#dc2626', fontSize: 13, fontWeight: 600, cursor: 'pointer', padding: 0 }}
-            >
-              {deletingSpec ? 'Deleting…' : 'Delete Spec'}
-            </button>
+            />
           </div>
         </div>
       </div>

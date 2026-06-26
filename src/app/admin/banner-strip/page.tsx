@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { TickerConfig, TickerManualItem, BannerStripItem } from '@/types'
+import { ConfirmButton } from '@/components/ui/ConfirmButton'
 
 const PRESET_LABELS = ['Announce', 'HR', 'Sales', 'IT', 'Finance', 'Operations', 'Reminder', 'Event']
 
@@ -162,7 +163,6 @@ export default function BannerStripAdminPage() {
   }
 
   function removeManualItem(id: string) {
-    if (!confirm('Remove this announcement?')) return
     update({ manual_items: config.manual_items.filter((item) => item.id !== id) })
   }
 
@@ -479,12 +479,13 @@ function ManualItemRow({
           {showAdvanced ? '▲' : '▼'}
         </button>
 
-        <button
-          onClick={onRemove}
-          className="text-xs font-medium text-red-500 hover:text-red-700 border border-red-200 hover:border-red-300 px-2.5 py-1.5 rounded-lg transition-colors"
-        >
-          Remove
-        </button>
+        <ConfirmButton
+          idleLabel="Remove"
+          confirmLabel="Yes, remove?"
+          onConfirm={onRemove}
+          variant="red"
+          size="sm"
+        />
       </div>
 
       {showAdvanced && (

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { Store } from '@/types'
+import { ConfirmButton } from '@/components/ui/ConfirmButton'
 
 export default function AdminStoresPage() {
   const [stores, setStores] = useState<Store[]>([])
@@ -68,7 +69,6 @@ export default function AdminStoresPage() {
   }
 
   async function handleDelete(store: Store) {
-    if (!confirm(`Delete "${store.store_name}"? This cannot be undone.`)) return
     const res = await fetch(`/api/stores/${store.id}`, { method: 'DELETE' })
     if (res.ok) loadStores()
   }
@@ -169,12 +169,13 @@ export default function AdminStoresPage() {
                 >
                   Edit
                 </button>
-                <button
-                  onClick={() => handleDelete(store)}
-                  className="px-3 py-1.5 text-xs font-medium text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
-                >
-                  Delete
-                </button>
+                <ConfirmButton
+                  idleLabel="Delete"
+                  confirmLabel="Yes, delete?"
+                  onConfirm={() => handleDelete(store)}
+                  variant="red"
+                  size="sm"
+                />
               </div>
             </div>
           ))}

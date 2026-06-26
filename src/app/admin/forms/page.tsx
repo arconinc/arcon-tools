@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import { CrmForm, FormCategory } from '@/types'
 import { formatFileSize } from '@/lib/forms-utils'
+import { ConfirmButton } from '@/components/ui/ConfirmButton'
 
 const CATEGORIES: { value: FormCategory; label: string; icon: string }[] = [
   { value: 'vendor', label: 'Vendor Forms', icon: '🏢' },
@@ -76,8 +77,7 @@ export default function FormsAdminPage() {
     }
   }
 
-  async function deleteForm(formId: string, name: string) {
-    if (!confirm(`Remove "${name}"?`)) return
+  async function deleteForm(formId: string) {
     try {
       const res = await fetch('/api/admin/forms', {
         method: 'DELETE',
@@ -264,7 +264,7 @@ export default function FormsAdminPage() {
                             }}
                             onEditSave={() => saveForm(form.id)}
                             onEditCancel={() => setEditingId(null)}
-                            onDelete={() => deleteForm(form.id, form.name)}
+                             onDelete={() => deleteForm(form.id)}
                             onUpload={(file) => handleFileUpload(form.id, file)}
                             onGenerateLink={() => generatePublicLink(form.id)}
                             isUploading={uploadingId === form.id}
@@ -377,9 +377,13 @@ function FormRow({
             {form.file_size_bytes && (
               <span className="fa-form-meta">{formatFileSize(form.file_size_bytes)}</span>
             )}
-            <button className="fa-btn fa-btn-danger fa-btn-sm" onClick={onDelete}>
-              <svg width="12" height="12" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-            </button>
+            <ConfirmButton
+              idleLabel="×"
+              confirmLabel="Remove?"
+              onConfirm={onDelete}
+              variant="red"
+              size="sm"
+            />
           </>
         )}
       </div>

@@ -4,7 +4,7 @@ import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useAppUser } from '@/components/layout/AppShell'
 import { TaskKanbanView, UserAvatar, PriorityIcon, type KanbanTask } from './TaskKanbanView'
-import { TaskTableView } from './TaskTableView'
+import { TaskTableView, type TableRowAction } from './TaskTableView'
 import { TaskQuickEditPanel } from './TaskQuickEditPanel'
 import QuickAddTask from './QuickAddTask'
 import { CreateTaskModal } from './CreateTaskModal'
@@ -12,6 +12,7 @@ import { TaskCreatedToast } from './TaskCreatedToast'
 import { TaskDetailModal } from './TaskDetailModal'
 import { DEPARTMENTS, DEPARTMENT_CATEGORIES, DEPARTMENT_DISPLAY_NAMES } from '@/lib/task-constants'
 import type { CrmTaskDepartment } from '@/types'
+import { SavedFiltersMenu } from '@/components/ui/SavedFiltersMenu'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -72,6 +73,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
   const [taskCreatedToastOpen, setTaskCreatedToastOpen] = useState(false)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
+  const [activeFilterId, setActiveFilterId] = useState<string | null>(null)
 
   // Dropdown state
   const [deptDropdownOpen, setDeptDropdownOpen] = useState(false)
@@ -268,6 +270,62 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
     syncUrl({ view: v === 'kanban' ? null : v })
   }
 
+  // ── Saved filter helpers ───────────────────────────────────────────────────
+
+  function getCurrentFilterConfig(): Record<string, unknown> {
+    return {
+      view,
+      department: department || null,
+      category: category || null,
+      assignees: selectedUserIds === 'all' ? 'all' : [...(selectedUserIds as Set<string>)],
+      showDelegated,
+      hideCompleted,
+      sortBy,
+      search: search || null,
+    }
+  }
+
+  function handleLoadFilter(config: Record<string, unknown>) {
+    const newView = (config.view as 'kanban' | 'table') ?? 'kanban'
+    const newDept = (config.department as CrmTaskDepartment | null) ?? ''
+    const newCategory = (config.category as string | null) ?? ''
+    const newAssignees = config.assignees
+    const newShowDelegated = config.showDelegated === true
+    const newHideCompleted = config.hideCompleted !== false
+    const newSortBy = (config.sortBy as 'priority' | 'due_date') ?? 'priority'
+    const newSearch = (config.search as string | null) ?? ''
+
+    let newSelectedUserIds: UserSelection = 'all'
+    if (newAssignees === 'all' || !newAssignees) {
+      newSelectedUserIds = 'all'
+    } else if (Array.isArray(newAssignees)) {
+      newSelectedUserIds = new Set(newAssignees as string[])
+    }
+
+    setView(newView)
+    setDepartment(newDept)
+    setCategory(newCategory)
+    setSelectedUserIds(newSelectedUserIds)
+    setShowDelegated(newShowDelegated)
+    setHideCompleted(newHideCompleted)
+    setSortBy(newSortBy)
+    setSearch(newSearch)
+    setPage(1)
+
+    // Sync to URL
+    const assigneesStr = newSelectedUserIds === 'all' ? null : [...(newSelectedUserIds as Set<string>)].join(',')
+    syncUrl({
+      view: newView === 'kanban' ? null : newView,
+      department: newDept || null,
+      category: newCategory || null,
+      assignees: assigneesStr,
+      delegated: newShowDelegated ? 'true' : null,
+      hide_completed: newHideCompleted ? null : 'false',
+      sort: newSortBy === 'priority' ? null : newSortBy,
+      search: newSearch || null,
+    })
+  }
+
   function handleDisclosureKey(e: React.KeyboardEvent<HTMLElement>, toggle: () => void) {
     if (e.key !== 'Enter' && e.key !== ' ') return
     e.preventDefault()
@@ -308,6 +366,40 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ assigned_to: currentUser.id }),
     })
+  }
+
+  // ── Row actions (table view) ───────────────────────────────────────────────
+
+  async function handleRowAction(taskId: string, action: TableRowAction) {
+    const task = tasks.find((t) => t.id === taskId)
+    if (!task) return
+
+    let patch: Record<string, unknown>
+    if (action === 'send_for_approval') {
+      patch = { status: 'waiting_on_approval' }
+      // Reassign to creator when creator is known (mirrors task detail page behaviour)
+      if (task.created_by) patch.assigned_to = task.created_by
+    } else {
+      patch = { status: 'completed' }
+    }
+
+    // Optimistic update
+    setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, ...patch } : t))
+
+    const res = await fetch(`/api/marketing/tasks/${taskId}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(patch),
+    })
+
+    if (!res.ok) {
+      // Roll back on error
+      setTasks((prev) => prev.map((t) => t.id === taskId ? task : t))
+      throw new Error('Failed to update task')
+    }
+
+    const updated = await res.json()
+    setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, ...updated } : t))
   }
 
   // ── Context menu ──────────────────────────────────────────────────────────
@@ -385,6 +477,14 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
+            {/* Saved filter views */}
+            <SavedFiltersMenu
+              pageKey={pathname.replace(/^\//, '') || 'task-board'}
+              currentConfig={getCurrentFilterConfig()}
+              onLoad={handleLoadFilter}
+              activeFilterId={activeFilterId}
+              onActiveFilterIdChange={setActiveFilterId}
+            />
             {/* View toggle */}
             <div style={{ display: 'flex', background: '#f0f0f0', borderRadius: 8, padding: 3, gap: 2 }}>
               <button
@@ -484,10 +584,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
             <select
               value={category}
               onChange={(e) => handleCategoryChange(e.target.value)}
-              className="tb-focusable"
-              style={{ padding: '0 12px', height: 36, border: '1.5px solid #e5e7eb', borderRadius: 8, fontSize: 13, background: '#fff', color: category ? '#111' : '#888', cursor: 'pointer', outline: 'none' }}
-              onFocus={e => { e.currentTarget.style.borderColor = '#9333ea' }}
-              onBlur={e => { e.currentTarget.style.borderColor = '#e5e7eb' }}
+              className="h-9 cursor-pointer rounded-lg border border-gray-200 bg-white px-3 text-[13px] text-gray-700 outline-none transition-colors focus:border-purple-500 focus:ring-2 focus:ring-purple-300"
             >
               <option value="">All categories</option>
               {availableCategories.map((c) => (
@@ -667,6 +764,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
                 vendor_id: null,
                 contact_id: null,
                 created_by: currentUser?.id ?? null,
+                created_by_name: currentUser?.display_name ?? null,
                 delegators: [],
               }])
               setTotal((t) => t + 1)
@@ -690,18 +788,22 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
           onCardContextMenu={handleTaskContextMenu}
           onReorder={handleReorder}
           onAssignToMe={handleAssignToMe}
+          onCardAction={handleRowAction}
         />
       ) : (
-        <TaskTableView
-          tasks={tasks}
-          loading={loading}
-          total={total}
-          page={page}
-          search={search}
-          onPageChange={setPage}
-          onRowClick={(id) => setSelectedTaskId(id)}
-          onRowContextMenu={handleTaskContextMenu}
-        />
+        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+          <TaskTableView
+            tasks={tasks}
+            loading={loading}
+            total={total}
+            page={page}
+            search={search}
+            onPageChange={setPage}
+            onRowClick={(id) => setSelectedTaskId(id)}
+            onRowContextMenu={handleTaskContextMenu}
+            onRowAction={handleRowAction}
+          />
+        </div>
       )}
 
       {/* Context menu */}

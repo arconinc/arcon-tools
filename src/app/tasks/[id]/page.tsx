@@ -14,6 +14,7 @@ import type { TaskPriority } from '@/hooks/useTask'
 import { TaskStatusBar, STATUSES } from '@/components/crm/task/TaskStatusBar'
 import { TaskNotesPreview } from '@/components/crm/task/TaskNotesPreview'
 import { CommentsTab } from '@/components/crm/task/CommentsTab'
+import { ConfirmButton } from '@/components/ui/ConfirmButton'
 
 // ── Local Types ───────────────────────────────────────────────────────────────
 
@@ -72,7 +73,6 @@ export default function TaskDetailPage() {
   const [saving, setSaving] = useState(false)
   const [uploadingAttachment, setUploadingAttachment] = useState(false)
   const attachmentInputRef = useRef<HTMLInputElement>(null)
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
 
   const [crmUsers, setCrmUsers] = useState<DropdownUser[]>([])
@@ -271,46 +271,7 @@ export default function TaskDetailPage() {
         Tasks
       </Link>
 
-      {/* Delete confirmation modal */}
-      {showDeleteConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-sm px-4">
-          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full p-6">
-            <div className="flex items-center gap-3 mb-4">
-              <div className="w-10 h-10 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0">
-                <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01M10.29 3.86L1.82 18a2 2 0 001.71 3h16.94a2 2 0 001.71-3L13.71 3.86a2 2 0 00-3.42 0z" />
-                </svg>
-              </div>
-              <h2 className="text-lg font-bold text-slate-900">Delete Task?</h2>
-            </div>
-            <p className="text-sm text-slate-600 mb-1">
-              You are about to permanently delete:
-            </p>
-            <p className="text-sm font-semibold text-slate-900 mb-4 bg-slate-50 px-3 py-2 rounded-lg truncate">
-              {task.title}
-            </p>
-            <p className="text-sm text-red-600 font-medium mb-6">
-              This cannot be undone. All comments, history, and attachments will be deleted.
-            </p>
-            <div className="flex gap-3 justify-end">
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                disabled={deleting}
-                className="px-4 py-2 text-sm font-semibold border border-slate-300 text-slate-700 rounded-lg hover:bg-slate-50 transition-colors disabled:opacity-60"
-              >
-                Cancel
-              </button>
-              <button
-                onClick={deleteTask}
-                disabled={deleting}
-                className="px-4 py-2 text-sm font-semibold bg-red-600 hover:bg-red-700 text-white rounded-lg transition-colors disabled:opacity-60"
-              >
-                {deleting ? 'Deleting…' : 'Delete Task'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
 
       {/* Header card */}
       <div className="bg-white border border-slate-200 rounded-2xl p-6 mb-5">
@@ -352,7 +313,7 @@ export default function TaskDetailPage() {
             </div>
           </div>
           <div className="flex-shrink-0 flex gap-2">
-            {task.created_by && (
+            {task.created_by && task.assigned_to !== task.created_by && (
               <button
                 onClick={() => saveFieldValues({ assigned_to: task.created_by, status: 'waiting_on_approval' })}
                 disabled={saving}
@@ -362,12 +323,14 @@ export default function TaskDetailPage() {
               </button>
             )}
             {(appUser?.is_admin || task.created_by === appUser?.id || task.task_owner === appUser?.id) && (
-              <button
-                onClick={() => setShowDeleteConfirm(true)}
-                className="px-3 py-1.5 text-xs font-semibold text-red-600 border border-red-200 rounded-lg hover:bg-red-50 transition-colors"
-              >
-                Delete
-              </button>
+              <ConfirmButton
+                idleLabel="Delete"
+                confirmLabel="Yes, delete task?"
+                onConfirm={deleteTask}
+                variant="red"
+                size="sm"
+                disabled={deleting}
+              />
             )}
           </div>
         </div>

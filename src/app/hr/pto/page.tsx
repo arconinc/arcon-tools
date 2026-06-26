@@ -4,7 +4,7 @@ import { useMemo, useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { PtoRequest, PTO_REASON_LABELS } from '@/types'
-import { DataTable, type DataTableColumn, FilterPillGroup, type FilterPillOption } from '@/components/ui'
+import { DataTable, type DataTableColumn, FilterPillGroup, type FilterPillOption, ConfirmButton } from '@/components/ui'
 
 type PtoFilter = 'all' | PtoRequest['status']
 type PtoRequestWithReviewer = PtoRequest & { reviewer?: { display_name: string } | null }
@@ -119,10 +119,6 @@ export default function PtoRequestsPage() {
   ], [counts])
 
   async function handleDelete(request: PtoRequestWithReviewer) {
-    const message = request.status === 'approved'
-      ? 'Cancel this approved PTO request? This will remove the approved time off.'
-      : 'Delete this PTO request?'
-    if (!confirm(message)) return
     setDeletingId(request.id)
     try {
       const res = await fetch(`/api/hr/pto/${request.id}`, { method: 'DELETE' })
@@ -210,16 +206,14 @@ export default function PtoRequestsPage() {
               Edit &amp; Resubmit
             </button>
           )}
-          <button
-            type="button"
+          <ConfirmButton
+            idleLabel={r.status === 'approved' ? 'Cancel Request' : 'Delete'}
+            confirmLabel={r.status === 'approved' ? 'Yes, cancel it?' : 'Yes, delete?'}
+            onConfirm={() => handleDelete(r)}
+            variant="red"
+            size="sm"
             disabled={deletingId === r.id}
-            onClick={() => handleDelete(r)}
-            title={r.status === 'approved' ? 'Cancel this approved time off request' : 'Delete this PTO request'}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-red-200 bg-white px-3 py-1.5 text-xs font-bold text-red-600 transition-colors hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-200 disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            <Icon type="x" className="h-3 w-3" />
-            {deletingId === r.id ? 'Deleting…' : r.status === 'approved' ? 'Cancel' : 'Delete'}
-          </button>
+          />
         </div>
       ),
     },

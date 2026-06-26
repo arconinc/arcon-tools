@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { BannerSlide } from '@/types'
+import { ConfirmButton } from '@/components/ui/ConfirmButton'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -97,7 +98,6 @@ export default function BannerAdminPage() {
   }
 
   function removeSlide(id: string) {
-    if (!confirm('Remove this slide?')) return
     const updated = slides.filter((s) => s.id !== id)
     setSlides(updated)
     scheduleSave(updated)
@@ -113,7 +113,6 @@ export default function BannerAdminPage() {
   }
 
   async function publishLive() {
-    if (!confirm('Publish these slides to the live dashboard?')) return
     setPublishing(true)
     const res = await fetch('/api/admin/banner', { method: 'POST' })
     setPublishing(false)
@@ -186,13 +185,13 @@ export default function BannerAdminPage() {
             >
               Preview
             </button>
-            <button
-              onClick={publishLive}
+            <ConfirmButton
+              idleLabel="Publish Live"
+              confirmLabel="Yes, publish?"
+              onConfirm={publishLive}
+              variant="purple"
               disabled={publishing}
-              className="px-4 py-2 bg-purple-700 hover:bg-purple-800 disabled:opacity-50 text-white text-sm font-medium rounded-xl transition-colors"
-            >
-              {publishing ? 'Publishing…' : 'Publish Live'}
-            </button>
+            />
           </div>
         </div>
 
@@ -324,12 +323,13 @@ function SlideCard({
             <svg width="12" height="12" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" /></svg>
           </button>
         </div>
-        <button
-          onClick={onRemove}
-          className="text-xs font-medium text-red-500 hover:text-red-700 border border-red-200 hover:border-red-300 px-2.5 py-1 rounded-lg transition-colors"
-        >
-          Remove
-        </button>
+        <ConfirmButton
+          idleLabel="Remove"
+          confirmLabel="Yes, remove?"
+          onConfirm={onRemove}
+          variant="red"
+          size="sm"
+        />
       </div>
 
       {/* Card body */}

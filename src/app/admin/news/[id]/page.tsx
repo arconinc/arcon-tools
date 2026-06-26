@@ -7,6 +7,7 @@ import { TiptapEditor } from '@/components/news/TiptapEditor'
 import { TiptapRenderer } from '@/components/news/TiptapRenderer'
 import { ARTICLE_TYPES, ARTICLE_TYPE_BADGE, computeReadingTime, stripHtml } from '@/lib/news-utils'
 import type { NewsArticle, ArticleType, ArticleStatus } from '@/types'
+import { ConfirmButton } from '@/components/ui/ConfirmButton'
 
 const EMPTY_CONTENT = {}
 
@@ -24,7 +25,7 @@ export default function ArticleEditorPage({ params }: Props) {
   const [error, setError] = useState<string | null>(null)
   const [success, setSuccess] = useState<string | null>(null)
   const [preview, setPreview] = useState(false)
-  const [archiveConfirm, setArchiveConfirm] = useState(false)
+
   const [uploadingCover, setUploadingCover] = useState(false)
 
   const [title, setTitle] = useState('')
@@ -130,7 +131,6 @@ export default function ArticleEditorPage({ params }: Props) {
       body: JSON.stringify({ status: 'archived' }),
     })
     setSaving(false)
-    setArchiveConfirm(false)
     router.push('/admin/news')
   }
 
@@ -190,12 +190,13 @@ export default function ArticleEditorPage({ params }: Props) {
             {preview ? 'Edit' : 'Preview'}
           </button>
           {!isNew && status !== 'archived' && (
-            <button
-              onClick={() => setArchiveConfirm(true)}
-              className="px-3 py-1.5 text-sm border border-amber-300 text-amber-700 rounded-xl hover:bg-amber-50"
-            >
-              Archive
-            </button>
+            <ConfirmButton
+              idleLabel="Archive"
+              confirmLabel="Yes, archive?"
+              onConfirm={archiveArticle}
+              variant="yellow"
+              disabled={saving}
+            />
           )}
           <button
             onClick={() => { isDirty.current = true; save('draft') }}
@@ -354,27 +355,7 @@ export default function ArticleEditorPage({ params }: Props) {
         </div>
       )}
 
-      {/* Archive confirmation */}
-      {archiveConfirm && (
-        <div className="fixed inset-0 bg-black/40 z-50 flex items-center justify-center p-4">
-          <div className="bg-white rounded-2xl shadow-xl p-6 w-full max-w-sm">
-            <h3 className="font-semibold text-slate-900 mb-2">Archive this article?</h3>
-            <p className="text-sm text-slate-500 mb-5">It will be removed from the news feed but not deleted.</p>
-            <div className="flex gap-3 justify-end">
-              <button onClick={() => setArchiveConfirm(false)} className="px-4 py-2 text-sm border border-slate-300 rounded-xl hover:bg-slate-50">
-                Cancel
-              </button>
-              <button
-                onClick={archiveArticle}
-                disabled={saving}
-                className="px-4 py-2 text-sm bg-amber-600 text-white rounded-xl hover:bg-amber-700 disabled:opacity-50"
-              >
-                {saving ? 'Archiving...' : 'Archive'}
-              </button>
-            </div>
-          </div>
-        </div>
-      )}
+
     </div>
   )
 }

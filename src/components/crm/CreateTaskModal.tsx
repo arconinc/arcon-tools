@@ -5,6 +5,8 @@ import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useAppUser } from '@/components/layout/AppShell'
 import { TaskAssignmentSelect } from '@/components/crm/TaskAssignmentSelect'
 import { TaskDescriptionEditor } from '@/components/crm/TaskDescriptionEditor'
+import { ConfirmButton } from '@/components/ui/ConfirmButton'
+import { DEPARTMENT_DISPLAY_NAMES } from '@/lib/task-constants'
 import type { CrmTask, CrmTaskDepartment } from '@/types'
 
 type DropdownUser = { id: string; display_name: string; email: string }
@@ -340,6 +342,28 @@ export function TaskFormModal({
     }
   }
 
+  async function handleMarkCompleted() {
+    if (!task?.id) return
+    setSaving(true)
+    try {
+      const res = await fetch(`/api/marketing/tasks/${task.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'completed' }),
+      })
+      if (!res.ok) {
+        const data = await res.json()
+        setError(data.error ?? 'Save failed')
+        return
+      }
+      const saved = await fetchSavedTask(task.id, task)
+      onSaved(saved as TaskFormTask)
+      onClose()
+    } finally {
+      setSaving(false)
+    }
+  }
+
   async function handleDeleteTask() {
     if (!task?.id) return
     setDeleting(true)
@@ -613,7 +637,7 @@ export function TaskFormModal({
                   ) : (
                     <span className="text-sm text-slate-700 leading-tight">
                       {form.department
-                        ? <>{form.department}{form.category && <span className="text-slate-400"> · {form.category}</span>}</>
+                        ? <>{DEPARTMENT_DISPLAY_NAMES[form.department as CrmTaskDepartment] || form.department}{form.category && <span className="text-slate-400"> · {form.category}</span>}</>
                         : <span className="text-slate-400 italic">Not set</span>
                       }
                     </span>
@@ -914,15 +938,23 @@ export function TaskFormModal({
               )}
             </div>
             <div className="flex gap-3">
-              {mode === 'edit' && task?.created_by && (
-                <button
-                  type="button"
-                  onClick={handleSendForApproval}
+              {mode === 'edit' && task?.id && task.status !== 'completed' && (
+                <ConfirmButton
+                  idleLabel="Mark Complete"
+                  confirmLabel="Yes, complete it?"
+                  onConfirm={handleMarkCompleted}
+                  variant="green"
                   disabled={saving}
-                  className="px-4 py-2 text-sm font-semibold text-yellow-700 border border-yellow-300 bg-yellow-50 rounded-xl hover:bg-yellow-100 disabled:opacity-60 transition-colors"
-                >
-                  Send for Approval
-                </button>
+                />
+              )}
+              {mode === 'edit' && task?.created_by && task.assigned_to !== task.created_by && (
+                <ConfirmButton
+                  idleLabel="Send for Approval"
+                  confirmLabel="Yes, send it?"
+                  onConfirm={handleSendForApproval}
+                  variant="yellow"
+                  disabled={saving}
+                />
               )}
               <button
                 type="button"

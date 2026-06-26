@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef, createContext, useContext } from 'react'
 import Link from 'next/link'
+import Image from 'next/image'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Store, CalendarCountdownEvent } from '@/types'
@@ -527,7 +528,7 @@ export default function AppShell({ children, user, isImpersonating, impersonated
               flexShrink: 0,
             }}>
               {user.avatar_url ? (
-                <img src={user.avatar_url} alt={user.display_name} referrerPolicy="no-referrer" style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                <Image src={user.avatar_url} alt={user.display_name} width={30} height={30} referrerPolicy="no-referrer" style={{ borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
               ) : (
                 <div style={{ width: 30, height: 30, background: '#6b1e98', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
                   {initials}
@@ -692,7 +693,7 @@ export default function AppShell({ children, user, isImpersonating, impersonated
                     title={user.display_name}
                   >
                     {user.avatar_url ? (
-                      <img src={user.avatar_url} alt={user.display_name} referrerPolicy="no-referrer" style={{ width: 32, height: 32, borderRadius: '50%', objectFit: 'cover' }} />
+                      <Image src={user.avatar_url} alt={user.display_name} width={32} height={32} referrerPolicy="no-referrer" style={{ borderRadius: '50%', objectFit: 'cover' }} />
                     ) : (
                       <div style={{ width: 32, height: 32, background: '#6b1e98', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, fontWeight: 700 }}>
                         {initials}
@@ -790,6 +791,7 @@ function SidebarNavItem({
   onHoverEnd?: () => void
 }) {
   const Icon = item.icon
+  const isExternal = item.href.startsWith('http://') || item.href.startsWith('https://')
 
   if (collapsed) {
     const collapsedStyle: React.CSSProperties = {
@@ -831,6 +833,14 @@ function SidebarNavItem({
         <div style={collapsedStyle} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
           <Icon className="w-[15px] h-[15px] flex-shrink-0" />
         </div>
+      )
+    }
+
+    if (isExternal) {
+      return (
+        <a href={item.href} target="_blank" rel="noopener noreferrer" style={collapsedStyle} onMouseEnter={handleMouseEnter} onMouseLeave={handleMouseLeave}>
+          <Icon className="w-[15px] h-[15px] flex-shrink-0" />
+        </a>
       )
     }
 
@@ -884,6 +894,21 @@ function SidebarNavItem({
 
   if (item.soon || item.href === '#') {
     return <div style={baseStyle}>{content}</div>
+  }
+
+  if (isExternal) {
+    return (
+      <a
+        href={item.href}
+        target="_blank"
+        rel="noopener noreferrer"
+        style={baseStyle}
+        onMouseEnter={(e) => { if (!active) { e.currentTarget.style.background = '#1e1e1e'; e.currentTarget.style.color = '#ddd' } }}
+        onMouseLeave={(e) => { if (!active) { e.currentTarget.style.background = 'transparent'; e.currentTarget.style.color = '#888' } }}
+      >
+        {content}
+      </a>
+    )
   }
 
   return (
