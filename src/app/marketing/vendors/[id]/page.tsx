@@ -7,13 +7,14 @@ import TagPicker from '@/components/crm/TagPicker'
 import { CreateTaskModal } from '@/components/crm/CreateTaskModal'
 import { CrmDetailActions } from '@/components/crm/CrmDetailActions'
 import { PlacesCompanyAutocomplete } from '@/components/crm/PlacesCompanyAutocomplete'
+import { PlacesAddressAutocomplete } from '@/components/crm/PlacesAddressAutocomplete'
 import { TaskCreatedToast } from '@/components/crm/TaskCreatedToast'
 import { useAppUser } from '@/components/layout/AppShell'
 import { useCrmTags } from '@/hooks'
 import { formatPhoneInput } from '@/lib/phone'
 import { CrmForm } from '@/types'
 import { recommendTaxForms, US_STATES } from '@/lib/forms-utils'
-import type { PlacesDetails } from '@/lib/google-places'
+import type { PlacesAddress, PlacesDetails } from '@/lib/google-places'
 
 type TagOption = { id: string; name: string; color: string }
 
@@ -436,6 +437,22 @@ export default function VendorDetailPage() {
       billing_state: place.address.state ?? prev.billing_state,
       billing_zip: place.address.postalCode ?? prev.billing_zip,
     }))
+  }
+
+  function applyAddressToEdit(prefix: 'billing' | 'shipping', address: PlacesAddress) {
+    handleEditChange(`${prefix}_address1`, address.address1 ?? '')
+    handleEditChange(`${prefix}_address2`, address.address2 ?? '')
+    handleEditChange(`${prefix}_city`, address.city ?? '')
+    handleEditChange(`${prefix}_state`, address.state ?? '')
+    handleEditChange(`${prefix}_zip`, address.postalCode ?? '')
+    handleEditChange(`${prefix}_country`, address.country ?? '')
+  }
+
+  function copyEditAddress(from: 'billing' | 'shipping', to: 'billing' | 'shipping') {
+    const fields = ['address1', 'address2', 'city', 'state', 'zip', 'country'] as const
+    fields.forEach((field) => {
+      handleEditChange(`${to}_${field}`, (ef[`${from}_${field}` as keyof VendorDetail] as string) ?? '')
+    })
   }
 
   if (isNew) {
@@ -883,6 +900,12 @@ export default function VendorDetailPage() {
                       <div className="px-5 py-2 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
                         <div className="w-0.5 h-3.5 bg-purple-300 rounded-full" />
                         <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Billing Address</h3>
+                        {editing && (
+                          <div className="ml-auto flex items-center gap-3">
+                            <button type="button" onClick={() => copyEditAddress('shipping', 'billing')} className="text-xs font-semibold text-purple-700 hover:text-purple-900">Copy shipping to billing</button>
+                            <PlacesAddressAutocomplete initialQuery={(ef.name as string) ?? vendor.name} onAddressSelect={(address) => applyAddressToEdit('billing', address)} />
+                          </div>
+                        )}
                       </div>
                       <div className="px-5 py-4">
                         {editing ? (
@@ -914,6 +937,12 @@ export default function VendorDetailPage() {
                       <div className="px-5 py-2 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
                         <div className="w-0.5 h-3.5 bg-purple-300 rounded-full" />
                         <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Shipping Address</h3>
+                        {editing && (
+                          <div className="ml-auto flex items-center gap-3">
+                            <button type="button" onClick={() => copyEditAddress('billing', 'shipping')} className="text-xs font-semibold text-purple-700 hover:text-purple-900">Copy billing to shipping</button>
+                            <PlacesAddressAutocomplete initialQuery={(ef.name as string) ?? vendor.name} onAddressSelect={(address) => applyAddressToEdit('shipping', address)} />
+                          </div>
+                        )}
                       </div>
                       <div className="px-5 py-4">
                         {editing ? (

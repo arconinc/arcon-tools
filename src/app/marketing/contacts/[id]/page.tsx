@@ -5,10 +5,12 @@ import { useRouter, useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import TagPicker from '@/components/crm/TagPicker'
 import EntitySearchPicker from '@/components/crm/EntitySearchPicker'
+import { PlacesAddressAutocomplete } from '@/components/crm/PlacesAddressAutocomplete'
 import { CreateTaskModal } from '@/components/crm/CreateTaskModal'
 import { CrmDetailActions } from '@/components/crm/CrmDetailActions'
 import { TaskCreatedToast } from '@/components/crm/TaskCreatedToast'
 import { formatPhoneInput } from '@/lib/phone'
+import type { PlacesAddress } from '@/lib/google-places'
 
 type DropdownUser = { id: string; display_name: string; email: string }
 type TagOption = { id: string; name: string; color: string }
@@ -151,6 +153,22 @@ export default function ContactDetailPage() {
   function handleEditChange(field: string, value: string) {
     const formatted = PHONE_FIELDS.has(field) ? formatPhoneInput(value) : value
     setEditForm((prev) => ({ ...prev, [field]: formatted || null }))
+  }
+
+  function applyAddressToEdit(prefix: 'mailing' | 'other', address: PlacesAddress) {
+    handleEditChange(`${prefix}_address1`, address.address1 ?? '')
+    handleEditChange(`${prefix}_address2`, address.address2 ?? '')
+    handleEditChange(`${prefix}_city`, address.city ?? '')
+    handleEditChange(`${prefix}_state`, address.state ?? '')
+    handleEditChange(`${prefix}_zip`, address.postalCode ?? '')
+    handleEditChange(`${prefix}_country`, address.country ?? '')
+  }
+
+  function copyEditAddress(from: 'mailing' | 'other', to: 'mailing' | 'other') {
+    const fields = ['address1', 'address2', 'city', 'state', 'zip', 'country'] as const
+    fields.forEach((field) => {
+      handleEditChange(`${to}_${field}`, (ef[`${from}_${field}` as keyof ContactDetail] as string) ?? '')
+    })
   }
 
   async function saveEdit() {
@@ -435,6 +453,12 @@ export default function ContactDetailPage() {
                       <div className="px-5 py-2 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
                         <div className="w-0.5 h-3.5 bg-purple-300 rounded-full" />
                         <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Mailing Address</h3>
+                        {editing && (
+                          <div className="ml-auto flex items-center gap-3">
+                            <button type="button" onClick={() => copyEditAddress('other', 'mailing')} className="text-xs font-semibold text-purple-700 hover:text-purple-900">Copy other to mailing</button>
+                            <PlacesAddressAutocomplete initialQuery={contact.customer?.name ?? contact.vendor?.name ?? `${contact.first_name} ${contact.last_name}`} onAddressSelect={(address) => applyAddressToEdit('mailing', address)} />
+                          </div>
+                        )}
                       </div>
                       <div className="px-5 py-4">
                         {editing ? (
@@ -466,6 +490,12 @@ export default function ContactDetailPage() {
                       <div className="px-5 py-2 bg-slate-50 border-b border-slate-100 flex items-center gap-2">
                         <div className="w-0.5 h-3.5 bg-purple-300 rounded-full" />
                         <h3 className="text-xs font-semibold text-slate-600 uppercase tracking-wide">Other Address</h3>
+                        {editing && (
+                          <div className="ml-auto flex items-center gap-3">
+                            <button type="button" onClick={() => copyEditAddress('mailing', 'other')} className="text-xs font-semibold text-purple-700 hover:text-purple-900">Copy mailing to other</button>
+                            <PlacesAddressAutocomplete initialQuery={contact.customer?.name ?? contact.vendor?.name ?? `${contact.first_name} ${contact.last_name}`} onAddressSelect={(address) => applyAddressToEdit('other', address)} />
+                          </div>
+                        )}
                       </div>
                       <div className="px-5 py-4">
                         {editing ? (
