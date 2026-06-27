@@ -7,6 +7,20 @@ import { dispatchNotification } from '@/lib/notifications/dispatch'
 import { customerAddedToAturian } from '@/lib/notifications/registry'
 import { resolveAturianAssignee } from '@/lib/crm/aturian-assignees'
 
+const CRM_ATTACHMENTS_BUCKET = 'crm-attachments'
+
+function isUserCrmAttachmentUrl(url: string, userId: string) {
+  try {
+    const parsedUrl = new URL(url)
+    const supabaseUrl = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!)
+    const expectedPrefix = `/storage/v1/object/public/${CRM_ATTACHMENTS_BUCKET}/${userId}/`
+
+    return parsedUrl.origin === supabaseUrl.origin && parsedUrl.pathname.startsWith(expectedPrefix)
+  } catch {
+    return false
+  }
+}
+
 // GET /api/marketing/customers?search=&status=&assigned_to=&tag_id=&page=1&limit=50
 export async function GET(req: NextRequest) {
   const appUser = await requireUser()
@@ -104,8 +118,12 @@ export async function POST(req: NextRequest) {
   if (!appUser) return unauthorized()
 
   const body = await req.json()
-  const { name, tag_ids, ...rest } = body
+  const { name, tag_ids, tax_certificate_url, ...rest } = body
   if (!name?.trim()) return badRequest('Name is required')
+  const taxCertificateUrl = typeof tax_certificate_url === 'string' ? tax_certificate_url.trim() : ''
+  const hasTaxCertificateUrl = taxCertificateUrl.length > 0
+  if (rest.tax_exempt === true && !hasTaxCertificateUrl) return badRequest('Tax Certificate is required when Tax Exempt is Yes')
+  if (hasTaxCertificateUrl && !isUserCrmAttachmentUrl(taxCertificateUrl, appUser.id)) return badRequest('Invalid tax certificate URL')
 
   const safeRest = stripReadOnly(rest, ['tags', 'assigned_user', 'created_by_user', 'contacts', 'opportunities', 'files', 'brand_data'])
 
@@ -117,6 +135,22 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) return serverError(error.message)
+
+  if (rest.tax_exempt === true && hasTaxCertificateUrl) {
+    const { error: fileError } = await adminClient
+      .from('crm_files')
+      .insert({
+        customer_id: data.id,
+        label: 'Tax Certificate',
+        url: taxCertificateUrl,
+        added_by: appUser.id,
+      })
+
+    if (fileError) {
+      await adminClient.from('crm_customers').delete().eq('id', data.id)
+      return serverError(fileError.message)
+    }
+  }
 
   if (Array.isArray(tag_ids) && tag_ids.length > 0) {
     await adminClient.from('crm_entity_tags').insert(

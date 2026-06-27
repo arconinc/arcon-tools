@@ -1,11 +1,11 @@
 'use client'
 
-import { useState, useEffect, useCallback, Suspense } from 'react'
+import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useAppUser } from '@/components/layout/AppShell'
 import { MultiSelect, type MultiSelectOption } from '@/components/ui/MultiSelect'
 import { TaskKanbanView, PriorityIcon, type KanbanTask } from './TaskKanbanView'
-import { TaskTableView, type TableRowAction } from './TaskTableView'
+import { TaskTableView, type TableRowAction, type TaskColumnFilters } from './TaskTableView'
 import { TaskQuickEditPanel } from './TaskQuickEditPanel'
 import QuickAddTask from './QuickAddTask'
 import { CreateTaskModal } from './CreateTaskModal'
@@ -26,6 +26,39 @@ type UserOption = {
 }
 
 type UserSelection = 'all' | Set<string>
+
+const EMPTY_COLUMN_FILTERS: TaskColumnFilters = {
+  title: '',
+  assignment: '',
+  priorities: [],
+  statuses: [],
+  dueFrom: '',
+  dueTo: '',
+  assignedTo: [],
+  createdBy: [],
+  linkedTypes: [],
+  linkedSearch: '',
+}
+
+function csvParam(value: string | null) {
+  return value ? value.split(',').map((item) => item.trim()).filter(Boolean) : []
+}
+
+function normalizeColumnFilters(value: unknown): TaskColumnFilters {
+  const filters = typeof value === 'object' && value !== null ? value as Partial<TaskColumnFilters> : {}
+  return {
+    title: filters.title ?? '',
+    assignment: filters.assignment ?? '',
+    priorities: Array.isArray(filters.priorities) ? filters.priorities : [],
+    statuses: Array.isArray(filters.statuses) ? filters.statuses : [],
+    dueFrom: filters.dueFrom ?? '',
+    dueTo: filters.dueTo ?? '',
+    assignedTo: Array.isArray(filters.assignedTo) ? filters.assignedTo : [],
+    createdBy: Array.isArray(filters.createdBy) ? filters.createdBy : [],
+    linkedTypes: Array.isArray(filters.linkedTypes) ? filters.linkedTypes : [],
+    linkedSearch: filters.linkedSearch ?? '',
+  }
+}
 
 // ── TaskBoard (inner) ─────────────────────────────────────────────────────────
 
@@ -68,6 +101,18 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
     searchParams.get('sort') === 'due_date' ? 'due_date' : 'priority'
   )
   const [search, setSearch] = useState(searchParams.get('search') ?? '')
+  const [columnFilters, setColumnFilters] = useState<TaskColumnFilters>(() => ({
+    title: searchParams.get('title_filter') ?? '',
+    assignment: searchParams.get('assignment_filter') ?? '',
+    priorities: csvParam(searchParams.get('priority_filter')),
+    statuses: csvParam(searchParams.get('status_filter')),
+    dueFrom: searchParams.get('due_from') ?? '',
+    dueTo: searchParams.get('due_to') ?? '',
+    assignedTo: csvParam(searchParams.get('assigned_to_filter')),
+    createdBy: csvParam(searchParams.get('created_by_filter')),
+    linkedTypes: csvParam(searchParams.get('linked_type_filter')),
+    linkedSearch: searchParams.get('linked_filter') ?? '',
+  }))
   const [page, setPage] = useState(1)
 
   // State
@@ -138,6 +183,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
 
   // Stable keys for effect deps
   const usersKey = selectedUserIds === 'all' ? 'all' : [...(selectedUserIds as Set<string>)].sort().join(',')
+  const columnFiltersKey = JSON.stringify(columnFilters)
 
   // Fetch tasks
   useEffect(() => {
@@ -163,6 +209,16 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
     if (department) params.set('department', department)
     if (category) params.set('category', category)
     if (view === 'table') {
+      if (columnFilters.title) params.set('title_search', columnFilters.title)
+      if (columnFilters.assignment) params.set('assignment_search', columnFilters.assignment)
+      if (columnFilters.priorities.length) params.set('priority', columnFilters.priorities.join(','))
+      if (columnFilters.statuses.length) params.set('column_status', columnFilters.statuses.join(','))
+      if (columnFilters.dueFrom) params.set('due_from', columnFilters.dueFrom)
+      if (columnFilters.dueTo) params.set('due_to', columnFilters.dueTo)
+      if (columnFilters.assignedTo.length) params.set('column_assigned_to', columnFilters.assignedTo.join(','))
+      if (columnFilters.createdBy.length) params.set('created_by', columnFilters.createdBy.join(','))
+      if (columnFilters.linkedTypes.length) params.set('linked_type', columnFilters.linkedTypes.join(','))
+      if (columnFilters.linkedSearch) params.set('linked_search', columnFilters.linkedSearch)
       params.set('page', String(page))
       params.set('limit', '50')
     } else {
@@ -179,7 +235,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
       .catch(() => setTasks([]))
       .finally(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usersKey, department, category, showDelegated, hideCompleted, initialized, view, page, refreshKey])
+  }, [usersKey, department, category, showDelegated, hideCompleted, initialized, view, page, refreshKey, columnFiltersKey])
 
   // ── Filter helpers ─────────────────────────────────────────────────────────
 
@@ -198,6 +254,13 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
   const userPhotoMap = Object.fromEntries(
     allUsers.map((u) => [u.id, u.profile_image_url ?? u.avatar_url])
   )
+
+  const userFilterOptions = useMemo(() => allUsers.map((u): MultiSelectOption => ({
+    value: u.id,
+    label: u.display_name,
+    chipLabel: u.display_name.split(' ')[0],
+    meta: u.department?.join(', ') || undefined,
+  })), [allUsers])
 
   // ── Filter setters (sync to URL) ───────────────────────────────────────────
 
@@ -270,6 +333,23 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
     syncUrl({ search: s || null })
   }
 
+  function handleColumnFiltersChange(next: TaskColumnFilters) {
+    setColumnFilters(next)
+    setPage(1)
+    syncUrl({
+      title_filter: next.title || null,
+      assignment_filter: next.assignment || null,
+      priority_filter: next.priorities.length ? next.priorities.join(',') : null,
+      status_filter: next.statuses.length ? next.statuses.join(',') : null,
+      due_from: next.dueFrom || null,
+      due_to: next.dueTo || null,
+      assigned_to_filter: next.assignedTo.length ? next.assignedTo.join(',') : null,
+      created_by_filter: next.createdBy.length ? next.createdBy.join(',') : null,
+      linked_type_filter: next.linkedTypes.length ? next.linkedTypes.join(',') : null,
+      linked_filter: next.linkedSearch || null,
+    })
+  }
+
   function handleViewChange(v: 'kanban' | 'table') {
     setView(v)
     setPage(1)
@@ -289,6 +369,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
       hideCompleted,
       sortBy,
       search: search || null,
+      columnFilters,
     }
   }
 
@@ -301,6 +382,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
     const newHideCompleted = config.hideCompleted !== false
     const newSortBy = (config.sortBy as 'priority' | 'due_date') ?? 'priority'
     const newSearch = (config.search as string | null) ?? ''
+    const newColumnFilters = normalizeColumnFilters(config.columnFilters)
 
     let newSelectedUserIds: UserSelection = 'all'
     if (newAssignees === 'all' || !newAssignees) {
@@ -317,6 +399,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
     setHideCompleted(newHideCompleted)
     setSortBy(newSortBy)
     setSearch(newSearch)
+    setColumnFilters(newColumnFilters)
     setPage(1)
 
     // Sync to URL
@@ -330,6 +413,16 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
       hide_completed: newHideCompleted ? null : 'false',
       sort: newSortBy === 'priority' ? null : newSortBy,
       search: newSearch || null,
+      title_filter: newColumnFilters.title || null,
+      assignment_filter: newColumnFilters.assignment || null,
+      priority_filter: newColumnFilters.priorities.length ? newColumnFilters.priorities.join(',') : null,
+      status_filter: newColumnFilters.statuses.length ? newColumnFilters.statuses.join(',') : null,
+      due_from: newColumnFilters.dueFrom || null,
+      due_to: newColumnFilters.dueTo || null,
+      assigned_to_filter: newColumnFilters.assignedTo.length ? newColumnFilters.assignedTo.join(',') : null,
+      created_by_filter: newColumnFilters.createdBy.length ? newColumnFilters.createdBy.join(',') : null,
+      linked_type_filter: newColumnFilters.linkedTypes.length ? newColumnFilters.linkedTypes.join(',') : null,
+      linked_filter: newColumnFilters.linkedSearch || null,
     })
   }
 
@@ -580,12 +673,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
 
           {/* Assignee dropdown */}
           <MultiSelect
-            options={allUsers.map((u): MultiSelectOption => ({
-              value: u.id,
-              label: u.display_name,
-              chipLabel: u.display_name.split(' ')[0],
-              meta: u.department?.join(', ') || undefined,
-            }))}
+            options={userFilterOptions}
             value={selectedUserIds === 'all' ? [] : [...(selectedUserIds as Set<string>)]}
             onChange={(ids) => {
               if (ids.length === 0) {
@@ -716,7 +804,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
           onCardAction={handleRowAction}
         />
       ) : (
-        <div style={{ flex: 1, minHeight: 0, overflowY: 'auto' }}>
+        <div style={{ flex: 1, minHeight: 0, overflow: 'hidden' }}>
           <TaskTableView
             tasks={tasks}
             loading={loading}
@@ -726,6 +814,9 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
             onPageChange={setPage}
             onRowClick={(id) => setSelectedTaskId(id)}
             onRowContextMenu={handleTaskContextMenu}
+            columnFilters={columnFilters}
+            filterUsers={allUsers}
+            onColumnFiltersChange={handleColumnFiltersChange}
             onRowAction={handleRowAction}
           />
         </div>

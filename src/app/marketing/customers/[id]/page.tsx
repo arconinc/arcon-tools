@@ -184,6 +184,9 @@ export default function CustomerDetailPage() {
   })
   const [creating, setCreating] = useState(false)
   const [createError, setCreateError] = useState<string | null>(null)
+  const [apDuplicateError, setApDuplicateError] = useState<string | null>(null)
+  const [taxCertificateFile, setTaxCertificateFile] = useState<File | null>(null)
+  const [taxCertificateError, setTaxCertificateError] = useState<string | null>(null)
 
   useEffect(() => {
     if (customer?.billing_state && !taxState) setTaxState(customer.billing_state)
@@ -206,6 +209,20 @@ export default function CustomerDetailPage() {
     clearCreateError('billing_city')
     clearCreateError('billing_state')
     clearCreateError('billing_zip')
+  }
+
+  const normalizeContactValue = (value: string) => value.trim().toLowerCase()
+
+  function getDuplicateApContactError(form = createForm) {
+    const ordererEmail = normalizeContactValue(form.orderer_email)
+    const apEmail = normalizeContactValue(form.ap_email)
+    if (ordererEmail && apEmail && ordererEmail === apEmail) return 'AP contact MUST be different then the orderers contact'
+
+    return null
+  }
+
+  function validateApContactDifference() {
+    setApDuplicateError(getDuplicateApContactError())
   }
 
   async function handleCreate(e: React.FormEvent) {
@@ -236,10 +253,30 @@ export default function CustomerDetailPage() {
     }
 
     if (!validateCreate(createForm, rules)) return
+    const duplicateError = getDuplicateApContactError()
+    if (duplicateError) {
+      setApDuplicateError(duplicateError)
+      return
+    }
+    if (createForm.tax_exempt === 'yes' && !taxCertificateFile) {
+      setTaxCertificateError('Tax Certificate is required when Tax Exempt is Yes')
+      return
+    }
 
     setCreating(true)
     setCreateError(null)
+    setTaxCertificateError(null)
     try {
+      let taxCertificateUrl: string | null = null
+      if (createForm.tax_exempt === 'yes' && taxCertificateFile) {
+        const uploadForm = new FormData()
+        uploadForm.append('file', taxCertificateFile)
+        const uploadRes = await fetch('/api/marketing/upload', { method: 'POST', body: uploadForm })
+        const uploadData = await uploadRes.json()
+        if (!uploadRes.ok) { setCreateError(uploadData.error ?? 'Tax certificate upload failed'); return }
+        taxCertificateUrl = uploadData.url
+      }
+
       const res = await fetch('/api/marketing/customers', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -259,6 +296,7 @@ export default function CustomerDetailPage() {
           billing_state: createForm.billing_state || null,
           billing_zip: createForm.billing_zip || null,
           tag_ids: createTagIds,
+          tax_certificate_url: taxCertificateUrl,
         }),
       })
       const data = await res.json()
@@ -365,8 +403,9 @@ export default function CustomerDetailPage() {
                 </select>
                 <FieldError error={createErrors.commissioned_client} />
               </div>
-              <div>
+              <div className="col-span-3">
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">Tax Exempt</label>
+                <p className="mt-0.5 mb-2 text-xs text-slate-400">Select Yes only when customer has current exemption paperwork. A tax certificate must be uploaded and will be saved to related files as &quot;Tax Certificate&quot;.</p>
                 <div className="flex gap-4">
                   <label className="inline-flex items-center gap-2 cursor-pointer">
                     <input type="radio" name="tax_exempt" value="yes"
@@ -378,14 +417,26 @@ export default function CustomerDetailPage() {
                   <label className="inline-flex items-center gap-2 cursor-pointer">
                     <input type="radio" name="tax_exempt" value="no"
                       checked={createForm.tax_exempt === 'no'}
-                      onChange={() => { setCreateForm((p) => ({ ...p, tax_exempt: 'no' })); clearCreateError('tax_exempt') }}
+                      onChange={() => { setCreateForm((p) => ({ ...p, tax_exempt: 'no' })); setTaxCertificateFile(null); setTaxCertificateError(null); clearCreateError('tax_exempt') }}
                       className="w-4 h-4 border-slate-300 text-purple-600 focus:ring-purple-400" />
                     <span className="text-sm text-slate-700">No</span>
                   </label>
                 </div>
                 <FieldError error={createErrors.tax_exempt} />
               </div>
-                  <p className="text-xs text-slate-400 italic mb-2 col-span-3">Is the customer tax exempt? (need to include exemption form to Amy — cannot mark exempt without correct paperwork)</p>
+              {createForm.tax_exempt === 'yes' && (
+                <div className="col-span-3">
+                  <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Tax Certificate</label>
+                  <input
+                    type="file"
+                    required
+                    onChange={(e) => { setTaxCertificateFile(e.target.files?.[0] ?? null); setTaxCertificateError(null) }}
+                    className={`block w-full text-sm text-slate-700 file:mr-4 file:rounded-lg file:border-0 file:bg-purple-50 file:px-3 file:py-2 file:text-sm file:font-semibold file:text-purple-700 hover:file:bg-purple-100 ${taxCertificateError ? 'text-red-700' : ''}`}
+                  />
+                  {taxCertificateError && <p className="mt-1 text-xs text-red-600">{taxCertificateError}</p>}
+                  <p className="mt-1 text-xs text-slate-400">Upload customer exemption certificate. It will appear in related files as Tax Certificate.</p>
+                </div>
+              )}
             </div>
           </div>
 
@@ -449,21 +500,24 @@ export default function CustomerDetailPage() {
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">First Name</label>
                 <input type="text" value={createForm.orderer_first_name}
-                  onChange={(e) => { setCreateForm((p) => ({ ...p, orderer_first_name: e.target.value })); clearCreateError('orderer_first_name') }}
+                  onChange={(e) => { setCreateForm((p) => ({ ...p, orderer_first_name: e.target.value })); clearCreateError('orderer_first_name'); clearCreateError('ap_email'); setApDuplicateError(null) }}
+                  onBlur={validateApContactDifference}
                   className={inputCls(createErrors.orderer_first_name)} />
                 <FieldError error={createErrors.orderer_first_name} />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Last Name</label>
                 <input type="text" value={createForm.orderer_last_name}
-                  onChange={(e) => { setCreateForm((p) => ({ ...p, orderer_last_name: e.target.value })); clearCreateError('orderer_last_name') }}
+                  onChange={(e) => { setCreateForm((p) => ({ ...p, orderer_last_name: e.target.value })); clearCreateError('orderer_last_name'); clearCreateError('ap_email'); setApDuplicateError(null) }}
+                  onBlur={validateApContactDifference}
                   className={inputCls(createErrors.orderer_last_name)} />
                 <FieldError error={createErrors.orderer_last_name} />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Email</label>
                 <input type="email" value={createForm.orderer_email}
-                  onChange={(e) => { setCreateForm((p) => ({ ...p, orderer_email: e.target.value })); clearCreateError('orderer_email') }}
+                  onChange={(e) => { setCreateForm((p) => ({ ...p, orderer_email: e.target.value })); clearCreateError('orderer_email'); clearCreateError('ap_email'); setApDuplicateError(null) }}
+                  onBlur={validateApContactDifference}
                   className={inputCls(createErrors.orderer_email)} />
                 <FieldError error={createErrors.orderer_email} />
               </div>
@@ -480,25 +534,28 @@ export default function CustomerDetailPage() {
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">First Name</label>
                 <input type="text" value={createForm.ap_first_name}
-                  onChange={(e) => { setCreateForm((p) => ({ ...p, ap_first_name: e.target.value })); clearCreateError('ap_first_name') }}
+                  onChange={(e) => { setCreateForm((p) => ({ ...p, ap_first_name: e.target.value })); clearCreateError('ap_first_name'); clearCreateError('ap_email'); setApDuplicateError(null) }}
+                  onBlur={validateApContactDifference}
                   className={inputCls(createErrors.ap_first_name)} />
                 <FieldError error={createErrors.ap_first_name} />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Last Name</label>
                 <input type="text" value={createForm.ap_last_name}
-                  onChange={(e) => { setCreateForm((p) => ({ ...p, ap_last_name: e.target.value })); clearCreateError('ap_last_name') }}
+                  onChange={(e) => { setCreateForm((p) => ({ ...p, ap_last_name: e.target.value })); clearCreateError('ap_last_name'); clearCreateError('ap_email'); setApDuplicateError(null) }}
+                  onBlur={validateApContactDifference}
                   className={inputCls(createErrors.ap_last_name)} />
                 <FieldError error={createErrors.ap_last_name} />
               </div>
               <div>
                 <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Email</label>
                 <input type="email" value={createForm.ap_email}
-                  onChange={(e) => { setCreateForm((p) => ({ ...p, ap_email: e.target.value })); clearCreateError('ap_email') }}
-                  className={inputCls(createErrors.ap_email)} />
-                <FieldError error={createErrors.ap_email} />
+                  onChange={(e) => { setCreateForm((p) => ({ ...p, ap_email: e.target.value })); clearCreateError('ap_email'); setApDuplicateError(null) }}
+                  onBlur={validateApContactDifference}
+                  className={inputCls(createErrors.ap_email ?? apDuplicateError ?? undefined)} />
+                <FieldError error={createErrors.ap_email ?? apDuplicateError ?? undefined} />
               </div>
-                <p className="text-xs text-slate-400 italic col-span-3">Accounts Payable Contact – Must be someone in Accounting</p>
+                <p className="text-xs text-slate-400 italic col-span-3">Accounts Payable Contact – Must be someone in Accounting. AP contact MUST be different then the orderers contact.</p>
             </div>
           </div>
 

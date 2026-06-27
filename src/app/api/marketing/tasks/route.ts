@@ -47,11 +47,21 @@ export async function GET(req: NextRequest) {
   const { searchParams } = new URL(req.url)
   const assignedTo = searchParams.get('assigned_to')
   const status = searchParams.get('status')
+  const columnStatus = searchParams.get('column_status')
   const category = searchParams.get('category')
   const department = searchParams.get('department')
+  const titleSearch = searchParams.get('title_search')?.trim()
+  const assignmentSearch = searchParams.get('assignment_search')?.trim()
+  const priority = searchParams.get('priority')
+  const columnAssignedTo = searchParams.get('column_assigned_to')
+  const createdBy = searchParams.get('created_by')
+  const linkedType = searchParams.get('linked_type')
+  const linkedSearch = searchParams.get('linked_search')?.trim()
   const delegatedByMe = searchParams.get('delegated_by_me') === 'true'
   const hideCompleted = searchParams.get('hide_completed') === 'true'
   const dueBefore = searchParams.get('due_before')
+  const dueFrom = searchParams.get('due_from')
+  const dueTo = searchParams.get('due_to')
   const opportunityId = searchParams.get('opportunity_id')
   const customerId = searchParams.get('customer_id')
   const vendorId = searchParams.get('vendor_id')
@@ -71,6 +81,33 @@ export async function GET(req: NextRequest) {
     } else {
       assignedToIds = assignedTo.split(',').map((s) => s.trim()).filter(Boolean)
     }
+  }
+
+  const columnAssignedToIds = columnAssignedTo?.split(',').map((s) => s.trim()).filter(Boolean) ?? []
+  const createdByIds = createdBy?.split(',').map((s) => s.trim()).filter(Boolean) ?? []
+  const priorityValues = priority?.split(',').map((s) => s.trim()).filter(Boolean) ?? []
+  const columnStatusValues = columnStatus?.split(',').map((s) => s.trim()).filter(Boolean) ?? []
+  const linkedTypeValues = linkedType?.split(',').map((s) => s.trim()).filter(Boolean) ?? []
+
+  const linkedTypeColumns = linkedTypeValues
+    .map((type) => ({ opportunity: 'opportunity_id', customer: 'customer_id', vendor: 'vendor_id', contact: 'contact_id' }[type]))
+    .filter(Boolean) as string[]
+
+  let linkedSearchFilters: string[] = []
+  if (linkedSearch) {
+    const like = `%${linkedSearch}%`
+    const [oppsRes, custsRes, vendsRes, contsRes] = await Promise.all([
+      adminClient.from('crm_opportunities').select('id').ilike('name', like).limit(100),
+      adminClient.from('crm_customers').select('id').ilike('name', like).limit(100),
+      adminClient.from('crm_vendors').select('id').ilike('name', like).limit(100),
+      adminClient.from('crm_contacts').select('id').or(`first_name.ilike.${quotePostgrestValue(like)},last_name.ilike.${quotePostgrestValue(like)}`).limit(100),
+    ])
+    linkedSearchFilters = [
+      ...((oppsRes.data ?? []).map((row: { id: string }) => `opportunity_id.eq.${row.id}`)),
+      ...((custsRes.data ?? []).map((row: { id: string }) => `customer_id.eq.${row.id}`)),
+      ...((vendsRes.data ?? []).map((row: { id: string }) => `vendor_id.eq.${row.id}`)),
+      ...((contsRes.data ?? []).map((row: { id: string }) => `contact_id.eq.${row.id}`)),
+    ]
   }
 
   const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
@@ -110,6 +147,13 @@ export async function GET(req: NextRequest) {
         q = q.eq('department', department)
       }
     }
+    if (titleSearch) q = q.ilike('title', `%${titleSearch}%`)
+    if (assignmentSearch) {
+      const value = quotePostgrestValue(`%${assignmentSearch}%`)
+      q = q.or(`department.ilike.${value},category.ilike.${value}`)
+    }
+    if (priorityValues.length === 1) q = q.eq('priority', priorityValues[0])
+    else if (priorityValues.length > 1) q = q.in('priority', priorityValues)
     if (status) {
       const statuses = status.split(',').map((s) => s.trim()).filter(Boolean)
       if (statuses.length === 1) {
@@ -118,7 +162,21 @@ export async function GET(req: NextRequest) {
         q = q.in('status', statuses)
       }
     }
+    if (columnStatusValues.length === 1) q = q.eq('status', columnStatusValues[0])
+    else if (columnStatusValues.length > 1) q = q.in('status', columnStatusValues)
     if (dueBefore) q = q.lte('due_date', dueBefore)
+    if (dueFrom) q = q.gte('due_date', dueFrom)
+    if (dueTo) q = q.lte('due_date', dueTo)
+    if (columnAssignedToIds.length === 1) q = q.eq('assigned_to', columnAssignedToIds[0])
+    else if (columnAssignedToIds.length > 1) q = q.in('assigned_to', columnAssignedToIds)
+    if (createdByIds.length === 1) q = q.eq('created_by', createdByIds[0])
+    else if (createdByIds.length > 1) q = q.in('created_by', createdByIds)
+    if (linkedTypeColumns.length === 1) q = q.not(linkedTypeColumns[0], 'is', null)
+    else if (linkedTypeColumns.length > 1) q = q.or(linkedTypeColumns.map((column) => `${column}.not.is.null`).join(','))
+    if (linkedSearch) {
+      if (linkedSearchFilters.length === 0) q = q.eq('id', '00000000-0000-0000-0000-000000000000')
+      else q = q.or(linkedSearchFilters.join(','))
+    }
     if (opportunityId) q = q.eq('opportunity_id', opportunityId)
     if (customerId) q = q.eq('customer_id', customerId)
     if (vendorId) q = q.eq('vendor_id', vendorId)
