@@ -12,7 +12,7 @@ test.describe('Document Section Page', () => {
     await page.waitForLoadState('networkidle')
 
     // Verify documents page loaded
-    await expect(page.locator('h1, h2')).first().toBeTruthy()
+    await expect(page.locator('h1, h2').first()).toBeVisible()
 
     // Find a section link and click it
     const sectionLink = page.locator('a[href*="/documents/"], button:has-text("View")')
@@ -24,7 +24,7 @@ test.describe('Document Section Page', () => {
     await page.waitForLoadState('networkidle')
 
     // Verify section page loaded
-    expect(page.url()).toContain('/documents/')
+    await expect(page).toHaveURL(/\/documents(\/[^/]+)?$/)
   })
 
   test('should expand a folder in document section', async ({ page }) => {
@@ -63,7 +63,7 @@ test.describe('Document Section Page', () => {
     } else {
       // If no explicit expand buttons, verify page content loaded
       const content = page.locator('[role="listitem"], li, .document-item')
-      await expect(content.first()).toBeTruthy()
+      await expect(content.first()).toBeVisible()
     }
   })
 

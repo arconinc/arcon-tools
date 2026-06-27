@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test'
+import { test, expect, type Page } from '@playwright/test'
 import { login } from './auth'
 
 test.describe('Customer Detail Page', () => {
@@ -6,14 +6,13 @@ test.describe('Customer Detail Page', () => {
     await login(page)
   })
 
-  test('should load customer detail and edit a field', async ({ page }) => {
-    // Navigate to marketing section
-    await page.goto('/marketing')
+  async function gotoCustomers(page: Page) {
+    await page.goto('/marketing/customers')
     await page.waitForLoadState('load')
+  }
 
-    // Click on the customers tab/link to view customers list
-    await page.click('a[href*="/marketing/customers"]')
-    await page.waitForLoadState('load')
+  test('should load customer detail and edit a field', async ({ page }) => {
+    await gotoCustomers(page)
 
     // Click the first customer in the list
     const firstCustomer = page.locator('a[href*="/marketing/customers/"], button:has-text("View")')
@@ -49,12 +48,7 @@ test.describe('Customer Detail Page', () => {
   })
 
   test('should open artwork modal', async ({ page }) => {
-    // Navigate to a customer detail page
-    await page.goto('/marketing')
-    await page.waitForLoadState('load')
-
-    await page.click('a[href*="/marketing/customers"]')
-    await page.waitForLoadState('load')
+    await gotoCustomers(page)
 
     // Click first customer
     const firstCustomer = page.locator('a[href*="/marketing/customers/"], button:has-text("View")')
@@ -78,11 +72,7 @@ test.describe('Customer Detail Page', () => {
   })
 
   test('should navigate to linked opportunity', async ({ page }) => {
-    await page.goto('/marketing')
-    await page.waitForLoadState('load')
-
-    await page.click('a[href*="/marketing/customers"]')
-    await page.waitForLoadState('load')
+    await gotoCustomers(page)
 
     // Find customer with opportunities
     const customers = page.locator('a[href*="/marketing/customers/"]')
@@ -96,7 +86,6 @@ test.describe('Customer Detail Page', () => {
     // Look for opportunities section and click a link
     const oppLink = page.locator('a[href*="/marketing/opportunities/"]')
     if (await oppLink.count() > 0) {
-      const oppHref = await oppLink.first().getAttribute('href')
       await oppLink.first().click()
       await page.waitForLoadState('load')
 

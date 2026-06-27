@@ -29,7 +29,7 @@ test.describe('Expense Report Edit Page', () => {
     }
 
     // Verify edit page loaded (look for /edit in URL or edit controls)
-    expect(page.url()).toContain('/expense-reports/')
+    await expect(page).toHaveURL(/\/expense-reports\/[^/]+(\/edit)?$/)
 
     // Find add line item button
     const addLineBtn = page.locator('button:has-text("Add Line"), button:has-text("Add Item"), button:has-text("Add Expense")')
