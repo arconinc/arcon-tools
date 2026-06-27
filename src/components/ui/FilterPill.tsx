@@ -1,6 +1,6 @@
 'use client'
 
-import { type ReactNode } from 'react'
+import { type CSSProperties, type ReactNode } from 'react'
 
 export type FilterPillColor = 'purple' | 'green' | 'amber' | 'red' | 'blue' | 'slate'
 
@@ -26,6 +26,7 @@ export type FilterPillOption<V extends string = string> = {
 type FilterPillProps<V extends string = string> = FilterPillOption<V> & {
   active: boolean
   onClick: () => void
+  style?: CSSProperties
 }
 
 export function FilterPill<V extends string = string>({
@@ -35,6 +36,7 @@ export function FilterPill<V extends string = string>({
   count,
   active,
   onClick,
+  style,
 }: FilterPillProps<V>) {
   const colorClass = active ? COLOR_ACTIVE[color] : COLOR_INACTIVE
 
@@ -43,6 +45,7 @@ export function FilterPill<V extends string = string>({
       type="button"
       onClick={onClick}
       className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors focus:outline-none focus:ring-2 focus:ring-purple-300 focus:ring-offset-1 ${colorClass}`}
+      style={style}
       aria-pressed={active}
     >
       {icon && (

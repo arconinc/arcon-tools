@@ -113,6 +113,8 @@ export default function DashboardCalendar() {
     return endTime ? `${date} · ${startTime}-${endTime}` : `${date} · ${startTime}`
   }
 
+  const allTypesActive = activeTypeIds.length === eventTypes.length && eventTypes.length > 0
+
   return (
     <div className="card events-card">
       <div className="card-header">
@@ -131,19 +133,28 @@ export default function DashboardCalendar() {
         <FilterPill
           value="all"
           label="All"
-          active={activeTypeIds.length === eventTypes.length && eventTypes.length > 0}
+          active={allTypesActive}
           onClick={showAllTypes}
+          style={allTypesActive ? undefined : { borderColor: '#6b1e98', color: '#6b1e98' }}
         />
-        {eventTypes.map((type) => (
-          <FilterPill
-            key={type.id}
-            value={type.id}
-            label={type.label}
-            active={activeTypeIds.includes(type.id)}
-            onClick={() => toggleType(type.id)}
-            icon={<span style={{ width: 7, height: 7, borderRadius: '50%', background: type.color, display: 'inline-block' }} />}
-          />
-        ))}
+        {eventTypes.map((type) => {
+          const active = activeTypeIds.includes(type.id)
+          return (
+            <FilterPill
+              key={type.id}
+              value={type.id}
+              label={type.label}
+              active={active}
+              onClick={() => toggleType(type.id)}
+              icon={<span style={{ width: 7, height: 7, borderRadius: '50%', background: active ? '#fff' : type.color, display: 'inline-block' }} />}
+              style={{
+                background: active ? type.color : '#fff',
+                borderColor: type.color,
+                color: active ? '#fff' : type.color,
+              }}
+            />
+          )
+        })}
       </div>
       {eventsLoading ? (
         <div className="calendar-skeleton">

@@ -75,7 +75,7 @@ async function fetchDbBirthdayEvents(timeMin: string, timeMax: string): Promise<
       if (date >= windowStart && date < windowEnd) {
         events.push({
           id: `db-bday-${user.id}-${year}`,
-          title: user.display_name,
+          title: `🎂 ${formatPossessive(user.display_name)} Birthday`,
           type: 'birthday',
           typeLabel: 'Birthdays',
           start: date,
@@ -119,7 +119,7 @@ async function fetchDbAnniversaryEvents(timeMin: string, timeMax: string): Promi
         const yearsCount = year - hireYear
         events.push({
           id: `db-anniversary-${user.id}-${year}`,
-          title: `${user.display_name} (${yearsCount}yr)`,
+          title: `🎉 ${user.display_name} (${yearsCount}yr)`,
           type: 'anniversary',
           typeLabel: 'Anniversaries',
           start: date,
@@ -188,4 +188,8 @@ function getCalendarWindow() {
     timeMin: start.toISOString(),
     timeMax: end.toISOString(),
   }
+}
+
+function formatPossessive(name: string) {
+  return name.endsWith('s') ? `${name}'` : `${name}'s`
 }

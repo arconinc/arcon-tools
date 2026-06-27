@@ -294,13 +294,13 @@ export default function DashboardPage() {
 
       {/* ── Below-fold content ── */}
       <div className="dash-content">
-          {/* My Tasks */}
-          <DashboardTasksWidget />
-
           {/* News & Announcements */}
           <div style={{ marginBottom: 24 }}>
               <NewsFeed />
           </div>
+
+          {/* My Tasks */}
+          <DashboardTasksWidget />
 
 
         {/* Company Calendar — full width */}
