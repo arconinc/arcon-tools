@@ -314,11 +314,13 @@ export default function AppShell({ children, user, isImpersonating, impersonated
       if (!event) return
       const diff = new Date(event.start).getTime() - Date.now()
       if (diff <= 0) { setCountdownDisplay('Now!'); return }
-      const d = Math.floor(diff / 86400000)
+      const totalDays = Math.floor(diff / 86400000)
+      const mo = Math.floor(totalDays / 30)
+      const d = totalDays % 30
       const h = Math.floor((diff % 86400000) / 3600000)
       const m = Math.floor((diff % 3600000) / 60000)
       const s = Math.floor((diff % 60000) / 1000)
-      setCountdownDisplay(d > 0 ? `${d}d ${h}h ${m}m ${s}s` : `${h}h ${m}m ${s}s`)
+      setCountdownDisplay(mo > 0 ? `${mo}mo ${d}d ${h}h ${m}m ${s}s` : totalDays > 0 ? `${totalDays}d ${h}h ${m}m ${s}s` : `${h}h ${m}m ${s}s`)
     }
     tick()
     const id = setInterval(tick, 1000)
