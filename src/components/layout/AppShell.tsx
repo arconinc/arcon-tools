@@ -122,22 +122,21 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
         { href: '/marketing/customers/new', label: 'Add Customer', icon: CrmCustomersIcon },
       ],
     },
-    {
-      label: 'Customers',
-      href: '/marketing/customers',
-      items: [],
-    },
-    {
-      label: 'Suppliers',
-      href: '/marketing/vendors',
-      items: [],
-    },
+      {
+          label: 'Sales',
+          items: [
+              { href: '/marketing', label: 'Dashboard', icon: CrmDashIcon },
+              { href: '/marketing/opportunities', label: 'Opportunities', icon: CrmOppsIcon },
+              { href: '/marketing/customers', label: 'Customers', icon: CrmCustomersIcon},
+              { href: '/marketing/vendors', label: 'Suppliers', icon: BuildingIcon },
+              { href: '/marketing/contacts', label: 'Contacts', icon: CrmContactsIcon },
+              { href: '/documents/sales', label: 'Documents', icon: DocumentIcon },
+              { href: '/sales/tasks', label: 'Tasks', icon: TaskCheckIcon },
+          ],
+      },
     {
       label: 'Marketing',
       items: [
-        { href: '/marketing', label: 'Dashboard', icon: CrmDashIcon },
-        { href: '/marketing/contacts', label: 'Contacts', icon: CrmContactsIcon, adminMatch: true },
-        { href: '/marketing/opportunities', label: 'Opportunities', icon: CrmOppsIcon, adminMatch: true },
         { href: '/documents/marketing', label: 'Documents', icon: DocumentIcon, adminMatch: true },
         { href: '/marketing/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
         { href: '/marketing/specs', label: 'Spec Samples', icon: SpecSampleIcon, adminMatch: true },
@@ -170,26 +169,19 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
       ],
     },
     {
-      label: 'Technology',
-      items: [
-        { href: '/documents/technology', label: 'Documents', icon: DocumentIcon, adminMatch: true },
-        { href: '/it/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
-      ],
-    },
-    {
-      label: 'Sales',
-      items: [
-        { href: '/documents/sales', label: 'Documents', icon: DocumentIcon, adminMatch: true },
-        { href: '/sales/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
-      ],
-    },
-    {
       label: 'Warehouse',
       items: [
         { href: '/documents/warehouse', label: 'Documents', icon: DocumentIcon, adminMatch: true },
         { href: '/warehouse/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
       ],
     },
+      {
+          label: 'Technology',
+          items: [
+              { href: '/documents/technology', label: 'Documents', icon: DocumentIcon, adminMatch: true },
+              { href: '/it/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
+          ],
+      },
   ]
 
   if (isAdmin) {
