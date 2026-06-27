@@ -312,6 +312,75 @@ export default function VendorDetailPage() {
     }
   }
 
+  async function downloadFilledForm(form: CrmForm) {
+    if (!vendor) return
+    setTaxLogging(form.id)
+    try {
+      const { PDFDocument, PDFName, PDFString, PDFBool } = await import('pdf-lib')
+      const pdfRes = await fetch(form.file_url)
+      const pdfBytes = await pdfRes.arrayBuffer()
+      const pdfDoc = await PDFDocument.load(pdfBytes)
+
+      const addr = [vendor.billing_address1, vendor.billing_city, vendor.billing_state, vendor.billing_zip].filter(Boolean).join(', ')
+      const fieldMap: Record<string, string> = {
+        // SSTGB Form F0003
+        'Item.NameofSeller': vendor.name ?? '',
+        'Item.SellersAddress': vendor.billing_address1 ?? '',
+        'Item.SellersCity': vendor.billing_city ?? '',
+        'Item.SellersStateCountry': vendor.billing_state ?? '',
+        'Item.SellerCountry': vendor.billing_country ?? '',
+        'Item.SellersPostalCode': vendor.billing_zip ?? '',
+        // Uniform Sales & Use Tax Resale Certificate — Multijurisdiction
+        'Issued to Seller': vendor.name ?? '',
+        'Address': addr,
+      }
+
+      // This PDF uses flat widget annotations as fields (no parent hierarchy).
+      // pdf-lib's AcroForm API doesn't write /V to these — set it directly on each annotation.
+      for (const page of pdfDoc.getPages()) {
+        const annotRefs = page.node.get(PDFName.of('Annots'))
+        if (!annotRefs) continue
+        const annots = pdfDoc.context.lookup(annotRefs) as { asArray?: () => unknown[] }
+        if (!annots?.asArray) continue
+        for (const ref of annots.asArray()) {
+          const annot = pdfDoc.context.lookup(ref as Parameters<typeof pdfDoc.context.lookup>[0]) as { get?: (k: unknown) => { decodeText?: () => string; value?: string } | undefined; set?: (k: unknown, v: unknown) => void } | null
+          if (!annot?.get || !annot?.set) continue
+          const t = annot.get(PDFName.of('T'))
+          if (!t) continue
+          const name = t.decodeText ? t.decodeText() : (t.value ?? '')
+          if (name in fieldMap) {
+            annot.set(PDFName.of('V'), PDFString.of(fieldMap[name]))
+          }
+        }
+      }
+
+      // Tell viewers to regenerate appearance streams from /V values
+      const acroFormRef = pdfDoc.catalog.get(PDFName.of('AcroForm'))
+      if (acroFormRef) {
+        const af = pdfDoc.context.lookup(acroFormRef) as { set?: (k: unknown, v: unknown) => void } | null
+        af?.set?.(PDFName.of('NeedAppearances'), PDFBool.True)
+      }
+
+      const filled = await pdfDoc.save()
+      const blob = new Blob([filled], { type: 'application/pdf' })
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      const safeName = (s: string) => s.replace(/[^a-z0-9]/gi, '-').toLowerCase().replace(/-+/g, '-').replace(/^-|-$/g, '')
+      a.download = `${safeName(vendor.name)}-${safeName(form.name)}.pdf`
+      a.click()
+      URL.revokeObjectURL(url)
+
+      await fetch(`/api/admin/forms/${form.id}/delivery-log`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ vendor_id: vendor.id, delivery_method: 'download' }),
+      })
+    } finally {
+      setTaxLogging(null)
+    }
+  }
+
   const [createForm, setCreateForm] = useState({
     name: '', phone: '', website: '', linkedin: '', description: '', product_line: '', specialty: '',
     orders_email: '', artwork_email: '', ap_email: '', sales_rep_name: '', sales_rep_email: '',
@@ -1062,15 +1131,13 @@ export default function VendorDetailPage() {
                               )}
                             </div>
                           </div>
-                          <a
-                            href={form.file_url}
-                            target="_blank"
-                            rel="noopener noreferrer"
-                            onClick={() => logFormDelivery(form.id)}
-                            className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-purple-700 hover:text-purple-900"
+                          <button
+                            onClick={() => downloadFilledForm(form)}
+                            disabled={taxLogging === form.id}
+                            className="mt-2 flex items-center gap-1.5 text-xs font-semibold text-purple-700 hover:text-purple-900 disabled:opacity-50"
                           >
-                            {taxLogging === form.id ? 'Opening…' : '↓ Download'}
-                          </a>
+                            {taxLogging === form.id ? 'Preparing…' : '↓ Download'}
+                          </button>
                         </div>
                       ))}
                     </div>
