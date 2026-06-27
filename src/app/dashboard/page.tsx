@@ -112,7 +112,7 @@ export default function DashboardPage() {
         @keyframes gradientShift { 0% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } 100% { background-position: 0% 50%; } }
         .banner-strip:hover .banner-inner, .banner-strip:focus-within .banner-inner { animation-play-state: paused; }
         .banner-inner { display: flex; align-items: center; white-space: nowrap; animation: marquee 28s linear infinite; }
-        @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-50%); } }
+        @keyframes marquee { 0% { transform: translateX(0); } 100% { transform: translateX(-100%); } }
         .banner-item { display: inline-flex; align-items: center; gap: 8px; padding: 0 28px; font-size: 12px; font-weight: 600; color: rgba(255,255,255,0.92); letter-spacing: 0.01em; }
         .banner-dot-sep { color: rgba(255,255,255,0.35); font-size: 16px; }
         .banner-label { font-size: 9px; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; background: rgba(255,255,255,0.2); color: #fff; padding: 2px 7px; border-radius: 3px; margin-right: 4px; }
@@ -261,8 +261,7 @@ export default function DashboardPage() {
       {bannerItems.length > 0 && (
         <div className="banner-strip">
           <div className="banner-inner">
-            {/* Render twice for seamless loop */}
-            {[...bannerItems, ...bannerItems].map((item, i) => (
+            {bannerItems.map((item, i) => (
               <span key={i} style={{ display: 'inline-flex', alignItems: 'center' }}>
                 <span className="banner-item">
                   {item.avatar_url && (item.source === 'birthday' || item.source === 'anniversary') && (
@@ -275,7 +274,7 @@ export default function DashboardPage() {
                   )}
                   <span className="banner-label">{item.label}</span>
                   {item.href ? (
-                    <Link href={item.href} style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: 2 }}>
+                    <Link href={item.href} style={{ color: 'inherit', textDecoration: 'none' }}>
                       {item.text}
                     </Link>
                   ) : item.text}

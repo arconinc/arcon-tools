@@ -4,7 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import AppShell from '@/components/layout/AppShell'
 import { ArticleCard } from '@/components/news/ArticleCard'
-import { formatPublishDate } from '@/lib/news-utils'
+import { getPollData } from '@/lib/poll-utils'
 import type { NewsArticleSummary } from '@/types'
 
 export default async function NewsListingPage() {
@@ -24,7 +24,8 @@ export default async function NewsListingPage() {
   const { data: articles } = await adminClient
     .from('news_articles')
     .select(`
-      id, title, type, excerpt, cover_image_url, pinned,
+      id, title, type, content_kind, excerpt, cover_image_url, pinned,
+      poll_question, poll_is_anonymous,
       reading_time_minutes, publish_date,
       author:users!created_by(display_name)
     `)
@@ -33,17 +34,21 @@ export default async function NewsListingPage() {
     .order('publish_date', { ascending: false })
     .limit(50)
 
-  const summaries: NewsArticleSummary[] = (articles ?? []).map((a) => ({
+  const summaries: NewsArticleSummary[] = await Promise.all((articles ?? []).map(async (a) => ({
     id: a.id,
     title: a.title,
     type: a.type,
+    content_kind: a.content_kind ?? 'article',
     excerpt: a.excerpt,
     cover_image_url: a.cover_image_url,
     pinned: a.pinned,
+    poll_question: a.poll_question,
+    poll_is_anonymous: a.poll_is_anonymous ?? true,
+    poll: a.content_kind === 'poll' ? await getPollData(a.id, appUser.id, false) : undefined,
     reading_time_minutes: a.reading_time_minutes,
     publish_date: a.publish_date,
     author_name: (a.author as unknown as { display_name: string } | null)?.display_name ?? 'Unknown',
-  }))
+  })))
 
   const avatarUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture || null
 

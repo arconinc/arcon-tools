@@ -236,6 +236,9 @@ export default function NewsAdminPage() {
                     >
                       {article.title}
                     </Link>
+                    {article.content_kind === 'poll' && (
+                      <span className="mt-1 inline-flex rounded-full bg-purple-100 px-2 py-0.5 text-[11px] font-semibold text-purple-700">Poll</span>
+                    )}
                     {article.excerpt && (
                       <p className="text-xs text-slate-400 line-clamp-1 mt-0.5">{article.excerpt}</p>
                     )}
@@ -265,7 +268,7 @@ export default function NewsAdminPage() {
 
                   {/* Reading time */}
                   <td className="px-4 py-3 text-slate-400 whitespace-nowrap">
-                    {article.reading_time_minutes ? `${article.reading_time_minutes} min` : '—'}
+                    {article.content_kind === 'poll' ? 'Poll' : article.reading_time_minutes ? `${article.reading_time_minutes} min` : '—'}
                   </td>
 
                   {/* Actions */}

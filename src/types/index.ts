@@ -302,17 +302,51 @@ export interface BannerConfig {
 
 export type ArticleType = 'COMPANY' | 'HR' | 'SALES' | 'IT' | 'FINANCE' | 'OPERATIONS' | 'GENERAL'
 export type ArticleStatus = 'draft' | 'published' | 'archived'
+export type ArticleContentKind = 'article' | 'poll'
+
+export interface PollOption {
+  id: string
+  article_id: string
+  option_text: string
+  sort_order: number
+  created_at: string
+  updated_at?: string
+}
+
+export interface PollOptionResult extends PollOption {
+  vote_count: number
+  voters?: PollVoter[]
+}
+
+export interface PollVoter {
+  id: string
+  display_name: string
+  email: string
+}
+
+export interface PollData {
+  question: string
+  is_anonymous: boolean
+  options: PollOptionResult[]
+  total_votes: number
+  user_vote_option_id: string | null
+  can_view_voters?: boolean
+}
 
 export interface NewsArticle {
   id: string
   title: string
   type: ArticleType
   status: ArticleStatus
+  content_kind: ArticleContentKind
   content_json: Record<string, unknown>
   content_html: string | null
   excerpt: string | null
   cover_image_url: string | null
   pinned: boolean
+  poll_question: string | null
+  poll_is_anonymous: boolean
+  poll?: PollData
   reading_time_minutes: number | null
   publish_date: string | null
   created_by: string
@@ -332,9 +366,13 @@ export interface NewsArticleSummary {
   id: string
   title: string
   type: ArticleType
+  content_kind: ArticleContentKind
   excerpt: string | null
   cover_image_url: string | null
   pinned: boolean
+  poll_question: string | null
+  poll_is_anonymous: boolean
+  poll?: PollData
   reading_time_minutes: number | null
   publish_date: string | null
   author_name: string
@@ -344,11 +382,15 @@ export interface NewsArticlePayload {
   title: string
   type: ArticleType
   status: ArticleStatus
+  content_kind?: ArticleContentKind
   content_json: Record<string, unknown>
   content_html: string
   cover_image_url?: string | null
   pinned?: boolean
   publish_date?: string | null
+  poll_question?: string | null
+  poll_is_anonymous?: boolean
+  poll_options?: { id?: string; option_text: string; sort_order: number }[]
 }
 
 // ─── Banner Strip (Ticker) ────────────────────────────────────────────────────

@@ -6,6 +6,8 @@ import AppShell from '@/components/layout/AppShell'
 import { TiptapRenderer } from '@/components/news/TiptapRenderer'
 import { ArticleTypeBadge } from '@/components/news/ArticleTypeBadge'
 import { formatPublishDate } from '@/lib/news-utils'
+import { getPollData } from '@/lib/poll-utils'
+import { PollBlock } from '@/components/news/PollBlock'
 import type { NewsArticle, ArticleType } from '@/types'
 
 interface PageProps {
@@ -41,6 +43,9 @@ export default async function ArticleReaderPage({ params }: PageProps) {
   if (!article) notFound()
 
   const a = article as NewsArticle & { author: { display_name: string } }
+  const poll = a.content_kind === 'poll'
+    ? await getPollData(a.id, appUser.id, !a.poll_is_anonymous || appUser.is_admin)
+    : undefined
   const avatarUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture || null
 
 
@@ -65,6 +70,9 @@ export default async function ArticleReaderPage({ params }: PageProps) {
         {/* Meta */}
         <div className="flex items-center gap-3 mb-4">
           <ArticleTypeBadge type={a.type as ArticleType} />
+          {a.content_kind === 'poll' && (
+            <span className="text-xs font-semibold px-2.5 py-1 rounded-full bg-purple-100 text-purple-700">Poll</span>
+          )}
           {a.pinned && <span className="text-sm text-purple-600 font-medium">📌 Pinned</span>}
         </div>
 
@@ -87,8 +95,14 @@ export default async function ArticleReaderPage({ params }: PageProps) {
         {/* Content */}
         {a.content_html ? (
           <TiptapRenderer html={a.content_html} />
-        ) : (
+        ) : a.content_kind !== 'poll' ? (
           <p className="text-slate-400 italic">No content available.</p>
+        ) : null}
+
+        {poll && (
+          <div className="mt-8">
+            <PollBlock articleId={a.id} poll={poll} showVoters={poll.can_view_voters ?? false} variant="detail" />
+          </div>
         )}
 
         {/* Footer */}

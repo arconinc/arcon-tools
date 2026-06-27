@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { generateExcerpt, computeReadingTime } from '@/lib/news-utils'
+import { validatePollOptions } from '@/lib/poll-utils'
 import type { NewsArticlePayload } from '@/types'
 
 async function getAdminUser() {
@@ -62,8 +63,18 @@ export async function POST(request: Request) {
   if (!body.type) {
     return NextResponse.json({ error: 'Type is required' }, { status: 400 })
   }
+  const contentKind = body.content_kind ?? 'article'
+  if (contentKind === 'poll') {
+    if (!body.poll_question?.trim()) {
+      return NextResponse.json({ error: 'Poll question is required' }, { status: 400 })
+    }
+    const validation = validatePollOptions(body.poll_options)
+    if (validation.error) return NextResponse.json({ error: validation.error }, { status: 400 })
+  }
 
-  const excerpt = generateExcerpt(body.content_html ?? '')
+  const excerpt = contentKind === 'poll'
+    ? body.poll_question?.trim() ?? ''
+    : generateExcerpt(body.content_html ?? '')
   const reading_time_minutes = computeReadingTime(body.content_html ?? '')
   const publish_date =
     body.status === 'published' && !body.publish_date
@@ -77,12 +88,15 @@ export async function POST(request: Request) {
       title: body.title.trim(),
       type: body.type,
       status: body.status,
+      content_kind: contentKind,
       content_json: body.content_json,
       content_html: body.content_html,
       excerpt,
       reading_time_minutes,
       cover_image_url: body.cover_image_url ?? null,
       pinned: body.pinned ?? false,
+      poll_question: contentKind === 'poll' ? body.poll_question?.trim() : null,
+      poll_is_anonymous: body.poll_is_anonymous ?? true,
       publish_date,
       created_by: admin.id,
     })
@@ -90,5 +104,12 @@ export async function POST(request: Request) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+  if (contentKind === 'poll') {
+    const validation = validatePollOptions(body.poll_options)
+    const { error: optionsError } = await adminClient
+      .from('poll_options')
+      .insert(validation.options.map((option) => ({ ...option, article_id: data.id })))
+    if (optionsError) return NextResponse.json({ error: optionsError.message }, { status: 500 })
+  }
   return NextResponse.json({ article: data }, { status: 201 })
 }
