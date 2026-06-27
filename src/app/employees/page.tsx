@@ -5,6 +5,7 @@ import { EmployeeSummary, OfficeLocation } from '@/types'
 import EmployeeCard from '@/components/employees/EmployeeCard'
 import { DEPARTMENTS, DEPARTMENT_DISPLAY_NAMES } from '@/lib/task-constants'
 import type { CrmTaskDepartment } from '@/types'
+import { MultiSelect, type MultiSelectOption } from '@/components/ui/MultiSelect'
 
 const OFFICE_LOCATIONS: OfficeLocation[] = ['Remote', 'Minnesota', 'Arizona', 'Colorado']
 
@@ -13,7 +14,7 @@ export default function EmployeeDirectoryPage() {
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [locationFilter, setLocationFilter] = useState<OfficeLocation | 'All'>('All')
-  const [departmentFilter, setDepartmentFilter] = useState<CrmTaskDepartment | 'All'>('All')
+  const [departmentFilter, setDepartmentFilter] = useState<string[]>([])
 
   useEffect(() => {
     fetch('/api/employees')
@@ -25,7 +26,7 @@ export default function EmployeeDirectoryPage() {
   const filtered = useMemo(() => {
     return employees.filter((e) => {
       if (locationFilter !== 'All' && e.office_location !== locationFilter) return false
-      if (departmentFilter !== 'All' && !e.department?.includes(departmentFilter)) return false
+      if (departmentFilter.length > 0 && !e.department?.some((d) => departmentFilter.includes(d))) return false
       if (search.trim()) {
         const q = search.toLowerCase()
         return (
@@ -54,8 +55,6 @@ export default function EmployeeDirectoryPage() {
         .pill { padding: 0.375rem 0.875rem; border-radius: 9999px; font-size: 0.8125rem; font-weight: 500; border: 1px solid #e2e8f0; background: white; color: #64748b; cursor: pointer; transition: all 0.15s; }
         .pill:hover { border-color: #c084fc; color: #7c3aed; }
         .pill.active { background: #7c3aed; border-color: #7c3aed; color: white; }
-        .dept-select { padding: 0.375rem 0.75rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; font-size: 0.8125rem; color: #374151; outline: none; }
-        .dept-select:focus { border-color: #a855f7; }
         .dir-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 1rem; }
         @media (min-width: 768px) { .dir-grid { grid-template-columns: repeat(3, 1fr); } }
         @media (min-width: 1024px) { .dir-grid { grid-template-columns: repeat(4, 1fr); } }
@@ -95,14 +94,13 @@ export default function EmployeeDirectoryPage() {
             ))}
           </div>
 
-          <select
-            className="dept-select"
+          <MultiSelect
+            options={DEPARTMENTS.map((d): MultiSelectOption => ({ value: d, label: DEPARTMENT_DISPLAY_NAMES[d] }))}
             value={departmentFilter}
-            onChange={(e) => setDepartmentFilter(e.target.value as CrmTaskDepartment | 'All')}
-          >
-            <option value="All">All Departments</option>
-            {DEPARTMENTS.map((d) => <option key={d} value={d}>{DEPARTMENT_DISPLAY_NAMES[d]}</option>)}
-          </select>
+            onChange={setDepartmentFilter}
+            placeholder="All Departments"
+            label="Filter by department"
+          />
         </div>
 
         <div className="dir-grid">

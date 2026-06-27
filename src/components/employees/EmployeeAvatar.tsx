@@ -1,4 +1,5 @@
 import Image from 'next/image'
+import { avatarThumbnailUrl } from '@/lib/format'
 
 interface EmployeeAvatarProps {
   displayName: string
@@ -32,7 +33,8 @@ export default function EmployeeAvatar({
   className = '',
 }: EmployeeAvatarProps) {
   const { px, cls } = sizeMap[size]
-  const src = profileImageUrl || avatarUrl
+  const rawSrc = profileImageUrl || avatarUrl
+  const src = avatarThumbnailUrl(rawSrc, px * 2) ?? rawSrc // 2× for retina
 
   if (src) {
     return (

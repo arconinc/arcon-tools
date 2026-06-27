@@ -2,7 +2,7 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import Image from 'next/image'
+import { avatarThumbnailUrl } from '@/lib/format'
 import { DEPARTMENT_DISPLAY_NAMES } from '@/lib/task-constants'
 import type { CrmTaskDepartment } from '@/types'
 
@@ -114,10 +114,12 @@ export function PriorityIcon({ priority }: { priority: KanbanPriority }) {
 
 export function UserAvatar({ name, avatarUrl, size = 20 }: { name: string; avatarUrl: string | null; size?: number }) {
   if (avatarUrl) {
+    const src = avatarThumbnailUrl(avatarUrl, size * 2) // 2× for retina
     return (
-      <Image
-        src={avatarUrl}
+      <img
+        src={src ?? avatarUrl}
         alt={name}
+        loading="lazy"
         width={size}
         height={size}
         style={{ borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}

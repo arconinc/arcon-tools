@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
   const customerId = searchParams.get('customer_id')
   const vendorId = searchParams.get('vendor_id')
   const type = searchParams.get('type')
-  const tagId = searchParams.get('tag_id')
+  const tagIds = (searchParams.get('tag_id') ?? '').split(',').filter(Boolean)
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
   const limit = Math.min(200, Math.max(1, parseInt(searchParams.get('limit') ?? '50', 10)))
   const from = (page - 1) * limit
@@ -23,13 +23,13 @@ export async function GET(req: NextRequest) {
   const adminClient = createAdminClient()
 
   let tagFilterIds: string[] | null = null
-  if (tagId) {
+  if (tagIds.length > 0) {
     const { data: tagRows } = await adminClient
       .from('crm_entity_tags')
       .select('entity_id')
-      .eq('tag_id', tagId)
+      .in('tag_id', tagIds)
       .eq('entity_type', 'contact')
-    tagFilterIds = (tagRows ?? []).map((r: any) => r.entity_id)
+    tagFilterIds = [...new Set((tagRows ?? []).map((r: any) => r.entity_id))]
     if (tagFilterIds.length === 0) return ok({ contacts: [], total: 0, page, limit })
   }
 

@@ -4,17 +4,18 @@ import { requireUser } from '@/lib/crm/require-user'
 import { unauthorized, badRequest, serverError, created, ok } from '@/lib/api/respond'
 import { stripReadOnly } from '@/lib/api/sanitize'
 
-// GET /api/marketing/opportunities?assigned_to=&status=&stage=&customer_id=&tag_id=&page=1&limit=50
+// GET /api/marketing/opportunities?assigned_to=&status=open,won&stage=Send+Quote,Follow+Up&customer_id=&tag_id=id1,id2&page=1&limit=50
+// Multi-value params: status, stage, tag_id accept comma-separated lists
 export async function GET(req: NextRequest) {
   const appUser = await requireUser()
   if (!appUser) return unauthorized()
 
   const { searchParams } = new URL(req.url)
   const assignedTo = searchParams.get('assigned_to')
-  const status = searchParams.get('status')
-  const stage = searchParams.get('stage')
+  const statuses = (searchParams.get('status') ?? '').split(',').filter(Boolean)
+  const stages = (searchParams.get('stage') ?? '').split(',').filter(Boolean)
   const customerId = searchParams.get('customer_id')
-  const tagId = searchParams.get('tag_id')
+  const tagIds = (searchParams.get('tag_id') ?? '').split(',').filter(Boolean)
   const search = searchParams.get('search')
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
   const limit = Math.min(200, Math.max(1, parseInt(searchParams.get('limit') ?? '50', 10)))
@@ -25,13 +26,13 @@ export async function GET(req: NextRequest) {
 
   // If filtering by tag, get matching entity IDs first
   let tagFilterIds: string[] | null = null
-  if (tagId) {
+  if (tagIds.length > 0) {
     const { data: tagRows } = await adminClient
       .from('crm_entity_tags')
       .select('entity_id')
-      .eq('tag_id', tagId)
+      .in('tag_id', tagIds)
       .eq('entity_type', 'opportunity')
-    tagFilterIds = (tagRows ?? []).map((r: any) => r.entity_id)
+    tagFilterIds = [...new Set((tagRows ?? []).map((r: any) => r.entity_id))]
     if (tagFilterIds.length === 0) {
       return ok({ items: [], total: 0, page, limit, pipeline_total: 0 })
     }
@@ -39,8 +40,10 @@ export async function GET(req: NextRequest) {
 
   const applyFilters = (q: any) => {
     if (assignedTo) q = q.eq('assigned_to', assignedTo)
-    if (status) q = q.eq('status', status)
-    if (stage) q = q.eq('pipeline_stage', stage)
+    if (statuses.length === 1) q = q.eq('status', statuses[0])
+    else if (statuses.length > 1) q = q.in('status', statuses)
+    if (stages.length === 1) q = q.eq('pipeline_stage', stages[0])
+    else if (stages.length > 1) q = q.in('pipeline_stage', stages)
     if (customerId) q = q.eq('customer_id', customerId)
     if (tagFilterIds) q = q.in('id', tagFilterIds)
     if (search) q = q.ilike('name', `%${search}%`)

@@ -483,6 +483,8 @@ export default function OpportunityDetailPage() {
         onStageClick={handleStageClick}
         onClose={handleClose}
         disabled={stageSaving}
+        onWonAnimationComplete={() => router.push('/marketing/opportunities')}
+        oppName={opp.name}
       />
 
       {/* Tabs */}

@@ -5,9 +5,13 @@ import { useRouter } from 'next/navigation'
 import { opportunityStatusBadge } from '@/lib/badges'
 import { DataTable, type DataTableColumn } from '@/components/ui/DataTable'
 import { FilterPillGroup, type FilterPillOption } from '@/components/ui/FilterPill'
+import { MultiSelect, type MultiSelectOption } from '@/components/ui/MultiSelect'
 import { SavedFiltersMenu } from '@/components/ui/SavedFiltersMenu'
 
 const PAGE_SIZE = 50
+const PAGE_KEY = 'marketing/opportunities'
+const FILTER_STORAGE_KEY = `savedFilters:current:${PAGE_KEY}`
+const ACTIVE_FILTER_STORAGE_KEY = `savedFilters:active:${PAGE_KEY}`
 
 type TagOption = { id: string; name: string; color: string }
 
@@ -29,6 +33,34 @@ type OppListItem = {
 }
 
 type StatusFilter = '' | 'open' | 'won' | 'lost' | 'stalled'
+
+type StoredOpportunityFilters = {
+  search?: unknown
+  statusFilter?: unknown
+  stageFilter?: unknown
+  ownerFilter?: unknown
+  tagFilter?: unknown
+}
+
+function readStoredFilters(): StoredOpportunityFilters {
+  if (typeof window === 'undefined') return {}
+  try {
+    const stored = window.localStorage.getItem(FILTER_STORAGE_KEY)
+    return stored ? JSON.parse(stored) : {}
+  } catch {
+    return {}
+  }
+}
+
+function readStoredString(key: string) {
+  if (typeof window === 'undefined') return null
+  try { return window.localStorage.getItem(key) } catch { return null }
+}
+
+function asStringArray(value: unknown) {
+  if (Array.isArray(value)) return value.filter((item): item is string => typeof item === 'string')
+  return typeof value === 'string' && value ? [value] : []
+}
 
 const STAGES = ['Send Quote', 'Follow Up on Quote', 'Quote Accepted', 'Send Thank You Email']
 
@@ -101,28 +133,34 @@ function isOverdue(iso: string | null) {
 
 export default function OpportunitiesPage() {
   const router = useRouter()
+  const storedFilters = readStoredFilters()
   const [rawOpps, setRawOpps] = useState<OppListItem[]>([])
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [allTags, setAllTags] = useState<TagOption[]>([])
-  const [search, setSearch] = useState('')
-  const [statusFilter, setStatusFilter] = useState<StatusFilter>('')
-  const [stageFilter, setStageFilter] = useState('')
-  const [ownerFilter, setOwnerFilter] = useState('')
-  const [tagFilter, setTagFilter] = useState('')
+  const [search, setSearch] = useState(() => typeof storedFilters.search === 'string' ? storedFilters.search : '')
+  const [statusFilter, setStatusFilter] = useState<StatusFilter>(() => {
+    const status = storedFilters.statusFilter
+    return status === 'open' || status === 'won' || status === 'lost' || status === 'stalled' ? status : ''
+  })
+  const [stageFilter, setStageFilter] = useState<string[]>(() => asStringArray(storedFilters.stageFilter))
+  const [ownerFilter, setOwnerFilter] = useState<string[]>(() => asStringArray(storedFilters.ownerFilter))
+  const [tagFilter, setTagFilter] = useState<string[]>(() => asStringArray(storedFilters.tagFilter))
   const [page, setPage] = useState(1)
-  const [activeFilterId, setActiveFilterId] = useState<string | null>(null)
+  const [activeFilterId, setActiveFilterId] = useState<string | null>(() => readStoredString(ACTIVE_FILTER_STORAGE_KEY))
 
   useEffect(() => {
     fetch('/api/marketing/tags').then((r) => r.json()).then((d) => { if (Array.isArray(d)) setAllTags(d) })
   }, [])
 
+
+
   const fetchOpps = useCallback(async (currentPage: number) => {
     setLoading(true)
     const params = new URLSearchParams()
     if (statusFilter) params.set('status', statusFilter)
-    if (stageFilter) params.set('stage', stageFilter)
-    if (tagFilter) params.set('tag_id', tagFilter)
+    if (stageFilter.length > 0) params.set('stage', stageFilter.join(','))
+    if (tagFilter.length > 0) params.set('tag_id', tagFilter.join(','))
     params.set('page', String(currentPage))
     params.set('limit', String(PAGE_SIZE))
     try {
@@ -133,9 +171,23 @@ export default function OpportunitiesPage() {
     } finally {
       setLoading(false)
     }
-  }, [statusFilter, stageFilter, tagFilter])
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [statusFilter, JSON.stringify(stageFilter), JSON.stringify(tagFilter)])
 
-  useEffect(() => { setPage(1) }, [statusFilter, stageFilter, tagFilter])
+  useEffect(() => { setPage(1) }, [search, statusFilter, stageFilter, ownerFilter, tagFilter])
+
+  useEffect(() => {
+    try {
+      window.localStorage.setItem(FILTER_STORAGE_KEY, JSON.stringify(getCurrentFilterConfig()))
+    } catch {}
+  }, [search, statusFilter, stageFilter, ownerFilter, tagFilter])
+
+  useEffect(() => {
+    try {
+      if (activeFilterId) window.localStorage.setItem(ACTIVE_FILTER_STORAGE_KEY, activeFilterId)
+      else window.localStorage.removeItem(ACTIVE_FILTER_STORAGE_KEY)
+    } catch {}
+  }, [activeFilterId])
 
   useEffect(() => {
     fetchOpps(page)
@@ -151,8 +203,8 @@ export default function OpportunitiesPage() {
           (o.customer_name ?? '').toLowerCase().includes(q)
       )
     }
-    if (ownerFilter) {
-      items = items.filter((o) => o.assigned_to === ownerFilter)
+    if (ownerFilter.length > 0) {
+      items = items.filter((o) => o.assigned_to && ownerFilter.includes(o.assigned_to))
     }
     return items
   })()
@@ -172,24 +224,27 @@ export default function OpportunitiesPage() {
     .filter((o) => o.status === 'open' && o.value != null)
     .reduce((s, o) => s + (o.value ?? 0), 0)
 
-  const activeFilters = !!(search || statusFilter || stageFilter || ownerFilter || tagFilter)
+  const activeFilters = !!(search || statusFilter || stageFilter.length || ownerFilter.length || tagFilter.length)
 
   function getCurrentFilterConfig(): Record<string, unknown> {
     return {
       search: search || null,
       statusFilter: statusFilter || null,
-      stageFilter: stageFilter || null,
-      ownerFilter: ownerFilter || null,
-      tagFilter: tagFilter || null,
+      stageFilter: stageFilter.length ? stageFilter : null,
+      ownerFilter: ownerFilter.length ? ownerFilter : null,
+      tagFilter: tagFilter.length ? tagFilter : null,
     }
   }
 
   function handleLoadFilter(config: Record<string, unknown>) {
     setSearch((config.search as string | null) ?? '')
     setStatusFilter(((config.statusFilter as StatusFilter | null) ?? '') as StatusFilter)
-    setStageFilter((config.stageFilter as string | null) ?? '')
-    setOwnerFilter((config.ownerFilter as string | null) ?? '')
-    setTagFilter((config.tagFilter as string | null) ?? '')
+    const sf = config.stageFilter
+    setStageFilter(Array.isArray(sf) ? sf : sf ? [sf as string] : [])
+    const of_ = config.ownerFilter
+    setOwnerFilter(Array.isArray(of_) ? of_ : of_ ? [of_ as string] : [])
+    const tf = config.tagFilter
+    setTagFilter(Array.isArray(tf) ? tf : tf ? [tf as string] : [])
     setPage(1)
   }
 
@@ -267,6 +322,10 @@ export default function OpportunitiesPage() {
     },
   ]
 
+  const stageOptions: MultiSelectOption[] = STAGES.map((s) => ({ value: s, label: s }))
+  const ownerSelectOptions: MultiSelectOption[] = ownerOptions.map(([id, name]) => ({ value: id, label: name }))
+  const tagSelectOptions: MultiSelectOption[] = allTags.map((t) => ({ value: t.id, label: t.name, color: t.color }))
+
   return (
     <div className="w-full px-6 py-8">
       {/* Header */}
@@ -276,13 +335,6 @@ export default function OpportunitiesPage() {
           <p className="text-sm text-slate-500 mt-0.5">Track deals and pipeline progress</p>
         </div>
         <div className="flex items-center gap-3">
-          <SavedFiltersMenu
-            pageKey="marketing/opportunities"
-            currentConfig={getCurrentFilterConfig()}
-            onLoad={handleLoadFilter}
-            activeFilterId={activeFilterId}
-            onActiveFilterIdChange={setActiveFilterId}
-          />
           <button
             onClick={() => router.push('/marketing/opportunities/new')}
             className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl transition-colors"
@@ -313,6 +365,14 @@ export default function OpportunitiesPage() {
 
       {/* Filters */}
       <div className="flex gap-3 mb-5 flex-wrap items-center">
+        <SavedFiltersMenu
+          pageKey={PAGE_KEY}
+          currentConfig={getCurrentFilterConfig()}
+          onLoad={handleLoadFilter}
+          activeFilterId={activeFilterId}
+          onActiveFilterIdChange={setActiveFilterId}
+          defaultActiveFilterId={activeFilterId}
+        />
         <div className="relative flex-1 min-w-[200px] max-w-sm">
           <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <circle cx="11" cy="11" r="8" strokeWidth={2} />
@@ -332,31 +392,28 @@ export default function OpportunitiesPage() {
           onChange={setStatusFilter}
           label="Status filter"
         />
-        <select
+        <MultiSelect
+          options={stageOptions}
           value={stageFilter}
-          onChange={(e) => setStageFilter(e.target.value)}
-          className="px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
-        >
-          <option value="">All Stages</option>
-          {STAGES.map((s) => <option key={s}>{s}</option>)}
-        </select>
-        <select
+          onChange={setStageFilter}
+          placeholder="All Stages"
+          label="Filter by stage"
+        />
+        <MultiSelect
+          options={ownerSelectOptions}
           value={ownerFilter}
-          onChange={(e) => setOwnerFilter(e.target.value)}
-          className="px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
-        >
-          <option value="">All Owners</option>
-          {ownerOptions.map(([id, name]) => <option key={id} value={id}>{name}</option>)}
-        </select>
+          onChange={setOwnerFilter}
+          placeholder="All Owners"
+          label="Filter by owner"
+        />
         {allTags.length > 0 && (
-          <select
+          <MultiSelect
+            options={tagSelectOptions}
             value={tagFilter}
-            onChange={(e) => setTagFilter(e.target.value)}
-            className="px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
-          >
-            <option value="">All Tags</option>
-            {allTags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-          </select>
+            onChange={setTagFilter}
+            placeholder="All Tags"
+            label="Filter by tag"
+          />
         )}
       </div>
 

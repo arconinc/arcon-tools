@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
-import { DataTable, type DataTableColumn } from '@/components/ui/DataTable'
+import { DataTable, type DataTableColumn, MultiSelect, type MultiSelectOption } from '@/components/ui'
 import { FilterPillGroup, type FilterPillOption } from '@/components/ui/FilterPill'
 
 const PAGE_SIZE = 50
@@ -52,7 +52,7 @@ export default function ContactsPage() {
   const [allTags, setAllTags] = useState<TagOption[]>([])
   const [search, setSearch] = useState('')
   const [type, setType] = useState<TypeFilter>('')
-  const [tagFilter, setTagFilter] = useState('')
+  const [tagFilter, setTagFilter] = useState<string[]>([])
   const [page, setPage] = useState(1)
 
   useEffect(() => {
@@ -64,7 +64,7 @@ export default function ContactsPage() {
     const params = new URLSearchParams()
     if (search) params.set('search', search)
     if (type) params.set('type', type)
-    if (tagFilter) params.set('tag_id', tagFilter)
+    if (tagFilter.length > 0) params.set('tag_id', tagFilter.join(','))
     params.set('page', String(currentPage))
     params.set('limit', String(PAGE_SIZE))
     try {
@@ -186,14 +186,13 @@ export default function ContactsPage() {
             />
           </div>
           {allTags.length > 0 && (
-            <select
+            <MultiSelect
+              options={allTags.map((t): MultiSelectOption => ({ value: t.id, label: t.name, color: t.color }))}
               value={tagFilter}
-              onChange={(e) => setTagFilter(e.target.value)}
-              className="px-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
-            >
-              <option value="">All Tags</option>
-              {allTags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
+              onChange={setTagFilter}
+              placeholder="All Tags"
+              label="Filter by tag"
+            />
           )}
         </div>
         <FilterPillGroup

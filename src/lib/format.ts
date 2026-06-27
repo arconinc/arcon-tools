@@ -45,3 +45,33 @@ export function formatBytes(bytes: number | null): string | null {
 export function todayISO(): string {
   return new Date().toISOString().split('T')[0]
 }
+
+/**
+ * Returns a resized avatar URL appropriate for small icon usage.
+ *
+ * - Supabase Storage URLs: rewritten to use the render/image transform endpoint.
+ *   Requires Supabase image transformations to be enabled on the project plan.
+ * - Google profile URLs (lh3.googleusercontent.com): size param appended.
+ * - Other URLs: returned as-is.
+ */
+export function avatarThumbnailUrl(url: string | null | undefined, sizePx: number): string | null {
+  if (!url) return null
+
+  // Supabase Storage: /storage/v1/object/public/ → /storage/v1/render/image/public/
+  if (url.includes('.supabase.co/storage/v1/object/public/')) {
+    const transformed = url.replace(
+      '/storage/v1/object/public/',
+      '/storage/v1/render/image/public/'
+    )
+    const sep = transformed.includes('?') ? '&' : '?'
+    return `${transformed}${sep}width=${sizePx}&height=${sizePx}&quality=75&resize=cover`
+  }
+
+  // Google profile photos support a size param at the end of the URL
+  if (url.includes('lh3.googleusercontent.com')) {
+    // Strip existing =sXXX-c size suffix if present, then append desired size
+    return url.replace(/=s\d+-c$/, '') + `=s${sizePx}-c`
+  }
+
+  return url
+}

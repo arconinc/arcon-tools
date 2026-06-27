@@ -22,6 +22,8 @@ interface Props {
   /** Optional: current active filter name, used to track "dirty" state */
   activeFilterId?: string | null
   onActiveFilterIdChange?: (id: string | null) => void
+  /** If set, auto-apply this filter ID once filters are fetched on mount */
+  defaultActiveFilterId?: string | null
 }
 
 export function SavedFiltersMenu({
@@ -30,6 +32,7 @@ export function SavedFiltersMenu({
   onLoad,
   activeFilterId,
   onActiveFilterIdChange,
+  defaultActiveFilterId,
 }: Props) {
   const { user } = useAppUser()
   const [filters, setFilters] = useState<SavedFilter[]>([])
@@ -40,6 +43,7 @@ export function SavedFiltersMenu({
   const [saveShared, setSaveShared] = useState(false)
   const [saving, setSaving] = useState(false)
   const [deleteConfirm, setDeleteConfirm] = useState<string | null>(null)
+  const autoAppliedRef = useRef(false)
   const menuRef = useRef<HTMLDivElement>(null)
   const saveRef = useRef<HTMLDivElement>(null)
 
@@ -48,13 +52,22 @@ export function SavedFiltersMenu({
     try {
       const res = await fetch(`/api/saved-filters?page_key=${encodeURIComponent(pageKey)}`)
       if (res.ok) {
-        const data = await res.json()
+        const data: SavedFilter[] = await res.json()
         setFilters(data)
+        // Auto-apply the last active filter on first load
+        if (!autoAppliedRef.current && defaultActiveFilterId) {
+          autoAppliedRef.current = true
+          const match = data.find(f => f.id === defaultActiveFilterId)
+          if (match) {
+            onLoad(match.filter_config)
+            onActiveFilterIdChange?.(match.id)
+          }
+        }
       }
     } finally {
       setLoading(false)
     }
-  }, [pageKey])
+  }, [pageKey]) // eslint-disable-line react-hooks/exhaustive-deps
 
   useEffect(() => {
     fetchFilters()
@@ -150,55 +163,50 @@ export function SavedFiltersMenu({
 
   return (
     <div className="flex items-center gap-2">
-      {/* Active filter badge */}
-      {activeFilter && (
-        <span className="flex items-center gap-1 text-xs font-medium text-purple-700 bg-purple-50 border border-purple-200 rounded-full px-2.5 py-0.5">
-          <svg className="w-3 h-3" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v3.172a2 2 0 01-.586 1.414l-4.828 4.828A2 2 0 0013 15.828V19l-4 2v-5.172a2 2 0 00-.586-1.414L4.586 9.586A2 2 0 014 8.172V7a2 2 0 012-2z" />
-          </svg>
-          {activeFilter.name}
-          {isDirty && <span className="text-purple-400 ml-0.5">*</span>}
-          <button
-            onClick={() => onActiveFilterIdChange?.(null)}
-            className="ml-0.5 text-purple-400 hover:text-purple-600"
-            title="Clear saved filter"
-          >
-            ×
-          </button>
-        </span>
-      )}
-
-      {/* Overwrite button — only when dirty and owner */}
-      {isDirty && activeFilter && isOwner(activeFilter) && (
-        <button
-          onClick={handleOverwrite}
-          disabled={saving}
-          className="text-xs text-purple-600 hover:text-purple-800 underline disabled:opacity-50"
-        >
-          {saving ? 'Saving…' : 'Update view'}
-        </button>
-      )}
-
       {/* Views dropdown */}
       <div className="relative" ref={menuRef}>
-        <button
+        <div
           onClick={() => { setOpen(v => !v); setSaveOpen(false) }}
-          className="flex items-center gap-1.5 text-sm text-gray-600 hover:text-gray-900 bg-white border border-gray-200 hover:border-gray-300 rounded-lg px-3 py-1.5 transition-colors"
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setOpen(v => !v); setSaveOpen(false) }
+          }}
+          role="button"
+          tabIndex={0}
+          aria-haspopup="listbox"
+          aria-expanded={open}
+          className="flex min-h-[34px] items-center gap-1.5 rounded-lg border border-gray-200 bg-white px-2.5 py-1 text-sm text-gray-600 transition-colors hover:border-gray-300 hover:text-gray-900 focus:outline-none focus:ring-2 focus:ring-purple-300"
         >
           <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M5 5a2 2 0 012-2h10a2 2 0 012 2v3.172a2 2 0 01-.586 1.414l-4.828 4.828A2 2 0 0013 15.828V19l-4 2v-5.172a2 2 0 00-.586-1.414L4.586 9.586A2 2 0 014 8.172V7a2 2 0 012-2z" />
           </svg>
-          Views
-          {filters.length > 0 && (
-            <span className="text-xs text-gray-400">({filters.length})</span>
+          {activeFilter ? (
+            <span className="inline-flex max-w-40 items-center gap-1 rounded-full border border-purple-200 bg-purple-50 px-2 py-0.5 text-xs font-semibold text-purple-700">
+              <span className="truncate">{activeFilter.name}</span>
+              {isDirty && <span className="text-purple-400">*</span>}
+              <button
+                type="button"
+                onClick={(e) => { e.stopPropagation(); onActiveFilterIdChange?.(null) }}
+                className="-mr-0.5 flex h-3.5 w-3.5 items-center justify-center rounded-full text-purple-400 hover:bg-purple-100 hover:text-purple-700"
+                title="Clear saved view"
+              >
+                ×
+              </button>
+            </span>
+          ) : (
+            <>
+              <span>Views</span>
+              {filters.length > 0 && (
+                <span className="text-xs text-gray-400">({filters.length})</span>
+              )}
+            </>
           )}
           <svg className="w-3 h-3 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
             <path strokeLinecap="round" strokeLinejoin="round" d="M19 9l-7 7-7-7" />
           </svg>
-        </button>
+        </div>
 
         {open && (
-          <div className="absolute right-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
+          <div className="absolute left-0 top-full mt-1 w-64 bg-white border border-gray-200 rounded-xl shadow-lg z-50 overflow-hidden">
             {loading ? (
               <div className="px-4 py-3 text-sm text-gray-400">Loading…</div>
             ) : filters.length === 0 ? (
@@ -218,6 +226,9 @@ export function SavedFiltersMenu({
                         onLoad={handleLoad}
                         onDeleteConfirm={setDeleteConfirm}
                         onDelete={handleDelete}
+                        canOverwrite={isDirty && f.id === activeFilterId && isOwner(f)}
+                        onOverwrite={handleOverwrite}
+                        saving={saving}
                       />
                     ))}
                   </>
@@ -235,6 +246,9 @@ export function SavedFiltersMenu({
                         onLoad={handleLoad}
                         onDeleteConfirm={setDeleteConfirm}
                         onDelete={handleDelete}
+                        canOverwrite={false}
+                        onOverwrite={handleOverwrite}
+                        saving={saving}
                       />
                     ))}
                   </>
@@ -247,18 +261,19 @@ export function SavedFiltersMenu({
 
       {/* Save view button */}
       <div className="relative" ref={saveRef}>
-        <button
-          onClick={() => { setSaveOpen(v => !v); setOpen(false); setSaveName('') }}
-          className="flex items-center gap-1.5 text-sm text-white bg-purple-600 hover:bg-purple-700 rounded-lg px-3 py-1.5 transition-colors"
-        >
-          <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
-          </svg>
-          Save view
-        </button>
+          <button
+            onClick={() => { setSaveOpen(v => !v); setOpen(false); setSaveName('') }}
+            className="flex h-[34px] w-[34px] items-center justify-center rounded-lg bg-purple-600 text-white transition-colors hover:bg-purple-700 focus:outline-none focus:ring-2 focus:ring-purple-300"
+            title="Save new view"
+            aria-label="Save new view"
+          >
+            <svg className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+              <path strokeLinecap="round" strokeLinejoin="round" d="M12 4v16m8-8H4" />
+            </svg>
+          </button>
 
         {saveOpen && (
-          <div className="absolute right-0 top-full mt-1 w-72 bg-white border border-gray-200 rounded-xl shadow-lg z-50 p-4">
+          <div className="absolute left-0 top-full mt-1 w-72 bg-white border border-gray-200 rounded-xl shadow-lg z-50 p-4">
             <p className="text-sm font-semibold text-gray-800 mb-3">Save current filters as view</p>
             <input
               type="text"
@@ -310,9 +325,23 @@ interface FilterRowProps {
   onLoad: (f: SavedFilter) => void
   onDeleteConfirm: (id: string | null) => void
   onDelete: (id: string) => void
+  canOverwrite: boolean
+  onOverwrite: () => void
+  saving: boolean
 }
 
-function FilterRow({ filter, isActive, isOwner, deleteConfirm, onLoad, onDeleteConfirm, onDelete }: FilterRowProps) {
+function FilterRow({
+  filter,
+  isActive,
+  isOwner,
+  deleteConfirm,
+  onLoad,
+  onDeleteConfirm,
+  onDelete,
+  canOverwrite,
+  onOverwrite,
+  saving,
+}: FilterRowProps) {
   return (
     <div
       className={`flex items-center gap-2 px-3 py-2 hover:bg-gray-50 group ${isActive ? 'bg-purple-50' : ''}`}
@@ -354,15 +383,30 @@ function FilterRow({ filter, isActive, isOwner, deleteConfirm, onLoad, onDeleteC
             </button>
           </div>
         ) : (
-          <button
-            onClick={() => onDeleteConfirm(filter.id)}
-            className="opacity-0 group-hover:opacity-100 text-gray-300 hover:text-red-400 transition-opacity flex-shrink-0"
-            title="Delete view"
-          >
-            <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
-            </svg>
-          </button>
+          <div className="flex flex-shrink-0 items-center gap-1">
+            {canOverwrite && (
+              <button
+                onClick={onOverwrite}
+                disabled={saving}
+                className="text-purple-500 transition-colors hover:text-purple-700 disabled:opacity-50"
+                title="Update view"
+              >
+                <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M17 21H7a2 2 0 01-2-2V5a2 2 0 012-2h8l4 4v12a2 2 0 01-2 2z" />
+                  <path strokeLinecap="round" strokeLinejoin="round" d="M9 21v-6h6v6M9 3v5h5" />
+                </svg>
+              </button>
+            )}
+            <button
+              onClick={() => onDeleteConfirm(filter.id)}
+              className="text-gray-300 opacity-0 transition-opacity hover:text-red-400 group-hover:opacity-100"
+              title="Delete view"
+            >
+              <svg className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+                <path strokeLinecap="round" strokeLinejoin="round" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+              </svg>
+            </button>
+          </div>
         )
       )}
     </div>

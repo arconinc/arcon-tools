@@ -1,9 +1,10 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback, Suspense } from 'react'
+import { useState, useEffect, useCallback, Suspense } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useAppUser } from '@/components/layout/AppShell'
-import { TaskKanbanView, UserAvatar, PriorityIcon, type KanbanTask } from './TaskKanbanView'
+import { MultiSelect, type MultiSelectOption } from '@/components/ui/MultiSelect'
+import { TaskKanbanView, PriorityIcon, type KanbanTask } from './TaskKanbanView'
 import { TaskTableView, type TableRowAction } from './TaskTableView'
 import { TaskQuickEditPanel } from './TaskQuickEditPanel'
 import QuickAddTask from './QuickAddTask'
@@ -39,10 +40,16 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
   const searchParams = useSearchParams()
   const { user: currentUser } = useAppUser()
 
-  // View: kanban | table — from URL param
-  const [view, setView] = useState<'kanban' | 'table'>(() =>
-    searchParams.get('view') === 'table' ? 'table' : 'kanban'
-  )
+  // View: kanban | table — from URL param, falling back to localStorage preference
+  const [view, setView] = useState<'kanban' | 'table'>(() => {
+    if (searchParams.get('view') === 'table') return 'table'
+    if (searchParams.get('view') === 'kanban') return 'kanban'
+    try {
+      const stored = localStorage.getItem('taskboard:view')
+      if (stored === 'table' || stored === 'kanban') return stored
+    } catch {}
+    return 'kanban'
+  })
 
   // Filters — initialized from URL params, with prop defaults as fallback
   const [department, setDepartment] = useState<CrmTaskDepartment | ''>(
@@ -73,13 +80,23 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
   const [taskCreatedToastOpen, setTaskCreatedToastOpen] = useState(false)
   const [selectedTaskId, setSelectedTaskId] = useState<string | null>(null)
   const [refreshKey, setRefreshKey] = useState(0)
-  const [activeFilterId, setActiveFilterId] = useState<string | null>(null)
+  const pageKey = pathname.replace(/^\//, '') || 'task-board'
+  const [activeFilterId, setActiveFilterId] = useState<string | null>(() => {
+    try { return localStorage.getItem(`taskboard:activeFilter:${pageKey}`) ?? null } catch { return null }
+  })
 
-  // Dropdown state
-  const [deptDropdownOpen, setDeptDropdownOpen] = useState(false)
-  const [assigneeDropdownOpen, setAssigneeDropdownOpen] = useState(false)
-  const deptDropdownRef = useRef<HTMLDivElement>(null)
-  const assigneeDropdownRef = useRef<HTMLDivElement>(null)
+  // Persist activeFilterId to localStorage whenever it changes
+  useEffect(() => {
+    try {
+      if (activeFilterId) {
+        localStorage.setItem(`taskboard:activeFilter:${pageKey}`, activeFilterId)
+      } else {
+        localStorage.removeItem(`taskboard:activeFilter:${pageKey}`)
+      }
+    } catch {}
+  }, [activeFilterId, pageKey])
+
+  // (dept and assignee dropdowns managed by MultiSelect component)
 
   // Context menu
   const [contextMenu, setContextMenu] = useState<{ taskId: string; position: { x: number; y: number } } | null>(null)
@@ -96,15 +113,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
     router.replace(`${pathname}?${params.toString()}`, { scroll: false })
   }, [pathname, router, searchParams])
 
-  // Close dropdowns on outside click
-  useEffect(() => {
-    function onClickOutside(e: MouseEvent) {
-      if (deptDropdownRef.current && !deptDropdownRef.current.contains(e.target as Node)) setDeptDropdownOpen(false)
-      if (assigneeDropdownRef.current && !assigneeDropdownRef.current.contains(e.target as Node)) setAssigneeDropdownOpen(false)
-    }
-    if (deptDropdownOpen || assigneeDropdownOpen) document.addEventListener('mousedown', onClickOutside)
-    return () => document.removeEventListener('mousedown', onClickOutside)
-  }, [deptDropdownOpen, assigneeDropdownOpen])
+
 
   // Load all users
   useEffect(() => {
@@ -197,7 +206,6 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
     setCategory('')
     setPage(1)
     syncUrl({ department: d || null, category: null })
-    setDeptDropdownOpen(false)
   }
 
   function handleCategoryChange(c: string) {
@@ -227,14 +235,12 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
     setSelectedUserIds(next)
     syncUrl({ assignees: currentUser.id })
     setPage(1)
-    setAssigneeDropdownOpen(false)
   }
 
   function handleSelectAllAssignees() {
     setSelectedUserIds('all')
     syncUrl({ assignees: null })
     setPage(1)
-    setAssigneeDropdownOpen(false)
   }
 
   function handleToggleDelegated() {
@@ -268,6 +274,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
     setView(v)
     setPage(1)
     syncUrl({ view: v === 'kanban' ? null : v })
+    try { localStorage.setItem('taskboard:view', v) } catch {}
   }
 
   // ── Saved filter helpers ───────────────────────────────────────────────────
@@ -324,12 +331,6 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
       sort: newSortBy === 'priority' ? null : newSortBy,
       search: newSearch || null,
     })
-  }
-
-  function handleDisclosureKey(e: React.KeyboardEvent<HTMLElement>, toggle: () => void) {
-    if (e.key !== 'Enter' && e.key !== ' ') return
-    e.preventDefault()
-    toggle()
   }
 
   // ── Kanban reorder ─────────────────────────────────────────────────────────
@@ -430,10 +431,6 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
-  const selectedUsers = selectedUserIds === 'all'
-    ? []
-    : allUsers.filter((u) => (selectedUserIds as Set<string>).has(u.id))
-
   const totalOpen = tasks.filter((t) => t.status !== 'completed').length
 
   return (
@@ -477,14 +474,6 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
             </p>
           </div>
           <div style={{ display: 'flex', gap: 8, alignItems: 'center' }}>
-            {/* Saved filter views */}
-            <SavedFiltersMenu
-              pageKey={pathname.replace(/^\//, '') || 'task-board'}
-              currentConfig={getCurrentFilterConfig()}
-              onLoad={handleLoadFilter}
-              activeFilterId={activeFilterId}
-              onActiveFilterIdChange={setActiveFilterId}
-            />
             {/* View toggle */}
             <div style={{ display: 'flex', background: '#f0f0f0', borderRadius: 8, padding: 3, gap: 2 }}>
               <button
@@ -524,59 +513,31 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
 
         {/* Filter row 1: Department + Category */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
+          {/* Saved filter views */}
+          <SavedFiltersMenu
+            pageKey={pageKey}
+            currentConfig={getCurrentFilterConfig()}
+            onLoad={handleLoadFilter}
+            activeFilterId={activeFilterId}
+            onActiveFilterIdChange={setActiveFilterId}
+            defaultActiveFilterId={activeFilterId}
+          />
 
           {/* Department dropdown */}
           {!isDepartmentLocked && (
-            <div ref={deptDropdownRef} style={{ position: 'relative' }}>
-              <div
-                className={`tb-select-box${deptDropdownOpen ? ' open' : ''}`}
-                onClick={() => { setDeptDropdownOpen((o) => !o); setAssigneeDropdownOpen(false) }}
-                onKeyDown={(e) => handleDisclosureKey(e, () => { setDeptDropdownOpen((o) => !o); setAssigneeDropdownOpen(false) })}
-                role="button"
-                tabIndex={0}
-                aria-haspopup="listbox"
-                aria-expanded={deptDropdownOpen}
-                style={{ minWidth: 160 }}
-              >
-                <div className="tb-chips">
-                  {!department
-                    ? <span style={{ fontSize: 13, color: '#888', padding: '1px 2px' }}>All departments</span>
-                    : <span className="tb-chip"><span>{DEPARTMENT_DISPLAY_NAMES[department as CrmTaskDepartment] ?? department}</span><button className="tb-chip-rm" onClick={(e) => { e.stopPropagation(); handleDeptChange('') }}>×</button></span>
-                  }
-                </div>
-                <div className="tb-chevron">
-                  <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                    style={{ transform: deptDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </div>
-              </div>
-              {deptDropdownOpen && (
-                <div className="tb-dropdown" style={{ minWidth: 180 }}>
-                  <div style={{ padding: '6px 0 2px' }}>
-                    <button className={`tb-dd-opt${!department ? ' sel' : ''}`} onClick={() => handleDeptChange('')}>
-                      <span className={`tb-check${!department ? ' on' : ''}`}>
-                        {!department && <svg width="10" height="10" fill="none" stroke="#fff" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                      </span>
-                      All departments
-                    </button>
-                  </div>
-                  <div className="tb-divider" />
-                  {DEPARTMENTS.map((d) => (
-                    <button key={d} className={`tb-dd-opt${department === d ? ' sel' : ''}`} onClick={() => handleDeptChange(d)}>
-                      <span className={`tb-check${department === d ? ' on' : ''}`}>
-                        {department === d && <svg width="10" height="10" fill="none" stroke="#fff" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                      </span>
-                      {DEPARTMENT_DISPLAY_NAMES[d]}
-                      {DEPARTMENT_CATEGORIES[d].length > 0 && (
-                        <span style={{ fontSize: 10, color: '#aaa', marginLeft: 'auto' }}>{DEPARTMENT_CATEGORIES[d].length}</span>
-                      )}
-                    </button>
-                  ))}
-                  <div style={{ height: 4 }} />
-                </div>
-              )}
-            </div>
+            <MultiSelect
+              single
+              options={DEPARTMENTS.map((d): MultiSelectOption => ({
+                value: d,
+                label: DEPARTMENT_DISPLAY_NAMES[d],
+                meta: DEPARTMENT_CATEGORIES[d].length > 0 ? String(DEPARTMENT_CATEGORIES[d].length) : undefined,
+              }))}
+              value={department ? [department] : []}
+              onChange={([d]) => handleDeptChange((d ?? '') as CrmTaskDepartment | '')}
+              placeholder="All departments"
+              label="Filter by department"
+              dropdownWidth={220}
+            />
           )}
 
           {/* Category dropdown (only when a dept is selected) */}
@@ -618,76 +579,40 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
         <div style={{ display: 'flex', gap: 8, marginBottom: 12, flexWrap: 'wrap', alignItems: 'center' }}>
 
           {/* Assignee dropdown */}
-          <div ref={assigneeDropdownRef} style={{ position: 'relative', flex: '0 1 300px' }}>
-            <div
-              className={`tb-select-box${assigneeDropdownOpen ? ' open' : ''}`}
-              onClick={() => { setAssigneeDropdownOpen((o) => !o); setDeptDropdownOpen(false) }}
-              onKeyDown={(e) => handleDisclosureKey(e, () => { setAssigneeDropdownOpen((o) => !o); setDeptDropdownOpen(false) })}
-              role="button"
-              tabIndex={0}
-              aria-haspopup="listbox"
-              aria-expanded={assigneeDropdownOpen}
-            >
-              <div className="tb-chips">
-                {selectedUserIds === 'all'
-                  ? <span style={{ fontSize: 13, color: '#888', padding: '1px 2px' }}>All assignees</span>
-                  : selectedUsers.length === 0
-                  ? <span style={{ fontSize: 13, color: '#bbb', padding: '1px 2px' }}>Select assignees…</span>
-                  : selectedUsers.map((u) => (
-                    <span key={u.id} className="tb-chip">
-                      <UserAvatar name={u.display_name} avatarUrl={u.profile_image_url ?? u.avatar_url} size={14} />
-                      <span style={{ overflow: 'hidden', textOverflow: 'ellipsis' }}>{u.display_name.split(' ')[0]}</span>
-                      <button className="tb-chip-rm" onClick={(e) => { e.stopPropagation(); handleToggleUser(u.id) }}>×</button>
-                    </span>
-                  ))
-                }
-              </div>
-              <div className="tb-chevron">
-                <svg width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                  style={{ transform: assigneeDropdownOpen ? 'rotate(180deg)' : 'none', transition: 'transform 0.15s' }}>
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </div>
-            </div>
-            {assigneeDropdownOpen && (
-              <div className="tb-dropdown">
-                <div style={{ padding: '6px 0 2px' }}>
-                  <button className={`tb-dd-opt${selectedUserIds === 'all' ? ' sel' : ''}`} onClick={handleSelectAllAssignees}>
-                    <span className={`tb-check${selectedUserIds === 'all' ? ' on' : ''}`}>
-                      {selectedUserIds === 'all' && <svg width="10" height="10" fill="none" stroke="#fff" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                    </span>
-                    All assignees
-                  </button>
-                  {currentUser && (
-                    <button className={`tb-dd-opt${isMeOnly ? ' sel' : ''}`} onClick={handleSelectMe}>
-                      <span className={`tb-check${isMeOnly ? ' on' : ''}`}>
-                        {isMeOnly && <svg width="10" height="10" fill="none" stroke="#fff" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                      </span>
-                      <UserAvatar name={currentUser.display_name} avatarUrl={currentUser.avatar_url ?? null} size={18} />
-                      Me ({currentUser.display_name})
-                    </button>
-                  )}
-                </div>
-                <div className="tb-divider" />
-                <div className="tb-scroll">
-                  {allUsers.map((u) => {
-                    const sel = selectedUserIds !== 'all' && (selectedUserIds as Set<string>).has(u.id)
-                    return (
-                      <button key={u.id} className={`tb-dd-opt${sel ? ' sel' : ''}`} onClick={() => handleToggleUser(u.id)}>
-                        <span className={`tb-check${sel ? ' on' : ''}`}>
-                          {sel && <svg width="10" height="10" fill="none" stroke="#fff" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
-                        </span>
-                        <UserAvatar name={u.display_name} avatarUrl={u.profile_image_url ?? u.avatar_url} size={22} />
-                        <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{u.display_name}</span>
-                        {u.department && u.department.length > 0 && <span style={{ fontSize: 10, color: '#aaa', marginLeft: 'auto', paddingLeft: 8, flexShrink: 0 }}>{u.department.join(', ')}</span>}
-                      </button>
-                    )
-                  })}
-                </div>
-                <div style={{ height: 4 }} />
-              </div>
-            )}
-          </div>
+          <MultiSelect
+            options={allUsers.map((u): MultiSelectOption => ({
+              value: u.id,
+              label: u.display_name,
+              chipLabel: u.display_name.split(' ')[0],
+              meta: u.department?.join(', ') || undefined,
+            }))}
+            value={selectedUserIds === 'all' ? [] : [...(selectedUserIds as Set<string>)]}
+            onChange={(ids) => {
+              if (ids.length === 0) {
+                handleSelectAllAssignees()
+              } else {
+                const next = new Set(ids)
+                setSelectedUserIds(next)
+                syncUrl({ assignees: ids.join(',') })
+                setPage(1)
+              }
+            }}
+            placeholder="All assignees"
+            label="Filter by assignee"
+            dropdownWidth={300}
+            topActions={currentUser ? (close) => (
+              <button
+                className={`ms-opt${isMeOnly ? ' ms-sel' : ''}`}
+                onClick={(e) => { e.stopPropagation(); handleSelectMe(); close() }}
+              >
+                <span className={`ms-check${isMeOnly ? ' ms-on' : ''}`}>
+                  {isMeOnly && <svg width="10" height="10" fill="none" stroke="#fff" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg>}
+                </span>
+                Me ({currentUser.display_name})
+              </button>
+            ) : undefined}
+            className="flex-none"
+          />
 
           {/* Search */}
           <div style={{ position: 'relative', flex: '1', minWidth: 160, maxWidth: 280 }}>

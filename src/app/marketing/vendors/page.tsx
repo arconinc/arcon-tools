@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
-import { DataTable, type DataTableColumn, FilterPillGroup, type FilterPillOption } from '@/components/ui'
+import { DataTable, type DataTableColumn, FilterPillGroup, type FilterPillOption, MultiSelect, type MultiSelectOption } from '@/components/ui'
 
 const PAGE_SIZE = 50
 
@@ -53,7 +53,7 @@ export default function VendorsPage() {
   const [loading, setLoading] = useState(true)
   const [allTags, setAllTags] = useState<TagOption[]>([])
   const [search, setSearch] = useState('')
-  const [tagFilter, setTagFilter] = useState('')
+  const [tagFilter, setTagFilter] = useState<string[]>([])
   const [premierFilter, setPremierFilter] = useState<PremierFilter>('')
   const [page, setPage] = useState(1)
 
@@ -65,7 +65,7 @@ export default function VendorsPage() {
     setLoading(true)
     const params = new URLSearchParams()
     if (search) params.set('search', search)
-    if (tagFilter) params.set('tag_id', tagFilter)
+    if (tagFilter.length > 0) params.set('tag_id', tagFilter.join(','))
     if (premierFilter === 'premier') params.set('premier', 'true')
     params.set('page', String(currentPage))
     params.set('limit', String(PAGE_SIZE))
@@ -196,15 +196,13 @@ export default function VendorsPage() {
         />
         <div className="flex flex-wrap items-center gap-2">
           {allTags.length > 0 && (
-            <select
+            <MultiSelect
+              options={allTags.map((t): MultiSelectOption => ({ value: t.id, label: t.name, color: t.color }))}
               value={tagFilter}
-              onChange={(e) => setTagFilter(e.target.value)}
-              aria-label="Filter by tag"
-              className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300"
-            >
-              <option value="">All Tags</option>
-              {allTags.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
-            </select>
+              onChange={setTagFilter}
+              placeholder="All Tags"
+              label="Filter by tag"
+            />
           )}
           <div className="relative">
             <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">

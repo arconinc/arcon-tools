@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef, createContext, useContext } from 'react'
 import Link from 'next/link'
 import Image from 'next/image'
+import { avatarThumbnailUrl } from '@/lib/format'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import { Store, CalendarCountdownEvent } from '@/types'
@@ -528,7 +529,7 @@ export default function AppShell({ children, user, isImpersonating, impersonated
               flexShrink: 0,
             }}>
               {user.avatar_url ? (
-                <Image src={user.avatar_url} alt={user.display_name} width={30} height={30} referrerPolicy="no-referrer" style={{ borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
+                <Image src={avatarThumbnailUrl(user.avatar_url, 60) ?? user.avatar_url} alt={user.display_name} width={30} height={30} referrerPolicy="no-referrer" style={{ borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }} />
               ) : (
                 <div style={{ width: 30, height: 30, background: '#6b1e98', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 11, fontWeight: 700, flexShrink: 0 }}>
                   {initials}
@@ -693,7 +694,7 @@ export default function AppShell({ children, user, isImpersonating, impersonated
                     title={user.display_name}
                   >
                     {user.avatar_url ? (
-                      <Image src={user.avatar_url} alt={user.display_name} width={32} height={32} referrerPolicy="no-referrer" style={{ borderRadius: '50%', objectFit: 'cover' }} />
+                      <Image src={avatarThumbnailUrl(user.avatar_url, 64) ?? user.avatar_url} alt={user.display_name} width={32} height={32} referrerPolicy="no-referrer" style={{ borderRadius: '50%', objectFit: 'cover' }} />
                     ) : (
                       <div style={{ width: 32, height: 32, background: '#6b1e98', borderRadius: '50%', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#fff', fontSize: 12, fontWeight: 700 }}>
                         {initials}

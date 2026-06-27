@@ -16,7 +16,7 @@ export async function GET(req: NextRequest) {
   const search = searchParams.get('search')?.trim()
   const status = searchParams.get('status')
   const assignedTo = searchParams.get('assigned_to')
-  const tagId = searchParams.get('tag_id')
+  const tagIds = (searchParams.get('tag_id') ?? '').split(',').filter(Boolean)
   const hasTags = searchParams.get('has_tags') === 'true'
   const page = Math.max(1, parseInt(searchParams.get('page') ?? '1', 10))
   const limit = Math.min(200, Math.max(1, parseInt(searchParams.get('limit') ?? '50', 10)))
@@ -27,12 +27,12 @@ export async function GET(req: NextRequest) {
 
   // If filtering by tag or has_tags, get matching entity IDs first
   let tagFilterIds: string[] | null = null
-  if (tagId || hasTags) {
+  if (tagIds.length > 0 || hasTags) {
     let tagQuery = adminClient
       .from('crm_entity_tags')
       .select('entity_id')
       .eq('entity_type', 'customer')
-    if (tagId) tagQuery = tagQuery.eq('tag_id', tagId)
+    if (tagIds.length > 0) tagQuery = tagQuery.in('tag_id', tagIds)
     const { data: tagRows } = await tagQuery
     tagFilterIds = [...new Set((tagRows ?? []).map((r: any) => r.entity_id))]
     if (tagFilterIds.length === 0) return ok({ customers: [], total: 0, page, limit })
