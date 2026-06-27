@@ -10,6 +10,7 @@ import { Store, CalendarCountdownEvent } from '@/types'
 import { setGAUser, trackPageView } from '@/lib/analytics'
 import * as Sentry from '@sentry/nextjs'
 import { NotificationBell } from './NotificationBell'
+import UniversalSearch from './UniversalSearch'
 
 // ── Module-level fetch cache ──────────────────────────────────────────────────
 // Survives React remounts within the same page session; cleared on full refresh.
@@ -226,7 +227,6 @@ export default function AppShell({ children, user, isImpersonating, impersonated
   const [countdownIdx, setCountdownIdx] = useState(0)
   const [countdownDisplay, setCountdownDisplay] = useState('')
   const [countdownFading, setCountdownFading] = useState(false)
-  const [searchQuery, setSearchQuery] = useState('')
   const [profileOpen, setProfileOpen] = useState(false)
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
 
@@ -358,12 +358,6 @@ export default function AppShell({ children, user, isImpersonating, impersonated
     trackPageView(window.location.href, user.email)
   }, [pathname, user.email])
 
-  function handleSearchSubmit(e: React.FormEvent) {
-    e.preventDefault()
-    if (!searchQuery.trim()) return
-    window.open(`https://www.google.com/search?q=${encodeURIComponent(searchQuery.trim())}`, '_blank', 'noopener,noreferrer')
-    setSearchQuery('')
-  }
 
   function handleHamburger() {
     if (typeof window !== 'undefined' && window.innerWidth >= 1024) {
@@ -624,41 +618,8 @@ export default function AppShell({ children, user, isImpersonating, impersonated
                 </div>
               )}
 
-              {/* Google Search */}
-              <form
-                onSubmit={handleSearchSubmit}
-                style={{ flex: 1, display: 'flex', alignItems: 'center' }}
-              >
-                <div style={{ position: 'relative', width: '100%' }}>
-                  <svg
-                    width="14" height="14" fill="none" stroke="currentColor" viewBox="0 0 24 24"
-                    style={{ position: 'absolute', left: 10, top: '50%', transform: 'translateY(-50%)', color: '#999', pointerEvents: 'none' }}
-                  >
-                    <circle cx="11" cy="11" r="8" strokeWidth={2} />
-                    <path strokeLinecap="round" strokeWidth={2} d="M21 21l-4.35-4.35" />
-                  </svg>
-                  <input
-                    type="search"
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    placeholder="Search Google…"
-                    style={{
-                      width: '100%',
-                      padding: '7px 12px 7px 32px',
-                      border: '1px solid #e5e7eb',
-                      borderRadius: 7,
-                      fontSize: 13,
-                      color: '#333',
-                      background: '#f9f9f9',
-                      outline: 'none',
-                      boxSizing: 'border-box',
-                      transition: 'border-color 0.15s, background 0.15s',
-                    }}
-                    onFocus={e => { e.currentTarget.style.borderColor = '#9333ea'; e.currentTarget.style.background = '#fff' }}
-                    onBlur={e => { e.currentTarget.style.borderColor = '#e5e7eb'; e.currentTarget.style.background = '#f9f9f9' }}
-                  />
-                </div>
-              </form>
+              {/* Universal site search */}
+              <UniversalSearch />
 
               {/* Right side */}
               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>

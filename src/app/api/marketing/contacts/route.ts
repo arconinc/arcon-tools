@@ -4,6 +4,10 @@ import { requireUser } from '@/lib/crm/require-user'
 import { unauthorized, badRequest, serverError, created, ok } from '@/lib/api/respond'
 import { stripReadOnly } from '@/lib/api/sanitize'
 
+function ilikePattern(value: string) {
+  return `%${value.replace(/[%,()]/g, '').trim()}%`
+}
+
 // GET /api/marketing/contacts?search=&customer_id=&vendor_id=&type=&tag_id=&page=1&limit=50
 export async function GET(req: NextRequest) {
   const appUser = await requireUser()
@@ -34,7 +38,17 @@ export async function GET(req: NextRequest) {
   }
 
   const applyFilters = (q: any) => {
-    if (search) q = q.or(`first_name.ilike.%${search}%,last_name.ilike.%${search}%,email.ilike.%${search}%`)
+    if (search) {
+      const parts = search.split(/\s+/).filter(Boolean)
+      const p = ilikePattern(search)
+      if (parts.length > 1) {
+        const first = ilikePattern(parts[0])
+        const last = ilikePattern(parts.slice(1).join(' '))
+        q = q.or(`and(first_name.ilike.${first},last_name.ilike.${last}),and(first_name.ilike.${last},last_name.ilike.${first}),email.ilike.${p}`)
+      } else {
+        q = q.or(`first_name.ilike.${p},last_name.ilike.${p},email.ilike.${p}`)
+      }
+    }
     if (customerId) q = q.eq('customer_id', customerId)
     if (vendorId) q = q.eq('vendor_id', vendorId)
     if (type) q = q.eq('type_of_contact', type)
