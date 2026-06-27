@@ -78,11 +78,15 @@ export default function UniversalSearch() {
     return () => document.removeEventListener('mousedown', onMouseDown)
   }, [open])
 
-  function go(r: SearchResult) {
-    router.push(r.url)
+  function goUrl(url: string) {
+    router.push(url)
     setQuery('')
     setResults([])
     setOpen(false)
+  }
+
+  function go(r: SearchResult) {
+    goUrl(r.url)
   }
 
   function onKeyDown(e: React.KeyboardEvent) {
@@ -150,31 +154,53 @@ export default function UniversalSearch() {
           ) : results.length === 0 ? (
             <div style={{ padding: '14px 16px', fontSize: 13, color: '#94a3b8' }}>No results for &ldquo;{query.trim()}&rdquo;</div>
           ) : (
-            results.map((r, i) => (
-              <div
-                key={`${r.type}-${r.id}`}
-                onMouseDown={() => go(r)}
-                onMouseEnter={() => setHighlight(i)}
-                style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 12,
-                  padding: '10px 14px',
-                  cursor: 'pointer',
-                  borderTop: i === 0 ? 'none' : '1px solid #f1f5f9',
-                  background: i === highlight ? '#faf5ff' : '#fff',
-                }}
-              >
-                <span style={{ color: '#9333ea', flexShrink: 0, display: 'flex' }}><TypeIcon type={r.type} /></span>
-                <span style={{ minWidth: 0, flex: 1 }}>
-                  <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.title}</span>
-                  {r.subtitle && (
-                    <span style={{ display: 'block', fontSize: 12, color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.subtitle}</span>
-                  )}
-                </span>
-                <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: 0.3 }}>{TYPE_LABEL[r.type]}</span>
-              </div>
-            ))
+            results.map((r, i) => {
+              const hasContactMeta = r.type === 'contact' && (r.contactTitle || (r.organizations?.length ?? 0) > 0)
+              return (
+                <div
+                  key={`${r.type}-${r.id}`}
+                  onMouseDown={() => go(r)}
+                  onMouseEnter={() => setHighlight(i)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: 12,
+                    padding: '10px 14px',
+                    cursor: 'pointer',
+                    borderTop: i === 0 ? 'none' : '1px solid #f1f5f9',
+                    background: i === highlight ? '#faf5ff' : '#fff',
+                  }}
+                >
+                  <span style={{ color: '#9333ea', flexShrink: 0, display: 'flex' }}><TypeIcon type={r.type} /></span>
+                  <span style={{ minWidth: 0, flex: 1 }}>
+                    <span style={{ display: 'block', fontSize: 13, fontWeight: 600, color: '#111', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.title}</span>
+                    {hasContactMeta ? (
+                      <span style={{ display: 'flex', alignItems: 'center', gap: 6, marginTop: 3, minWidth: 0, flexWrap: 'wrap' }}>
+                        {r.contactTitle && (
+                          <span style={{ maxWidth: 160, padding: '2px 6px', borderRadius: 999, background: '#f1f5f9', color: '#475569', fontSize: 11, fontWeight: 600, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>
+                            {r.contactTitle}
+                          </span>
+                        )}
+                        {r.organizations?.map(organization => (
+                          <button
+                            key={organization.url}
+                            type="button"
+                            onMouseDown={e => { e.stopPropagation(); e.preventDefault(); goUrl(organization.url) }}
+                            style={{ maxWidth: 180, padding: '2px 7px', borderRadius: 999, border: '1px solid #e9d5ff', background: '#faf5ff', color: '#7e22ce', fontSize: 11, fontWeight: 700, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis', cursor: 'pointer' }}
+                            title={`Open ${organization.name}`}
+                          >
+                            {organization.name}
+                          </button>
+                        ))}
+                      </span>
+                    ) : r.subtitle && (
+                      <span style={{ display: 'block', fontSize: 12, color: '#94a3b8', whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{r.subtitle}</span>
+                    )}
+                  </span>
+                  <span style={{ flexShrink: 0, fontSize: 11, fontWeight: 600, color: '#a78bfa', textTransform: 'uppercase', letterSpacing: 0.3 }}>{TYPE_LABEL[r.type]}</span>
+                </div>
+              )
+            })
           )}
         </div>
       )}

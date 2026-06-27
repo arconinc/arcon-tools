@@ -194,7 +194,7 @@ export function TaskDescriptionEditor({ initialHtml, onChange, placeholder }: Pr
       {/* Editor content */}
       <EditorContent
         editor={editor}
-        className="flex-1 overflow-y-auto prose prose-sm prose-slate max-w-none px-3 py-2 focus-within:outline-none"
+        className="flex-1 overflow-y-auto prose prose-sm prose-slate max-w-none px-3 py-2 [&_.ProseMirror]:outline-none"
         style={{ minHeight: '80px' }}
       />
     </div>

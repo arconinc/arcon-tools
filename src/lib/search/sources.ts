@@ -12,6 +12,8 @@ export interface SearchResult {
   subtitle: string | null
   url: string
   score: number
+  contactTitle?: string | null
+  organizations?: { name: string; url: string }[]
 }
 
 export interface SearchSource {
@@ -73,11 +75,35 @@ export const SEARCH_SOURCES: SearchSource[] = [
         : `first_name.ilike.${p},last_name.ilike.${p},email.ilike.${p}`
       const { data } = await admin
         .from('crm_contacts')
-        .select('id, first_name, last_name, email, title')
+        .select('id, first_name, last_name, email, title, customer_id, vendor_id')
         .or(nameFilter)
         .limit(LIMIT)
-      return (data ?? []).map(c => {
+
+      const contacts = data ?? []
+      const customerIds = [...new Set(contacts.map(c => c.customer_id).filter((id): id is string => Boolean(id)))]
+      const vendorIds = [...new Set(contacts.map(c => c.vendor_id).filter((id): id is string => Boolean(id)))]
+      const [customersRes, vendorsRes] = await Promise.all([
+        customerIds.length > 0
+          ? admin.from('crm_customers').select('id, name').in('id', customerIds)
+          : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+        vendorIds.length > 0
+          ? admin.from('crm_vendors').select('id, name').in('id', vendorIds)
+          : Promise.resolve({ data: [] as { id: string; name: string }[] }),
+      ])
+      const customerNames = new Map((customersRes.data ?? []).map(c => [c.id, c.name]))
+      const vendorNames = new Map((vendorsRes.data ?? []).map(v => [v.id, v.name]))
+
+      return contacts.map(c => {
         const name = `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim()
+        const organizations = [
+          c.customer_id && customerNames.get(c.customer_id)
+            ? { name: customerNames.get(c.customer_id)!, url: `/marketing/customers/${c.customer_id}` }
+            : null,
+          c.vendor_id && vendorNames.get(c.vendor_id)
+            ? { name: vendorNames.get(c.vendor_id)!, url: `/marketing/vendors/${c.vendor_id}` }
+            : null,
+        ].filter((organization): organization is { name: string; url: string } => Boolean(organization))
+        const subtitleParts = [c.title, ...organizations.map(organization => organization.name)].filter((part): part is string => Boolean(part))
         // best score across the searchable fields
         const score = Math.max(
           scoreMatch(name, term),
@@ -89,9 +115,11 @@ export const SEARCH_SOURCES: SearchSource[] = [
           type: 'contact' as const,
           id: c.id,
           title: name || c.email || 'Contact',
-          subtitle: c.title || c.email || null,
+          subtitle: subtitleParts.length > 0 ? subtitleParts.join(', ') : c.email || null,
           url: `/marketing/contacts/${c.id}`,
           score,
+          contactTitle: c.title,
+          organizations,
         }
       })
     },
