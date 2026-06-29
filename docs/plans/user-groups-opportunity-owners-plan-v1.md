@@ -159,7 +159,9 @@ Admin UI for group list, create/edit modal, active toggle, capability badges, me
 ---
 
 ### Task 8: Wire Opportunity Owner Dropdowns To Assignment Pool
-**Status:** [ ] Not Started
+**Status:** [x] Complete
+**Completed:** 2026-06-29
+**Review Issues:** none
 **Wave:** 3
 **Prerequisites:** Task 5, Task 6
 **Parallel with:** Task 7

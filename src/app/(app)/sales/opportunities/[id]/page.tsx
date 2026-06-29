@@ -106,7 +106,7 @@ export default function OpportunityDetailPage() {
   const [crmUsers, setCrmUsers] = useState<DropdownUser[]>([])
 
   useEffect(() => {
-    fetch('/api/marketing/users').then((r) => r.json()).then((users) => {
+    fetch('/api/marketing/assignment-pools/opportunity_owners/users').then((r) => r.json()).then((users) => {
       if (Array.isArray(users)) setCrmUsers(users)
     })
   }, [])
@@ -116,6 +116,7 @@ export default function OpportunityDetailPage() {
   const [createTaskOpen, setCreateTaskOpen] = useState(false)
   const [taskCreatedToastOpen, setTaskCreatedToastOpen] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [editError, setEditError] = useState<string | null>(null)
   const [stageSaving, setStageSaving] = useState(false)
   const [closeModal, setCloseModal] = useState<'won' | 'lost' | null>(null)
 
@@ -176,21 +177,25 @@ export default function OpportunityDetailPage() {
   function startEdit() {
     if (!opp) return
     setEditForm({ ...opp })
+    setEditError(null)
     setEditing(true)
   }
 
   function cancelEdit() {
     setEditing(false)
     setEditForm({})
+    setEditError(null)
   }
 
   function handleEditChange(field: string, value: string) {
+    setEditError(null)
     setEditForm((prev) => ({ ...prev, [field]: value === '' ? null : value }))
   }
 
   async function saveEdit() {
     if (!opp) return
     setSaving(true)
+    setEditError(null)
     try {
       const payload = { ...editForm }
       // Convert numeric strings to numbers
@@ -202,7 +207,7 @@ export default function OpportunityDetailPage() {
         body: JSON.stringify(payload),
       })
       const data = await res.json()
-      if (!res.ok) { alert(data.error ?? 'Save failed'); return }
+      if (!res.ok) { setEditError(data.error ?? 'Save failed'); return }
       setOpp((prev) => prev ? { ...prev, ...data } : prev)
       setEditing(false)
     } finally {
@@ -533,6 +538,10 @@ export default function OpportunityDetailPage() {
               </div>
             )}
           </div>
+
+          {editError && (
+            <div className="mx-5 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{editError}</div>
+          )}
 
           <div className="px-5 py-4 grid grid-cols-2 gap-4">
             {editing ? (
