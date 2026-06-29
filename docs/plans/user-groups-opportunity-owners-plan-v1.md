@@ -39,7 +39,9 @@ Create `groups`, `group_memberships`, `group_capabilities`. Add indexes. Seed sy
 ---
 
 ### Task 2: Add Group Shared Types And Constants
-**Status:** [ ] Not Started
+**Status:** [x] Complete
+**Completed:** 2026-06-29
+**Review Issues:** none
 **Wave:** 1
 **Prerequisites:** None
 **Parallel with:** Task 1

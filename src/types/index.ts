@@ -38,6 +38,46 @@ export interface AppUser {
   deactivated_at: string | null
 }
 
+// ─── Groups ──────────────────────────────────────────────────────────────────
+
+export type GroupCapabilityKey = 'access_control' | 'assignment_pool' | 'directory_group' | 'notification_recipient' | 'task_routing'
+
+export type GroupSourceType = 'manual' | 'department' | 'role' | 'assignment_pool'
+
+export type GroupMembershipSource = 'manual' | 'department' | 'role' | 'opportunity_assignment'
+
+export interface Group {
+  id: string
+  key: string
+  name: string
+  description: string | null
+  color: string
+  is_system: boolean
+  is_active: boolean
+  sort_order: number
+  source_type: GroupSourceType
+  source_id: string | null
+  created_at: string
+  updated_at: string
+}
+
+export interface GroupMembership {
+  id: string
+  group_id: string
+  user_id: string
+  source: GroupMembershipSource
+  assigned_by: string | null
+  assigned_at: string
+}
+
+export interface GroupCapability {
+  id: string
+  group_id: string
+  capability: GroupCapabilityKey
+  config: Record<string, unknown>
+  created_at: string
+}
+
 // ─── Employee Directory ──────────────────────────────────────────────────────
 
 export interface EmployeeSummary {
