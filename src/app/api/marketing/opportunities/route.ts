@@ -3,6 +3,25 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 import { unauthorized, badRequest, serverError, created, ok } from '@/lib/api/respond'
 import { stripReadOnly } from '@/lib/api/sanitize'
+import { OPPORTUNITY_OWNERS_GROUP_KEY } from '@/lib/groups/constants'
+
+async function validateOpportunityOwner(adminClient: ReturnType<typeof createAdminClient>, assignedTo: unknown) {
+  if (typeof assignedTo !== 'string' || assignedTo.trim() === '') {
+    return { valid: false, error: null }
+  }
+
+  const { data, error } = await adminClient
+    .from('group_memberships')
+    .select('id, groups!inner(key, is_active), users!inner(id, deactivated_at)')
+    .eq('user_id', assignedTo)
+    .eq('groups.key', OPPORTUNITY_OWNERS_GROUP_KEY)
+    .eq('groups.is_active', true)
+    .is('users.deactivated_at', null)
+    .maybeSingle()
+
+  if (error) return { valid: false, error: error.message }
+  return { valid: Boolean(data), error: null }
+}
 
 // GET /api/marketing/opportunities?assigned_to=&status=open,won&stage=Send+Quote,Follow+Up&customer_id=&tag_id=id1,id2&page=1&limit=50
 // Multi-value params: status, stage, tag_id accept comma-separated lists
@@ -128,6 +147,13 @@ export async function POST(req: NextRequest) {
   const safeRest = stripReadOnly(rest, ['tags', 'assigned_user_name', 'customer_name', 'closed_at'])
 
   const adminClient = createAdminClient()
+
+  if (safeRest.assigned_to != null) {
+    const { valid, error } = await validateOpportunityOwner(adminClient, safeRest.assigned_to)
+    if (error) return serverError(error)
+    if (!valid) return badRequest('assigned_to must be an active Opportunity Owner')
+  }
+
   const { data, error } = await adminClient
     .from('crm_opportunities')
     .insert({

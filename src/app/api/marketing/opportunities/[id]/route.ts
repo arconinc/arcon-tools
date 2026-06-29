@@ -1,12 +1,31 @@
 import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
-import { unauthorized, forbidden, notFound, serverError, ok } from '@/lib/api/respond'
+import { unauthorized, forbidden, badRequest, notFound, serverError, ok } from '@/lib/api/respond'
 import { stripReadOnly } from '@/lib/api/sanitize'
 import { setEntityTags } from '@/lib/crm/tags'
+import { OPPORTUNITY_OWNERS_GROUP_KEY } from '@/lib/groups/constants'
 
 // Fields that trigger a stage history row on change
 const TRACKED_FIELDS = ['pipeline_stage', 'status', 'value', 'probability', 'forecast_close_date'] as const
+
+async function validateOpportunityOwner(adminClient: ReturnType<typeof createAdminClient>, assignedTo: unknown) {
+  if (typeof assignedTo !== 'string' || assignedTo.trim() === '') {
+    return { valid: false, error: null }
+  }
+
+  const { data, error } = await adminClient
+    .from('group_memberships')
+    .select('id, groups!inner(key, is_active), users!inner(id, deactivated_at)')
+    .eq('user_id', assignedTo)
+    .eq('groups.key', OPPORTUNITY_OWNERS_GROUP_KEY)
+    .eq('groups.is_active', true)
+    .is('users.deactivated_at', null)
+    .maybeSingle()
+
+  if (error) return { valid: false, error: error.message }
+  return { valid: Boolean(data), error: null }
+}
 
 // GET /api/marketing/opportunities/[id]
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -98,15 +117,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const adminClient = createAdminClient()
 
-  // Handle tag updates if tag_ids provided
-  if (Array.isArray(tag_ids)) {
-    await setEntityTags(adminClient, 'opportunity', id, tag_ids)
-    // If only updating tags, return early
-    if (Object.keys(updates).length === 0) {
-      return ok({ ok: true })
-    }
-  }
-
   // Fetch current record for stage history comparison
   const { data: current, error: fetchErr } = await adminClient
     .from('crm_opportunities')
@@ -115,6 +125,21 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .single()
 
   if (fetchErr || !current) return notFound('Opportunity not found')
+
+  if ('assigned_to' in updates && updates.assigned_to !== current.assigned_to && updates.assigned_to != null) {
+    const { valid, error } = await validateOpportunityOwner(adminClient, updates.assigned_to)
+    if (error) return serverError(error)
+    if (!valid) return badRequest('assigned_to must be an active Opportunity Owner')
+  }
+
+  // Handle tag updates after validation so rejected owner changes have no side effects.
+  if (Array.isArray(tag_ids)) {
+    await setEntityTags(adminClient, 'opportunity', id, tag_ids)
+    // If only updating tags, return early
+    if (Object.keys(updates).length === 0) {
+      return ok({ ok: true })
+    }
+  }
 
   // Determine which tracked fields changed
   const changedFields = TRACKED_FIELDS.filter(

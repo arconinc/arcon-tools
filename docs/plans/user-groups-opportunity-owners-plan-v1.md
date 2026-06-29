@@ -117,7 +117,9 @@ Authenticated endpoint returning active users in group with `assignment_pool` ca
 ---
 
 ### Task 6: Validate Opportunity Assignment Server-Side
-**Status:** [ ] Not Started
+**Status:** [x] Complete
+**Completed:** 2026-06-29
+**Review Issues:** none
 **Wave:** 2
 **Prerequisites:** Task 1, Task 2
 **Parallel with:** Task 3, Task 4, Task 5
