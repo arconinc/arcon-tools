@@ -16,7 +16,7 @@ async function validateOpportunityOwner(adminClient: ReturnType<typeof createAdm
 
   const { data, error } = await adminClient
     .from('group_memberships')
-    .select('id, groups!inner(key, is_active), users!inner(id, deactivated_at)')
+    .select('id, groups!group_memberships_group_id_fkey!inner(key, is_active), users!group_memberships_user_id_fkey!inner(id, deactivated_at)')
     .eq('user_id', assignedTo)
     .eq('groups.key', OPPORTUNITY_OWNERS_GROUP_KEY)
     .eq('groups.is_active', true)

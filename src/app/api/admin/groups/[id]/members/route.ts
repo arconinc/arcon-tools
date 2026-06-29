@@ -55,7 +55,7 @@ export async function GET(
 
   const { data: members, error: membersError } = await adminClient
     .from('group_memberships')
-    .select('id, group_id, user_id, source, assigned_by, assigned_at, user:users(id, display_name, email, avatar_url, profile_image_url, deactivated_at)')
+    .select('id, group_id, user_id, source, assigned_by, assigned_at, user:users!group_memberships_user_id_fkey(id, display_name, email, avatar_url, profile_image_url, deactivated_at)')
     .eq('group_id', id)
     .order('assigned_at', { ascending: false })
 
@@ -128,7 +128,7 @@ export async function PUT(
 
   const { data: members, error: membersError } = await adminClient
     .from('group_memberships')
-    .select('id, group_id, user_id, source, assigned_by, assigned_at, user:users(id, display_name, email, avatar_url, profile_image_url, deactivated_at)')
+    .select('id, group_id, user_id, source, assigned_by, assigned_at, user:users!group_memberships_user_id_fkey(id, display_name, email, avatar_url, profile_image_url, deactivated_at)')
     .eq('group_id', id)
     .order('assigned_at', { ascending: false })
 

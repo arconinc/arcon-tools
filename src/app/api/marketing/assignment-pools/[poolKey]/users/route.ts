@@ -25,7 +25,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ poo
 
   const { data: memberships, error: membershipsError } = await adminClient
     .from('group_memberships')
-    .select('users!inner(id, display_name, email, department, avatar_url, profile_image_url)')
+    .select('users!group_memberships_user_id_fkey!inner(id, display_name, email, department, avatar_url, profile_image_url)')
     .in('group_id', groupIds)
     .is('users.deactivated_at', null)
 
