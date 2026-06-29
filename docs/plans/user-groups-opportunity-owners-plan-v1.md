@@ -138,7 +138,9 @@ On opportunity create/update, validate non-null `assigned_to` is active member o
 ---
 
 ### Task 7: Build Admin Groups Page
-**Status:** [ ] Not Started
+**Status:** [x] Complete
+**Completed:** 2026-06-29
+**Review Issues:** none
 **Wave:** 3
 **Prerequisites:** Task 3, Task 4
 **Parallel with:** Task 8
