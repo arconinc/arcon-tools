@@ -98,7 +98,9 @@ Admin-only membership read/replace endpoint. Store `assigned_by` as real admin u
 ---
 
 ### Task 5: Add Assignment Pool Users API
-**Status:** [ ] Not Started
+**Status:** [x] Complete
+**Completed:** 2026-06-29
+**Review Issues:** none
 **Wave:** 2
 **Prerequisites:** Task 1, Task 2
 **Parallel with:** Task 3, Task 4
