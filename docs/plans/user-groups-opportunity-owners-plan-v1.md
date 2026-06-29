@@ -1,6 +1,7 @@
 # Feature: User Groups And Opportunity Owners
 **Created:** 2026-06-29
-**Status:** In Progress
+**Status:** Complete
+**Completed:** 2026-06-29
 
 ## Executive Summary
 Add Groups as unified people collections while keeping legacy roles/departments intact. First slice: admin-managed groups plus `Opportunity Owners` assignment pool for opportunity owner dropdowns and API validation. Out of scope: full notification, task routing, document permission, and legacy table removal.
@@ -199,7 +200,9 @@ Add admin nav link to `/admin/groups`. Add user group summary to admin users API
 ---
 
 ### Task 10: Add Migration Notes And Manual Test Script
-**Status:** [ ] Not Started
+**Status:** [x] Complete
+**Completed:** 2026-06-29
+**Review Issues:** none
 **Wave:** 4
 **Prerequisites:** Task 1, Task 6, Task 8
 **Parallel with:** Task 9
