@@ -204,7 +204,7 @@ export default function SpecDetailPage() {
         <span>›</span>
         {spec.customer && (
           <>
-            <Link href={`/marketing/customers/${spec.customer.id}`} style={{ color: '#64748b', textDecoration: 'none' }}>{spec.customer.name}</Link>
+            <Link href={`/sales/customers/${spec.customer.id}`} style={{ color: '#64748b', textDecoration: 'none' }}>{spec.customer.name}</Link>
             <span>›</span>
           </>
         )}
@@ -232,7 +232,7 @@ export default function SpecDetailPage() {
           </div>
           {spec.customer && (
             <div style={{ marginTop: 6, fontSize: 14, color: '#374151' }}>
-              <Link href={`/marketing/customers/${spec.customer.id}`} style={{ color: '#7c3aed', fontWeight: 600, textDecoration: 'none' }}>{spec.customer.name}</Link>
+              <Link href={`/sales/customers/${spec.customer.id}`} style={{ color: '#7c3aed', fontWeight: 600, textDecoration: 'none' }}>{spec.customer.name}</Link>
               {spec.contact && <span style={{ color: '#64748b' }}> · {spec.contact.first_name} {spec.contact.last_name}</span>}
             </div>
           )}

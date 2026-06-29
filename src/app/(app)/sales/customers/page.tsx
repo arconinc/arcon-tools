@@ -211,7 +211,7 @@ export default function CustomersPage() {
           <p className="text-sm text-slate-500 mt-0.5">All customer organizations</p>
         </div>
         <button
-          onClick={() => router.push('/marketing/customers/new')}
+          onClick={() => router.push('/sales/customers/new')}
           className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -261,7 +261,7 @@ export default function CustomersPage() {
         loading={loading}
         emptyMessage={search || status || tagFilter ? 'No customers match your filters.' : 'No customers yet. Create one to get started.'}
         getRowKey={(customer) => customer.id}
-        onRowClick={(customer) => router.push(`/marketing/customers/${customer.id}`)}
+        onRowClick={(customer) => router.push(`/sales/customers/${customer.id}`)}
         pagination={{
           page,
           total,

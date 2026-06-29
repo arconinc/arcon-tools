@@ -49,7 +49,7 @@ export const taskAssigned: NotificationDefinition<TaskAssignedPayload> = {
         ? `New ${p.department} task: ${p.task_title}`
         : `${p.actor_name} assigned you: ${p.task_title}`,
     body: fmtDueDate(p.due_date) ? `Due ${fmtDueDate(p.due_date)}` : 'No due date',
-    linkUrl: `/marketing/tasks/${p.task_id}`,
+    linkUrl: `/sales/tasks/${p.task_id}`,
   }),
   email: (p, recipient) => {
     const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
@@ -82,7 +82,7 @@ export const taskAssigned: NotificationDefinition<TaskAssignedPayload> = {
         greeting: `Hi ${firstName},`,
         bodyLines: lines,
         ctaText: 'View task',
-        ctaUrl: `${appUrl()}/marketing/tasks/${p.task_id}`,
+        ctaUrl: `${appUrl()}/sales/tasks/${p.task_id}`,
       }),
     }
   },
@@ -416,7 +416,7 @@ export const taskCompleted: NotificationDefinition<TaskCompletedPayload> = {
   render: (p) => ({
     title: `${p.actor_name} completed: ${p.task_title}`,
     body: p.department ? `${p.department} task marked complete` : 'Task marked complete',
-    linkUrl: `/marketing/tasks/${p.task_id}`,
+    linkUrl: `/sales/tasks/${p.task_id}`,
   }),
   email: (p, recipient) => {
     const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
@@ -432,7 +432,7 @@ export const taskCompleted: NotificationDefinition<TaskCompletedPayload> = {
           ...(p.department ? [`<strong>Department:</strong> ${p.department}`] : []),
         ],
         ctaText: 'View task',
-        ctaUrl: `${appUrl()}/marketing/tasks/${p.task_id}`,
+        ctaUrl: `${appUrl()}/sales/tasks/${p.task_id}`,
       }),
     }
   },
@@ -582,7 +582,7 @@ export const contactFormSubmitted: NotificationDefinition<ContactFormSubmittedPa
   render: (p) => ({
     title: `New contact form: ${p.task_title}`,
     body: `Via ${p.source}`,
-    linkUrl: `/marketing/tasks/${p.task_id}`,
+    linkUrl: `/sales/tasks/${p.task_id}`,
   }),
   email: (p, recipient) => {
     const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
@@ -605,7 +605,7 @@ export const contactFormSubmitted: NotificationDefinition<ContactFormSubmittedPa
           tableHtml,
         ],
         ctaText: 'View Task',
-        ctaUrl: `${appUrl()}/marketing/tasks/${p.task_id}`,
+        ctaUrl: `${appUrl()}/sales/tasks/${p.task_id}`,
       }),
     }
   },
@@ -630,7 +630,7 @@ export const supplierAddedToAturian: NotificationDefinition<SupplierAturianPaylo
   render: (p) => ({
     title: `New supplier to add to Aturian: ${p.vendor_name}`,
     body: `Requested by ${p.requestor_name}`,
-    linkUrl: `/marketing/vendors/${p.vendor_id}`,
+    linkUrl: `/sales/suppliers/${p.vendor_id}`,
   }),
   email: (p, recipient) => {
     const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
@@ -648,7 +648,7 @@ export const supplierAddedToAturian: NotificationDefinition<SupplierAturianPaylo
           ...(p.orders_email ? [`<strong>Orders Email:</strong> ${p.orders_email}`] : []),
         ],
         ctaText: 'View Supplier',
-        ctaUrl: `${appUrl()}/marketing/vendors/${p.vendor_id}`,
+        ctaUrl: `${appUrl()}/sales/suppliers/${p.vendor_id}`,
       }),
     }
   },
@@ -674,7 +674,7 @@ export const customerAddedToAturian: NotificationDefinition<CustomerAturianPaylo
   render: (p) => ({
     title: `New customer to add to Aturian: ${p.customer_name}`,
     body: `Requested by ${p.requestor_name}`,
-    linkUrl: `/marketing/customers/${p.customer_id}`,
+    linkUrl: `/sales/customers/${p.customer_id}`,
   }),
   email: (p, recipient) => {
     const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
@@ -692,7 +692,7 @@ export const customerAddedToAturian: NotificationDefinition<CustomerAturianPaylo
           ...(addr ? [`<strong>Billing Address:</strong> ${addr}`] : []),
         ],
         ctaText: 'View Customer',
-        ctaUrl: `${appUrl()}/marketing/customers/${p.customer_id}`,
+        ctaUrl: `${appUrl()}/sales/customers/${p.customer_id}`,
       }),
     }
   },

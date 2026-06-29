@@ -7,7 +7,7 @@ test.describe('Customer Detail Page', () => {
   })
 
   async function gotoCustomers(page: Page) {
-    await page.goto('/marketing/customers')
+    await page.goto('/sales/customers')
     await page.waitForLoadState('load')
   }
 
@@ -15,7 +15,7 @@ test.describe('Customer Detail Page', () => {
     await gotoCustomers(page)
 
     // Click the first customer in the list
-    const firstCustomer = page.locator('a[href*="/marketing/customers/"], button:has-text("View")')
+    const firstCustomer = page.locator('a[href*="/sales/customers/"], button:has-text("View")')
     if (await firstCustomer.count() > 0) {
       await firstCustomer.first().click()
       await page.waitForLoadState('load')
@@ -51,7 +51,7 @@ test.describe('Customer Detail Page', () => {
     await gotoCustomers(page)
 
     // Click first customer
-    const firstCustomer = page.locator('a[href*="/marketing/customers/"], button:has-text("View")')
+    const firstCustomer = page.locator('a[href*="/sales/customers/"], button:has-text("View")')
     if (await firstCustomer.count() > 0) {
       await firstCustomer.first().click()
       await page.waitForLoadState('load')
@@ -75,7 +75,7 @@ test.describe('Customer Detail Page', () => {
     await gotoCustomers(page)
 
     // Find customer with opportunities
-    const customers = page.locator('a[href*="/marketing/customers/"]')
+    const customers = page.locator('a[href*="/sales/customers/"]')
     if (await customers.count() === 0) {
       test.skip()
     }
@@ -84,13 +84,13 @@ test.describe('Customer Detail Page', () => {
     await page.waitForLoadState('load')
 
     // Look for opportunities section and click a link
-    const oppLink = page.locator('a[href*="/marketing/opportunities/"]')
+    const oppLink = page.locator('a[href*="/sales/opportunities/"]')
     if (await oppLink.count() > 0) {
       await oppLink.first().click()
       await page.waitForLoadState('load')
 
       // Verify we navigated to opportunity detail
-      expect(page.url()).toContain('/marketing/opportunities/')
+      expect(page.url()).toContain('/sales/opportunities/')
     }
   })
 })

@@ -14,7 +14,7 @@ test.describe('Task Detail Page', () => {
     // If no tasks there, try marketing/tasks
     let taskLink = page.locator('a[href*="/tasks/"]').first()
     if (await taskLink.count() === 0) {
-      await page.goto('/marketing/tasks')
+      await page.goto('/sales/tasks')
       await page.waitForLoadState('networkidle')
       taskLink = page.locator('a[href*="/tasks/"]').first()
     }
@@ -66,7 +66,7 @@ test.describe('Task Detail Page', () => {
     // Find a task
     let taskLink = page.locator('a[href*="/tasks/"]').first()
     if (await taskLink.count() === 0) {
-      await page.goto('/marketing/tasks')
+      await page.goto('/sales/tasks')
       await page.waitForLoadState('networkidle')
       taskLink = page.locator('a[href*="/tasks/"]').first()
     }

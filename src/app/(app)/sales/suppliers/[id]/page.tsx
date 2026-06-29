@@ -362,7 +362,7 @@ export default function VendorDetailPage() {
       }
 
       const filled = await pdfDoc.save()
-      const blob = new Blob([filled], { type: 'application/pdf' })
+      const blob = new Blob([filled.buffer as ArrayBuffer], { type: 'application/pdf' })
       const url = URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
@@ -475,7 +475,7 @@ export default function VendorDetailPage() {
       })
       const data = await res.json()
       if (!res.ok) { setCreateError(data.error ?? 'Create failed'); return }
-      router.push(`/marketing/vendors/${data.id}`)
+      router.push(`/sales/suppliers/${data.id}`)
     } finally { setCreating(false) }
   }
 
@@ -528,7 +528,7 @@ export default function VendorDetailPage() {
 
     return (
       <div className="max-w-4xl mx-auto px-6 py-6">
-        <Link href="/marketing/vendors" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-5">
+        <Link href="/sales/suppliers" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-5">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
           Suppliers
         </Link>
@@ -734,7 +734,7 @@ export default function VendorDetailPage() {
               className="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl disabled:opacity-60 transition-colors">
               {creating ? 'Creating…' : 'Create Supplier'}
             </button>
-            <Link href="/marketing/vendors" className="px-5 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors">
+            <Link href="/sales/suppliers" className="px-5 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors">
               Cancel
             </Link>
           </div>
@@ -758,8 +758,8 @@ export default function VendorDetailPage() {
 
     return (
       <div className="px-6 py-5">
-        <Link href="/marketing/vendors" className="text-sm text-slate-500 hover:text-slate-700">← Suppliers</Link>
-        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">{error ?? 'Vendor not found'}</div>
+        <Link href="/sales/suppliers" className="text-sm text-slate-500 hover:text-slate-700">← Suppliers</Link>
+        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">{error ?? 'Supplier not found'}</div>
       </div>
     )
   }
@@ -769,7 +769,7 @@ export default function VendorDetailPage() {
 
   return (
     <div className="px-6 py-5">
-      <Link href="/marketing/vendors" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-3">
+      <Link href="/sales/suppliers" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-3">
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
         Suppliers
       </Link>
@@ -864,10 +864,10 @@ export default function VendorDetailPage() {
                 )}
               </div>
 
-              {/* Vendor Account section */}
+              {/* Supplier account section */}
               <div className="border-t border-slate-100">
                 <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
-                  <h2 className="text-sm font-semibold text-slate-700">Vendor Account</h2>
+                  <h2 className="text-sm font-semibold text-slate-700">Supplier Account</h2>
                 </div>
                 <div className="px-5 py-4 grid grid-cols-4 gap-3">
                   {editing ? (
@@ -1094,7 +1094,7 @@ export default function VendorDetailPage() {
               </div>
               <div className="p-4 space-y-3">
                 <div>
-                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Vendor State</label>
+                  <label className="block text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Supplier State</label>
                   <select
                     value={taxState}
                     onChange={e => setTaxState(e.target.value)}
@@ -1242,13 +1242,13 @@ export default function VendorDetailPage() {
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
             <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50">
               <h2 className="text-sm font-semibold text-slate-700">Contacts ({vendor.contacts.length})</h2>
-              <button onClick={() => router.push(`/marketing/contacts/new?vendor_id=${vendor.id}`)} className="text-xs font-semibold text-purple-700 hover:text-purple-900">+ Add</button>
+              <button onClick={() => router.push(`/sales/contacts/new?vendor_id=${vendor.id}`)} className="text-xs font-semibold text-purple-700 hover:text-purple-900">+ Add</button>
             </div>
             {vendor.contacts.length === 0
               ? <div className="px-5 py-5 text-sm text-slate-400 text-center">No contacts linked.</div>
               : <div className="divide-y divide-slate-100">
                   {vendor.contacts.map((c) => (
-                    <div key={c.id} onClick={() => router.push(`/marketing/contacts/${c.id}`)}
+                    <div key={c.id} onClick={() => router.push(`/sales/contacts/${c.id}`)}
                       className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 cursor-pointer transition-colors">
                       <div className="w-7 h-7 bg-purple-100 rounded-full flex items-center justify-center text-xs font-bold text-purple-700 flex-shrink-0">
                         {c.first_name[0]}{c.last_name[0]}
@@ -1290,7 +1290,7 @@ export default function VendorDetailPage() {
       {activeTab === 'activity' && (
         <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center text-sm text-slate-400">
           Task activity for this vendor will appear here once the Tasks feature is complete.{' '}
-          <button onClick={() => router.push(`/marketing/tasks?vendor_id=${vendor.id}`)} className="text-purple-700 hover:underline">View tasks →</button>
+          <button onClick={() => router.push(`/sales/tasks?vendor_id=${vendor.id}`)} className="text-purple-700 hover:underline">View tasks →</button>
         </div>
       )}
       <CreateTaskModal

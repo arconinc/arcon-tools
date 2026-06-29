@@ -59,7 +59,7 @@ export const SEARCH_SOURCES: SearchSource[] = [
         id: c.id,
         title: c.name,
         subtitle: c.industry || c.billing_city || null,
-        url: `/marketing/customers/${c.id}`,
+        url: `/sales/customers/${c.id}`,
         score: scoreMatch(c.name, term),
       }))
     },
@@ -97,10 +97,10 @@ export const SEARCH_SOURCES: SearchSource[] = [
         const name = `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim()
         const organizations = [
           c.customer_id && customerNames.get(c.customer_id)
-            ? { name: customerNames.get(c.customer_id)!, url: `/marketing/customers/${c.customer_id}` }
+            ? { name: customerNames.get(c.customer_id)!, url: `/sales/customers/${c.customer_id}` }
             : null,
           c.vendor_id && vendorNames.get(c.vendor_id)
-            ? { name: vendorNames.get(c.vendor_id)!, url: `/marketing/vendors/${c.vendor_id}` }
+            ? { name: vendorNames.get(c.vendor_id)!, url: `/sales/suppliers/${c.vendor_id}` }
             : null,
         ].filter((organization): organization is { name: string; url: string } => Boolean(organization))
         const subtitleParts = [c.title, ...organizations.map(organization => organization.name)].filter((part): part is string => Boolean(part))
@@ -116,7 +116,7 @@ export const SEARCH_SOURCES: SearchSource[] = [
           id: c.id,
           title: name || c.email || 'Contact',
           subtitle: subtitleParts.length > 0 ? subtitleParts.join(', ') : c.email || null,
-          url: `/marketing/contacts/${c.id}`,
+          url: `/sales/contacts/${c.id}`,
           score,
           contactTitle: c.title,
           organizations,
@@ -138,7 +138,7 @@ export const SEARCH_SOURCES: SearchSource[] = [
         id: v.id,
         title: v.name,
         subtitle: v.product_line || v.specialty || null,
-        url: `/marketing/vendors/${v.id}`,
+        url: `/sales/suppliers/${v.id}`,
         score: scoreMatch(v.name, term),
       }))
     },

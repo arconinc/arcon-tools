@@ -336,7 +336,7 @@ export default function OpportunitiesPage() {
         </div>
         <div className="flex items-center gap-3">
           <button
-            onClick={() => router.push('/marketing/opportunities/new')}
+            onClick={() => router.push('/sales/opportunities/new')}
             className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl transition-colors"
           >
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -423,7 +423,7 @@ export default function OpportunitiesPage() {
         loading={loading}
         emptyMessage={activeFilters ? 'No opportunities match your filters.' : 'No opportunities yet. Create one to get started.'}
         getRowKey={(o) => o.id}
-        onRowClick={(o) => router.push(`/marketing/opportunities/${o.id}`)}
+        onRowClick={(o) => router.push(`/sales/opportunities/${o.id}`)}
         pagination={{
           page,
           total,

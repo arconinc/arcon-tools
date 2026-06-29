@@ -350,7 +350,7 @@ export default function CustomerDetailPage() {
       }
 
       await Promise.all(contactCreates)
-      router.push(`/marketing/customers/${customerId}`)
+      router.push(`/sales/customers/${customerId}`)
     } finally { setCreating(false) }
   }
 
@@ -358,7 +358,7 @@ export default function CustomerDetailPage() {
   if (isNew) {
     return (
       <div className="max-w-4xl mx-auto px-6 py-6">
-        <Link href="/marketing/customers" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-5">
+        <Link href="/sales/customers" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-5">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
@@ -627,7 +627,7 @@ export default function CustomerDetailPage() {
               className="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl disabled:opacity-60 transition-colors">
               {creating ? 'Creating…' : 'Create Customer'}
             </button>
-            <Link href="/marketing/customers" className="px-5 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors">
+            <Link href="/sales/customers" className="px-5 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors">
               Cancel
             </Link>
           </div>
@@ -652,7 +652,7 @@ export default function CustomerDetailPage() {
   if (error || !customer) {
     return (
       <div className="px-6 py-5">
-        <Link href="/marketing/customers" className="text-sm text-slate-500 hover:text-slate-700">← Customers</Link>
+        <Link href="/sales/customers" className="text-sm text-slate-500 hover:text-slate-700">← Customers</Link>
         <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">{error ?? 'Customer not found'}</div>
       </div>
     )
@@ -664,7 +664,7 @@ export default function CustomerDetailPage() {
   return (
     <div className="px-6 py-5">
       {/* Back */}
-      <Link href="/marketing/customers" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-3">
+      <Link href="/sales/customers" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-3">
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
@@ -681,7 +681,7 @@ export default function CustomerDetailPage() {
         id={customer.id}
         onCreateOpportunity={() =>
           router.push(
-            `/marketing/opportunities/new?customer_id=${customer.id}&customer_name=${encodeURIComponent(customer.name)}`
+            `/sales/opportunities/new?customer_id=${customer.id}&customer_name=${encodeURIComponent(customer.name)}`
           )
         }
         onCreateTask={() => setCreateTaskOpen(true)}
@@ -1184,7 +1184,7 @@ export default function CustomerDetailPage() {
           <CustomerContactsList
             contacts={customer.contacts}
             onAddClick={() => setShowAddContact(true)}
-            onContactClick={(id) => router.push(`/marketing/contacts/${id}`)}
+            onContactClick={(id) => router.push(`/sales/contacts/${id}`)}
           />
 
           <CustomerOpportunitiesList
@@ -1193,10 +1193,10 @@ export default function CustomerDetailPage() {
             customerId={customer.id}
             onAddClick={() =>
               router.push(
-                `/marketing/opportunities/new?customer_id=${customer.id}&customer_name=${encodeURIComponent(customer.name)}`
+                `/sales/opportunities/new?customer_id=${customer.id}&customer_name=${encodeURIComponent(customer.name)}`
               )
             }
-            onOpportunityClick={(id) => router.push(`/marketing/opportunities/${id}`)}
+            onOpportunityClick={(id) => router.push(`/sales/opportunities/${id}`)}
           />
 
           <CustomerFilesList files={customer.files} />
@@ -1231,7 +1231,7 @@ export default function CustomerDetailPage() {
       {activeTab === 'activity' && (
         <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center text-sm text-slate-400">
           Task activity for this customer will appear here once the Tasks feature is complete.{' '}
-          <button onClick={() => router.push(`/marketing/tasks?customer_id=${customer.id}`)} className="text-purple-700 hover:underline">View tasks →</button>
+          <button onClick={() => router.push(`/sales/tasks?customer_id=${customer.id}`)} className="text-purple-700 hover:underline">View tasks →</button>
         </div>
       )}
 

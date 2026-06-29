@@ -283,7 +283,7 @@ export default function OpportunityDetailPage() {
       })
       const data = await res.json()
       if (!res.ok) { setCreateError(data.error ?? 'Create failed'); return }
-      router.push(`/marketing/opportunities/${data.id}`)
+      router.push(`/sales/opportunities/${data.id}`)
     } finally {
       setCreating(false)
     }
@@ -293,7 +293,7 @@ export default function OpportunityDetailPage() {
   if (isNew) {
     return (
       <div className="max-w-4xl mx-auto px-6 py-8">
-        <Link href="/marketing/opportunities" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-6">
+        <Link href="/sales/opportunities" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-6">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
           </svg>
@@ -392,7 +392,7 @@ export default function OpportunityDetailPage() {
               className="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl disabled:opacity-60 transition-colors">
               {creating ? 'Creating…' : 'Create Opportunity'}
             </button>
-            <Link href="/marketing/opportunities" className="px-5 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors">
+            <Link href="/sales/opportunities" className="px-5 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors">
               Cancel
             </Link>
           </div>
@@ -416,7 +416,7 @@ export default function OpportunityDetailPage() {
   if (error || !opp) {
     return (
       <div className="px-6 py-5">
-        <Link href="/marketing/opportunities" className="text-sm text-slate-500 hover:text-slate-700">← Opportunities</Link>
+        <Link href="/sales/opportunities" className="text-sm text-slate-500 hover:text-slate-700">← Opportunities</Link>
         <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
           {error ?? 'Opportunity not found'}
         </div>
@@ -430,7 +430,7 @@ export default function OpportunityDetailPage() {
   return (
     <div className="px-6 py-5">
       {/* Back */}
-      <Link href="/marketing/opportunities" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-3">
+      <Link href="/sales/opportunities" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-3">
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>
@@ -447,7 +447,7 @@ export default function OpportunityDetailPage() {
                 {opp.status}
               </span>
               {opp.customer && (
-                <Link href={`/marketing/customers/${opp.customer.id}`} className="text-sm text-purple-700 hover:underline font-medium">
+                <Link href={`/sales/customers/${opp.customer.id}`} className="text-sm text-purple-700 hover:underline font-medium">
                   {opp.customer.name}
                 </Link>
               )}
@@ -483,7 +483,7 @@ export default function OpportunityDetailPage() {
         onStageClick={handleStageClick}
         onClose={handleClose}
         disabled={stageSaving}
-        onWonAnimationComplete={() => router.push('/marketing/opportunities')}
+        onWonAnimationComplete={() => router.push('/sales/opportunities')}
         oppName={opp.name}
       />
 

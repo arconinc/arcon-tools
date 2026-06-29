@@ -120,17 +120,17 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
       label: 'Aturian',
       items: [
         { href: 'https://arcon.erp.network/', label: 'Login', icon: LoginIcon },
-        { href: '/marketing/customers/new', label: 'Add Customer', icon: CrmCustomersIcon },
+        { href: '/sales/customers/new', label: 'Add Customer', icon: CrmCustomersIcon },
       ],
     },
       {
           label: 'Sales',
           items: [
-              { href: '/marketing', label: 'Dashboard', icon: CrmDashIcon },
-              { href: '/marketing/opportunities', label: 'Opportunities', icon: CrmOppsIcon },
-              { href: '/marketing/customers', label: 'Customers', icon: CrmCustomersIcon},
-              { href: '/marketing/vendors', label: 'Suppliers', icon: BuildingIcon },
-              { href: '/marketing/contacts', label: 'Contacts', icon: CrmContactsIcon },
+              { href: '/sales', label: 'Dashboard', icon: CrmDashIcon },
+              { href: '/sales/opportunities', label: 'Opportunities', icon: CrmOppsIcon },
+              { href: '/sales/customers', label: 'Customers', icon: CrmCustomersIcon},
+              { href: '/sales/suppliers', label: 'Suppliers', icon: BuildingIcon },
+              { href: '/sales/contacts', label: 'Contacts', icon: CrmContactsIcon },
               { href: '/documents/sales', label: 'Documents', icon: DocumentIcon },
               { href: '/sales/tasks', label: 'Tasks', icon: TaskCheckIcon },
           ],
@@ -138,8 +138,8 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
     {
       label: 'Marketing',
       items: [
+        { href: '/marketing', label: 'Dashboard', icon: CrmDashIcon, adminMatch: true },
         { href: '/documents/marketing', label: 'Documents', icon: DocumentIcon, adminMatch: true },
-        { href: '/marketing/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
         { href: '/marketing/specs', label: 'Spec Samples', icon: SpecSampleIcon, adminMatch: true },
       ],
     },

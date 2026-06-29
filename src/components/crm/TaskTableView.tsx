@@ -61,10 +61,10 @@ function isOverdue(iso: string | null) {
 }
 
 function linkedToHref(t: KanbanTask): string | null {
-  if (t.opportunity_id) return `/marketing/opportunities/${t.opportunity_id}`
-  if (t.customer_id) return `/marketing/customers/${t.customer_id}`
-  if (t.vendor_id) return `/marketing/vendors/${t.vendor_id}`
-  if (t.contact_id) return `/marketing/contacts/${t.contact_id}`
+  if (t.opportunity_id) return `/sales/opportunities/${t.opportunity_id}`
+  if (t.customer_id) return `/sales/customers/${t.customer_id}`
+  if (t.vendor_id) return `/sales/suppliers/${t.vendor_id}`
+  if (t.contact_id) return `/sales/contacts/${t.contact_id}`
   return null
 }
 

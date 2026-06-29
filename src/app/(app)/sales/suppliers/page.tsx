@@ -177,7 +177,7 @@ export default function VendorsPage() {
           <p className="text-sm text-slate-500 mt-0.5">Supplier organizations and partners</p>
         </div>
         <button
-          onClick={() => router.push('/marketing/vendors/new')}
+          onClick={() => router.push('/sales/suppliers/new')}
           className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -226,7 +226,7 @@ export default function VendorsPage() {
         loading={loading}
         emptyMessage={search || tagFilter || premierFilter ? 'No vendors match your filters.' : 'No vendors yet. Create one to get started.'}
         getRowKey={(vendor) => vendor.id}
-        onRowClick={(vendor) => router.push(`/marketing/vendors/${vendor.id}`)}
+        onRowClick={(vendor) => router.push(`/sales/suppliers/${vendor.id}`)}
         pagination={{
           page,
           total,

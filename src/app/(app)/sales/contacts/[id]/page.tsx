@@ -212,14 +212,14 @@ export default function ContactDetailPage() {
       })
       const data = await res.json()
       if (!res.ok) { setCreateError(data.error ?? 'Create failed'); return }
-      router.push(`/marketing/contacts/${data.id}`)
+      router.push(`/sales/contacts/${data.id}`)
     } finally { setCreating(false) }
   }
 
   if (isNew) {
     return (
       <div className="max-w-4xl mx-auto px-6 py-6">
-        <Link href="/marketing/contacts" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-5">
+        <Link href="/sales/contacts" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-5">
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
           Contacts
         </Link>
@@ -259,7 +259,7 @@ export default function ContactDetailPage() {
             <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Type of Contact</label>
             <select value={createForm.type_of_contact} onChange={(e) => setCreateForm((p) => ({ ...p, type_of_contact: e.target.value }))}
               className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-              <option>Customer</option><option>Vendor</option><option>Prospect</option><option>Partner</option><option>Other</option>
+              <option>Customer</option><option value="Vendor">Supplier</option><option>Prospect</option><option>Partner</option><option>Other</option>
             </select>
           </div>
           <EntitySearchPicker
@@ -272,7 +272,7 @@ export default function ContactDetailPage() {
             placeholder="Search customers…"
           />
           <EntitySearchPicker
-            label="Link to Vendor"
+            label="Link to Supplier"
             apiPath="/api/marketing/vendors"
             resultsKey="vendors"
             value={createForm.vendor_id || null}
@@ -285,7 +285,7 @@ export default function ContactDetailPage() {
               className="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl disabled:opacity-60 transition-colors">
               {creating ? 'Creating…' : 'Create Contact'}
             </button>
-            <Link href="/marketing/contacts" className="px-5 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors">
+            <Link href="/sales/contacts" className="px-5 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors">
               Cancel
             </Link>
           </div>
@@ -307,7 +307,7 @@ export default function ContactDetailPage() {
   if (error || !contact) {
     return (
       <div className="px-6 py-5">
-        <Link href="/marketing/contacts" className="text-sm text-slate-500 hover:text-slate-700">← Contacts</Link>
+        <Link href="/sales/contacts" className="text-sm text-slate-500 hover:text-slate-700">← Contacts</Link>
         <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">{error ?? 'Contact not found'}</div>
       </div>
     )
@@ -317,7 +317,7 @@ export default function ContactDetailPage() {
 
   return (
     <div className="px-6 py-5">
-      <Link href="/marketing/contacts" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-3">
+      <Link href="/sales/contacts" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-3">
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" /></svg>
         Contacts
       </Link>
@@ -342,10 +342,10 @@ export default function ContactDetailPage() {
               )}
               {contact.phone && <span className="text-xs text-slate-500">{contact.phone}</span>}
               {contact.customer && (
-                <Link href={`/marketing/customers/${contact.customer.id}`} className="text-xs text-purple-700 hover:underline">{contact.customer.name}</Link>
+                <Link href={`/sales/customers/${contact.customer.id}`} className="text-xs text-purple-700 hover:underline">{contact.customer.name}</Link>
               )}
               {contact.vendor && (
-                <Link href={`/marketing/vendors/${contact.vendor.id}`} className="text-xs text-purple-700 hover:underline">{contact.vendor.name}</Link>
+                <Link href={`/sales/suppliers/${contact.vendor.id}`} className="text-xs text-purple-700 hover:underline">{contact.vendor.name}</Link>
               )}
             </div>
           </div>
@@ -395,7 +395,7 @@ export default function ContactDetailPage() {
                       <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-0.5">Type of Contact</label>
                       <select value={(ef.type_of_contact as string) ?? 'Customer'} onChange={(e) => handleEditChange('type_of_contact', e.target.value)}
                         className="w-full px-2.5 py-1.5 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white">
-                        <option>Customer</option><option>Vendor</option><option>Prospect</option><option>Partner</option><option>Other</option>
+                        <option>Customer</option><option value="Vendor">Supplier</option><option>Prospect</option><option>Partner</option><option>Other</option>
                       </select>
                     </div>
                     <div>
@@ -565,7 +565,7 @@ export default function ContactDetailPage() {
                         placeholder="Search customers…"
                       />
                       <EntitySearchPicker
-                        label="Link to Vendor"
+                        label="Link to Supplier"
                         apiPath="/api/marketing/vendors"
                         resultsKey="vendors"
                         value={(ef.vendor_id as string) || null}
@@ -636,7 +636,7 @@ export default function ContactDetailPage() {
               ) : (
                 <div className="space-y-3">
                   {contact.customer && (
-                    <div onClick={() => router.push(`/marketing/customers/${contact.customer!.id}`)}
+                    <div onClick={() => router.push(`/sales/customers/${contact.customer!.id}`)}
                       className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl hover:bg-slate-50 cursor-pointer transition-colors">
                       <div className="w-8 h-8 bg-blue-100 rounded-lg flex items-center justify-center text-xs font-bold text-blue-700 flex-shrink-0">C</div>
                       <div>
@@ -646,12 +646,12 @@ export default function ContactDetailPage() {
                     </div>
                   )}
                   {contact.vendor && (
-                    <div onClick={() => router.push(`/marketing/vendors/${contact.vendor!.id}`)}
+                    <div onClick={() => router.push(`/sales/suppliers/${contact.vendor!.id}`)}
                       className="flex items-center gap-3 p-3 border border-slate-200 rounded-xl hover:bg-slate-50 cursor-pointer transition-colors">
                       <div className="w-8 h-8 bg-orange-100 rounded-lg flex items-center justify-center text-xs font-bold text-orange-700 flex-shrink-0">V</div>
                       <div>
                         <div className="text-sm font-medium text-slate-800">{contact.vendor.name}</div>
-                        <div className="text-xs text-slate-400">Vendor</div>
+                        <div className="text-xs text-slate-400">Supplier</div>
                       </div>
                     </div>
                   )}
@@ -687,7 +687,7 @@ export default function ContactDetailPage() {
       {activeTab === 'activity' && (
         <div className="bg-white border border-slate-200 rounded-2xl p-6 text-center text-sm text-slate-400">
           Task activity for this contact will appear here once the Tasks feature is complete.{' '}
-          <button onClick={() => router.push(`/marketing/tasks?contact_id=${contact.id}`)} className="text-purple-700 hover:underline">View tasks →</button>
+          <button onClick={() => router.push(`/sales/tasks?contact_id=${contact.id}`)} className="text-purple-700 hover:underline">View tasks →</button>
         </div>
       )}
       <CreateTaskModal

@@ -90,7 +90,7 @@ export default function TaskDetailPage() {
 
   useEffect(() => {
     if (isNew) {
-      router.replace('/marketing/tasks')
+      router.replace('/sales/tasks')
       return
     }
     load()
@@ -214,7 +214,7 @@ export default function TaskDetailPage() {
         alert(data.error ?? 'Delete failed')
         return
       }
-      router.push('/marketing/tasks')
+      router.push('/sales/tasks')
     } finally {
       setDeleting(false)
     }
@@ -239,7 +239,7 @@ export default function TaskDetailPage() {
 
     return (
       <div className="max-w-4xl mx-auto px-6 py-8">
-        <Link href="/marketing/tasks" className="text-sm text-slate-500 hover:text-slate-700">← Tasks</Link>
+        <Link href="/sales/tasks" className="text-sm text-slate-500 hover:text-slate-700">← Tasks</Link>
         <div className="mt-6 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
           {error ?? 'Task not found'}
         </div>
@@ -251,20 +251,20 @@ export default function TaskDetailPage() {
   const statusInfo = STATUSES.find((s) => s.value === task.status)
 
   const linkedObj = task.opportunity
-    ? { type: 'opportunity', label: 'Opportunity', href: `/marketing/opportunities/${task.opportunity.id}`, name: task.opportunity.name, color: 'bg-purple-100 text-purple-700' }
+    ? { type: 'opportunity', label: 'Opportunity', href: `/sales/opportunities/${task.opportunity.id}`, name: task.opportunity.name, color: 'bg-purple-100 text-purple-700' }
     : task.customer
-    ? { type: 'customer', label: 'Customer', href: `/marketing/customers/${task.customer.id}`, name: task.customer.name, color: 'bg-blue-100 text-blue-700' }
+    ? { type: 'customer', label: 'Customer', href: `/sales/customers/${task.customer.id}`, name: task.customer.name, color: 'bg-blue-100 text-blue-700' }
     : task.vendor
-    ? { type: 'vendor', label: 'Supplier', href: `/marketing/vendors/${task.vendor.id}`, name: task.vendor.name, color: 'bg-orange-100 text-orange-700' }
+    ? { type: 'vendor', label: 'Supplier', href: `/sales/suppliers/${task.vendor.id}`, name: task.vendor.name, color: 'bg-orange-100 text-orange-700' }
     : task.contact
-    ? { type: 'contact', label: 'Contact', href: `/marketing/contacts/${task.contact.id}`, name: `${task.contact.first_name} ${task.contact.last_name}`, color: 'bg-teal-100 text-teal-700' }
+    ? { type: 'contact', label: 'Contact', href: `/sales/contacts/${task.contact.id}`, name: `${task.contact.first_name} ${task.contact.last_name}`, color: 'bg-teal-100 text-teal-700' }
     : null
 
 
   return (
     <div className="max-w-4xl mx-auto px-6 py-8">
       {/* Back */}
-      <Link href="/marketing/tasks" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-5">
+      <Link href="/sales/tasks" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-5">
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
         </svg>

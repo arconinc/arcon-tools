@@ -365,7 +365,7 @@ export default function CrmImportPage() {
 
           <div className="pt-3 border-t border-slate-100 flex gap-3">
             <a
-              href={importType === 'vendors' ? '/marketing/vendors' : importType === 'customers' ? '/marketing/customers' : importType === 'opportunities' ? '/marketing/opportunities' : '/marketing/contacts'}
+              href={importType === 'vendors' ? '/sales/suppliers' : importType === 'customers' ? '/sales/customers' : importType === 'opportunities' ? '/sales/opportunities' : '/sales/contacts'}
               className="px-4 py-2 text-sm font-semibold bg-purple-700 hover:bg-purple-800 text-white rounded-lg transition-colors"
             >
               {importType === 'vendors' ? 'View Vendors' : importType === 'customers' ? 'View Customers' : importType === 'opportunities' ? 'View Opportunities' : 'View Contacts'}

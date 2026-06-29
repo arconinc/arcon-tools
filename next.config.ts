@@ -15,6 +15,15 @@ const nextConfig: NextConfig = {
       { protocol: 'https', hostname: '*.supabase.co' },
     ],
   },
+  async redirects() {
+    return [
+      { source: '/marketing/customers/:path*', destination: '/sales/customers/:path*', permanent: true },
+      { source: '/marketing/contacts/:path*', destination: '/sales/contacts/:path*', permanent: true },
+      { source: '/marketing/opportunities/:path*', destination: '/sales/opportunities/:path*', permanent: true },
+      { source: '/marketing/vendors/:path*', destination: '/sales/suppliers/:path*', permanent: true },
+      { source: '/marketing/tasks/:path*', destination: '/sales/tasks/:path*', permanent: true },
+    ]
+  },
 };
 
 export default withSentryConfig(nextConfig, {

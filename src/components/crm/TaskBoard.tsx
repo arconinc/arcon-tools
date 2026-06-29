@@ -246,7 +246,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
     (selectedUserIds as Set<string>).has(currentUser?.id ?? '')
 
   const pageTitle = defaultDepartment
-    ? `${defaultDepartment} Tasks`
+    ? `${DEPARTMENT_DISPLAY_NAMES[defaultDepartment] ?? defaultDepartment} Tasks`
     : isMeOnly
     ? 'My Tasks'
     : 'Task Board'

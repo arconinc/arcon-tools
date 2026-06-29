@@ -38,11 +38,15 @@ type TypeFilter = '' | 'Customer' | 'Vendor' | 'Prospect' | 'Partner' | 'Other'
 const TYPE_OPTIONS: FilterPillOption<TypeFilter>[] = [
   { value: '', label: 'All Types' },
   { value: 'Customer', label: 'Customer', color: 'blue' },
-  { value: 'Vendor', label: 'Vendor', color: 'amber' },
+  { value: 'Vendor', label: 'Supplier', color: 'amber' },
   { value: 'Prospect', label: 'Prospect', color: 'amber' },
   { value: 'Partner', label: 'Partner', color: 'purple' },
   { value: 'Other', label: 'Other', color: 'slate' },
 ]
+
+const TYPE_LABELS: Record<string, string> = {
+  Vendor: 'Supplier',
+}
 
 export default function ContactsPage() {
   const router = useRouter()
@@ -103,7 +107,7 @@ export default function ContactsPage() {
       className: 'hidden md:table-cell',
       render: (c) => (
         <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold ${TYPE_BADGE[c.type_of_contact] ?? TYPE_BADGE.Other}`}>
-          {c.type_of_contact}
+          {TYPE_LABELS[c.type_of_contact] ?? c.type_of_contact}
         </span>
       ),
     },
@@ -160,7 +164,7 @@ export default function ContactsPage() {
           <p className="text-sm text-slate-500 mt-0.5">People across all organizations</p>
         </div>
         <button
-          onClick={() => router.push('/marketing/contacts/new')}
+          onClick={() => router.push('/sales/contacts/new')}
           className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl transition-colors"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -209,7 +213,7 @@ export default function ContactsPage() {
         loading={loading}
         emptyMessage={emptyMessage}
         getRowKey={(c) => c.id}
-        onRowClick={(c) => router.push(`/marketing/contacts/${c.id}`)}
+        onRowClick={(c) => router.push(`/sales/contacts/${c.id}`)}
         pagination={{
           page,
           total,

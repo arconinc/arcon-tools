@@ -77,7 +77,7 @@ export function CrmLinksTab({ store, onSaved }: { store: StoreDetail; onSaved: (
             <div className="w-8 h-8 rounded-full bg-purple-100 flex items-center justify-center text-purple-700 font-bold text-sm shrink-0">
               {linkedCustomer.name[0]}
             </div>
-            <Link href={`/marketing/customers/${linkedCustomer.id}`} className="flex-1 text-sm font-medium text-slate-800 hover:text-purple-700 transition-colors">
+            <Link href={`/sales/customers/${linkedCustomer.id}`} className="flex-1 text-sm font-medium text-slate-800 hover:text-purple-700 transition-colors">
               {linkedCustomer.name}
             </Link>
             <button onClick={() => setCustomer(null)} disabled={saving}
