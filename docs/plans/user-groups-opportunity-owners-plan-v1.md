@@ -57,7 +57,9 @@ Add group, group membership, group capability TypeScript types. Add capability c
 ---
 
 ### Task 3: Add Admin Groups API
-**Status:** [ ] Not Started
+**Status:** [x] Complete
+**Completed:** 2026-06-29
+**Review Issues:** none
 **Wave:** 2
 **Prerequisites:** Task 1, Task 2
 **Parallel with:** Task 4
