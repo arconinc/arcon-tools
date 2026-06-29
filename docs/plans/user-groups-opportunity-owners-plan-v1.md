@@ -179,7 +179,9 @@ Change new/edit opportunity owner dropdowns to fetch `/api/marketing/assignment-
 ---
 
 ### Task 9: Add Groups Link And User Admin Read Model
-**Status:** [ ] Not Started
+**Status:** [x] Complete
+**Completed:** 2026-06-29
+**Review Issues:** none
 **Wave:** 4
 **Prerequisites:** Task 7
 **Parallel with:** Task 10

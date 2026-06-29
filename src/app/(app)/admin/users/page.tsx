@@ -67,13 +67,15 @@ function formatLastLogin(val: string | null): string {
 
 const EMPTY_FORM = { display_name: '', email: '', birth_date: '', start_date: '', is_admin: false }
 type UserStatusFilter = 'active' | 'deactivated'
+type UserGroupSummary = { id: string; name: string; color: string; is_active: boolean }
+type AdminUser = AppUser & { groups?: UserGroupSummary[] }
 type ConfirmAction =
-  | { type: 'admin'; user: AppUser; nextIsAdmin: boolean }
-  | { type: 'deactivate'; user: AppUser; nextDeactivated: boolean }
-  | { type: 'impersonate'; user: AppUser }
+  | { type: 'admin'; user: AdminUser; nextIsAdmin: boolean }
+  | { type: 'deactivate'; user: AdminUser; nextDeactivated: boolean }
+  | { type: 'impersonate'; user: AdminUser }
 
-function sortUsersByLastName(a: AppUser, b: AppUser) {
-  const getSortName = (user: AppUser) => {
+function sortUsersByLastName(a: AdminUser, b: AdminUser) {
+  const getSortName = (user: AdminUser) => {
     const nameParts = user.display_name.trim().split(/\s+/).filter(Boolean)
     const lastName = nameParts.at(-1) ?? user.email
     return `${lastName} ${user.display_name} ${user.email}`.toLocaleLowerCase()
@@ -91,7 +93,7 @@ async function responseErrorMessage(res: Response, fallback: string) {
 }
 
 export default function AdminUsersPage() {
-  const [users, setUsers] = useState<AppUser[]>([])
+  const [users, setUsers] = useState<AdminUser[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [userFilter, setUserFilter] = useState<UserStatusFilter>('active')
@@ -160,7 +162,7 @@ export default function AdminUsersPage() {
     }
   }
 
-  async function handleImpersonate(user: AppUser) {
+  async function handleImpersonate(user: AdminUser) {
     setImpersonatingId(user.id)
     setRowErrors((current) => ({ ...current, [user.id]: '' }))
     try {
@@ -297,7 +299,7 @@ export default function AdminUsersPage() {
   const activeUsers = users.filter(u => !u.deactivated_at).sort(sortUsersByLastName)
   const deactivatedUsers = users.filter(u => u.deactivated_at).sort(sortUsersByLastName)
 
-  async function toggleAdmin(user: AppUser) {
+  async function toggleAdmin(user: AdminUser) {
     setTogglingId(user.id)
     setRowErrors((current) => ({ ...current, [user.id]: '' }))
     try {
@@ -317,7 +319,7 @@ export default function AdminUsersPage() {
     }
   }
 
-  async function toggleDeactivate(user: AppUser) {
+  async function toggleDeactivate(user: AdminUser) {
     setDeactivatingId(user.id)
     setRowErrors((current) => ({ ...current, [user.id]: '' }))
     try {
@@ -337,7 +339,7 @@ export default function AdminUsersPage() {
     }
   }
 
-  function startEdit(user: AppUser) {
+  function startEdit(user: AdminUser) {
     setEditingId(user.id)
     setEditForm({
       display_name: user.display_name,
@@ -403,7 +405,7 @@ export default function AdminUsersPage() {
     }
   }
 
-  function renderAvatar(user: AppUser) {
+  function renderAvatar(user: AdminUser) {
     const imageUrl = user.profile_image_url || user.avatar_url
 
     if (imageUrl) {
@@ -424,11 +426,11 @@ export default function AdminUsersPage() {
     )
   }
 
-  function departmentLabels(user: AppUser) {
+  function departmentLabels(user: AdminUser) {
     return user.department?.map((d) => DEPARTMENT_DISPLAY_NAMES[d as keyof typeof DEPARTMENT_DISPLAY_NAMES] ?? d) ?? []
   }
 
-  function roleBadges(user: AppUser) {
+  function roleBadges(user: AdminUser) {
     if ((user.roles ?? []).length === 0) return <span className="text-xs text-slate-400">—</span>
 
     return (user.roles ?? []).map((roleName: string) => {
@@ -445,7 +447,21 @@ export default function AdminUsersPage() {
     })
   }
 
-  function renderExpandedRow(user: AppUser) {
+  function groupBadges(user: AdminUser) {
+    if ((user.groups ?? []).length === 0) return <span className="text-xs text-slate-400">—</span>
+
+    return (user.groups ?? []).map((group) => (
+      <span
+        key={group.id}
+        className="rounded-full px-2 py-0.5 text-xs font-semibold leading-none"
+        style={{ background: group.color + '22', color: group.color }}
+      >
+        {group.name}
+      </span>
+    ))
+  }
+
+  function renderExpandedRow(user: AdminUser) {
     const isEditing = editingId === user.id
     const isManagingRoles = roleManagingId === user.id
 
@@ -593,7 +609,8 @@ export default function AdminUsersPage() {
     ? visibleUsers.filter((user) => {
         const labels = departmentLabels(user).join(' ')
         const roles = (user.roles ?? []).join(' ')
-        return `${user.display_name} ${user.email} ${labels} ${roles}`.toLocaleLowerCase().includes(searchTerm)
+        const groups = (user.groups ?? []).map((group) => group.name).join(' ')
+        return `${user.display_name} ${user.email} ${labels} ${roles} ${groups}`.toLocaleLowerCase().includes(searchTerm)
       })
     : visibleUsers
   const filterOptions: FilterPillOption<UserStatusFilter>[] = [
@@ -601,7 +618,7 @@ export default function AdminUsersPage() {
     { value: 'deactivated', label: 'Deactivated', color: 'slate', count: deactivatedUsers.length },
   ]
 
-  const columns: DataTableColumn<AppUser>[] = [
+  const columns: DataTableColumn<AdminUser>[] = [
     {
       key: 'name',
       header: 'Name',
@@ -637,6 +654,12 @@ export default function AdminUsersPage() {
       header: 'Email',
       sortValue: (user) => user.email,
       render: (user) => <span className="text-xs text-slate-600">{user.email}</span>,
+    },
+    {
+      key: 'groups',
+      header: 'Groups',
+      sortValue: (user) => (user.groups ?? []).map((group) => group.name).join(', '),
+      render: (user) => <div className="flex flex-wrap gap-1">{groupBadges(user)}</div>,
     },
     {
       key: 'departments',
@@ -787,9 +810,9 @@ export default function AdminUsersPage() {
       </div>
 
       <div className="mb-5 rounded-lg border border-purple-100 bg-purple-50/50 px-4 py-3 text-xs leading-relaxed text-purple-950/75">
-        <strong className="font-semibold text-purple-950">Departments</strong> route task boards and notifications via Edit.
+        <strong className="font-semibold text-purple-950">Groups</strong> are the new source of truth for people collections.
         <span className="mx-2 text-purple-300" aria-hidden="true">•</span>
-        <strong className="font-semibold text-purple-950">Roles</strong> grant restricted access via Roles; admins bypass role checks.
+        Keep <strong className="font-semibold text-purple-950">Departments</strong> and <strong className="font-semibold text-purple-950">Roles</strong> updated during migration; admins bypass role checks.
       </div>
 
       {syncResult && (

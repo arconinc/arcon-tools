@@ -20,7 +20,7 @@ export async function GET(request: Request) {
   const adminClient = createAdminClient()
   let query = adminClient
     .from('users')
-    .select('id, email, display_name, is_admin, avatar_url, profile_image_url, created_at, last_login_at, birth_date, start_date, google_id, department, deactivated_at, user_roles!user_id(roles(name))')
+    .select('id, email, display_name, is_admin, avatar_url, profile_image_url, created_at, last_login_at, birth_date, start_date, google_id, department, deactivated_at, user_roles!user_id(roles(name)), group_memberships!user_id(groups(id, name, color, is_active))')
     .order('created_at', { ascending: false })
 
   if (!includeDeactivated) {
@@ -39,7 +39,12 @@ export async function GET(request: Request) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ? u.user_roles.map((r: any) => r.roles?.name).filter(Boolean)
       : [],
+    groups: Array.isArray(u.group_memberships)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? u.group_memberships.map((m: any) => m.groups).filter((group: any) => group?.is_active)
+      : [],
     user_roles: undefined,
+    group_memberships: undefined,
   })))
   return NextResponse.json(normalized)
 }

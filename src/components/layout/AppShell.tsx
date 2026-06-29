@@ -199,6 +199,7 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
         { href: '/admin/specs/ideas', label: 'Spec Ideas', icon: SpecSampleIcon, adminMatch: true },
         { href: '/admin/stores', label: 'Stores', icon: StoreIcon, adminMatch: true },
         { href: '/admin/users', label: 'Manage Users', icon: UserAdminIcon, adminMatch: true },
+        { href: '/admin/groups', label: 'Groups', icon: UsersIcon, adminMatch: true },
         { href: '/admin/access-requests', label: 'Access Requests', icon: LockIcon, adminMatch: true },
         { href: '/releases', label: 'Release Notes', icon: ReleaseIcon, adminMatch: true },
         { href: '/admin/audit-log', label: 'Audit Log', icon: LogIcon, adminMatch: true },
