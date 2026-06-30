@@ -36,7 +36,7 @@ export async function GET(req: NextRequest) {
 
   const { data: perms } = await adminClient
     .from('document_permissions')
-    .select('document_id, role_id, user_id, roles(name, label)')
+    .select('document_id, group_id, user_id, groups!document_permissions_group_id_fkey(name)')
     .in('document_id', docIds)
 
   const summary: Record<string, { roles: string[]; userCount: number; ownerId: string | null }> = {}
@@ -47,9 +47,9 @@ export async function GET(req: NextRequest) {
 
   for (const p of perms ?? []) {
     if (!summary[p.document_id]) continue
-    if (p.role_id) {
+    if (p.group_id) {
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const label = (p as any).roles?.label ?? p.role_id
+      const label = (p as any).groups?.name ?? p.group_id
       summary[p.document_id].roles.push(label)
     }
     if (p.user_id) {

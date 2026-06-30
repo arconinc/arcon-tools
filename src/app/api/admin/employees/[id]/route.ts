@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { ASSIGNMENT_GROUP_BY_DEPARTMENT, DEPARTMENT_BY_ASSIGNMENT_GROUP } from '@/lib/auth/group-access'
 
 async function requireAdmin(googleId: string) {
   const adminClient = createAdminClient()
@@ -25,16 +26,23 @@ export async function GET(
     .select(`
       id, email, display_name, is_admin, google_id,
       birth_date, start_date, phone, address1, address2, city, state, zip,
-      job_title, department, office_location, employment_type, timezone,
+      job_title, office_location, employment_type, timezone,
       profile_image_url, avatar_url,
       linkedin_url, bio_json, bio_html, skills, interests,
-      manager_id
+      manager_id,
+      group_memberships!group_memberships_user_id_fkey(groups(id, key, is_active, source_type))
     `)
     .eq('id', id)
     .single()
 
   if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
-  return NextResponse.json(data)
+  return NextResponse.json({
+    ...data,
+    department: Array.isArray(data.group_memberships)
+      ? [...new Set(data.group_memberships.map((membership: any) => membership.groups).filter((group: any) => group?.is_active && group?.source_type === 'assignment_pool').map((group: any) => DEPARTMENT_BY_ASSIGNMENT_GROUP[group.key]).filter(Boolean))]
+      : null,
+    group_memberships: undefined,
+  })
 }
 
 export async function PATCH(
@@ -50,7 +58,7 @@ export async function PATCH(
   const body = await request.json()
 
   const allowed = [
-    'display_name', 'job_title', 'department', 'office_location', 'employment_type',
+    'display_name', 'job_title', 'office_location', 'employment_type',
     'manager_id', 'birth_date', 'start_date', 'is_admin',
     'phone', 'linkedin_url', 'timezone',
     'bio_json', 'bio_html', 'skills', 'interests',
@@ -62,18 +70,40 @@ export async function PATCH(
     if (key in body) updates[key] = body[key]
   }
 
-  if (Object.keys(updates).length === 0) {
+  if (Object.keys(updates).length === 0 && !('department' in body)) {
     return NextResponse.json({ error: 'No valid fields provided' }, { status: 400 })
   }
 
   const adminClient = createAdminClient()
-  const { data, error } = await adminClient
-    .from('users')
-    .update(updates)
-    .eq('id', id)
-    .select()
-    .single()
+  let data = null
+  if (Object.keys(updates).length > 0) {
+    const updateResult = await adminClient
+      .from('users')
+      .update(updates)
+      .eq('id', id)
+      .select()
+      .single()
+    if (updateResult.error) return NextResponse.json({ error: updateResult.error.message }, { status: 500 })
+    data = updateResult.data
+  }
 
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json(data)
+  if ('department' in body) {
+    const nextGroupKeys = Array.isArray(body.department)
+      ? [...new Set(body.department.map((name: string) => ASSIGNMENT_GROUP_BY_DEPARTMENT[name]).filter((key: string | undefined): key is string => !!key))]
+      : []
+    const { data: assignmentGroups } = await adminClient
+      .from('groups')
+      .select('id, key, group_capabilities!inner(capability)')
+      .eq('is_active', true)
+      .eq('group_capabilities.capability', 'assignment_pool')
+    const assignmentGroupIds = (assignmentGroups ?? []).map((group) => group.id)
+    if (assignmentGroupIds.length > 0) {
+      await adminClient.from('group_memberships').delete().eq('user_id', id).in('group_id', assignmentGroupIds)
+    }
+    const groupIdsToInsert = (assignmentGroups ?? []).filter((group) => nextGroupKeys.includes(group.key)).map((group) => group.id)
+    if (groupIdsToInsert.length > 0) {
+      await adminClient.from('group_memberships').insert(groupIdsToInsert.map((groupId) => ({ group_id: groupId, user_id: id, source: 'manual' })))
+    }
+  }
+  return NextResponse.json(data ?? { ok: true })
 }

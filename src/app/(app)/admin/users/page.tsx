@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { AppUser } from '@/types'
+import type { AppUser, GroupSourceType } from '@/types'
 import { DEPARTMENTS, DEPARTMENT_DISPLAY_NAMES } from '@/lib/task-constants'
 import { DataTable, FilterPillGroup, Modal, type DataTableColumn, type FilterPillOption } from '@/components/ui'
 
@@ -67,7 +67,7 @@ function formatLastLogin(val: string | null): string {
 
 const EMPTY_FORM = { display_name: '', email: '', birth_date: '', start_date: '', is_admin: false }
 type UserStatusFilter = 'active' | 'deactivated'
-type UserGroupSummary = { id: string; name: string; color: string; is_active: boolean }
+type UserGroupSummary = { id: string; name: string; color: string; is_active: boolean; source_type: GroupSourceType }
 type AdminUser = AppUser & { groups?: UserGroupSummary[] }
 type ConfirmAction =
   | { type: 'admin'; user: AdminUser; nextIsAdmin: boolean }
@@ -81,6 +81,17 @@ function sortUsersByLastName(a: AdminUser, b: AdminUser) {
     return `${lastName} ${user.display_name} ${user.email}`.toLocaleLowerCase()
   }
   return getSortName(a).localeCompare(getSortName(b))
+}
+
+const GROUP_SOURCE_LABELS: Record<GroupSourceType, string> = {
+  manual: 'Group',
+  department: 'Assignment',
+  role: 'Access',
+  assignment_pool: 'Assignment',
+}
+
+function groupDisplayName(group: UserGroupSummary) {
+  return `${GROUP_SOURCE_LABELS[group.source_type]}: ${group.name}`
 }
 
 async function responseErrorMessage(res: Response, fallback: string) {
@@ -118,6 +129,19 @@ export default function AdminUsersPage() {
   const [roleManagingId, setRoleManagingId] = useState<string | null>(null)
   const [pendingRoleIds, setPendingRoleIds] = useState<string[]>([])
   const [savingRoles, setSavingRoles] = useState(false)
+  const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null)
+  const actionMenuRef = useRef<HTMLDivElement>(null)
+
+  useEffect(() => {
+    if (!openActionMenuId) return
+    function handleClick(e: MouseEvent) {
+      if (actionMenuRef.current && !actionMenuRef.current.contains(e.target as Node)) {
+        setOpenActionMenuId(null)
+      }
+    }
+    document.addEventListener('mousedown', handleClick)
+    return () => document.removeEventListener('mousedown', handleClick)
+  }, [openActionMenuId])
 
   useEffect(() => {
     fetch('/api/admin/roles')
@@ -427,7 +451,7 @@ export default function AdminUsersPage() {
   }
 
   function departmentLabels(user: AdminUser) {
-    return user.department?.map((d) => DEPARTMENT_DISPLAY_NAMES[d as keyof typeof DEPARTMENT_DISPLAY_NAMES] ?? d) ?? []
+    return [...new Set(user.department?.map((d) => DEPARTMENT_DISPLAY_NAMES[d as keyof typeof DEPARTMENT_DISPLAY_NAMES] ?? d) ?? [])]
   }
 
   function roleBadges(user: AdminUser) {
@@ -456,7 +480,7 @@ export default function AdminUsersPage() {
         className="rounded-full px-2 py-0.5 text-xs font-semibold leading-none"
         style={{ background: group.color + '22', color: group.color }}
       >
-        {group.name}
+        {groupDisplayName(group)}
       </span>
     ))
   }
@@ -609,7 +633,7 @@ export default function AdminUsersPage() {
     ? visibleUsers.filter((user) => {
         const labels = departmentLabels(user).join(' ')
         const roles = (user.roles ?? []).join(' ')
-        const groups = (user.groups ?? []).map((group) => group.name).join(' ')
+        const groups = (user.groups ?? []).map(groupDisplayName).join(' ')
         return `${user.display_name} ${user.email} ${labels} ${roles} ${groups}`.toLocaleLowerCase().includes(searchTerm)
       })
     : visibleUsers
@@ -658,7 +682,7 @@ export default function AdminUsersPage() {
     {
       key: 'groups',
       header: 'Groups',
-      sortValue: (user) => (user.groups ?? []).map((group) => group.name).join(', '),
+      sortValue: (user) => (user.groups ?? []).map(groupDisplayName).join(', '),
       render: (user) => <div className="flex flex-wrap gap-1">{groupBadges(user)}</div>,
     },
     {
@@ -707,65 +731,88 @@ export default function AdminUsersPage() {
     {
       key: 'actions',
       header: 'Actions',
-      className: 'w-[260px]',
+      className: 'w-[80px]',
       headerClassName: 'text-right',
       render: (user) => {
         const rowError = rowErrors[user.id]
+        const isOpen = openActionMenuId === user.id
         return (
-          <div>
-            <div className="flex flex-wrap justify-end gap-1.5">
-              {user.deactivated_at ? (
-                <button
-                  type="button"
-                  onClick={() => setConfirmAction({ type: 'deactivate', user, nextDeactivated: false })}
-                  disabled={deactivatingId === user.id}
-                  className="rounded-lg border border-green-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-green-700 transition-colors hover:bg-green-50 focus:outline-none focus:ring-2 focus:ring-green-200 disabled:opacity-50"
-                >
-                  {deactivatingId === user.id ? 'Reactivating…' : 'Reactivate'}
-                </button>
-              ) : (
-                <>
-                  <button
-                    type="button"
-                    onClick={() => startEdit(user)}
-                    className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-purple-300"
-                  >
-                    Edit
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => openRoleManager(user.id)}
-                    className="rounded-lg border border-purple-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-purple-700 transition-colors hover:bg-purple-50 focus:outline-none focus:ring-2 focus:ring-purple-300"
-                  >
-                    Roles
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => setConfirmAction({ type: 'admin', user, nextIsAdmin: !user.is_admin })}
-                    disabled={togglingId === user.id}
-                    className="rounded-lg border border-purple-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-purple-700 transition-colors hover:bg-purple-50 focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:opacity-50"
-                  >
-                    {togglingId === user.id ? 'Updating…' : user.is_admin ? 'Remove Admin' : 'Make Admin'}
-                  </button>
-                  {!user.is_admin && (
+          <div className="flex flex-col items-end">
+            <div className="relative" ref={isOpen ? actionMenuRef : undefined}>
+              <button
+                type="button"
+                onClick={() => setOpenActionMenuId(isOpen ? null : user.id)}
+                className="flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-purple-300"
+              >
+                Actions
+                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" className={`transition-transform ${isOpen ? 'rotate-180' : ''}`}><path d="m6 9 6 6 6-6"/></svg>
+              </button>
+              {isOpen && (
+                <div className="absolute right-0 z-50 mt-1 w-48 rounded-xl border border-slate-200 bg-white py-1 shadow-lg">
+                  {user.deactivated_at ? (
                     <button
                       type="button"
-                      onClick={() => setConfirmAction({ type: 'impersonate', user })}
-                      disabled={impersonatingId === user.id}
-                      className="rounded-lg border border-amber-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-amber-700 transition-colors hover:bg-amber-50 focus:outline-none focus:ring-2 focus:ring-amber-200 disabled:opacity-50"
+                      onClick={() => { setOpenActionMenuId(null); setConfirmAction({ type: 'deactivate', user, nextDeactivated: false }) }}
+                      disabled={deactivatingId === user.id}
+                      className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium text-green-700 hover:bg-green-50 disabled:opacity-50"
                     >
-                      {impersonatingId === user.id ? 'Starting…' : 'Impersonate'}
+                      <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M9 12l2 2 4-4"/><circle cx="12" cy="12" r="10"/></svg>
+                      {deactivatingId === user.id ? 'Reactivating…' : 'Reactivate'}
                     </button>
+                  ) : (
+                    <>
+                      <button
+                        type="button"
+                        onClick={() => { setOpenActionMenuId(null); startEdit(user) }}
+                        className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium text-slate-700 hover:bg-slate-50"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4 9.5-9.5z"/></svg>
+                        Edit Profile
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setOpenActionMenuId(null); openRoleManager(user.id) }}
+                        className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium text-purple-700 hover:bg-purple-50"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+                        Manage Roles
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => { setOpenActionMenuId(null); setConfirmAction({ type: 'admin', user, nextIsAdmin: !user.is_admin }) }}
+                        disabled={togglingId === user.id}
+                        className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium text-purple-700 hover:bg-purple-50 disabled:opacity-50"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="8" r="4"/><path d="M20 21a8 8 0 1 0-16 0"/><path d="M16 11l2 2 4-4"/></svg>
+                        {togglingId === user.id ? 'Updating…' : user.is_admin ? 'Remove Admin' : 'Make Admin'}
+                      </button>
+                      {!user.is_admin && (
+                        <>
+                          <div className="my-1 border-t border-slate-100" />
+                          <button
+                            type="button"
+                            onClick={() => { setOpenActionMenuId(null); setConfirmAction({ type: 'impersonate', user }) }}
+                            disabled={impersonatingId === user.id}
+                            className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium text-amber-700 hover:bg-amber-50 disabled:opacity-50"
+                          >
+                            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/></svg>
+                            {impersonatingId === user.id ? 'Starting…' : 'Impersonate'}
+                          </button>
+                        </>
+                      )}
+                      <div className="my-1 border-t border-slate-100" />
+                      <button
+                        type="button"
+                        onClick={() => { setOpenActionMenuId(null); setConfirmAction({ type: 'deactivate', user, nextDeactivated: true }) }}
+                        disabled={deactivatingId === user.id}
+                        className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium text-red-600 hover:bg-red-50 disabled:opacity-50"
+                      >
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+                        {deactivatingId === user.id ? 'Deactivating…' : 'Deactivate'}
+                      </button>
+                    </>
                   )}
-                  <button
-                    type="button"
-                    onClick={() => setConfirmAction({ type: 'deactivate', user, nextDeactivated: true })}
-                    disabled={deactivatingId === user.id}
-                    className="rounded-lg border border-red-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-red-600 transition-colors hover:bg-red-50 focus:outline-none focus:ring-2 focus:ring-red-200 disabled:opacity-50"
-                  >
-                    {deactivatingId === user.id ? 'Deactivating…' : 'Deactivate'}
-                  </button>
-                </>
+                </div>
               )}
             </div>
             {rowError && (

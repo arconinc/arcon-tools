@@ -4,7 +4,7 @@ import { RESTRICTED_RESOURCES } from './permissions'
 
 export interface DocumentAccessContext {
   ownerId: string | null
-  roleGrants: string[]   // role names that have been granted access
+  roleGrants: string[]   // access group keys that have been granted access
   userGrants: string[]   // user IDs explicitly granted
 }
 
@@ -26,7 +26,7 @@ export function canAccessDocument(
   // Individual user grant
   if (ctx.userGrants.includes(user.id)) return true
 
-  // Role grant — user must have at least one of the granted roles
+  // Access group grant — user must have at least one granted access group
   if (ctx.roleGrants.some(r => user.roles.includes(r))) return true
 
   return false

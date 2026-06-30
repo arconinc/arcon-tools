@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getUserAccessGroupKeys } from '@/lib/auth/group-access'
 
 // Maps URL slugs to doc_sections.name values
 const SECTION_SLUG_MAP: Record<string, string> = {
@@ -13,9 +14,47 @@ const SECTION_SLUG_MAP: Record<string, string> = {
 }
 
 export interface SectionManagerContext {
-  user: { id: string; is_admin: boolean; department: string[] | null }
+  user: { id: string; is_admin: boolean; department?: string[] | null }
   section: { id: string; name: string; department: string | null }
   canManage: boolean
+  canCreate: boolean
+}
+
+const SECTION_CREATE_ACCESS_ROLES: Record<string, string[]> = {
+  Accounting: ['access:accounting_access'],
+  HR: ['access:hr_access'],
+}
+
+function sectionAccessKey(section: { name: string; department: string | null }) {
+  return section.department ?? section.name
+}
+
+async function canCreateInSection(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  adminClient: any,
+  appUser: { id: string; is_admin: boolean },
+  section: { name: string; department: string | null }
+) {
+  if (appUser.is_admin) return true
+
+  const requiredRoles = SECTION_CREATE_ACCESS_ROLES[sectionAccessKey(section)]
+  if (!requiredRoles) return true
+
+  const roles = new Set<string>(await getUserAccessGroupKeys(adminClient, appUser.id))
+  return requiredRoles.some((role) => roles.has(role))
+}
+
+async function canManageSection(
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  adminClient: any,
+  appUser: { id: string; is_admin: boolean },
+  section: { name: string; department: string | null }
+) {
+  if (appUser.is_admin) return true
+  const requiredRoles = SECTION_CREATE_ACCESS_ROLES[sectionAccessKey(section)]
+  if (!requiredRoles) return false
+  const roles = new Set<string>(await getUserAccessGroupKeys(adminClient, appUser.id))
+  return requiredRoles.some((role) => roles.has(role))
 }
 
 export async function getSectionContext(sectionId: string): Promise<SectionManagerContext | null> {
@@ -25,7 +64,7 @@ export async function getSectionContext(sectionId: string): Promise<SectionManag
 
   const adminClient = createAdminClient()
   const [userResult, sectionResult] = await Promise.all([
-    adminClient.from('users').select('id, is_admin, department').eq('google_id', authUser.id).single(),
+    adminClient.from('users').select('id, is_admin').eq('google_id', authUser.id).single(),
     adminClient.from('doc_sections').select('id, name, department').eq('id', sectionId).single(),
   ])
 
@@ -33,11 +72,10 @@ export async function getSectionContext(sectionId: string): Promise<SectionManag
 
   const appUser = userResult.data
   const section = sectionResult.data
-  const canManage =
-    appUser.is_admin ||
-    (section.department != null && (appUser.department ?? []).includes(section.department))
+  const canManage = await canManageSection(adminClient, appUser, section)
+  const canCreate = canManage || await canCreateInSection(adminClient, appUser, section)
 
-  return { user: appUser, section, canManage }
+  return { user: appUser, section, canManage, canCreate }
 }
 
 export async function getSectionContextBySlug(slug: string): Promise<SectionManagerContext | null> {
@@ -50,7 +88,7 @@ export async function getSectionContextBySlug(slug: string): Promise<SectionMana
 
   const adminClient = createAdminClient()
   const [userResult, sectionResult] = await Promise.all([
-    adminClient.from('users').select('id, is_admin, department').eq('google_id', authUser.id).single(),
+    adminClient.from('users').select('id, is_admin').eq('google_id', authUser.id).single(),
     adminClient.from('doc_sections').select('id, name, department').eq('name', sectionName).single(),
   ])
 
@@ -58,11 +96,10 @@ export async function getSectionContextBySlug(slug: string): Promise<SectionMana
 
   const appUser = userResult.data
   const section = sectionResult.data
-  const canManage =
-    appUser.is_admin ||
-    (section.department != null && (appUser.department ?? []).includes(section.department))
+  const canManage = await canManageSection(adminClient, appUser, section)
+  const canCreate = canManage || await canCreateInSection(adminClient, appUser, section)
 
-  return { user: appUser, section, canManage }
+  return { user: appUser, section, canManage, canCreate }
 }
 
 // Gets section context by resolving an item's section (item → folder → section)
@@ -89,18 +126,17 @@ export async function getSectionContextForItem(itemId: string): Promise<SectionM
 
   const userResult = await adminClient
     .from('users')
-    .select('id, is_admin, department')
+    .select('id, is_admin')
     .eq('google_id', authUser.id)
     .single()
 
   if (!userResult.data) return null
 
   const appUser = userResult.data
-  const canManage =
-    appUser.is_admin ||
-    (section.department != null && (appUser.department ?? []).includes(section.department))
+  const canManage = await canManageSection(adminClient, appUser, section)
+  const canCreate = canManage || await canCreateInSection(adminClient, appUser, section)
 
-  return { user: appUser, section, canManage }
+  return { user: appUser, section, canManage, canCreate }
 }
 
 // Gets section context by resolving a folder's section
@@ -111,7 +147,7 @@ export async function getSectionContextForFolder(folderId: string): Promise<Sect
 
   const adminClient = createAdminClient()
   const [userResult, folderResult] = await Promise.all([
-    adminClient.from('users').select('id, is_admin, department').eq('google_id', authUser.id).single(),
+    adminClient.from('users').select('id, is_admin').eq('google_id', authUser.id).single(),
     adminClient.from('doc_folders').select('id, section_id, doc_sections(id, name, department)').eq('id', folderId).single(),
   ])
 
@@ -122,9 +158,8 @@ export async function getSectionContextForFolder(folderId: string): Promise<Sect
   if (!section) return null
 
   const appUser = userResult.data
-  const canManage =
-    appUser.is_admin ||
-    (section.department != null && (appUser.department ?? []).includes(section.department))
+  const canManage = await canManageSection(adminClient, appUser, section)
+  const canCreate = canManage || await canCreateInSection(adminClient, appUser, section)
 
-  return { user: appUser, section, canManage }
+  return { user: appUser, section, canManage, canCreate }
 }

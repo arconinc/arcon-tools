@@ -2,6 +2,7 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { RESTRICTED_RESOURCES } from '@/lib/permissions'
 import { isLocalDevUrl } from '@/lib/auth/dev-login'
+import { getUserAccessGroupKeys } from '@/lib/auth/group-access'
 import * as Sentry from '@sentry/nextjs'
 
 // Pre-compute the set of restricted page prefixes for fast lookup in middleware
@@ -115,16 +116,8 @@ export async function proxy(request: NextRequest) {
     }
 
     if (!isAdmin && effectiveUserId) {
-      const [{ data: directRoles }, { data: deptRoles }] = await Promise.all([
-        adminClient.from('user_roles').select('roles(name)').eq('user_id', effectiveUserId),
-        adminClient.from('user_departments').select('department_roles(roles(name))').eq('user_id', effectiveUserId),
-      ])
-      const roleNames = new Set<string>()
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      for (const r of (directRoles ?? []) as any[]) if (r.roles?.name) roleNames.add(r.roles.name)
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      for (const ud of (deptRoles ?? []) as any[]) for (const dr of ud.department_roles ?? []) if (dr.roles?.name) roleNames.add(dr.roles.name)
-      if (!roleNames.has(restricted.role)) {
+      const accessGroupKeys = await getUserAccessGroupKeys(adminClient, effectiveUserId)
+      if (!(accessGroupKeys as string[]).includes(restricted.role)) {
         const denied = new URL('/access-denied', request.url)
         denied.searchParams.set('resource', pathname)
         denied.searchParams.set('role', restricted.role)

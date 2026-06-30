@@ -20,7 +20,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
       .single(),
     adminClient
       .from('document_permissions')
-      .select('id, document_id, role_id, user_id, granted_by, granted_at, roles(id, name, label, color), users!document_permissions_user_id_fkey(id, display_name, email, avatar_url)')
+      .select('id, document_id, group_id, user_id, granted_by, granted_at, groups!document_permissions_group_id_fkey(id, key, name, color), users!document_permissions_user_id_fkey(id, display_name, email, avatar_url)')
       .eq('document_id', docId),
   ])
 
@@ -34,8 +34,8 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
   const permissions = (permsResult.data ?? []).map((p: any) => ({
     id: p.id,
     document_id: p.document_id,
-    role_id: p.role_id,
-    role: p.roles ?? null,
+    role_id: p.group_id,
+    role: p.groups ? { id: p.groups.id, name: p.groups.key, label: p.groups.name, color: p.groups.color } : null,
     user_id: p.user_id,
     granted_by: p.granted_by,
     granted_at: p.granted_at,
@@ -77,8 +77,8 @@ export async function PUT(req: NextRequest, { params }: { params: Promise<{ id: 
   if (deleteError) return NextResponse.json({ error: deleteError.message }, { status: 500 })
 
   const newGrants = [
-    ...(role_grants ?? []).map(r => ({ document_id: docId, role_id: r, user_id: null, granted_by: ctx.user.id })),
-    ...(user_grants ?? []).map(u => ({ document_id: docId, role_id: null, user_id: u, granted_by: ctx.user.id })),
+    ...(role_grants ?? []).map(r => ({ document_id: docId, group_id: r, user_id: null, granted_by: ctx.user.id })),
+    ...(user_grants ?? []).map(u => ({ document_id: docId, group_id: null, user_id: u, granted_by: ctx.user.id })),
   ]
 
   if (newGrants.length > 0) {

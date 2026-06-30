@@ -11,9 +11,17 @@ export async function GET() {
 
   const adminClient = createAdminClient()
   const { data } = await adminClient
-    .from('roles')
-    .select('id, name, label, description, color')
-    .order('label')
+    .from('groups')
+    .select('id, key, name, description, color, group_capabilities!inner(capability)')
+    .eq('is_active', true)
+    .eq('group_capabilities.capability', 'access_control')
+    .order('name')
 
-  return NextResponse.json(data ?? [])
+  return NextResponse.json((data ?? []).map((group) => ({
+    id: group.id,
+    name: group.key,
+    label: group.name,
+    description: group.description,
+    color: group.color,
+  })))
 }

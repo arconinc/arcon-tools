@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getDocAccessContext, filterAccessibleDocuments } from '@/lib/documents/access'
+import { normalizeAccessGroupKey } from '@/lib/auth/group-access'
 
 // GET /api/documents — returns section > folder > document tree filtered by user's access.
 // Section/folder access is still gated by required_role (existing behavior).
@@ -18,7 +19,8 @@ export async function GET() {
   function canAccessSection(required_role: string | null): boolean {
     if (isAdmin) return true
     if (!required_role) return true
-    return roles.includes(required_role)
+    const requiredGroup = normalizeAccessGroupKey(required_role)
+    return !requiredGroup || roles.includes(requiredGroup)
   }
 
   const [{ data: sections }, { data: folders }, { data: docs }] = await Promise.all([

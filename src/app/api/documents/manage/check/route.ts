@@ -8,10 +8,11 @@ export async function GET(req: NextRequest) {
   if (!slug) return NextResponse.json({ error: 'slug is required' }, { status: 400 })
 
   const ctx = await getSectionContextBySlug(slug)
-  if (!ctx) return NextResponse.json({ canManage: false, sectionId: null, isAdmin: false })
+  if (!ctx) return NextResponse.json({ canManage: false, canCreate: false, sectionId: null, isAdmin: false })
 
   return NextResponse.json({
     canManage: ctx.canManage,
+    canCreate: ctx.canCreate,
     sectionId: ctx.section.id,
     isAdmin: ctx.user.is_admin,
   })

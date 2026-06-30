@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { dispatchNotification } from '@/lib/notifications/dispatch'
 import { ptoReviewed } from '@/lib/notifications/registry'
+import { userHasAccessGroup } from '@/lib/auth/group-access'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -22,12 +23,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
   if (!dbUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   if (!dbUser.is_admin) {
-    const { data: userRoles } = await adminClient
-      .from('user_roles')
-      .select('roles(name)')
-      .eq('user_id', dbUser.id)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const isHr = (userRoles ?? []).some((r: any) => r.roles?.name === 'hr')
+    const isHr = await userHasAccessGroup(adminClient, dbUser.id, ['access:hr_access'])
     if (!isHr) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

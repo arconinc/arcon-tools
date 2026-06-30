@@ -40,7 +40,7 @@ export interface AppUser {
 
 // ─── Groups ──────────────────────────────────────────────────────────────────
 
-export type GroupCapabilityKey = 'access_control' | 'assignment_pool' | 'directory_group' | 'notification_recipient' | 'task_routing'
+export type GroupCapabilityKey = 'access_control' | 'assignment_pool'
 
 export type GroupSourceType = 'manual' | 'department' | 'role' | 'assignment_pool'
 
@@ -554,7 +554,7 @@ export interface Department {
 export interface DocumentPermission {
   id: string
   document_id: string
-  role_id: string | null
+  group_id: string | null
   user_id: string | null
   granted_by: string | null
   granted_at: string

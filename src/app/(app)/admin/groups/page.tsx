@@ -226,7 +226,7 @@ export default function AdminGroupsPage() {
     if (group.capabilities.length === 0) return <span className="text-xs text-slate-400">—</span>
     return group.capabilities.map((capability) => (
       <span key={capability.id} className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold leading-none text-purple-700">
-        {GROUP_CAPABILITY_LABELS[capability.capability]}
+        {GROUP_CAPABILITY_LABELS[capability.capability] ?? capability.capability}
       </span>
     ))
   }
@@ -249,7 +249,7 @@ export default function AdminGroupsPage() {
   const searchTerm = search.trim().toLocaleLowerCase()
   const filteredGroups = searchTerm
     ? visibleGroups.filter((group) => {
-        const capabilities = group.capabilities.map((capability) => GROUP_CAPABILITY_LABELS[capability.capability]).join(' ')
+        const capabilities = group.capabilities.map((capability) => GROUP_CAPABILITY_LABELS[capability.capability] ?? capability.capability).join(' ')
         return `${group.name} ${group.key} ${group.description ?? ''} ${capabilities}`.toLocaleLowerCase().includes(searchTerm)
       })
     : visibleGroups
@@ -340,7 +340,7 @@ export default function AdminGroupsPage() {
         <div>
           <h1 className="text-2xl font-bold text-slate-900">Groups</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Manage people groups, capabilities, and assignment-pool membership.
+            Manage access controls and assignment-pool membership.
           </p>
         </div>
         <button
@@ -353,9 +353,9 @@ export default function AdminGroupsPage() {
       </div>
 
       <div className="mb-5 rounded-lg border border-purple-100 bg-purple-50/50 px-4 py-3 text-xs leading-relaxed text-purple-950/75">
-        <strong className="font-semibold text-purple-950">Capabilities</strong> define how groups are used: Access, Assignment Pool, Directory, Notification, and Task Routing.
+        <strong className="font-semibold text-purple-950">Capabilities</strong> define how groups are used: Access Control or Assignment Pool.
         <span className="mx-2 text-purple-300" aria-hidden="true">•</span>
-        <strong className="font-semibold text-purple-950">Members</strong> control assignment pools such as Opportunity Owners.
+        <strong className="font-semibold text-purple-950">Members</strong> control who has access or can receive assigned work.
       </div>
 
       {error && (
@@ -421,7 +421,7 @@ export default function AdminGroupsPage() {
                   key: editingGroup ? current.key : slugify(e.target.value),
                 }))}
                 className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-purple-400 focus:outline-none"
-                placeholder="Opportunity Owners"
+                placeholder="Sales"
               />
             </div>
             <div>
@@ -432,7 +432,7 @@ export default function AdminGroupsPage() {
                 disabled={!!editingGroup?.is_system}
                 onChange={(e) => setForm((current) => ({ ...current, key: slugify(e.target.value) }))}
                 className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-purple-400 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
-                placeholder="opportunity_owners"
+                placeholder="sales"
               />
             </div>
             <div>

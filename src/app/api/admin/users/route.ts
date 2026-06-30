@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { ASSIGNMENT_GROUP_BY_DEPARTMENT, DEPARTMENT_BY_ASSIGNMENT_GROUP } from '@/lib/auth/group-access'
 
 async function requireAdmin(googleId: string) {
   const adminClient = createAdminClient()
@@ -20,7 +21,7 @@ export async function GET(request: Request) {
   const adminClient = createAdminClient()
   let query = adminClient
     .from('users')
-    .select('id, email, display_name, is_admin, avatar_url, profile_image_url, created_at, last_login_at, birth_date, start_date, google_id, department, deactivated_at, user_roles!user_id(roles(name)), group_memberships!group_memberships_user_id_fkey(groups(id, name, color, is_active))')
+    .select('id, email, display_name, is_admin, avatar_url, profile_image_url, created_at, last_login_at, birth_date, start_date, google_id, deactivated_at, group_memberships!group_memberships_user_id_fkey(groups(id, key, name, color, is_active, source_type))')
     .order('created_at', { ascending: false })
 
   if (!includeDeactivated) {
@@ -32,18 +33,18 @@ export async function GET(request: Request) {
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
   const normalized = (data ?? []).map((u) => (({
     ...u,
-    department: Array.isArray(u.department)
-      ? u.department
-      : u.department ? [u.department as string] : null,
-    roles: Array.isArray(u.user_roles)
+    department: Array.isArray(u.group_memberships)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      ? u.user_roles.map((r: any) => r.roles?.name).filter(Boolean)
+      ? [...new Set(u.group_memberships.map((m: any) => m.groups).filter((group: any) => group?.is_active && group?.source_type === 'assignment_pool').map((group: any) => DEPARTMENT_BY_ASSIGNMENT_GROUP[group.key]).filter(Boolean))]
+      : null,
+    roles: Array.isArray(u.group_memberships)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ? u.group_memberships.map((m: any) => m.groups).filter((group: any) => group?.is_active && group?.source_type === 'role').map((group: any) => group.key).filter(Boolean)
       : [],
     groups: Array.isArray(u.group_memberships)
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       ? u.group_memberships.map((m: any) => m.groups).filter((group: any) => group?.is_active)
       : [],
-    user_roles: undefined,
     group_memberships: undefined,
   })))
   return NextResponse.json(normalized)
@@ -88,7 +89,6 @@ export async function PATCH(request: Request) {
   if (display_name !== undefined) updates.display_name = display_name
   if (birth_date !== undefined) updates.birth_date = birth_date
   if (start_date !== undefined) updates.start_date = start_date
-  if (department !== undefined) updates.department = Array.isArray(department) && department.length > 0 ? department : null
   if (deactivate === true) updates.deactivated_at = new Date().toISOString()
   if (deactivate === false) updates.deactivated_at = null
 
@@ -101,5 +101,32 @@ export async function PATCH(request: Request) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  if (department !== undefined) {
+    const nextGroupKeys = Array.isArray(department)
+      ? [...new Set(department.map((name: string) => ASSIGNMENT_GROUP_BY_DEPARTMENT[name]).filter((key): key is string => !!key))]
+      : []
+    const { data: assignmentGroups } = await adminClient
+      .from('groups')
+      .select('id, key, group_capabilities!inner(capability)')
+      .eq('is_active', true)
+      .eq('group_capabilities.capability', 'assignment_pool')
+
+    const assignmentGroupIds = (assignmentGroups ?? []).map((group) => group.id)
+    if (assignmentGroupIds.length > 0) {
+      await adminClient.from('group_memberships').delete().eq('user_id', userId).in('group_id', assignmentGroupIds)
+    }
+
+    const groupIdsToInsert = (assignmentGroups ?? [])
+      .filter((group) => nextGroupKeys.includes(group.key))
+      .map((group) => group.id)
+
+    if (groupIdsToInsert.length > 0) {
+      await adminClient.from('group_memberships').insert(
+        groupIdsToInsert.map((groupId) => ({ group_id: groupId, user_id: userId, source: 'manual' }))
+      )
+    }
+  }
+
   return NextResponse.json(data)
 }

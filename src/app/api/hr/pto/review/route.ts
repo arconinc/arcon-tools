@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { userHasAccessGroup } from '@/lib/auth/group-access'
 
 // GET /api/hr/pto/review — HR: list all PTO requests (hr role required)
 export async function GET() {
@@ -17,12 +18,7 @@ export async function GET() {
   if (!dbUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   if (!dbUser.is_admin) {
-    const { data: userRoles } = await adminClient
-      .from('user_roles')
-      .select('roles(name)')
-      .eq('user_id', dbUser.id)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const isHr = (userRoles ?? []).some((r: any) => r.roles?.name === 'hr')
+    const isHr = await userHasAccessGroup(adminClient, dbUser.id, ['access:hr_access'])
     if (!isHr) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
   }
 

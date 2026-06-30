@@ -11,7 +11,7 @@ export async function POST(request: Request) {
 
   const ctx = await getSectionContext(section_id)
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!ctx.canManage) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!ctx.canCreate) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const adminClient = createAdminClient()
   const { data, error } = await adminClient

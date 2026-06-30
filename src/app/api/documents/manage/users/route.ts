@@ -12,7 +12,7 @@ export async function GET() {
   const adminClient = createAdminClient()
   const { data, error } = await adminClient
     .from('users')
-    .select('id, display_name, email, avatar_url, department')
+    .select('id, display_name, email, avatar_url')
     .is('deactivated_at', null)
     .order('display_name')
 

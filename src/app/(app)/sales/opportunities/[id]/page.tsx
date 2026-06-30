@@ -106,7 +106,7 @@ export default function OpportunityDetailPage() {
   const [crmUsers, setCrmUsers] = useState<DropdownUser[]>([])
 
   useEffect(() => {
-    fetch('/api/marketing/assignment-pools/opportunity_owners/users').then((r) => r.json()).then((users) => {
+    fetch('/api/marketing/assignment-pools/sales/users').then((r) => r.json()).then((users) => {
       if (Array.isArray(users)) setCrmUsers(users)
     })
   }, [])

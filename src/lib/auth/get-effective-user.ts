@@ -1,6 +1,7 @@
 import { cookies } from 'next/headers'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { getUserAccessGroupKeys } from '@/lib/auth/group-access'
 
 export interface EffectiveUser {
   id: string
@@ -73,28 +74,5 @@ async function getUserRoleNames(
   adminClient: any,
   userId: string
 ): Promise<string[]> {
-  // Direct role grants
-  const { data: directRoles } = await adminClient
-    .from('user_roles')
-    .select('roles(name)')
-    .eq('user_id', userId)
-
-  // Roles inferred via department membership (department_roles junction)
-  const { data: deptRoles } = await adminClient
-    .from('user_departments')
-    .select('department_roles(roles(name))')
-    .eq('user_id', userId)
-
-  const names = new Set<string>()
-
-  for (const r of directRoles ?? []) {
-    if (r.roles?.name) names.add(r.roles.name)
-  }
-  for (const ud of deptRoles ?? []) {
-    for (const dr of ud.department_roles ?? []) {
-      if (dr.roles?.name) names.add(dr.roles.name)
-    }
-  }
-
-  return [...names]
+  return getUserAccessGroupKeys(adminClient, userId)
 }

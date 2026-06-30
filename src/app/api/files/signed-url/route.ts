@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { hasFileAccess, requiredRoleFor } from '@/lib/access'
 import { PRIVATE_BUCKETS } from '@/lib/permissions'
+import { getUserAccessGroupKeys } from '@/lib/auth/group-access'
 
 // GET /api/files/signed-url?bucket=financial-reports&path=2026-04.pdf
 // Issues a 1-hour signed URL for files in private Supabase Storage buckets.
@@ -55,15 +56,10 @@ export async function GET(req: NextRequest) {
     }
   }
 
-  // Check role-based access
-  let roles: string[] = []
+  // Check access-group-based access
+  let accessGroups: string[] = []
   if (!isAdmin) {
-    const { data: userRoles } = await adminClient
-      .from('user_roles')
-      .select('roles(name)')
-      .eq('user_id', effectiveUserId)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    roles = (userRoles ?? []).map((r: any) => r.roles?.name).filter(Boolean)
+    accessGroups = await getUserAccessGroupKeys(adminClient, effectiveUserId)
 
     // Also check individual file_permissions grants
     const { data: filePerm } = await adminClient
@@ -75,7 +71,7 @@ export async function GET(req: NextRequest) {
 
     const hasIndividualGrant = filePerm?.can_read === true
 
-    if (!hasIndividualGrant && !hasFileAccess(roles, false, bucket)) {
+    if (!hasIndividualGrant && !hasFileAccess(accessGroups, false, bucket)) {
       const role = requiredRoleFor(`file:bucket:${bucket}`)
       const requestUrl = `/access-requests/new?resource=file%3Abucket%3A${bucket}&role=${role ?? ''}`
       return NextResponse.json(

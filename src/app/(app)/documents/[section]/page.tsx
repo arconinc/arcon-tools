@@ -107,6 +107,7 @@ export default function SectionDocumentsPage() {
 
   // Management
   const [canManage, setCanManage] = useState(false)
+  const [canCreate, setCanCreate] = useState(false)
   const [sectionId, setSectionId] = useState<string | null>(null)
   const [permSummary, setPermSummary] = useState<Record<string, PermSummaryEntry>>({})
   const [reorderingId, setReorderingId] = useState<string | null>(null)
@@ -199,15 +200,16 @@ export default function SectionDocumentsPage() {
     if (!sectionName) return
     const [docsData, manageData] = await Promise.all([
       fetch('/api/documents').then(r => r.json()),
-      fetch(`/api/documents/manage/check?slug=${sectionSlug}`).then(r => r.json()).catch(() => ({ canManage: false })),
+      fetch(`/api/documents/manage/check?slug=${sectionSlug}`).then(r => r.json()).catch(() => ({ canManage: false, canCreate: false })),
     ])
     const secs: DocSectionWithTree[] = docsData.sections ?? []
     const targetSection = secs.find(s => s.name === sectionName)
     if (!targetSection) { setNotFound(true); setLoading(false); return }
 
     setSection(targetSection)
-    const manage = manageData as { canManage: boolean; sectionId: string | null }
+    const manage = manageData as { canManage: boolean; canCreate: boolean; sectionId: string | null }
     setCanManage(manage.canManage)
+    setCanCreate(manage.canCreate)
     setSectionId(manage.sectionId ?? targetSection.id)
 
     if (manage.canManage && manage.sectionId) {
@@ -675,7 +677,7 @@ export default function SectionDocumentsPage() {
 
   return (
     <>
-      {canManage && (
+      {canCreate && (
         <>
           <Script src="https://apis.google.com/js/api.js" onLoad={() => { window.gapi.load('picker', () => setGapiReady(true)) }} />
           <Script src="https://accounts.google.com/gsi/client" onLoad={() => setGisReady(true)} />
@@ -827,7 +829,7 @@ export default function SectionDocumentsPage() {
           <div className="sidebar" style={{ width: sidebarWidth, minWidth: sidebarWidth }}>
             <div className="sidebar-header">
               <span className="sidebar-label">Folders</span>
-              {canManage && (
+              {canCreate && (
                 <button
                   className="sidebar-add-btn"
                   title="New top-level folder"
@@ -874,7 +876,7 @@ export default function SectionDocumentsPage() {
             </div>
 
             {/* Inline add-folder form */}
-            {canManage && addFolderParentId !== undefined && (
+            {canCreate && addFolderParentId !== undefined && (
               <div className="add-folder-inline">
                 <span className="add-folder-label">
                   {addFolderParentId === null ? 'New top-level folder' : `New subfolder`}
@@ -911,7 +913,7 @@ export default function SectionDocumentsPage() {
                       {selectedFolder.documents.length} doc{selectedFolder.documents.length !== 1 ? 's' : ''}
                     </span>
                   </div>
-                  {canManage && (
+                  {canCreate && (
                     <button className="btn-sm btn-primary" onClick={openAddDoc}>+ Add Document</button>
                   )}
                 </>
@@ -965,7 +967,7 @@ export default function SectionDocumentsPage() {
                     },
                   ]}
                   loading={false}
-                  emptyMessage={canManage ? 'No documents in this folder. Click "+ Add Document" to add one.' : 'No documents in this folder.'}
+                  emptyMessage={canCreate ? 'No documents in this folder. Click "+ Add Document" to add one.' : 'No documents in this folder.'}
                   getRowKey={(doc) => doc.id}
                   minWidth="400px"
                 />
@@ -1188,10 +1190,6 @@ export default function SectionDocumentsPage() {
                   <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7h12m0 0l-4-4m4 4l-4 4m0 6H4m0 0l4 4m-4-4l4-4" /></svg>
                   Move to folder…
                 </button>
-                <button className="ctx-item" onClick={() => { setAddFolderParentId(folderCtxMenu.node.id); setNewFolderName(''); setExpandedIds(prev => new Set([...prev, folderCtxMenu.node.id])); setFolderCtxMenu(null) }}>
-                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
-                  New subfolder
-                </button>
                 <button className="ctx-item" onClick={() => { setEditingFolder(folderCtxMenu.node); setEditFolderName(folderCtxMenu.node.name); setFolderCtxMenu(null) }}>
                   <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                   Rename
@@ -1200,6 +1198,15 @@ export default function SectionDocumentsPage() {
                 <button className="ctx-item danger" onClick={() => { handleDeleteFolder(folderCtxMenu.node); setFolderCtxMenu(null) }}>
                   <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
                   Delete
+                </button>
+              </>
+            )}
+            {canCreate && (
+              <>
+                <div className="ctx-divider" />
+                <button className="ctx-item" onClick={() => { setAddFolderParentId(folderCtxMenu.node.id); setNewFolderName(''); setExpandedIds(prev => new Set([...prev, folderCtxMenu.node.id])); setFolderCtxMenu(null) }}>
+                  <svg width="14" height="14" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" /></svg>
+                  New subfolder
                 </button>
               </>
             )}
@@ -1288,4 +1295,3 @@ export default function SectionDocumentsPage() {
     </>
   )
 }
-

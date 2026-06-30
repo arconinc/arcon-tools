@@ -27,14 +27,20 @@ export async function GET(req: NextRequest) {
     .from('access_requests')
     .select(`
       id, status, resource_type, resource_key, message, review_note, created_at, reviewed_at,
-      roles(id, name, label, color),
+      groups!access_requests_group_id_fkey(id, key, name, color),
       requester:requester_id(id, display_name, email, avatar_url, profile_image_url),
       reviewer:reviewed_by(id, display_name)
     `)
     .eq('status', status)
     .order('created_at', { ascending: false })
 
-  return NextResponse.json(data ?? [])
+  return NextResponse.json((data ?? []).map((request) => ({
+    ...request,
+    roles: (() => {
+      const group = Array.isArray(request.groups) ? request.groups[0] : request.groups
+      return group ? { id: group.id, name: group.key, label: group.name, color: group.color } : null
+    })(),
+  })))
 }
 
 // PUT /api/admin/access-requests — approve or deny a request
@@ -60,7 +66,7 @@ export async function PUT(req: NextRequest) {
 
   const { data: request } = await adminClient
     .from('access_requests')
-    .select('id, requester_id, role_id, status, roles(id, name, label)')
+    .select('id, requester_id, group_id, status, groups!access_requests_group_id_fkey(id, key, name)')
     .eq('id', request_id)
     .single()
 
@@ -69,8 +75,8 @@ export async function PUT(req: NextRequest) {
     return NextResponse.json({ error: 'Request is no longer pending' }, { status: 409 })
   }
 
-  const role = (Array.isArray(request.roles) ? request.roles[0] : request.roles) as { id: string; name: string; label: string } | null
-  if (!role) return NextResponse.json({ error: 'Role not found' }, { status: 404 })
+  const group = (Array.isArray(request.groups) ? request.groups[0] : request.groups) as { id: string; key: string; name: string } | null
+  if (!group) return NextResponse.json({ error: 'Access group not found' }, { status: 404 })
 
   // Update request status
   await adminClient
@@ -84,16 +90,16 @@ export async function PUT(req: NextRequest) {
     .eq('id', request_id)
 
   if (action === 'approved') {
-    // Grant the role (ignore conflict if they already have it)
+    // Grant the access group (ignore conflict if they already have it)
     await adminClient
-      .from('user_roles')
-      .upsert({ user_id: request.requester_id, role_id: role.id, granted_by: dbUser.id }, { onConflict: 'user_id,role_id' })
+      .from('group_memberships')
+      .upsert({ user_id: request.requester_id, group_id: group.id, source: 'manual', assigned_by: dbUser.id }, { onConflict: 'group_id,user_id' })
 
     await dispatchNotification({
       definition: accessRequestApproved,
       payload: {
         request_id,
-        role_label: role.label,
+        role_label: group.name,
         reviewer_name: dbUser.display_name,
         review_note: review_note?.trim() || null,
       },
@@ -104,7 +110,7 @@ export async function PUT(req: NextRequest) {
       definition: accessRequestDenied,
       payload: {
         request_id,
-        role_label: role.label,
+        role_label: group.name,
         reviewer_name: dbUser.display_name,
         review_note: review_note?.trim() || null,
       },

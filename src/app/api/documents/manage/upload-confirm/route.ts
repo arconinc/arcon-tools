@@ -14,7 +14,7 @@ export async function POST(req: NextRequest) {
 
   const ctx = await getSectionContextForFolder(folder_id)
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!ctx.canManage) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!ctx.canCreate) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   // Verify the file actually exists in storage before creating the DB record
   const adminClient = createAdminClient()

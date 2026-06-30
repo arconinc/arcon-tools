@@ -8,22 +8,22 @@ export type ResourceKey =
   | `section:${string}`  // named section key used in <RoleGate>
   | `file:${string}`     // 'file:bucket:<name>' — private Supabase Storage bucket
 
-// Maps restricted resource → role name required to access it.
+// Maps restricted resource → access group key required to access it.
 // Resources NOT listed here are open to all authenticated users.
 export const RESTRICTED_RESOURCES: Partial<Record<string, string>> = {
   // Financial documents
-  'page:/accounting/financials': 'accounting',
-  'section:dashboard:financials': 'accounting',
-  'file:bucket:financial-reports': 'accounting',
+  'page:/accounting/financials': 'access:owner_access',
+  'section:dashboard:financials': 'access:owner_access',
+  'file:bucket:financial-reports': 'access:accounting_access',
 
   // HR sensitive documents (SSN, bank info, etc.)
-  'page:/hr/documents': 'hr',
-  'section:dashboard:hr-documents': 'hr',
-  'file:bucket:hr-documents': 'hr',
+  'page:/hr/documents': 'access:hr_access',
+  'section:dashboard:hr-documents': 'access:hr_access',
+  'file:bucket:hr-documents': 'access:hr_access',
 
   // HR-only pages
-  'page:/hr/tasks': 'hr',
-  'page:/hr/pto/requests': 'hr',
+  'page:/hr/tasks': 'access:hr_access',
+  'page:/hr/pto/requests': 'access:hr_access',
 }
 
 // Private Supabase Storage buckets — files are served via signed URL only.

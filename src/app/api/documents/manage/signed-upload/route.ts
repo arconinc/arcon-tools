@@ -27,7 +27,7 @@ export async function POST(req: NextRequest) {
   } else if (folder_id) {
     const ctx = await getSectionContextForFolder(folder_id)
     if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-    if (!ctx.canManage) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+    if (!ctx.canCreate) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
     folderId = folder_id
   } else {
     return NextResponse.json({ error: 'folder_id or item_id is required' }, { status: 400 })

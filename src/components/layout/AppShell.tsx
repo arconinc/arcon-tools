@@ -156,8 +156,8 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
       items: [
         { href: '/documents/hr', label: 'Documents', icon: DocumentIcon, adminMatch: true },
         { href: '/hr/pto', label: 'PTO Requests', icon: CalendarIcon, adminMatch: true },
-        { href: '/hr/pto/requests', label: 'Review PTO', icon: TaskCheckIcon, adminMatch: true, requiredRole: 'hr' },
-        { href: '/hr/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true, requiredRole: 'hr' },
+        { href: '/hr/pto/requests', label: 'Review PTO', icon: TaskCheckIcon, adminMatch: true, requiredRole: 'access:hr_access' },
+        { href: '/hr/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true, requiredRole: 'access:hr_access' },
       ],
     },
     {

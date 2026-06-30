@@ -20,7 +20,7 @@ export async function POST(req: NextRequest) {
 
   const ctx = await getSectionContextForFolder(folder_id)
   if (!ctx) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-  if (!ctx.canManage) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
+  if (!ctx.canCreate) return NextResponse.json({ error: 'Forbidden' }, { status: 403 })
 
   const sanitized = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
   const storagePath = `${folder_id}/${crypto.randomUUID()}-${sanitized}`

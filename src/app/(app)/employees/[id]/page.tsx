@@ -8,6 +8,16 @@ import type { CrmTaskDepartment } from '@/types'
 import EmployeeAvatar from '@/components/employees/EmployeeAvatar'
 import OfficeLocationBadge from '@/components/employees/OfficeLocationBadge'
 import { TiptapRenderer } from '@/components/news/TiptapRenderer'
+import { DEPARTMENT_BY_ASSIGNMENT_GROUP } from '@/lib/auth/group-access'
+
+function assignmentDepartments(user: { group_memberships?: unknown }) {
+  const memberships = Array.isArray(user.group_memberships) ? user.group_memberships : []
+  return [...new Set(memberships
+    .map((membership: any) => membership.groups)
+    .filter((group: any) => group?.is_active && group?.source_type === 'assignment_pool')
+    .map((group: any) => DEPARTMENT_BY_ASSIGNMENT_GROUP[group.key])
+    .filter(Boolean))]
+}
 
 function yearsOfService(startDate: string | null): string | null {
   if (!startDate) return null
@@ -63,11 +73,12 @@ export default async function EmployeeProfilePage({
   const { data: emp, error } = await adminClient
     .from('users')
     .select(`
-      id, email, display_name, job_title, department, office_location, employment_type,
+      id, email, display_name, job_title, office_location, employment_type,
       profile_image_url, avatar_url, start_date,
       phone, linkedin_url, timezone,
       bio_html, bio_json, skills, interests,
-      manager_id
+      manager_id,
+      group_memberships!group_memberships_user_id_fkey(groups(id, key, is_active, source_type))
     `)
     .eq('id', id)
     .single()
@@ -80,15 +91,21 @@ export default async function EmployeeProfilePage({
       ? adminClient.from('users').select('id, display_name, job_title, profile_image_url, avatar_url').eq('id', emp.manager_id).single()
       : Promise.resolve({ data: null }),
     adminClient.from('users')
-      .select('id, email, display_name, job_title, department, office_location, employment_type, profile_image_url, avatar_url, start_date')
+      .select('id, email, display_name, job_title, office_location, employment_type, profile_image_url, avatar_url, start_date, group_memberships!group_memberships_user_id_fkey(groups(id, key, is_active, source_type))')
       .eq('manager_id', id)
       .order('display_name'),
   ])
 
+  const { group_memberships: _groupMemberships, ...employeeData } = emp as typeof emp & { group_memberships?: unknown }
+  void _groupMemberships
   const profile: EmployeeProfile = {
-    ...emp,
+    ...employeeData,
+    department: assignmentDepartments(emp),
     manager: managerResult.data ?? null,
-    direct_reports: directReportsResult.data ?? [],
+    direct_reports: (directReportsResult.data ?? []).map((report) => ({
+      ...report,
+      department: assignmentDepartments(report),
+    })),
   }
   const isOwnProfile = viewerUser.id === profile.id
   const canEdit = viewerUser.is_admin || isOwnProfile

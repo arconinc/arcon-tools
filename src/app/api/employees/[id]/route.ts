@@ -1,6 +1,16 @@
 import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
+import { DEPARTMENT_BY_ASSIGNMENT_GROUP } from '@/lib/auth/group-access'
+
+function assignmentDepartments(user: { group_memberships?: unknown }) {
+  const memberships = Array.isArray(user.group_memberships) ? user.group_memberships : []
+  return [...new Set(memberships
+    .map((membership: any) => membership.groups)
+    .filter((group: any) => group?.is_active && group?.source_type === 'assignment_pool')
+    .map((group: any) => DEPARTMENT_BY_ASSIGNMENT_GROUP[group.key])
+    .filter(Boolean))]
+}
 
 export async function GET(
   _request: Request,
@@ -16,11 +26,12 @@ export async function GET(
   const { data, error } = await adminClient
     .from('users')
     .select(`
-      id, email, display_name, job_title, department, office_location, employment_type,
+      id, email, display_name, job_title, office_location, employment_type,
       profile_image_url, avatar_url, start_date,
       phone, linkedin_url, timezone,
       bio_html, bio_json, skills, interests,
-      manager_id
+      manager_id,
+      group_memberships!group_memberships_user_id_fkey(groups(id, key, is_active, source_type))
     `)
     .eq('id', id)
     .single()
@@ -33,14 +44,20 @@ export async function GET(
       ? adminClient.from('users').select('id, display_name, job_title, profile_image_url, avatar_url').eq('id', data.manager_id).single()
       : Promise.resolve({ data: null }),
     adminClient.from('users')
-      .select('id, email, display_name, job_title, department, office_location, employment_type, profile_image_url, avatar_url, start_date')
+      .select('id, email, display_name, job_title, office_location, employment_type, profile_image_url, avatar_url, start_date, group_memberships!group_memberships_user_id_fkey(groups(id, key, is_active, source_type))')
       .eq('manager_id', id)
       .order('display_name'),
   ])
 
   return NextResponse.json({
     ...data,
+    department: assignmentDepartments(data),
+    group_memberships: undefined,
     manager: managerResult.data ?? null,
-    direct_reports: directReportsResult.data ?? [],
+    direct_reports: (directReportsResult.data ?? []).map((report) => ({
+      ...report,
+      department: assignmentDepartments(report),
+      group_memberships: undefined,
+    })),
   })
 }

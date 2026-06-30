@@ -63,14 +63,144 @@ Status: Completed
   - `/marketing/social` once built
   - `/marketing/self-promo` once built
 
-## Later Phases
+## Phase 5: Marketing Dashboard
 
 Status: Pending
 
-- Build real Marketing dashboard at `/marketing`.
-- Build Content Calendar.
-- Set up Marketing document folder structure.
-- Polish Spec Samples.
-- Build Vendor Relations.
-- Build Social Media link hub.
-- Build Self Promo catalog.
+- Replace temporary `/marketing` landing page with real Marketing home.
+- Add weekly plan calendar as primary module.
+- Read calendar items from Content Calendar data once Phase 6 exists.
+- Add summary cards for:
+  - upcoming posts
+  - pending spec sample follow-ups
+  - upcoming vendor relation meetings
+  - self promo inventory highlights
+- Keep page useful before all later phases exist by showing empty states and links to available modules.
+
+Deployability:
+
+- Can deploy with static placeholders first.
+- Should not require DB changes unless dashboard starts reading Phase 6+ tables.
+
+## Phase 6: Content Calendar
+
+Status: Pending
+
+- Add route: `/marketing/content-calendar`.
+- Add API under `/api/marketing/content-calendar`.
+- Add DB table, proposed: `marketing_content_calendar_items`.
+- Track:
+  - title
+  - platform
+  - publish date/time
+  - status
+  - campaign
+  - content type
+  - caption/notes
+  - asset URL or document link
+  - owner user
+- Build calendar and list views.
+- Add create/edit/delete actions.
+- Feed `/marketing` dashboard weekly calendar from same source.
+
+Deployability:
+
+- Can ship independently with new table/API/UI.
+- Existing Sales and Spec Sample routes should remain untouched.
+
+## Phase 7: Marketing Documents Setup
+
+Status: Pending
+
+- Use existing `/documents/marketing` document system.
+- Create or seed requested folder structure:
+  - Brand Assets
+  - Arcon Logos
+  - Arcon Brand Guidelines
+  - Flyers + Sales Materials
+  - Arcon Product Flyers
+  - Graphics
+  - Product Images
+  - Canva Designs
+  - Photos/Videos
+  - Presentations/Virtuals
+  - Customer Presentations
+  - Virtual Decks
+- Confirm external links are supported as document records.
+- If external links are not supported cleanly, add minimal link-type support to documents.
+
+Deployability:
+
+- Can deploy as data/config-only if existing document system supports links.
+- If link support is needed, ship as a small isolated documents enhancement.
+
+## Phase 8: Spec Samples Polish
+
+Status: Pending
+
+- Keep route: `/marketing/specs`.
+- Keep existing `spec_samples` foundation.
+- Add or expose client-requested fields/views:
+  - customer-grouped view
+  - PO number
+  - supplier
+  - item link and item number
+  - sent-to contact and email
+  - date sent
+  - proof/image storage
+  - follow-up needed filters
+- Prefer minimal table additions over any table rename.
+
+Deployability:
+
+- Can ship field/view improvements incrementally.
+- Existing spec records should remain compatible.
+
+## Phase 9: Vendor Relations
+
+Status: Pending
+
+- Add route: `/marketing/vendor-relations`.
+- Add API under `/api/marketing/vendor-relations`.
+- Add DB tables, proposed:
+  - `marketing_vendor_meetings`
+  - `marketing_vendor_meeting_signups`
+- Build meeting schedule view.
+- Build signup form attached to each meeting.
+- On signup, create Arc/company calendar event and invite sales team.
+- Google Calendar helper currently read-only; add write-capable scope/helper only in this phase.
+
+Deployability:
+
+- Ship meeting schedule without calendar write first if needed.
+- Calendar invite work should be separately testable and guarded by env config.
+
+## Phase 10: Social Media and Self Promo
+
+Status: Pending
+
+### Social Media
+
+- Add route: `/marketing/social`.
+- Build external link hub for company social platforms.
+- Decide whether links are static config or admin-editable records.
+
+### Self Promo
+
+- Add route: `/marketing/self-promo`.
+- Add API under `/api/marketing/self-promo`.
+- Add DB table, proposed: `marketing_self_promo_items`.
+- Track:
+  - item name
+  - item link
+  - color
+  - proof/image URL or file
+  - pricing
+  - warehouse quantity
+  - current/past status
+  - notes
+
+Deployability:
+
+- Social link hub can ship first with static links.
+- Self Promo catalog can ship independently after DB/API/UI are ready.

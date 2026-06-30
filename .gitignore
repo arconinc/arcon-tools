@@ -50,3 +50,8 @@ next-env.d.ts
 /playwright-report/
 /timesheet-data.json
 /timesheet-scan.js
+/supabase/seed.sql
+/role-department-usage.csv
+/supabase/migrations/20260101000000_baseline.sql
+/supabase/prod_data.sql
+/supabase/prod_dump.sql
