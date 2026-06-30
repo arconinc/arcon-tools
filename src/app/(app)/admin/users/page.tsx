@@ -480,7 +480,7 @@ export default function AdminUsersPage() {
         className="rounded-full px-2 py-0.5 text-xs font-semibold leading-none"
         style={{ background: group.color + '22', color: group.color }}
       >
-        {groupDisplayName(group)}
+        {group.name}
       </span>
     ))
   }
@@ -684,31 +684,6 @@ export default function AdminUsersPage() {
       header: 'Groups',
       sortValue: (user) => (user.groups ?? []).map(groupDisplayName).join(', '),
       render: (user) => <div className="flex flex-wrap gap-1">{groupBadges(user)}</div>,
-    },
-    {
-      key: 'departments',
-      header: 'Departments',
-      sortValue: (user) => departmentLabels(user).join(', '),
-      render: (user) => {
-        const labels = departmentLabels(user)
-        return (
-          <div className="flex flex-wrap gap-1">
-            {labels.length > 0 ? (
-              labels.map((label) => (
-                <span key={label} className="rounded-full bg-blue-100 px-2 py-0.5 text-xs font-semibold leading-none text-blue-700">{label}</span>
-              ))
-            ) : (
-              <span className="text-xs text-slate-400">—</span>
-            )}
-          </div>
-        )
-      },
-    },
-    {
-      key: 'roles',
-      header: 'Roles',
-      sortValue: (user) => (user.roles ?? []).join(', '),
-      render: (user) => <div className="flex flex-wrap gap-1">{roleBadges(user)}</div>,
     },
     {
       key: 'birthdate',
