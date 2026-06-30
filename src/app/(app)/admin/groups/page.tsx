@@ -24,6 +24,7 @@ type GroupForm = {
   description: string
   color: string
   capabilities: GroupCapabilityKey[]
+  poolKey: string
 }
 
 const EMPTY_FORM: GroupForm = {
@@ -32,6 +33,7 @@ const EMPTY_FORM: GroupForm = {
   description: '',
   color: '#6b7280',
   capabilities: [],
+  poolKey: '',
 }
 
 async function responseErrorMessage(res: Response, fallback: string) {
@@ -47,10 +49,12 @@ function slugify(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
 }
 
-function capabilityPayload(group: GroupWithDetails | null, capabilityKeys: GroupCapabilityKey[]) {
+function capabilityPayload(group: GroupWithDetails | null, capabilityKeys: GroupCapabilityKey[], poolKey: string) {
   return capabilityKeys.map((capability) => ({
     capability,
-    config: group?.capabilities.find((item) => item.capability === capability)?.config ?? {},
+    config: capability === 'assignment_pool'
+      ? { ...(group?.capabilities.find((item) => item.capability === capability)?.config ?? {}), pool_key: poolKey.trim() || undefined }
+      : (group?.capabilities.find((item) => item.capability === capability)?.config ?? {}),
   }))
 }
 
@@ -122,12 +126,14 @@ export default function AdminGroupsPage() {
 
   async function openEditModal(group: GroupWithDetails) {
     setEditingGroup(group)
+    const existingPoolCap = group.capabilities.find((c) => c.capability === 'assignment_pool')
     setForm({
       key: group.key,
       name: group.name,
       description: group.description ?? '',
       color: group.color,
       capabilities: group.capabilities.map((capability) => capability.capability),
+      poolKey: (existingPoolCap?.config as Record<string, string> | undefined)?.pool_key ?? '',
     })
     setMemberOptions([])
     setMemberIds([])
@@ -161,7 +167,7 @@ export default function AdminGroupsPage() {
         name: form.name.trim(),
         description: form.description.trim() || null,
         color: form.color || '#6b7280',
-        capabilities: capabilityPayload(editingGroup, form.capabilities),
+        capabilities: capabilityPayload(editingGroup, form.capabilities, form.poolKey),
       }
       const res = await fetch(editingGroup ? `/api/admin/groups/${editingGroup.id}` : '/api/admin/groups', {
         method: editingGroup ? 'PATCH' : 'POST',
@@ -475,6 +481,18 @@ export default function AdminGroupsPage() {
                 </label>
               ))}
             </div>
+            {form.capabilities.includes('assignment_pool') && (
+              <div className="mt-2">
+                <label className="mb-1 block text-xs text-slate-500">Pool Key <span className="text-slate-400">(e.g. <code>sales</code>)</span></label>
+                <input
+                  type="text"
+                  value={form.poolKey}
+                  onChange={(e) => setForm((current) => ({ ...current, poolKey: e.target.value }))}
+                  placeholder="sales"
+                  className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-purple-400 focus:outline-none font-mono"
+                />
+              </div>
+            )}
           </div>
 
           {editingGroup && (

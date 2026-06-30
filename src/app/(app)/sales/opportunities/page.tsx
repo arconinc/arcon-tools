@@ -149,8 +149,11 @@ export default function OpportunitiesPage() {
   const [page, setPage] = useState(1)
   const [activeFilterId, setActiveFilterId] = useState<string | null>(() => readStoredString(ACTIVE_FILTER_STORAGE_KEY))
 
+  const [rosterUsers, setRosterUsers] = useState<{ id: string; display_name: string }[]>([])
+
   useEffect(() => {
     fetch('/api/marketing/tags').then((r) => r.json()).then((d) => { if (Array.isArray(d)) setAllTags(d) })
+    fetch('/api/marketing/assignment-pools/sales/users').then((r) => r.json()).then((d) => { if (Array.isArray(d)) setRosterUsers(d) })
   }, [])
 
 
@@ -209,15 +212,6 @@ export default function OpportunitiesPage() {
     return items
   })()
 
-  const ownerOptions = (() => {
-    const seen = new Map<string, string>()
-    for (const o of rawOpps) {
-      if (o.assigned_to && !seen.has(o.assigned_to)) {
-        seen.set(o.assigned_to, o.assigned_user_name ?? o.assigned_to)
-      }
-    }
-    return [...seen.entries()].sort((a, b) => a[1].localeCompare(b[1]))
-  })()
 
   const openCount = opps.filter((o) => o.status === 'open').length
   const openValue = opps
@@ -323,7 +317,7 @@ export default function OpportunitiesPage() {
   ]
 
   const stageOptions: MultiSelectOption[] = STAGES.map((s) => ({ value: s, label: s }))
-  const ownerSelectOptions: MultiSelectOption[] = ownerOptions.map(([id, name]) => ({ value: id, label: name }))
+  const ownerSelectOptions: MultiSelectOption[] = rosterUsers.map((u) => ({ value: u.id, label: u.display_name }))
   const tagSelectOptions: MultiSelectOption[] = allTags.map((t) => ({ value: t.id, label: t.name, color: t.color }))
 
   return (
