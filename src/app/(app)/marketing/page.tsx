@@ -4,6 +4,11 @@ import Link from 'next/link'
 
 const MARKETING_LINKS = [
   {
+    title: 'Calendar',
+    description: 'LinkedIn, MailChimp, Instagram, and Facebook content calendar.',
+    href: '/marketing/calendar',
+  },
+  {
     title: 'Documents',
     description: 'Brand assets, flyers, graphics, Canva designs, photos, videos, and presentations.',
     href: '/documents/marketing',
@@ -16,7 +21,6 @@ const MARKETING_LINKS = [
 ]
 
 const UPCOMING_LINKS = [
-  'Content Calendar',
   'Vendor Relations',
   'Social Media',
   'Self Promo',

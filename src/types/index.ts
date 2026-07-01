@@ -156,6 +156,22 @@ export interface CompanyCalendarResponse {
   cachedAt: string
 }
 
+// ─── Marketing Calendar ─────────────────────────────────────────────────────
+
+export type MarketingCalendarPlatform = 'linkedin' | 'mailchimp' | 'instagram' | 'facebook'
+
+export interface MarketingCalendarEvent {
+  id: string
+  title: string
+  event_date: string        // YYYY-MM-DD
+  event_time: string | null // HH:MM
+  platforms: MarketingCalendarPlatform[]
+  art_url: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
 // ─── Store ───────────────────────────────────────────────────────────────────
 
 export type StoreStatus = 'Active' | 'Inactive'

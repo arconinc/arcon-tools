@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import Script from 'next/script'
 import { useParams, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
@@ -55,6 +55,20 @@ function findFolder(nodes: DocFolderNode[], id: string): DocFolderNode | null {
   return null
 }
 
+interface DocSearchResult { doc: DriveDocument; folderId: string; path: string }
+
+function searchFolders(nodes: DocFolderNode[], query: string, parentPath: string[], out: DocSearchResult[]) {
+  for (const node of nodes) {
+    const path = [...parentPath, node.name]
+    for (const doc of node.documents) {
+      if (doc.title.toLowerCase().includes(query) || doc.description?.toLowerCase().includes(query)) {
+        out.push({ doc, folderId: node.id, path: path.join(' / ') })
+      }
+    }
+    if (node.children.length > 0) searchFolders(node.children, query, path, out)
+  }
+}
+
 // ─── Main page ────────────────────────────────────────────────────────────────
 
 export default function SectionDocumentsPage() {
@@ -74,6 +88,16 @@ export default function SectionDocumentsPage() {
   const [selectedFolderId, setSelectedFolderId] = useState<string | null>(folderParam ?? null)
   const [expandedIds, setExpandedIds] = useState<Set<string>>(new Set())
   const [highlightedDocId, setHighlightedDocId] = useState<string | null>(docParam)
+
+  // Search
+  const [searchQuery, setSearchQuery] = useState('')
+  const searchResults = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+    if (!query || !section) return null
+    const out: DocSearchResult[] = []
+    searchFolders(section.folders, query, [], out)
+    return out
+  }, [searchQuery, section])
 
   // Resizable sidebar
   const [sidebarWidth, setSidebarWidth] = useState(240)
@@ -267,13 +291,32 @@ export default function SectionDocumentsPage() {
     })
   }
 
-  function selectFolder(id: string) {
+  function selectFolder(id: string, docId: string | null = null) {
     setSelectedFolderId(id)
-    setHighlightedDocId(null)
+    setHighlightedDocId(docId)
     const url = new URL(window.location.href)
     url.searchParams.set('folder', id)
-    url.searchParams.delete('doc')
+    if (docId) url.searchParams.set('doc', docId)
+    else url.searchParams.delete('doc')
     window.history.replaceState(null, '', url.toString())
+  }
+
+  function findAncestorIds(nodes: DocFolderNode[], targetId: string, trail: string[] = []): string[] | null {
+    for (const n of nodes) {
+      if (n.id === targetId) return trail
+      const found = findAncestorIds(n.children, targetId, [...trail, n.id])
+      if (found) return found
+    }
+    return null
+  }
+
+  function openSearchResult(result: DocSearchResult) {
+    if (section) {
+      const ancestors = findAncestorIds(section.folders, result.folderId) ?? []
+      setExpandedIds(prev => new Set([...prev, ...ancestors, result.folderId]))
+    }
+    selectFolder(result.folderId, result.doc.id)
+    setSearchQuery('')
   }
 
   function copyFolderLink(node: DocFolderNode) {
@@ -691,6 +734,21 @@ export default function SectionDocumentsPage() {
         .docs-header h1 { font-size: 1.75rem; font-weight: 700; color: #111; margin: 0 0 0.25rem; }
         .docs-header p { color: #6b7280; margin: 0; font-size: 0.9rem; }
 
+        .docs-search { position: relative; margin-bottom: 1.25rem; max-width: 420px; }
+        .docs-search input { width: 100%; box-sizing: border-box; padding: 0.6rem 0.875rem 0.6rem 2.25rem; border: 1.5px solid #e5e7eb; border-radius: 8px; font-size: 0.9rem; outline: none; }
+        .docs-search input:focus { border-color: #7c3aed; }
+        .docs-search svg { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: #9ca3af; width: 16px; height: 16px; }
+
+        .search-results-panel { border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 1px 4px rgba(0,0,0,0.06); overflow: hidden; }
+        .search-results-header { padding: 0.75rem 1.25rem; border-bottom: 1px solid #f3f4f6; font-size: 0.8rem; color: #9ca3af; }
+        .search-result-row { display: flex; align-items: flex-start; gap: 0.625rem; padding: 0.875rem 1.25rem; cursor: pointer; border-bottom: 1px solid #f3f4f6; background: none; width: 100%; text-align: left; border-left: none; border-right: none; border-top: none; }
+        .search-result-row:last-child { border-bottom: none; }
+        .search-result-row:hover { background: #faf5ff; }
+        .search-result-row svg { width: 15px; height: 15px; color: #9ca3af; flex-shrink: 0; margin-top: 2px; }
+        .search-result-title { font-size: 0.875rem; font-weight: 600; color: #111; }
+        .search-result-desc { font-size: 0.8rem; color: #6b7280; margin-top: 0.15rem; }
+        .search-result-path { font-size: 0.75rem; color: #7c3aed; margin-top: 0.3rem; }
+
         .two-panel { display: flex; gap: 0; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; box-shadow: 0 1px 4px rgba(0,0,0,0.06); min-height: 400px; }
 
         /* ── Sidebar ── */
@@ -824,6 +882,39 @@ export default function SectionDocumentsPage() {
           </div>
         </div>
 
+        <div className="docs-search">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z" /></svg>
+          <input
+            type="text"
+            placeholder="Search documents by name or description…"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
+        </div>
+
+        {searchResults !== null ? (
+          <div className="search-results-panel">
+            <div className="search-results-header">
+              {searchResults.length} result{searchResults.length !== 1 ? 's' : ''} for &ldquo;{searchQuery}&rdquo;
+            </div>
+            {searchResults.length === 0 ? (
+              <div className="empty-state">
+                <p>No documents match your search.</p>
+              </div>
+            ) : (
+              searchResults.map(r => (
+                <button key={r.doc.id} className="search-result-row" onClick={() => openSearchResult(r)}>
+                  <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                  <div>
+                    <div className="search-result-title">{r.doc.title}</div>
+                    {r.doc.description && <div className="search-result-desc">{r.doc.description}</div>}
+                    <div className="search-result-path">{r.path}</div>
+                  </div>
+                </button>
+              ))
+            )}
+          </div>
+        ) : (
         <div className="two-panel">
           {/* ── Sidebar ── */}
           <div className="sidebar" style={{ width: sidebarWidth, minWidth: sidebarWidth }}>
@@ -975,6 +1066,7 @@ export default function SectionDocumentsPage() {
             </div>
           </div>
         </div>
+        )}
       </div>
 
       {toastMsg && <div className="toast">{toastMsg}</div>}

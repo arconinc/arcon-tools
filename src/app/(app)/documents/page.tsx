@@ -1,8 +1,8 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
-import type { DocSectionWithTree, DocFolderNode } from '@/types'
+import type { DocSectionWithTree, DocFolderNode, DriveDocument } from '@/types'
 
 function countFolders(folders: DocFolderNode[]): number {
   let n = 0
@@ -20,6 +20,33 @@ function countDocs(folders: DocFolderNode[]): number {
   return n
 }
 
+interface SearchResult {
+  doc: DriveDocument
+  sectionSlug: string
+  sectionName: string
+  folderId: string
+  path: string
+}
+
+function searchFolders(
+  nodes: DocFolderNode[],
+  query: string,
+  sectionSlug: string,
+  sectionName: string,
+  parentPath: string[],
+  out: SearchResult[]
+) {
+  for (const node of nodes) {
+    const path = [...parentPath, node.name]
+    for (const doc of node.documents) {
+      if (doc.title.toLowerCase().includes(query) || doc.description?.toLowerCase().includes(query)) {
+        out.push({ doc, sectionSlug, sectionName, folderId: node.id, path: path.join(' / ') })
+      }
+    }
+    if (node.children.length > 0) searchFolders(node.children, query, sectionSlug, sectionName, path, out)
+  }
+}
+
 const SECTION_SLUGS: Record<string, string> = {
   'HR': 'hr',
   'Marketing': 'marketing',
@@ -33,6 +60,7 @@ const SECTION_SLUGS: Record<string, string> = {
 export default function DocumentsPage() {
   const [sections, setSections] = useState<DocSectionWithTree[]>([])
   const [loading, setLoading] = useState(true)
+  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     fetch('/api/documents')
@@ -40,6 +68,17 @@ export default function DocumentsPage() {
       .then(data => setSections(data.sections ?? []))
       .finally(() => setLoading(false))
   }, [])
+
+  const searchResults = useMemo(() => {
+    const query = searchQuery.trim().toLowerCase()
+    if (!query) return null
+    const out: SearchResult[] = []
+    for (const section of sections) {
+      const slug = SECTION_SLUGS[section.name] ?? section.name.toLowerCase().replace(/[\s-]+/g, '')
+      searchFolders(section.folders, query, slug, section.name, [], out)
+    }
+    return out
+  }, [searchQuery, sections])
 
   return (
     <>
@@ -66,6 +105,19 @@ export default function DocumentsPage() {
         @keyframes skpulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.45; } }
 
         .empty-state { text-align: center; padding: 4rem; color: #9ca3af; font-size: 0.875rem; }
+
+        .docs-search { position: relative; margin-bottom: 1.5rem; max-width: 480px; }
+        .docs-search input { width: 100%; box-sizing: border-box; padding: 0.6rem 0.875rem 0.6rem 2.25rem; border: 1.5px solid #e5e7eb; border-radius: 8px; font-size: 0.9rem; outline: none; }
+        .docs-search input:focus { border-color: #7c3aed; }
+        .docs-search svg { position: absolute; left: 0.75rem; top: 50%; transform: translateY(-50%); color: #9ca3af; width: 16px; height: 16px; }
+
+        .search-results-list { display: flex; flex-direction: column; gap: 0.625rem; }
+        .search-result-card { display: flex; align-items: flex-start; gap: 0.625rem; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; padding: 0.875rem 1rem; text-decoration: none; color: inherit; transition: all 0.15s; }
+        .search-result-card:hover { border-color: #7c3aed; box-shadow: 0 2px 8px rgba(124,58,237,0.1); }
+        .search-result-card svg.doc-icon { width: 16px; height: 16px; color: #9ca3af; flex-shrink: 0; margin-top: 2px; }
+        .search-result-title { font-size: 0.9rem; font-weight: 600; color: #111; }
+        .search-result-desc { font-size: 0.8rem; color: #6b7280; margin-top: 0.15rem; }
+        .search-result-path { font-size: 0.75rem; color: #7c3aed; margin-top: 0.3rem; }
       `}</style>
 
       <div className="docs-overview">
@@ -74,10 +126,41 @@ export default function DocumentsPage() {
           <p>Company resources and reference documents</p>
         </div>
 
+        <div className="docs-search">
+          <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z" /></svg>
+          <input
+            type="text"
+            placeholder="Search all documents by name or description…"
+            value={searchQuery}
+            onChange={e => setSearchQuery(e.target.value)}
+          />
+        </div>
+
         {loading ? (
           <div className="sections-grid">
             {[...Array(4)].map((_, i) => <div key={i} className="section-card-skeleton" />)}
           </div>
+        ) : searchResults !== null ? (
+          searchResults.length === 0 ? (
+            <div className="empty-state">No documents match &ldquo;{searchQuery}&rdquo;.</div>
+          ) : (
+            <div className="search-results-list">
+              {searchResults.map(r => (
+                <Link
+                  key={r.doc.id}
+                  href={`/documents/${r.sectionSlug}?folder=${r.folderId}&doc=${r.doc.id}`}
+                  className="search-result-card"
+                >
+                  <svg className="doc-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                  <div>
+                    <div className="search-result-title">{r.doc.title}</div>
+                    {r.doc.description && <div className="search-result-desc">{r.doc.description}</div>}
+                    <div className="search-result-path">{r.sectionName} / {r.path}</div>
+                  </div>
+                </Link>
+              ))}
+            </div>
+          )
         ) : sections.length === 0 ? (
           <div className="empty-state">No documents have been added yet.</div>
         ) : (

@@ -2,6 +2,8 @@ import type { GroupCapabilityKey } from '@/types'
 
 export const OPPORTUNITY_OWNERS_GROUP_KEY = 'sales'
 
+export const MARKETING_CALENDAR_EDITORS_GROUP_KEY = 'marketing_calendar_editors'
+
 export const GROUP_CAPABILITIES = {
   ACCESS_CONTROL: 'access_control',
   ASSIGNMENT_POOL: 'assignment_pool',

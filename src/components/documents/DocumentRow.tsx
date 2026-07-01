@@ -15,6 +15,11 @@ export function DocumentNameCell({
   isHighlighted?: boolean
 }) {
   const [fetching, setFetching] = useState(false)
+  const rowRef = useRef<HTMLButtonElement>(null)
+
+  useEffect(() => {
+    if (isHighlighted) rowRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+  }, [isHighlighted])
 
   async function handleOpen() {
     setFetching(true)
@@ -36,10 +41,19 @@ export function DocumentNameCell({
 
   return (
     <button
+      ref={rowRef}
       className="doc-link"
       onClick={handleOpen}
       disabled={fetching}
-      style={{ background: 'none', border: 'none', padding: 0, textAlign: 'left' }}
+      style={{
+        background: isHighlighted ? '#fef3c7' : 'none',
+        border: 'none',
+        padding: isHighlighted ? '0.375rem 0.5rem' : 0,
+        margin: isHighlighted ? '-0.375rem -0.5rem' : 0,
+        borderRadius: isHighlighted ? '6px' : 0,
+        textAlign: 'left',
+        transition: 'background 0.3s',
+      }}
     >
       {isUploaded ? (
         <svg className="doc-icon" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M9 19l3 3m0 0l3-3m-3 3V10" /></svg>
