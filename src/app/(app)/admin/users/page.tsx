@@ -4,7 +4,6 @@ import { useState, useEffect, useCallback, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { AppUser, GroupSourceType } from '@/types'
-import { DEPARTMENTS, DEPARTMENT_DISPLAY_NAMES } from '@/lib/task-constants'
 import { DataTable, FilterPillGroup, Modal, type DataTableColumn, type FilterPillOption } from '@/components/ui'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
@@ -116,7 +115,7 @@ export default function AdminUsersPage() {
   const [addError, setAddError] = useState<string | null>(null)
 
   const [editingId, setEditingId] = useState<string | null>(null)
-  const [editForm, setEditForm] = useState({ display_name: '', birth_date: '', start_date: '', departments: [] as string[] })
+  const [editForm, setEditForm] = useState({ display_name: '', birth_date: '', start_date: '' })
   const [saving, setSaving] = useState(false)
 
   const [togglingId, setTogglingId] = useState<string | null>(null)
@@ -125,10 +124,6 @@ export default function AdminUsersPage() {
   const [confirmAction, setConfirmAction] = useState<ConfirmAction | null>(null)
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({})
 
-  const [allRoles, setAllRoles] = useState<{ id: string; name: string; label: string; color: string }[]>([])
-  const [roleManagingId, setRoleManagingId] = useState<string | null>(null)
-  const [pendingRoleIds, setPendingRoleIds] = useState<string[]>([])
-  const [savingRoles, setSavingRoles] = useState(false)
   const [openActionMenuId, setOpenActionMenuId] = useState<string | null>(null)
   const actionMenuRef = useRef<HTMLDivElement>(null)
 
@@ -142,49 +137,6 @@ export default function AdminUsersPage() {
     document.addEventListener('mousedown', handleClick)
     return () => document.removeEventListener('mousedown', handleClick)
   }, [openActionMenuId])
-
-  useEffect(() => {
-    fetch('/api/admin/roles')
-      .then(r => r.json())
-      .then(data => setAllRoles(Array.isArray(data) ? data : []))
-      .catch(() => setAllRoles([]))
-  }, [])
-
-  async function openRoleManager(userId: string) {
-    setRowErrors((current) => ({ ...current, [userId]: '' }))
-    try {
-      const res = await fetch(`/api/admin/user-roles?userId=${userId}`)
-      if (!res.ok) {
-        throw new Error(await responseErrorMessage(res, 'Failed to load roles for this user.'))
-      }
-      const data = await res.json()
-      setPendingRoleIds(Array.isArray(data) ? data.map((r: { role_id: string }) => r.role_id) : [])
-      setRoleManagingId(userId)
-    } catch (err) {
-      setRowErrors((current) => ({ ...current, [userId]: err instanceof Error ? err.message : 'Failed to load roles for this user.' }))
-    }
-  }
-
-  async function saveRoles(userId: string) {
-    setSavingRoles(true)
-    setRowErrors((current) => ({ ...current, [userId]: '' }))
-    try {
-      const res = await fetch('/api/admin/user-roles', {
-        method: 'PUT',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ userId, roleIds: pendingRoleIds }),
-      })
-      if (!res.ok) {
-        throw new Error(await responseErrorMessage(res, 'Failed to save roles.'))
-      }
-      setRoleManagingId(null)
-      loadUsers()
-    } catch (err) {
-      setRowErrors((current) => ({ ...current, [userId]: err instanceof Error ? err.message : 'Failed to save roles.' }))
-    } finally {
-      setSavingRoles(false)
-    }
-  }
 
   async function handleImpersonate(user: AdminUser) {
     setImpersonatingId(user.id)
@@ -369,7 +321,6 @@ export default function AdminUsersPage() {
       display_name: user.display_name,
       birth_date: user.birth_date ?? '',
       start_date: user.start_date ?? '',
-      departments: user.department ?? [],
     })
   }
 
@@ -385,7 +336,6 @@ export default function AdminUsersPage() {
           display_name: editForm.display_name,
           birth_date: editForm.birth_date || null,
           start_date: editForm.start_date || null,
-          department: editForm.departments.length > 0 ? editForm.departments : null,
         }),
       })
       if (!res.ok) {
@@ -450,27 +400,6 @@ export default function AdminUsersPage() {
     )
   }
 
-  function departmentLabels(user: AdminUser) {
-    return [...new Set(user.department?.map((d) => DEPARTMENT_DISPLAY_NAMES[d as keyof typeof DEPARTMENT_DISPLAY_NAMES] ?? d) ?? [])]
-  }
-
-  function roleBadges(user: AdminUser) {
-    if ((user.roles ?? []).length === 0) return <span className="text-xs text-slate-400">—</span>
-
-    return (user.roles ?? []).map((roleName: string) => {
-      const role = allRoles.find(r => r.name === roleName)
-      return (
-        <span
-          key={roleName}
-          className="rounded-full px-2 py-0.5 text-xs font-semibold leading-none"
-          style={{ background: (role?.color ?? '#6b7280') + '22', color: role?.color ?? '#6b7280' }}
-        >
-          {role?.label ?? roleName}
-        </span>
-      )
-    })
-  }
-
   function groupBadges(user: AdminUser) {
     if ((user.groups ?? []).length === 0) return <span className="text-xs text-slate-400">—</span>
 
@@ -487,9 +416,8 @@ export default function AdminUsersPage() {
 
   function renderExpandedRow(user: AdminUser) {
     const isEditing = editingId === user.id
-    const isManagingRoles = roleManagingId === user.id
 
-    if (!isEditing && !isManagingRoles) return null
+    if (!isEditing) return null
 
     if (isEditing) {
       const rowError = rowErrors[user.id]
@@ -527,29 +455,6 @@ export default function AdminUsersPage() {
                 className="w-full rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-300"
               />
             </div>
-            <div className="sm:col-span-2">
-              <label className="mb-1 block text-xs font-semibold text-slate-600">Departments</label>
-              <div className="flex flex-wrap gap-x-4 gap-y-1.5 pt-0.5">
-                {DEPARTMENTS.map((d) => (
-                  <label key={d} className="flex cursor-pointer items-center gap-1.5 text-xs text-slate-600">
-                    <input
-                      type="checkbox"
-                      checked={editForm.departments.includes(d)}
-                      onChange={(e) => {
-                        setEditForm((f) => ({
-                          ...f,
-                          departments: e.target.checked
-                            ? [...f.departments, d]
-                            : f.departments.filter((x) => x !== d),
-                        }))
-                      }}
-                      className="accent-purple-600"
-                    />
-                    {DEPARTMENT_DISPLAY_NAMES[d]}
-                  </label>
-                ))}
-              </div>
-            </div>
           </div>
           <div className="flex gap-2">
             <button
@@ -575,55 +480,6 @@ export default function AdminUsersPage() {
       )
     }
 
-    if (isManagingRoles) {
-      const rowError = rowErrors[user.id]
-      return (
-        <div>
-          <p className="mb-2 text-xs font-semibold text-slate-600">Assign roles — {user.display_name}</p>
-              <div className="flex flex-wrap gap-x-4 gap-y-1.5 mb-3">
-                {allRoles.map(role => (
-                  <label key={role.id} className="flex items-center gap-1.5 text-xs text-slate-600 cursor-pointer">
-                    <input
-                      type="checkbox"
-                      checked={pendingRoleIds.includes(role.id)}
-                      onChange={e => {
-                        setPendingRoleIds(prev =>
-                          e.target.checked ? [...prev, role.id] : prev.filter(id => id !== role.id)
-                        )
-                      }}
-                      className="accent-purple-600"
-                    />
-                    <span className="font-medium px-2 py-0.5 rounded-full text-xs"
-                      style={{ background: role.color + '22', color: role.color }}>
-                      {role.label}
-                    </span>
-                  </label>
-                ))}
-              </div>
-              <div className="flex gap-2">
-                <button
-                  onClick={() => saveRoles(user.id)}
-                  disabled={savingRoles}
-                  className="rounded-lg bg-purple-700 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-purple-800 disabled:opacity-50"
-                >
-                  {savingRoles ? 'Saving…' : 'Save Roles'}
-                </button>
-                <button
-                  onClick={() => setRoleManagingId(null)}
-                  className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50"
-                >
-                  Cancel
-                </button>
-              </div>
-          {rowError && (
-            <p className="mt-2 text-xs font-medium text-red-600" role="alert">
-              {rowError}
-            </p>
-          )}
-        </div>
-      )
-    }
-
     return null
   }
 
@@ -631,10 +487,9 @@ export default function AdminUsersPage() {
   const searchTerm = search.trim().toLocaleLowerCase()
   const filteredUsers = searchTerm
     ? visibleUsers.filter((user) => {
-        const labels = departmentLabels(user).join(' ')
         const roles = (user.roles ?? []).join(' ')
         const groups = (user.groups ?? []).map(groupDisplayName).join(' ')
-        return `${user.display_name} ${user.email} ${labels} ${roles} ${groups}`.toLocaleLowerCase().includes(searchTerm)
+        return `${user.display_name} ${user.email} ${roles} ${groups}`.toLocaleLowerCase().includes(searchTerm)
       })
     : visibleUsers
   const filterOptions: FilterPillOption<UserStatusFilter>[] = [
@@ -746,14 +601,6 @@ export default function AdminUsersPage() {
                       </button>
                       <button
                         type="button"
-                        onClick={() => { setOpenActionMenuId(null); openRoleManager(user.id) }}
-                        className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium text-purple-700 hover:bg-purple-50"
-                      >
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
-                        Manage Roles
-                      </button>
-                      <button
-                        type="button"
                         onClick={() => { setOpenActionMenuId(null); setConfirmAction({ type: 'admin', user, nextIsAdmin: !user.is_admin }) }}
                         disabled={togglingId === user.id}
                         className="flex w-full items-center gap-2.5 px-3 py-2 text-xs font-medium text-purple-700 hover:bg-purple-50 disabled:opacity-50"
@@ -829,12 +676,6 @@ export default function AdminUsersPage() {
             {showAdd ? 'Cancel' : '+ Add User'}
           </button>
         </div>
-      </div>
-
-      <div className="mb-5 rounded-lg border border-purple-100 bg-purple-50/50 px-4 py-3 text-xs leading-relaxed text-purple-950/75">
-        <strong className="font-semibold text-purple-950">Groups</strong> are the new source of truth for people collections.
-        <span className="mx-2 text-purple-300" aria-hidden="true">•</span>
-        Keep <strong className="font-semibold text-purple-950">Departments</strong> and <strong className="font-semibold text-purple-950">Roles</strong> updated during migration; admins bypass role checks.
       </div>
 
       {syncResult && (
