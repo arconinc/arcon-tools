@@ -142,6 +142,7 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
         { href: '/marketing/calendar', label: 'Calendar', icon: CalendarIcon, adminMatch: true },
         { href: '/documents/marketing', label: 'Documents', icon: DocumentIcon, adminMatch: true },
         { href: '/marketing/specs', label: 'Spec Samples', icon: SpecSampleIcon, adminMatch: true },
+        { href: '/marketing/self-promo', label: 'Self-promo', icon: MegaphoneIcon, adminMatch: true },
       ],
     },
     {
