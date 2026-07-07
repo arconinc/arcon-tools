@@ -5,6 +5,7 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { ExpenseReportLineItem, ExpenseReportVersion, ExpenseReportComment } from '@/types'
 import { EXPENSE_CATEGORIES } from '@/lib/expense-constants'
+import { useAppUser } from '@/components/layout/AppShell'
 
 interface ReportDetail {
   id: string
@@ -188,9 +189,31 @@ function CommentThread({ comments, reportId, lineItemId, currentUserId, isAdmin,
   )
 }
 
+const FIELD_LABELS: Record<string, string> = {
+  expense_date: 'Date', vendor: 'Vendor', category: 'Category',
+  description: 'Description', original_amount: 'Amount',
+  adjusted_amount: 'Adjusted Amount', payment_type: 'Payment Type',
+  reimbursable: 'Reimbursable',
+}
+
+function formatFieldValue(field: string, value: string): string {
+  if (!value) return '(blank)'
+  if (field === 'original_amount' || field === 'adjusted_amount') {
+    const n = parseFloat(value)
+    return isNaN(n) ? value : n.toLocaleString('en-US', { style: 'currency', currency: 'USD' })
+  }
+  if (field === 'reimbursable') return value === 'true' ? 'Yes' : 'No'
+  if (field === 'payment_type') return value === 'credit_card' ? 'Credit Card' : value === 'cash' ? 'Cash' : value
+  if (field === 'expense_date') {
+    try { return new Date(value + 'T12:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' }) } catch { return value }
+  }
+  return value
+}
+
 export default function AdminExpenseReportDetailPage() {
   const { id } = useParams<{ id: string }>()
   const router = useRouter()
+  const { user: appUser } = useAppUser()
   const [report, setReport] = useState<ReportDetail | null>(null)
   const [loading, setLoading] = useState(true)
   const [actionLoading, setActionLoading] = useState(false)
@@ -198,6 +221,7 @@ export default function AdminExpenseReportDetailPage() {
   const [expandedCommentRow, setExpandedCommentRow] = useState<string | null>(null)
   const [editingCell, setEditingCell] = useState<{ itemId: string; field: string } | null>(null)
   const [cellValue, setCellValue] = useState('')
+  const [oldCellValue, setOldCellValue] = useState('')
   const [savingCell, setSavingCell] = useState(false)
 
   // Modals
@@ -246,7 +270,8 @@ export default function AdminExpenseReportDetailPage() {
     setActionLoading(false)
   }
 
-  async function saveCell(itemId: string, field: string, value: string) {
+  async function saveCell(itemId: string, field: string, value: string, prevValue?: string) {
+    const prev = prevValue ?? oldCellValue
     setSavingCell(true)
     const body: Record<string, unknown> = {}
     if (field === 'original_amount' || field === 'adjusted_amount') {
@@ -261,6 +286,20 @@ export default function AdminExpenseReportDetailPage() {
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify(body),
     })
+    if (value !== prev) {
+      const adminName = appUser?.display_name ?? 'Admin'
+      const label = FIELD_LABELS[field] ?? field
+      const fromStr = formatFieldValue(field, prev)
+      const toStr = formatFieldValue(field, value)
+      await fetch(`/api/expense-reports/${id}/comments`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          body: `${adminName} updated ${label} from "${fromStr}" to "${toStr}"`,
+          line_item_id: itemId,
+        }),
+      })
+    }
     setSavingCell(false)
     setEditingCell(null)
     load()
@@ -287,6 +326,7 @@ export default function AdminExpenseReportDetailPage() {
   function startEdit(itemId: string, field: string, current: string) {
     setEditingCell({ itemId, field })
     setCellValue(current)
+    setOldCellValue(current)
     setTimeout(() => cellRef.current?.focus(), 30)
   }
 
@@ -457,92 +497,83 @@ export default function AdminExpenseReportDetailPage() {
                   const commentCount = lineItemCommentCounts[item.id] ?? 0
                   const hasUnresolved = comments.some(c => c.line_item_id === item.id && !c.parent_id && !c.resolved_at)
                   const isExpanded = expandedCommentRow === item.id
-                  const isEditing = (field: string) => editingCell?.itemId === item.id && editingCell?.field === field
-
-                  function CellInput({ field, type = 'text', options }: { field: string; type?: string; options?: string[] }) {
-                    if (!isEditing(field)) return null
-                    if (options) {
-                      return (
-                        <select
-                          ref={cellRef as React.RefObject<HTMLSelectElement>}
-                          className="cell-edit"
-                          value={cellValue}
-                          onChange={e => setCellValue(e.target.value)}
-                          onBlur={() => saveCell(item.id, field, cellValue)}
-                          onKeyDown={e => { if (e.key === 'Enter') saveCell(item.id, field, cellValue); if (e.key === 'Escape') setEditingCell(null) }}
-                        >
-                          <option value=""></option>
-                          {options.map(o => <option key={o} value={o}>{o}</option>)}
-                        </select>
-                      )
-                    }
-                    return (
-                      <input
-                        ref={cellRef as React.RefObject<HTMLInputElement>}
-                        className="cell-edit"
-                        type={type}
-                        value={cellValue}
-                        onChange={e => setCellValue(e.target.value)}
-                        onBlur={() => saveCell(item.id, field, cellValue)}
-                        onKeyDown={e => { if (e.key === 'Enter') saveCell(item.id, field, cellValue); if (e.key === 'Escape') setEditingCell(null) }}
-                      />
-                    )
-                  }
+                  const activeField = editingCell?.itemId === item.id ? editingCell.field : null
 
                   return (
                     <Fragment key={item.id}>
                       <tr style={{ background: hasUnresolved ? '#fffbeb' : undefined }}>
                         <td>
-                          {isEditing('expense_date') ? <CellInput field="expense_date" type="date" /> : (
+                          {activeField === 'expense_date' ? (
+                            <input ref={cellRef as React.RefObject<HTMLInputElement>} className="cell-edit" type="date" value={cellValue} onChange={e => setCellValue(e.target.value)} onBlur={() => saveCell(item.id, 'expense_date', cellValue)} onKeyDown={e => { if (e.key === 'Enter') saveCell(item.id, 'expense_date', cellValue); if (e.key === 'Escape') setEditingCell(null) }} />
+                          ) : (
                             <span className="editable-cell" onClick={() => startEdit(item.id, 'expense_date', item.expense_date ?? '')}>
                               {item.expense_date ? formatDateShort(item.expense_date + 'T12:00:00') : <em style={{ color: '#c4b5fd' }}>—</em>}
                             </span>
                           )}
                         </td>
                         <td>
-                          {isEditing('vendor') ? <CellInput field="vendor" /> : (
+                          {activeField === 'vendor' ? (
+                            <input ref={cellRef as React.RefObject<HTMLInputElement>} className="cell-edit" type="text" value={cellValue} onChange={e => setCellValue(e.target.value)} onBlur={() => saveCell(item.id, 'vendor', cellValue)} onKeyDown={e => { if (e.key === 'Enter') saveCell(item.id, 'vendor', cellValue); if (e.key === 'Escape') setEditingCell(null) }} />
+                          ) : (
                             <span className="editable-cell" onClick={() => startEdit(item.id, 'vendor', item.vendor ?? '')}>
                               {item.vendor || <em style={{ color: '#c4b5fd' }}>—</em>}
                             </span>
                           )}
                         </td>
                         <td>
-                          {isEditing('category') ? <CellInput field="category" options={[...EXPENSE_CATEGORIES]} /> : (
+                          {activeField === 'category' ? (
+                            <select ref={cellRef as React.RefObject<HTMLSelectElement>} className="cell-edit" value={cellValue} onChange={e => { const v = e.target.value; saveCell(item.id, 'category', v) }} onKeyDown={e => { if (e.key === 'Escape') setEditingCell(null) }}>
+                              <option value=""></option>
+                              {EXPENSE_CATEGORIES.map(o => <option key={o} value={o}>{o}</option>)}
+                            </select>
+                          ) : (
                             <span className="editable-cell" onClick={() => startEdit(item.id, 'category', item.category ?? '')}>
                               {item.category || <em style={{ color: '#c4b5fd' }}>—</em>}
                             </span>
                           )}
                         </td>
                         <td style={{ maxWidth: 180 }}>
-                          {isEditing('description') ? <CellInput field="description" /> : (
+                          {activeField === 'description' ? (
+                            <input ref={cellRef as React.RefObject<HTMLInputElement>} className="cell-edit" type="text" value={cellValue} onChange={e => setCellValue(e.target.value)} onBlur={() => saveCell(item.id, 'description', cellValue)} onKeyDown={e => { if (e.key === 'Enter') saveCell(item.id, 'description', cellValue); if (e.key === 'Escape') setEditingCell(null) }} />
+                          ) : (
                             <span className="editable-cell" onClick={() => startEdit(item.id, 'description', item.description ?? '')} style={{ display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', maxWidth: 180 }}>
                               {item.description || <em style={{ color: '#c4b5fd' }}>—</em>}
                             </span>
                           )}
                         </td>
                         <td>
-                          {isEditing('original_amount') ? <CellInput field="original_amount" type="number" /> : (
+                          {activeField === 'original_amount' ? (
+                            <input ref={cellRef as React.RefObject<HTMLInputElement>} className="cell-edit" type="number" value={cellValue} onChange={e => setCellValue(e.target.value)} onBlur={() => saveCell(item.id, 'original_amount', cellValue)} onKeyDown={e => { if (e.key === 'Enter') saveCell(item.id, 'original_amount', cellValue); if (e.key === 'Escape') setEditingCell(null) }} />
+                          ) : (
                             <span className="editable-cell" onClick={() => startEdit(item.id, 'original_amount', String(item.original_amount ?? ''))}>
                               {item.original_amount != null ? formatCurrency(item.original_amount) : <em style={{ color: '#c4b5fd' }}>—</em>}
                             </span>
                           )}
                         </td>
                         <td>
-                          {isEditing('adjusted_amount') ? <CellInput field="adjusted_amount" type="number" /> : (
+                          {activeField === 'adjusted_amount' ? (
+                            <input ref={cellRef as React.RefObject<HTMLInputElement>} className="cell-edit" type="number" value={cellValue} onChange={e => setCellValue(e.target.value)} onBlur={() => saveCell(item.id, 'adjusted_amount', cellValue)} onKeyDown={e => { if (e.key === 'Enter') saveCell(item.id, 'adjusted_amount', cellValue); if (e.key === 'Escape') setEditingCell(null) }} />
+                          ) : (
                             <span className="editable-cell" onClick={() => startEdit(item.id, 'adjusted_amount', String(item.adjusted_amount ?? ''))}>
                               {item.adjusted_amount != null ? formatCurrency(item.adjusted_amount) : <em style={{ color: '#c4b5fd' }}>—</em>}
                             </span>
                           )}
                         </td>
                         <td>
-                          {isEditing('payment_type') ? <CellInput field="payment_type" options={['cash', 'credit_card']} /> : (
+                          {activeField === 'payment_type' ? (
+                            <select ref={cellRef as React.RefObject<HTMLSelectElement>} className="cell-edit" value={cellValue} onChange={e => { const v = e.target.value; saveCell(item.id, 'payment_type', v) }} onKeyDown={e => { if (e.key === 'Escape') setEditingCell(null) }}>
+                              <option value=""></option>
+                              <option value="cash">Cash</option>
+                              <option value="credit_card">Credit Card</option>
+                            </select>
+                          ) : (
                             <span className="editable-cell" onClick={() => startEdit(item.id, 'payment_type', item.payment_type ?? '')}>
                               {item.payment_type === 'credit_card' ? 'CC' : item.payment_type === 'cash' ? 'Cash' : <em style={{ color: '#c4b5fd' }}>—</em>}
                             </span>
                           )}
                         </td>
                         <td>
-                          <span className="editable-cell" onClick={() => saveCell(item.id, 'reimbursable', String(!item.reimbursable))}>
+                          <span className="editable-cell" onClick={() => saveCell(item.id, 'reimbursable', String(!item.reimbursable), String(item.reimbursable))}>
                             {item.reimbursable ? '✓' : '—'}
                           </span>
                         </td>

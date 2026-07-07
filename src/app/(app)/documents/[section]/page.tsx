@@ -824,7 +824,7 @@ export default function SectionDocumentsPage() {
         .actions-cell { position: relative; text-align: right; }
         .actions-menu-btn { padding: 0.35rem 0.625rem; border: 1px solid #e5e7eb; border-radius: 6px; background: #fff; cursor: pointer; font-size: 0.875rem; color: #6b7280; transition: all 0.1s; }
         .actions-menu-btn:hover { background: #f3f4f6; border-color: #d1d5db; color: #374151; }
-        .actions-dropdown { position: absolute; right: 0; top: calc(100% + 4px); background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); min-width: 160px; z-index: 100; overflow: hidden; }
+        .actions-dropdown { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; box-shadow: 0 8px 24px rgba(0,0,0,0.12); min-width: 160px; overflow: hidden; }
         .actions-dropdown-item { display: flex; align-items: center; gap: 0.5rem; padding: 0.55rem 0.875rem; font-size: 0.85rem; color: #374151; cursor: pointer; border: none; background: none; width: 100%; text-align: left; transition: background 0.1s; }
         .actions-dropdown-item:hover { background: #f9fafb; }
         .actions-dropdown-item.danger { color: #ef4444; }

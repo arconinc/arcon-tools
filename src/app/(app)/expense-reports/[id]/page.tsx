@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, Fragment } from 'react'
 import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { ExpenseReportLineItem, ExpenseReportVersion, ExpenseReportComment } from '@/types'
@@ -186,6 +186,7 @@ export default function ExpenseReportDetailPage() {
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
 
+  const [expandedCommentRows, setExpandedCommentRows] = useState<Set<string>>(new Set())
   const [newComment, setNewComment] = useState('')
   const [postingComment, setPostingComment] = useState(false)
 
@@ -249,6 +250,11 @@ export default function ExpenseReportDetailPage() {
   const lineItemComments = comments.filter(c => c.line_item_id)
   const generalComments = comments.filter(c => !c.line_item_id)
   const unresolvedLineComments = lineItemComments.filter(c => !c.resolved_at).length
+
+  const commentsByItemId = lineItemComments.reduce<Record<string, ExpenseReportComment[]>>((acc, c) => {
+    if (c.line_item_id) { acc[c.line_item_id] = [...(acc[c.line_item_id] ?? []), c] }
+    return acc
+  }, {})
 
   return (
     <div style={{ width: '100%', padding: '24px 16px 40px' }}>
@@ -377,25 +383,50 @@ export default function ExpenseReportDetailPage() {
                   <th style={{ textAlign: 'right' }}>Amount</th>
                   <th>Type</th>
                   <th>Reimb.</th>
+                  <th style={{ width: 40 }}></th>
                 </tr>
               </thead>
               <tbody>
-                {lineItems.map(item => (
-                  <tr key={item.id}>
-                    <td style={{ whiteSpace: 'nowrap', color: '#6b7280' }}>{item.expense_date ?? '—'}</td>
-                    <td style={{ fontWeight: 500 }}>{item.vendor ?? '—'}</td>
-                    <td style={{ color: '#6b7280' }}>{item.category ?? '—'}</td>
-                    <td style={{ color: '#6b7280', maxWidth: 200 }}>{item.description ?? '—'}</td>
-                    <td style={{ textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 500 }}>
-                      {formatCurrency(item.original_amount)}
-                      {item.adjusted_amount !== null && item.adjusted_amount !== item.original_amount && (
-                        <div style={{ fontSize: 11, color: '#7c3aed' }}>→ {formatCurrency(item.adjusted_amount)}</div>
+                {lineItems.map(item => {
+                  const itemComments = commentsByItemId[item.id] ?? []
+                  const unresolved = itemComments.filter(c => !c.resolved_at).length
+                  const isExpanded = expandedCommentRows.has(item.id)
+                  const toggle = () => setExpandedCommentRows(prev => { const n = new Set(prev); n.has(item.id) ? n.delete(item.id) : n.add(item.id); return n })
+                  return (
+                    <Fragment key={item.id}>
+                      <tr style={{ background: unresolved > 0 ? '#fffbeb' : undefined }}>
+                        <td style={{ whiteSpace: 'nowrap', color: '#6b7280' }}>{item.expense_date ?? '—'}</td>
+                        <td style={{ fontWeight: 500 }}>{item.vendor ?? '—'}</td>
+                        <td style={{ color: '#6b7280' }}>{item.category ?? '—'}</td>
+                        <td style={{ color: '#6b7280', maxWidth: 200 }}>{item.description ?? '—'}</td>
+                        <td style={{ textAlign: 'right', whiteSpace: 'nowrap', fontWeight: 500 }}>
+                          {formatCurrency(item.original_amount)}
+                          {item.adjusted_amount !== null && item.adjusted_amount !== item.original_amount && (
+                            <div style={{ fontSize: 11, color: '#7c3aed' }}>→ {formatCurrency(item.adjusted_amount)}</div>
+                          )}
+                        </td>
+                        <td style={{ color: '#6b7280', textTransform: 'capitalize' }}>{item.payment_type?.replace('_', ' ') ?? '—'}</td>
+                        <td style={{ color: item.reimbursable ? '#166534' : '#dc2626' }}>{item.reimbursable ? 'Yes' : 'No'}</td>
+                        <td>
+                          {itemComments.length > 0 && (
+                            <button onClick={toggle} style={{ background: unresolved > 0 ? '#fef3c7' : '#ede9fe', border: 'none', cursor: 'pointer', borderRadius: 6, padding: '2px 7px', fontSize: 11, color: unresolved > 0 ? '#92400e' : '#6d28d9', fontWeight: 700 }}>
+                              💬 {itemComments.length}
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                      {isExpanded && (
+                        <tr>
+                          <td colSpan={8} style={{ padding: '12px 16px', background: '#faf5ff', borderTop: '1px solid #e9d5ff' }}>
+                            {itemComments.map(c => (
+                              <CommentThread key={c.id} comment={c} reportId={id} canComment={true} onRefresh={load} />
+                            ))}
+                          </td>
+                        </tr>
                       )}
-                    </td>
-                    <td style={{ color: '#6b7280', textTransform: 'capitalize' }}>{item.payment_type?.replace('_', ' ') ?? '—'}</td>
-                    <td style={{ color: item.reimbursable ? '#166534' : '#dc2626' }}>{item.reimbursable ? 'Yes' : 'No'}</td>
-                  </tr>
-                ))}
+                    </Fragment>
+                  )
+                })}
               </tbody>
             </table>
           </div>
