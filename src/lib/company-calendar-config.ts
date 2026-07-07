@@ -40,6 +40,14 @@ export const COMPANY_CALENDAR_EVENT_TYPES: CompanyCalendarEventType[] = [
     googleColorIds: [],
     titlePrefixes: ['[PTO]', 'PTO:'],
   },
+  {
+    id: 'vendor_demo',
+    label: 'Vendor Demos',
+    color: '#059669',
+    accentColor: '#ecfdf5',
+    googleColorIds: [],
+    titlePrefixes: [],
+  },
 ]
 
 export function getCompanyCalendarId() {

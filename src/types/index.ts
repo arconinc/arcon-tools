@@ -125,7 +125,7 @@ export interface BirthdayEvent {
 
 // ─── Company Calendar ────────────────────────────────────────────────────────
 
-export type CompanyCalendarEventTypeId = 'birthday' | 'anniversary' | 'company' | 'pto'
+export type CompanyCalendarEventTypeId = 'birthday' | 'anniversary' | 'company' | 'pto' | 'vendor_demo'
 
 export interface CompanyCalendarEventType {
   id: CompanyCalendarEventTypeId
@@ -170,6 +170,25 @@ export interface MarketingCalendarEvent {
   created_by: string
   created_at: string
   updated_at: string
+}
+
+// ─── Vendor Relations ───────────────────────────────────────────────────────
+
+export type VendorDemoSlotStatus = 'open' | 'reserved'
+
+export interface VendorDemoSlot {
+  id: string
+  start_time: string
+  end_time: string
+  status: VendorDemoSlotStatus
+  vendor_id: string | null
+  vendor_notes: string | null
+  reserved_at: string | null
+  task_id: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+  vendor: { id: string; name: string } | null
 }
 
 // ─── Store ───────────────────────────────────────────────────────────────────

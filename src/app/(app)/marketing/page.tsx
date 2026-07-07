@@ -18,10 +18,14 @@ const MARKETING_LINKS = [
     description: 'Track samples, customer follow-ups, proofs, PO numbers, suppliers, and sent dates.',
     href: '/marketing/specs',
   },
+  {
+    title: 'Vendor Relations',
+    description: 'Define vendor demo time slots and see who has booked a spot.',
+    href: '/marketing/vendor-relations',
+  },
 ]
 
 const UPCOMING_LINKS = [
-  'Vendor Relations',
   'Social Media',
   'Self Promo',
 ]

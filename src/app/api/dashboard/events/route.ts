@@ -30,15 +30,16 @@ export async function GET() {
 
   try {
     const { timeMin, timeMax } = getCalendarWindow()
-    const [googleEvents, dbBirthdays, dbAnniversaries, dbPto] = await Promise.all([
+    const [googleEvents, dbBirthdays, dbAnniversaries, dbPto, dbVendorDemos] = await Promise.all([
       getCachedCalendarEvents(timeMin, timeMax),
       fetchDbBirthdayEvents(timeMin, timeMax),
       fetchDbAnniversaryEvents(timeMin, timeMax),
       fetchDbPtoEvents(timeMin, timeMax),
+      fetchDbVendorDemoEvents(timeMin, timeMax),
     ])
     const response: CompanyCalendarResponse = {
       eventTypes: COMPANY_CALENDAR_EVENT_TYPES,
-      events: [...googleEvents, ...dbBirthdays, ...dbAnniversaries, ...dbPto],
+      events: [...googleEvents, ...dbBirthdays, ...dbAnniversaries, ...dbPto, ...dbVendorDemos],
       cachedAt: new Date().toISOString(),
     }
 
@@ -170,6 +171,36 @@ async function fetchDbPtoEvents(timeMin: string, timeMax: string): Promise<Compa
       start: row.start_date,
       end: endDateStr,
       allDay: true,
+      description: null,
+      location: null,
+      htmlLink: null,
+      googleColorId: null,
+    }
+  })
+}
+
+async function fetchDbVendorDemoEvents(timeMin: string, timeMax: string): Promise<CompanyCalendarEvent[]> {
+  const adminClient = createAdminClient()
+  const { data: rows } = await adminClient
+    .from('vendor_demo_slots')
+    .select('id, start_time, end_time, vendor:crm_vendors(name)')
+    .eq('status', 'reserved')
+    .gte('start_time', timeMin)
+    .lt('start_time', timeMax)
+
+  if (!rows) return []
+
+  return rows.map((row) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const vendorName = (row.vendor as any)?.name ?? 'Vendor'
+    return {
+      id: `vendor-demo-${row.id}`,
+      title: `Vendor Demo: ${vendorName}`,
+      type: 'vendor_demo' as const,
+      typeLabel: 'Vendor Demos',
+      start: row.start_time,
+      end: row.end_time,
+      allDay: false,
       description: null,
       location: null,
       htmlLink: null,

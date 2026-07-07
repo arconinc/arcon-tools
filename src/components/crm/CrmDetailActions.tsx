@@ -2,7 +2,12 @@
 
 import { useEffect, useRef, useState } from 'react'
 
-export function CrmDetailActions({ onCreateTask }: { onCreateTask: () => void }) {
+interface CrmDetailActionsProps {
+  onCreateTask: () => void
+  extraAction?: { label: string; href: string }
+}
+
+export function CrmDetailActions({ onCreateTask, extraAction }: CrmDetailActionsProps) {
   const [open, setOpen] = useState(false)
   const ref = useRef<HTMLDivElement>(null)
 
@@ -38,6 +43,15 @@ export function CrmDetailActions({ onCreateTask }: { onCreateTask: () => void })
           >
             Create Task
           </button>
+          {extraAction && (
+            <a
+              href={extraAction.href}
+              onClick={() => setTimeout(() => setOpen(false), 0)}
+              className="block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-purple-50 hover:text-purple-700"
+            >
+              {extraAction.label}
+            </a>
+          )}
         </div>
       )}
     </div>

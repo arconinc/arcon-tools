@@ -63,7 +63,7 @@ type VendorDetail = {
   notes: string | null
   logo_url: string | null; brand_data_id: string | null; brand_data: BrandDataLocal | null
   created_by: string; created_at: string; updated_at: string
-  contacts: { id: string; first_name: string; last_name: string; title: string | null; email: string | null; phone: string | null }[]
+  contacts: { id: string; first_name: string; last_name: string; title: string | null; email: string | null; phone: string | null; created_at: string }[]
   files: { id: string; label: string; url: string; created_at: string }[]
   created_by_user: { id: string; display_name: string; email: string } | null
 }
@@ -766,6 +766,14 @@ export default function VendorDetailPage() {
 
   const ef = editForm as Partial<VendorDetail>
 
+  const firstContact = [...vendor.contacts].sort((a, b) => a.created_at.localeCompare(b.created_at))[0]
+  const vendorRelationsMailto = firstContact?.email && typeof window !== 'undefined'
+    ? (() => {
+        const signupUrl = `${window.location.origin}/order/vendor-relations/${vendor.id}`
+        const body = `Hi,\n\nPlease use the link below to sign up for a Vendor Relations demo time slot:\n${signupUrl}\n\nThanks,\nArcon`
+        return `mailto:${firstContact.email}?subject=${encodeURIComponent('Vendor Demonstration Signup')}&body=${encodeURIComponent(body)}`
+      })()
+    : undefined
 
   return (
     <div className="px-6 py-5">
@@ -802,7 +810,10 @@ export default function VendorDetailPage() {
               )}
             </div>
           </div>
-          <CrmDetailActions onCreateTask={() => setCreateTaskOpen(true)} />
+          <CrmDetailActions
+            onCreateTask={() => setCreateTaskOpen(true)}
+            extraAction={vendorRelationsMailto ? { label: 'Email Vendor Relations Signup', href: vendorRelationsMailto } : undefined}
+          />
         </div>
       </div>
 
