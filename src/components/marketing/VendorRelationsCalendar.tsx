@@ -81,6 +81,17 @@ export default function VendorRelationsCalendar() {
     return `${dateLabel} · ${startLabel} – ${endLabel}`
   }
 
+  function buildGoogleCalendarUrl(slot: VendorDemoSlot) {
+    const fmt = (d: Date) =>
+      d.toISOString().replace(/[-:]/g, '').replace(/\.\d{3}/, '')
+    const start = fmt(new Date(slot.start_time))
+    const end = fmt(new Date(slot.end_time))
+    const title = slot.status === 'reserved' ? `Vendor Demo – ${slot.vendor?.name ?? 'Vendor'}` : 'Vendor Demo (Open Slot)'
+    const details = slot.vendor_notes ? encodeURIComponent(slot.vendor_notes) : ''
+    const text = encodeURIComponent(title)
+    return `https://calendar.google.com/calendar/render?action=TEMPLATE&text=${text}&dates=${start}/${end}&details=${details}`
+  }
+
   async function handleDelete(slot: VendorDemoSlot) {
     const message =
       slot.status === 'reserved'
@@ -153,11 +164,23 @@ export default function VendorRelationsCalendar() {
               {selectedSlot.vendor_notes && (
                 <p style={{ fontSize: 12, color: '#555', marginTop: 8 }}>{selectedSlot.vendor_notes}</p>
               )}
-              {canEdit && (
-                <button type="button" className="event-detail-delete" onClick={() => handleDelete(selectedSlot)}>
-                  Delete Time Slot
-                </button>
-              )}
+              <div style={{ marginTop: 10, display: 'flex', alignItems: 'center', gap: 8 }}>
+                <a
+                  href={buildGoogleCalendarUrl(selectedSlot)}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Create an event in Google Calendar and invite the team"
+                  style={{ fontSize: 11, fontWeight: 700, color: '#fff', background: '#6b1e98', textDecoration: 'none', borderRadius: 6, padding: '5px 10px', display: 'inline-block' }}
+                >
+                  📅 Create Event
+                </a>
+                {canEdit && (
+                  <button type="button" onClick={() => handleDelete(selectedSlot)} style={{ fontSize: 11, fontWeight: 700, color: '#b91c1c', background: '#fef2f2', border: '1px solid #fecaca', borderRadius: 6, padding: '5px 10px', cursor: 'pointer', display: 'inline-flex', alignItems: 'center', gap: 5 }}>
+                    <svg width="11" height="11" viewBox="0 0 16 16" fill="currentColor"><path d="M6 2a1 1 0 0 0-1 1v.5H2.5a.5.5 0 0 0 0 1H3v9a1 1 0 0 0 1 1h8a1 1 0 0 0 1-1v-9h.5a.5.5 0 0 0 0-1H11V3a1 1 0 0 0-1-1H6zm1 1h2v.5H7V3zm-3 2h8v9H4V5zm2 1.5a.5.5 0 0 0-.5.5v5a.5.5 0 0 0 1 0V7a.5.5 0 0 0-.5-.5zm2 0a.5.5 0 0 0-.5.5v5a.5.5 0 0 0 1 0V7a.5.5 0 0 0-.5-.5zm2 0a.5.5 0 0 0-.5.5v5a.5.5 0 0 0 1 0V7a.5.5 0 0 0-.5-.5z"/></svg>
+                    Delete Time Slot
+                  </button>
+                )}
+              </div>
             </div>
           )}
         </>
