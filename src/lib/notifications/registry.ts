@@ -49,7 +49,7 @@ export const taskAssigned: NotificationDefinition<TaskAssignedPayload> = {
         ? `New ${p.department} task: ${p.task_title}`
         : `${p.actor_name} assigned you: ${p.task_title}`,
     body: fmtDueDate(p.due_date) ? `Due ${fmtDueDate(p.due_date)}` : 'No due date',
-    linkUrl: `/sales/tasks/${p.task_id}`,
+    linkUrl: `/tasks/${p.task_id}`,
   }),
   email: (p, recipient) => {
     const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
@@ -82,7 +82,7 @@ export const taskAssigned: NotificationDefinition<TaskAssignedPayload> = {
         greeting: `Hi ${firstName},`,
         bodyLines: lines,
         ctaText: 'View task',
-        ctaUrl: `${appUrl()}/sales/tasks/${p.task_id}`,
+        ctaUrl: `${appUrl()}/tasks/${p.task_id}`,
       }),
     }
   },
@@ -416,7 +416,7 @@ export const taskCompleted: NotificationDefinition<TaskCompletedPayload> = {
   render: (p) => ({
     title: `${p.actor_name} completed: ${p.task_title}`,
     body: p.department ? `${p.department} task marked complete` : 'Task marked complete',
-    linkUrl: `/sales/tasks/${p.task_id}`,
+    linkUrl: `/tasks/${p.task_id}`,
   }),
   email: (p, recipient) => {
     const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
@@ -432,7 +432,7 @@ export const taskCompleted: NotificationDefinition<TaskCompletedPayload> = {
           ...(p.department ? [`<strong>Department:</strong> ${p.department}`] : []),
         ],
         ctaText: 'View task',
-        ctaUrl: `${appUrl()}/sales/tasks/${p.task_id}`,
+        ctaUrl: `${appUrl()}/tasks/${p.task_id}`,
       }),
     }
   },
@@ -582,7 +582,7 @@ export const contactFormSubmitted: NotificationDefinition<ContactFormSubmittedPa
   render: (p) => ({
     title: `New contact form: ${p.task_title}`,
     body: `Via ${p.source}`,
-    linkUrl: `/sales/tasks/${p.task_id}`,
+    linkUrl: `/tasks/${p.task_id}`,
   }),
   email: (p, recipient) => {
     const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
@@ -605,7 +605,7 @@ export const contactFormSubmitted: NotificationDefinition<ContactFormSubmittedPa
           tableHtml,
         ],
         ctaText: 'View Task',
-        ctaUrl: `${appUrl()}/sales/tasks/${p.task_id}`,
+        ctaUrl: `${appUrl()}/tasks/${p.task_id}`,
       }),
     }
   },
