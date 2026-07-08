@@ -128,9 +128,9 @@ export async function POST(req: NextRequest) {
             priority: 'medium',
             status: 'not_started',
             description,
-            fanout_kind: 'user',
+            fanout_kind: 'department',
           },
-          recipientSpec: { userId: assigneeId },
+          recipientSpec: { department: 'Marketing' },
         })
       } catch (err) {
         console.error('[public/vendor-relations/reserve] notification dispatch failed:', err)
