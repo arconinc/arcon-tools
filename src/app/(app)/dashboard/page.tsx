@@ -97,6 +97,8 @@ export default function DashboardPage() {
         .hero-eyebrow { font-size: 10px; font-weight: 800; letter-spacing: 0.08em; text-transform: uppercase; color: rgba(255,255,255,0.74); margin-bottom: 5px; }
         .hero-title { font-size: 22px; font-weight: 800; color: #fff; line-height: 1.2; margin-bottom: 4px; text-shadow: 0 1px 4px rgba(0,0,0,0.4); text-wrap: balance; }
         .hero-sub { font-size: 13px; color: rgba(255,255,255,0.84); font-weight: 500; max-width: 68ch; text-wrap: pretty; }
+        .hero-learn-more { display: inline-block; margin-top: 10px; padding: 6px 14px; background: rgba(255,255,255,0.18); border: 1px solid rgba(255,255,255,0.4); border-radius: 999px; font-size: 12px; font-weight: 700; color: #fff; text-decoration: none; backdrop-filter: blur(4px); transition: background 150ms ease, border-color 150ms ease; }
+        .hero-learn-more:hover { background: rgba(255,255,255,0.28); border-color: rgba(255,255,255,0.6); }
         .hero-arrow { position: absolute; top: 50%; transform: translateY(-50%); z-index: 20; width: 36px; height: 36px; background: rgba(0,0,0,0.38); border: 1px solid rgba(255,255,255,0.32); border-radius: 999px; display: flex; align-items: center; justify-content: center; cursor: pointer; color: #fff; transition: background 150ms ease, border-color 150ms ease; }
         .hero-arrow:hover { background: rgba(107,30,152,0.82); border-color: rgba(255,255,255,0.46); }
         .hero-arrow:focus-visible, .hero-dot:focus-visible, .banner-edit:focus-visible, .card-action:focus-visible { outline: 2px solid #c084fc; outline-offset: 2px; }
@@ -209,6 +211,16 @@ export default function DashboardPage() {
                   {slide.emoji ? ` ${slide.emoji}` : ''}
                 </div>
                 {slide.subhead && <div className="hero-sub">{slide.subhead}</div>}
+                {slide.link_url && (
+                  <a
+                    href={slide.link_url}
+                    className="hero-learn-more"
+                    target={slide.link_url.startsWith('http') ? '_blank' : undefined}
+                    rel={slide.link_url.startsWith('http') ? 'noopener noreferrer' : undefined}
+                  >
+                    Learn More →
+                  </a>
+                )}
               </div>
             </div>
           ))}

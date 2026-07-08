@@ -2,7 +2,6 @@ import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
-import AppShell from '@/components/layout/AppShell'
 import { TiptapRenderer } from '@/components/news/TiptapRenderer'
 import { ArticleTypeBadge } from '@/components/news/ArticleTypeBadge'
 import { formatPublishDate } from '@/lib/news-utils'
@@ -46,11 +45,8 @@ export default async function ArticleReaderPage({ params }: PageProps) {
   const poll = a.content_kind === 'poll'
     ? await getPollData(a.id, appUser.id, !a.poll_is_anonymous || appUser.is_admin)
     : undefined
-  const avatarUrl = user.user_metadata?.avatar_url || user.user_metadata?.picture || null
-
 
   return (
-    <AppShell user={{ ...appUser, avatar_url: avatarUrl }}>
       <div className="max-w-4xl mx-auto px-6 py-8">
         {/* Back */}
         <Link href="/news" className="text-sm text-slate-400 hover:text-purple-600 flex items-center gap-1 mb-6 transition-colors">
@@ -112,6 +108,5 @@ export default async function ArticleReaderPage({ params }: PageProps) {
           </Link>
         </div>
       </div>
-    </AppShell>
   )
 }

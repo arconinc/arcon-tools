@@ -414,6 +414,20 @@ function SlideCard({
               className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
             />
           </div>
+
+          <div>
+            <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1.5">
+              Learn More URL <span className="font-normal normal-case text-slate-400">(optional)</span>
+            </label>
+            <input
+              type="url"
+              value={slide.link_url ?? ''}
+              onChange={(e) => onChange({ link_url: e.target.value || null })}
+              placeholder="e.g. /news/article-id or https://..."
+              className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
+            />
+            <p className="text-xs text-slate-400 mt-1">If set, a &quot;Learn More&quot; button appears on the slide.</p>
+          </div>
         </div>
 
         {/* Right — background */}
@@ -640,6 +654,11 @@ function PreviewModal({
                       {s.emoji ? ` ${s.emoji}` : ''}
                     </div>
                     {s.subhead && <div className="be-sub">{s.subhead}</div>}
+                    {s.link_url && (
+                      <span style={{ display: 'inline-block', marginTop: 8, padding: '4px 12px', background: 'rgba(255,255,255,0.18)', border: '1px solid rgba(255,255,255,0.4)', borderRadius: 999, fontSize: 11, fontWeight: 700, color: '#fff' }}>
+                        Learn More →
+                      </span>
+                    )}
                   </div>
                 </div>
               ))}

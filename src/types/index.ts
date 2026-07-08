@@ -364,6 +364,7 @@ export interface BannerSlide {
   bg_type: 'gradient' | 'image'
   bg_gradient: 'hs-1' | 'hs-2' | 'hs-3' | 'hs-4' | 'hs-5'
   bg_image_url: string | null
+  link_url?: string | null
 }
 
 export interface BannerConfig {
