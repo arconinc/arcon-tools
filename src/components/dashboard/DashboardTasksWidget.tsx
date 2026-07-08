@@ -175,6 +175,7 @@ export function DashboardTasksWidget() {
           emptyMessage="No tasks assigned to you."
           getRowKey={(t) => t.id}
           onRowClick={() => router.push(tasksUrl)}
+          resizable
         />
       </div>
     </div>

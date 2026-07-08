@@ -158,6 +158,7 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
       label: 'HR',
       items: [
         { href: '/documents/hr', label: 'Documents', icon: DocumentIcon, adminMatch: true },
+        { href: '/hr/links', label: 'Employee Links', icon: LinkIcon, adminMatch: true },
         { href: '/hr/pto', label: 'PTO Requests', icon: CalendarIcon, adminMatch: true },
         { href: '/hr/pto/requests', label: 'Review PTO', icon: TaskCheckIcon, adminMatch: true, requiredRole: 'access:hr_access' },
         { href: '/hr/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true, requiredRole: 'access:hr_access' },
@@ -201,6 +202,7 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
         { href: '/admin/marketing-import', label: 'Marketing Import', icon: UploadIcon, adminMatch: true },
         { href: '/admin/specs/ideas', label: 'Spec Ideas', icon: SpecSampleIcon, adminMatch: true },
         { href: '/admin/stores', label: 'Stores', icon: StoreIcon, adminMatch: true },
+        { href: '/admin/hr-links', label: 'Employee Links', icon: LinkIcon, adminMatch: true },
         { href: '/admin/users', label: 'Manage Users', icon: UserAdminIcon, adminMatch: true },
         { href: '/admin/groups', label: 'Groups', icon: UsersIcon, adminMatch: true },
         { href: '/admin/access-requests', label: 'Access Requests', icon: LockIcon, adminMatch: true },
@@ -991,6 +993,9 @@ function UploadIcon({ className }: { className?: string }) {
   return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-8l-4-4m0 0L8 8m4-4v12" /></svg>
 }
 
+function LinkIcon({ className }: { className?: string }) {
+  return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13.828 10.172a4 4 0 00-5.656 0l-4 4a4 4 0 105.656 5.656l1.102-1.101m-.758-4.899a4 4 0 005.656 0l4-4a4 4 0 00-5.656-5.656l-1.1 1.1" /></svg>
+}
 function LoginIcon({ className }: { className?: string }) {
   return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 5l7 7m0 0l-7 7m7-7H3" /></svg>
 }

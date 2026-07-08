@@ -1,6 +1,6 @@
 'use client'
 
-import { Fragment, type KeyboardEvent, type ReactNode, useMemo, useState } from 'react'
+import { Fragment, type KeyboardEvent, type ReactNode, useCallback, useMemo, useRef, useState } from 'react'
 
 type SortDirection = 'asc' | 'desc'
 type SortValue = string | number | boolean | Date | null | undefined
@@ -13,6 +13,7 @@ export type DataTableColumn<T> = {
   className?: string
   headerClassName?: string
   skeletonWidth?: string
+  width?: number
 }
 
 type Pagination = {
@@ -33,6 +34,7 @@ type DataTableProps<T> = {
   renderExpandedRow?: (row: T) => ReactNode
   pagination?: Pagination
   minWidth?: string
+  resizable?: boolean
 }
 
 function normalizeSortValue(value: SortValue): string | number {
@@ -113,9 +115,35 @@ export function DataTable<T>({
   renderExpandedRow,
   pagination,
   minWidth = '760px',
+  resizable = false,
 }: DataTableProps<T>) {
   const [sortKey, setSortKey] = useState<string | null>(null)
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc')
+  const [colWidths, setColWidths] = useState<Record<string, number>>(() =>
+    Object.fromEntries(columns.filter((c) => c.width).map((c) => [c.key, c.width!]))
+  )
+  const dragState = useRef<{ key: string; startX: number; startWidth: number } | null>(null)
+
+  const startResize = useCallback((e: React.MouseEvent, key: string, currentWidth: number) => {
+    e.preventDefault()
+    dragState.current = { key, startX: e.clientX, startWidth: currentWidth }
+
+    function onMove(ev: MouseEvent) {
+      if (!dragState.current) return
+      const delta = ev.clientX - dragState.current.startX
+      const next = Math.max(60, dragState.current.startWidth + delta)
+      setColWidths((prev) => ({ ...prev, [dragState.current!.key]: next }))
+    }
+
+    function onUp() {
+      dragState.current = null
+      window.removeEventListener('mousemove', onMove)
+      window.removeEventListener('mouseup', onUp)
+    }
+
+    window.addEventListener('mousemove', onMove)
+    window.addEventListener('mouseup', onUp)
+  }, [])
 
   const sortedRows = useMemo(() => {
     const sortColumn = columns.find((column) => column.key === sortKey)
@@ -148,7 +176,14 @@ export function DataTable<T>({
   return (
     <div className="overflow-hidden rounded-[10px] border border-purple-100 bg-white">
       <div className="overflow-x-auto">
-        <table className="w-full text-sm" style={{ minWidth }}>
+        <table className="w-full text-sm" style={{ minWidth, tableLayout: resizable ? 'fixed' : undefined }}>
+          {resizable && (
+            <colgroup>
+              {columns.map((column) => (
+                <col key={column.key} style={colWidths[column.key] ? { width: colWidths[column.key] } : undefined} />
+              ))}
+            </colgroup>
+          )}
           <thead className="border-b border-purple-100 bg-purple-50/70">
             <tr>
               {columns.map((column) => {
@@ -158,6 +193,7 @@ export function DataTable<T>({
                     key={column.key}
                     className={`px-5 py-3 text-left text-xs font-semibold uppercase tracking-wide text-purple-950/70 ${column.className ?? ''} ${column.headerClassName ?? ''}`}
                     aria-sort={isSorted ? (sortDirection === 'asc' ? 'ascending' : 'descending') : undefined}
+                    style={{ position: 'relative', userSelect: resizable ? 'none' : undefined }}
                   >
                     {column.sortValue ? (
                       <button
@@ -173,6 +209,18 @@ export function DataTable<T>({
                       </button>
                     ) : (
                       column.header
+                    )}
+                    {resizable && (
+                      <span
+                        onMouseDown={(e) => startResize(e, column.key, colWidths[column.key] ?? (e.currentTarget.parentElement?.offsetWidth ?? 100))}
+                        style={{
+                          position: 'absolute', top: 0, right: 0, bottom: 0,
+                          width: 6, cursor: 'col-resize',
+                          background: 'transparent',
+                        }}
+                        onMouseEnter={(e) => { (e.currentTarget as HTMLElement).style.background = 'rgba(109,40,217,0.15)' }}
+                        onMouseLeave={(e) => { (e.currentTarget as HTMLElement).style.background = 'transparent' }}
+                      />
                     )}
                   </th>
                 )
