@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 import { dispatchNotification } from '@/lib/notifications/dispatch'
 import { taskAssigned } from '@/lib/notifications/registry'
+import { fetchAndStoreOgImage } from '@/lib/specs/fetch-og-image'
 
 // GET /api/marketing/specs?customer_id=&csr_id=&status=&vendor=&month=YYYY-MM&page=1&limit=50
 export async function GET(req: NextRequest) {
@@ -204,6 +205,11 @@ export async function POST(req: NextRequest) {
           })
         }
       }
+    }
+
+    // Auto-fetch og:image from vendor_link if no image yet
+    if (newSpec.vendor_link && !newSpec.item_image_url) {
+      fetchAndStoreOgImage(newSpec.vendor_link, newSpec.id).catch(() => null)
     }
 
     created.push(newSpec)

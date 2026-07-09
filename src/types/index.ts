@@ -1155,6 +1155,7 @@ export interface SpecSample {
   linked_task_id: string | null
   artwork_task_id: string | null
   spec_idea_id: string | null
+  proof_url: string | null
   created_at: string
   updated_at: string
 }

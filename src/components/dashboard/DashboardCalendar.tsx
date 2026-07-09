@@ -14,6 +14,48 @@ import {
 } from '@/types'
 import { FilterPill } from '@/components/ui'
 
+const EVENT_TYPE_ICONS: Record<string, (color: string) => React.ReactNode> = {
+  birthday: (color) => (
+    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: 'inline-block', flexShrink: 0 }}>
+      <path d="M8 1c.6 0 1 .5.8 1L8 4 7.2 2c-.2-.5.2-1 .8-1z" fill={color}/>
+      <rect x="2" y="7" width="12" height="8" rx="1.5" fill={color} opacity=".25"/>
+      <path d="M2 10h12v1H2z" fill={color}/>
+      <rect x="2" y="7" width="12" height="8" rx="1.5" stroke={color} strokeWidth="1.2" fill="none"/>
+      <circle cx="5.5" cy="4.5" r="1" fill={color}/>
+      <circle cx="10.5" cy="4.5" r="1" fill={color}/>
+      <path d="M5.5 3.5V6M10.5 3.5V6" stroke={color} strokeWidth="1.2" strokeLinecap="round"/>
+    </svg>
+  ),
+  anniversary: (color) => (
+    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: 'inline-block', flexShrink: 0 }}>
+      <path d="M8 2.5C5.5 2.5 3 4.5 3 7c0 3 5 6.5 5 6.5s5-3.5 5-6.5c0-2.5-2.5-4.5-5-4.5z" fill={color} opacity=".25" stroke={color} strokeWidth="1.2"/>
+      <circle cx="8" cy="7" r="2" fill={color}/>
+    </svg>
+  ),
+  company: (color) => (
+    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: 'inline-block', flexShrink: 0 }}>
+      <rect x="2" y="2" width="12" height="12" rx="1.5" stroke={color} strokeWidth="1.2" fill={color} fillOpacity=".15"/>
+      <path d="M2 5.5h12" stroke={color} strokeWidth="1.2"/>
+      <circle cx="5" cy="3.75" r=".8" fill={color}/>
+      <circle cx="11" cy="3.75" r=".8" fill={color}/>
+      <rect x="5" y="8" width="2" height="2" rx=".4" fill={color}/>
+      <rect x="9" y="8" width="2" height="2" rx=".4" fill={color}/>
+    </svg>
+  ),
+  pto: (color) => (
+    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: 'inline-block', flexShrink: 0 }}>
+      <circle cx="8" cy="8" r="5.5" stroke={color} strokeWidth="1.2" fill={color} fillOpacity=".15"/>
+      <path d="M8 5v3.5l2 2" stroke={color} strokeWidth="1.2" strokeLinecap="round" strokeLinejoin="round"/>
+    </svg>
+  ),
+  vendor_demo: (color) => (
+    <svg width="11" height="11" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" style={{ display: 'inline-block', flexShrink: 0 }}>
+      <rect x="1.5" y="3" width="13" height="9" rx="1.5" stroke={color} strokeWidth="1.2" fill={color} fillOpacity=".15"/>
+      <path d="M6 7l3 1.5L6 10V7z" fill={color}/>
+    </svg>
+  ),
+}
+
 export default function DashboardCalendar() {
   const [companyEvents, setCompanyEvents] = useState<CompanyCalendarEvent[]>([])
   const [eventTypes, setEventTypes] = useState<CompanyCalendarEventType[]>([])
@@ -84,7 +126,9 @@ export default function DashboardCalendar() {
     const type = event ? eventTypeMap.get(event.type) : null
     return (
       <div className="arc-cal-event" title={event?.title ?? info.event.title}>
-        <span className="arc-cal-dot" style={{ background: type?.accentColor ?? '#f3e8ff' }} />
+        {event?.type && EVENT_TYPE_ICONS[event.type]
+          ? EVENT_TYPE_ICONS[event.type](type?.accentColor ?? '#f3e8ff')
+          : <span className="arc-cal-dot" style={{ background: type?.accentColor ?? '#f3e8ff' }} />}
         {info.timeText && <span className="arc-cal-time">{info.timeText}</span>}
         <span className="arc-cal-title">{info.event.title}</span>
       </div>
@@ -146,7 +190,7 @@ export default function DashboardCalendar() {
               label={type.label}
               active={active}
               onClick={() => toggleType(type.id)}
-              icon={<span style={{ width: 7, height: 7, borderRadius: '50%', background: active ? '#fff' : type.color, display: 'inline-block' }} />}
+              icon={EVENT_TYPE_ICONS[type.id] ? EVENT_TYPE_ICONS[type.id](active ? '#fff' : type.color) : <span style={{ width: 7, height: 7, borderRadius: '50%', background: active ? '#fff' : type.color, display: 'inline-block' }} />}
               style={{
                 background: active ? type.color : '#fff',
                 borderColor: type.color,
@@ -202,7 +246,7 @@ export default function DashboardCalendar() {
                     className="event-type-pill"
                     style={{ background: type?.accentColor ?? '#f3e8ff', color: type?.color ?? '#6b1e98' }}
                   >
-                    <span className="event-filter-dot" style={{ background: type?.color ?? '#6b1e98', marginRight: 0 }} />
+                    {type && EVENT_TYPE_ICONS[type.id] ? EVENT_TYPE_ICONS[type.id](type.color) : <span className="event-filter-dot" style={{ background: type?.color ?? '#6b1e98', marginRight: 0 }} />}
                     {selectedEvent.typeLabel}
                   </span>
                   <span>{formatSelectedEventDate(selectedEvent)}</span>

@@ -121,6 +121,7 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
       items: [
         { href: 'https://arcon.erp.network/', label: 'Login', icon: LoginIcon },
         { href: '/sales/customers/new', label: 'Add Customer', icon: CrmCustomersIcon },
+        { href: '/sales/suppliers/new', label: 'Add Supplier', icon: BuildingIcon },
       ],
     },
       {
@@ -142,6 +143,7 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
         { href: '/marketing/calendar', label: 'Calendar', icon: CalendarIcon, adminMatch: true },
         { href: '/documents/marketing', label: 'Documents', icon: DocumentIcon, adminMatch: true },
         { href: '/marketing/specs', label: 'Spec Samples', icon: SpecSampleIcon, adminMatch: true },
+        { href: '/admin/specs/ideas', label: 'Spec Ideas', icon: SpecSampleIcon, adminOnly: true, adminMatch: true },
         { href: '/marketing/vendor-relations', label: 'Vendor Relations', icon: BuildingIcon, adminMatch: true },
         { href: '/marketing/self-promo', label: 'Self-promo', icon: MegaphoneIcon, adminMatch: true },
       ],
@@ -200,7 +202,6 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
         { href: '/admin/marketing-goals', label: 'Sales Goals', icon: GoalIcon, adminMatch: true },
         { href: '/admin/marketing-tags', label: 'Marketing Tags', icon: TagIcon, adminMatch: true },
         { href: '/admin/marketing-import', label: 'Marketing Import', icon: UploadIcon, adminMatch: true },
-        { href: '/admin/specs/ideas', label: 'Spec Ideas', icon: SpecSampleIcon, adminMatch: true },
         { href: '/admin/stores', label: 'Stores', icon: StoreIcon, adminMatch: true },
         { href: '/admin/hr-links', label: 'Employee Links', icon: LinkIcon, adminMatch: true },
         { href: '/admin/users', label: 'Manage Users', icon: UserAdminIcon, adminMatch: true },

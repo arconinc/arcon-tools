@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
+import { fetchAndStoreOgImage } from '@/lib/specs/fetch-og-image'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -68,6 +69,14 @@ export async function PUT(req: NextRequest, { params }: Params) {
   } = body
 
   const adminClient = createAdminClient()
+
+  // Check if vendor_link is changing so we know whether to re-fetch og:image
+  const { data: existing } = await adminClient
+    .from('spec_samples')
+    .select('vendor_link, item_image_url')
+    .eq('id', id)
+    .single()
+
   const { data, error } = await adminClient
     .from('spec_samples')
     .update({ ...rest, updated_at: new Date().toISOString() })
@@ -76,6 +85,16 @@ export async function PUT(req: NextRequest, { params }: Params) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Re-fetch og:image if vendor_link changed
+  if (
+    rest.vendor_link !== undefined &&
+    rest.vendor_link !== existing?.vendor_link &&
+    rest.vendor_link
+  ) {
+    fetchAndStoreOgImage(rest.vendor_link, id).catch(() => null)
+  }
+
   return NextResponse.json(data)
 }
 

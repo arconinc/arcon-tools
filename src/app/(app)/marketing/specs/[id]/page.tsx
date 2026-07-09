@@ -33,6 +33,7 @@ type SpecDetail = {
   linked_task: { id: string; title: string; status: string; due_date: string | null } | null
   artwork_task: { id: string; title: string; status: string; due_date: string | null } | null
   spec_idea: { id: string; item_name: string; vendor: string; image_url: string | null; ordering_instructions_html: string | null } | null
+  proof_url: string | null
 }
 
 // ─── Status config ────────────────────────────────────────────────────────────
@@ -109,6 +110,9 @@ export default function SpecDetailPage() {
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState<Partial<SpecDetail>>({})
   const [deletingSpec, setDeletingSpec] = useState(false)
+  const [fetchingImage, setFetchingImage] = useState(false)
+  const [uploadingProof, setUploadingProof] = useState(false)
+  const [imageError, setImageError] = useState<string | null>(null)
 
   useEffect(() => {
     fetch(`/api/marketing/specs/${id}`)
@@ -141,6 +145,36 @@ export default function SpecDetailPage() {
     setSpec(prev => prev ? { ...prev, ...updated } : null)
     setEditing(false)
     setSaving(false)
+  }
+
+  async function handleFetchImage() {
+    if (!spec) return
+    setFetchingImage(true)
+    setImageError(null)
+    const res = await fetch(`/api/marketing/specs/${id}/fetch-image`, { method: 'POST' })
+    const data = await res.json()
+    if (res.ok) {
+      setSpec(prev => prev ? { ...prev, item_image_url: data.url } : null)
+    } else {
+      setImageError(data.error ?? 'Failed to fetch image')
+    }
+    setFetchingImage(false)
+  }
+
+  async function handleProofUpload(file: File) {
+    setUploadingProof(true)
+    setImageError(null)
+    const fd = new FormData()
+    fd.append('file', file)
+    const res = await fetch(`/api/marketing/specs/${id}/upload-proof`, { method: 'POST', body: fd })
+    const data = await res.json()
+    if (res.ok) {
+      const isImage = file.type !== 'application/pdf'
+      setSpec(prev => prev ? { ...prev, proof_url: data.url, ...(isImage ? { item_image_url: data.url } : {}) } : null)
+    } else {
+      setImageError(data.error ?? 'Upload failed')
+    }
+    setUploadingProof(false)
   }
 
   async function handleDelete() {
@@ -213,13 +247,26 @@ export default function SpecDetailPage() {
 
       {/* Header */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 20, marginBottom: 24 }}>
-        {spec.item_image_url ? (
-          <img src={spec.item_image_url} alt="" style={{ width: 80, height: 80, borderRadius: 12, objectFit: 'cover', border: '1px solid #e2e8f0', flexShrink: 0 }} />
-        ) : (
-          <div style={{ width: 80, height: 80, borderRadius: 12, background: '#f1f5f9', border: '1px solid #e2e8f0', flexShrink: 0, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-            <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="#cbd5e1" strokeWidth={1}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
-          </div>
-        )}
+        <div style={{ flexShrink: 0, display: 'flex', flexDirection: 'column', gap: 6, alignItems: 'center' }}>
+          {spec.item_image_url ? (
+            <img src={spec.item_image_url} alt="" style={{ width: 80, height: 80, borderRadius: 12, objectFit: 'cover', border: '1px solid #e2e8f0' }} />
+          ) : (
+            <div style={{ width: 80, height: 80, borderRadius: 12, background: '#f1f5f9', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+              <svg width="32" height="32" fill="none" viewBox="0 0 24 24" stroke="#cbd5e1" strokeWidth={1}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path d="M21 15l-5-5L5 21"/></svg>
+            </div>
+          )}
+          {spec.vendor_link && (
+            <button
+              onClick={handleFetchImage}
+              disabled={fetchingImage}
+              title="Fetch image from vendor page"
+              style={{ fontSize: 10, fontWeight: 600, color: '#7c3aed', background: '#f5f3ff', border: '1px solid #ede9fe', borderRadius: 6, padding: '3px 7px', cursor: 'pointer', opacity: fetchingImage ? .6 : 1, whiteSpace: 'nowrap' }}
+            >
+              {fetchingImage ? '…' : '⬇ Fetch'}
+            </button>
+          )}
+          {imageError && <div style={{ fontSize: 10, color: '#dc2626', maxWidth: 90, textAlign: 'center', lineHeight: 1.3 }}>{imageError}</div>}
+        </div>
         <div style={{ flex: 1 }}>
           <div style={{ display: 'flex', alignItems: 'flex-start', gap: 12, marginBottom: 6 }}>
             <h1 style={{ fontSize: 22, fontWeight: 800, color: '#1e293b', margin: 0 }}>{spec.item_name}</h1>
@@ -535,6 +582,36 @@ export default function SpecDetailPage() {
               </div>
             </div>
           )}
+
+          {/* Proof */}
+          <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden' }}>
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid #f1f5f9', background: '#fafafa' }}>
+              <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: '#94a3b8' }}>Proof Artwork</div>
+              <label style={{ fontSize: 11, fontWeight: 600, color: '#7c3aed', background: '#f5f3ff', border: '1px solid #ede9fe', borderRadius: 6, padding: '3px 8px', cursor: uploadingProof ? 'default' : 'pointer', opacity: uploadingProof ? .6 : 1, whiteSpace: 'nowrap' }}>
+                {uploadingProof ? 'Uploading…' : spec.proof_url ? '↑ Replace' : '↑ Upload'}
+                <input type="file" accept="image/*,application/pdf" style={{ display: 'none' }} disabled={uploadingProof} onChange={e => { const f = e.target.files?.[0]; if (f) handleProofUpload(f); e.target.value = '' }} />
+              </label>
+            </div>
+            <div style={{ padding: '12px 16px' }}>
+              {spec.proof_url ? (
+                spec.proof_url.toLowerCase().includes('.pdf') ? (
+                  <a href={spec.proof_url} target="_blank" rel="noopener noreferrer" style={{ display: 'flex', alignItems: 'center', gap: 8, padding: '12px 14px', background: '#fdf4ff', border: '1px solid #ede9fe', borderRadius: 8, textDecoration: 'none', color: '#7c3aed', fontWeight: 600, fontSize: 13 }}>
+                    <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={1.5}><path strokeLinecap="round" strokeLinejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 00-3.375-3.375h-1.5A1.125 1.125 0 0113.5 7.125v-1.5a3.375 3.375 0 00-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 00-9-9z" /></svg>
+                    View PDF Proof ↗
+                  </a>
+                ) : (
+                  <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
+                    <a href={spec.proof_url} target="_blank" rel="noopener noreferrer" title="Open full size">
+                      <img src={spec.proof_url} alt="Proof artwork" style={{ width: '100%', borderRadius: 8, border: '1px solid #e2e8f0', objectFit: 'contain', maxHeight: 260, cursor: 'zoom-in' }} />
+                    </a>
+                    <a href={spec.proof_url} target="_blank" rel="noopener noreferrer" style={{ fontSize: 12, color: '#7c3aed', fontWeight: 600, textDecoration: 'none' }}>Open full size ↗</a>
+                  </div>
+                )
+              ) : (
+                <div style={{ color: '#94a3b8', fontSize: 13, textAlign: 'center', padding: '12px 0' }}>No proof uploaded yet</div>
+              )}
+            </div>
+          </div>
 
           {/* Meta */}
           <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 14, padding: '16px 18px' }}>

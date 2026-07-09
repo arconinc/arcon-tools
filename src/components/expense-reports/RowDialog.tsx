@@ -105,6 +105,11 @@ export function RowDialog({
             <option value="">Select a category…</option>
             {EXPENSE_CATEGORIES.map(c => <option key={c} value={c}>{c}</option>)}
           </select>
+          {form.category === 'TBD - Please describe' && (
+            <div style={{ marginTop: 8, padding: 12, backgroundColor: '#fef3c7', borderRadius: 6, fontSize: 13, color: '#92400e' }}>
+              ⚠️ When selecting "TBD", please provide a clear description of the expense category below.
+            </div>
+          )}
         </div>
 
         <div style={{ gridColumn: '1 / -1' }}>
