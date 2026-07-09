@@ -83,7 +83,7 @@ export default function DashboardPage() {
     <>
       <style>{`
         /* ── Hero Carousel ── */
-        .hero { position: relative; height: 340px; overflow: hidden; flex-shrink: 0; background: #16051f; }
+        .hero { position: relative; height: 540px; overflow: hidden; flex-shrink: 0; background: #16051f; }
         .hero-slides { display: flex; height: 100%; transition: transform 0.55s cubic-bezier(0.22,1,0.36,1); }
         .hero-slide { min-width: 100%; height: 100%; position: relative; display: flex; align-items: flex-end; overflow: hidden; background-size: cover; background-position: center; }
         .hs-1 { background: linear-gradient(135deg, #1a0a2e 0%, #4a1575 40%, #7c3aed 70%, #a855f7 100%); }
