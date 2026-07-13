@@ -9,7 +9,7 @@ export default function EmployeeCard({ employee }: { employee: EmployeeSummary }
   return (
     <Link
       href={`/employees/${employee.id}`}
-      className="block bg-white rounded-xl border border-slate-200 p-5 hover:border-purple-300 hover:shadow-md transition-all group"
+      className="block w-full bg-white rounded-xl border border-slate-200 p-5 hover:border-purple-300 hover:shadow-md transition-all group"
     >
       <div className="flex items-start gap-3">
         <EmployeeAvatar

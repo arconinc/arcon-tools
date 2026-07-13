@@ -42,7 +42,8 @@ export default function EmployeeDirectoryPage() {
   return (
     <>
       <style>{`
-        .dir-page { padding: 2rem; max-width: 1200px; margin: 0 auto; }
+        .dir-page { padding: 2rem; max-width: 1200px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+        .dir-grid > * { min-width: 0; width: 100%; box-sizing: border-box; }
         .dir-header { margin-bottom: 1.5rem; }
         .dir-title { font-size: 1.5rem; font-weight: 700; color: #1e293b; }
         .dir-count { font-size: 0.875rem; color: #64748b; margin-top: 0.25rem; }

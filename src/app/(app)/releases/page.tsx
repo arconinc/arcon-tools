@@ -1,8 +1,6 @@
 import { redirect } from 'next/navigation'
 import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
-import { createAdminClient } from '@/lib/supabase/admin'
-import AppShell from '@/components/layout/AppShell'
 import releasesData from '@/data/releases.json'
 import type { Release, ReleaseChangeCategory } from '@/types'
 
@@ -28,18 +26,8 @@ export default async function ReleasesPage() {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) redirect('/login')
 
-  const adminClient = createAdminClient()
-  const { data: appUser } = await adminClient
-    .from('users')
-    .select('id, email, display_name, is_admin')
-    .eq('google_id', user.id)
-    .single()
-
-  if (!appUser) redirect('/login')
-
-
   return (
-    <AppShell user={appUser}>
+    <>
       <style>{`
         .releases-page { max-width: 1200px; margin: 0 auto; padding: 32px 24px 64px; }
         .releases-header { margin-bottom: 32px; }
@@ -104,6 +92,6 @@ export default async function ReleasesPage() {
           })
         )}
       </div>
-    </AppShell>
+    </>
   )
 }
