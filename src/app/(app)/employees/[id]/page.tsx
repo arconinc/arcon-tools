@@ -10,13 +10,15 @@ import OfficeLocationBadge from '@/components/employees/OfficeLocationBadge'
 import { TiptapRenderer } from '@/components/news/TiptapRenderer'
 import { DEPARTMENT_BY_ASSIGNMENT_GROUP } from '@/lib/auth/group-access'
 
-function assignmentDepartments(user: { group_memberships?: unknown }) {
+function assignmentDepartments(user: { group_memberships?: unknown; department?: unknown }) {
   const memberships = Array.isArray(user.group_memberships) ? user.group_memberships : []
-  return [...new Set(memberships
+  const groupDepts = memberships
     .map((membership: any) => membership.groups)
     .filter((group: any) => group?.is_active && group?.source_type === 'assignment_pool')
     .map((group: any) => DEPARTMENT_BY_ASSIGNMENT_GROUP[group.key])
-    .filter(Boolean))]
+    .filter(Boolean)
+  const directDepts = Array.isArray(user.department) ? user.department : []
+  return [...new Set([...groupDepts, ...directDepts])]
 }
 
 function yearsOfService(startDate: string | null): string | null {
@@ -77,7 +79,7 @@ export default async function EmployeeProfilePage({
       profile_image_url, avatar_url, start_date,
       phone, linkedin_url, timezone,
       bio_html, bio_json, skills, interests,
-      manager_id,
+      manager_id, department,
       group_memberships!group_memberships_user_id_fkey(groups(id, key, is_active, source_type))
     `)
     .eq('id', id)

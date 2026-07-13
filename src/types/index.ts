@@ -91,6 +91,8 @@ export interface EmployeeSummary {
   profile_image_url: string | null
   avatar_url: string | null
   start_date: string | null
+  phone: string | null
+  bio_html: string | null
 }
 
 export interface EmployeeProfile extends EmployeeSummary {
@@ -645,7 +647,7 @@ export type CrmContactType = 'Customer' | 'Vendor' | 'Prospect' | 'Partner' | 'O
 export type CrmOpportunityStatus = 'open' | 'won' | 'lost' | 'stalled'
 export type CrmPipelineStage = 'Send Quote' | 'Follow Up on Quote' | 'Quote Accepted' | 'Send Thank You Email'
 export type CrmOpportunityCategory = 'Apparel' | 'Packaging Product' | 'Print Product' | 'Promotional Product' | 'Signage' | 'Store/Ecommerce Build'
-export type CrmTaskDepartment = 'CRM' | 'E-Commerce' | 'HR' | 'IT' | 'Accounting' | 'Sales' | 'Warehouse' | 'General'
+export type CrmTaskDepartment = 'CRM' | 'E-Commerce' | 'HR' | 'IT' | 'Accounting' | 'Sales' | 'Warehouse' | 'Order Management' | 'CSR'
 export type CrmTaskStatus = 'not_started' | 'in_progress' | 'completed' | 'waiting_on_approval' | 'waiting_on_client_approval' | 'need_changes'
 export type CrmTaskPriority = 'low' | 'medium' | 'high'
 export type CrmTaskCategory =

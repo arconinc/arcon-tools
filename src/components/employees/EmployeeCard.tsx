@@ -32,6 +32,27 @@ export default function EmployeeCard({ employee }: { employee: EmployeeSummary }
           )}
         </div>
       </div>
+
+      <div className="mt-3 space-y-1">
+        <p className="text-xs text-slate-500 truncate">
+          <span className="text-slate-400">✉</span>{' '}
+          <span className="hover:text-purple-600">{employee.email}</span>
+        </p>
+        {employee.phone && (
+          <p className="text-xs text-slate-500 truncate">
+            <span className="text-slate-400">📞</span>{' '}
+            {employee.phone}
+          </p>
+        )}
+      </div>
+
+      {employee.bio_html && (
+        <p
+          className="mt-3 text-xs text-slate-400 line-clamp-2 leading-relaxed"
+          dangerouslySetInnerHTML={{ __html: employee.bio_html }}
+        />
+      )}
+
       {employee.office_location && (
         <div className="mt-3">
           <OfficeLocationBadge location={employee.office_location} />

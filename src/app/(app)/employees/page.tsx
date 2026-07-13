@@ -60,7 +60,7 @@ export default function EmployeeDirectoryPage() {
         @media (min-width: 768px) { .dir-grid { grid-template-columns: repeat(3, 1fr); } }
         @media (min-width: 1024px) { .dir-grid { grid-template-columns: repeat(4, 1fr); } }
         .empty-state { grid-column: 1 / -1; text-align: center; padding: 4rem 2rem; color: #94a3b8; }
-        .skeleton { background: #f1f5f9; border-radius: 0.75rem; height: 120px; animation: pulse 1.5s infinite; }
+        .skeleton { background: #f1f5f9; border-radius: 0.75rem; height: 180px; animation: pulse 1.5s infinite; }
         @keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.5 } }
       `}</style>
 

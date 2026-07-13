@@ -34,7 +34,8 @@ export const ASSIGNMENT_GROUP_BY_DEPARTMENT: Record<string, string | null> = {
   Warehouse: 'warehouse',
   'E-Commerce': 'ecommerce',
   IT: 'it',
-  General: null,
+  'Order Management': null,
+  CSR: null,
 }
 
 export const DEPARTMENT_BY_ASSIGNMENT_GROUP: Record<string, string> = {

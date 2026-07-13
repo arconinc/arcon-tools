@@ -36,7 +36,7 @@ export default function QuickAddTask({ defaultDepartment, onTaskCreated }: Quick
       if (defaultDepartment) {
         body.department = defaultDepartment
       } else {
-        body.department = 'General'
+        body.department = 'Order Management'
         body.category = 'To Do General'
       }
       const res = await fetch('/api/marketing/tasks', {

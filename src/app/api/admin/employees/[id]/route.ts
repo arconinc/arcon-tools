@@ -29,18 +29,20 @@ export async function GET(
       job_title, office_location, employment_type, timezone,
       profile_image_url, avatar_url,
       linkedin_url, bio_json, bio_html, skills, interests,
-      manager_id,
+      manager_id, department,
       group_memberships!group_memberships_user_id_fkey(groups(id, key, is_active, source_type))
     `)
     .eq('id', id)
     .single()
 
   if (error || !data) return NextResponse.json({ error: 'Not found' }, { status: 404 })
+  const groupDepartments = Array.isArray(data.group_memberships)
+    ? data.group_memberships.map((m: any) => m.groups).filter((g: any) => g?.is_active && g?.source_type === 'assignment_pool').map((g: any) => DEPARTMENT_BY_ASSIGNMENT_GROUP[g.key]).filter(Boolean)
+    : []
+  const directDepartments: string[] = Array.isArray(data.department) ? data.department : []
   return NextResponse.json({
     ...data,
-    department: Array.isArray(data.group_memberships)
-      ? [...new Set(data.group_memberships.map((membership: any) => membership.groups).filter((group: any) => group?.is_active && group?.source_type === 'assignment_pool').map((group: any) => DEPARTMENT_BY_ASSIGNMENT_GROUP[group.key]).filter(Boolean))]
-      : null,
+    department: [...new Set([...groupDepartments, ...directDepartments])],
     group_memberships: undefined,
   })
 }
@@ -88,9 +90,10 @@ export async function PATCH(
   }
 
   if ('department' in body) {
-    const nextGroupKeys = Array.isArray(body.department)
-      ? [...new Set(body.department.map((name: string) => ASSIGNMENT_GROUP_BY_DEPARTMENT[name]).filter((key: string | undefined): key is string => !!key))]
-      : []
+    const deptList: string[] = Array.isArray(body.department) ? body.department : []
+    const nextGroupKeys = [...new Set(deptList.map((name: string) => ASSIGNMENT_GROUP_BY_DEPARTMENT[name]).filter((key: string | undefined): key is string => !!key))]
+    const directDepts = deptList.filter((name: string) => ASSIGNMENT_GROUP_BY_DEPARTMENT[name] === null)
+
     const { data: assignmentGroups } = await adminClient
       .from('groups')
       .select('id, key, group_capabilities!inner(capability)')
@@ -104,6 +107,8 @@ export async function PATCH(
     if (groupIdsToInsert.length > 0) {
       await adminClient.from('group_memberships').insert(groupIdsToInsert.map((groupId) => ({ group_id: groupId, user_id: id, source: 'manual' })))
     }
+
+    await adminClient.from('users').update({ department: directDepts.length > 0 ? directDepts : null }).eq('id', id)
   }
   return NextResponse.json(data ?? { ok: true })
 }

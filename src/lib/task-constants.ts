@@ -8,7 +8,8 @@ export const DEPARTMENT_DISPLAY_NAMES: Record<CrmTaskDepartment, string> = {
   Accounting: 'Accounting',
   Sales: 'Sales',
   Warehouse: 'Warehouse',
-  General: 'General',
+  'Order Management': 'Order Management',
+  CSR: 'CSR',
 }
 
 export const DEPARTMENTS: CrmTaskDepartment[] = [
@@ -19,7 +20,8 @@ export const DEPARTMENTS: CrmTaskDepartment[] = [
   'Accounting',
   'Sales',
   'Warehouse',
-  'General',
+  'Order Management',
+  'CSR',
 ]
 
 export const DEPARTMENT_CATEGORIES: Record<CrmTaskDepartment, CrmTaskCategory[]> = {
@@ -55,7 +57,8 @@ export const DEPARTMENT_CATEGORIES: Record<CrmTaskDepartment, CrmTaskCategory[]>
   IT: [],
   Accounting: [],
   Sales: [],
-  General: ['To Do General'],
+  'Order Management': ['To Do General'],
+  CSR: [],
 }
 
 // Maps department → the route where its task board lives
@@ -67,7 +70,8 @@ export const DEPARTMENT_ROUTES: Record<CrmTaskDepartment, string> = {
   Accounting: '/accounting/tasks',
   Sales: '/sales/tasks?department=Sales',
   Warehouse: '/warehouse/tasks',
-  General: '/my-tasks',
+  'Order Management': '/my-tasks',
+  CSR: '/my-tasks',
 }
 
 // Reverse map: route pathname → department
@@ -88,7 +92,8 @@ export const ALL_CATEGORIES: CrmTaskCategory[] = [
   ...DEPARTMENT_CATEGORIES.HR,
   ...DEPARTMENT_CATEGORIES.Accounting,
   ...DEPARTMENT_CATEGORIES.Sales,
-  ...DEPARTMENT_CATEGORIES.General,
+  ...DEPARTMENT_CATEGORIES['Order Management'],
+  ...DEPARTMENT_CATEGORIES.CSR,
 ]
 
 export function getTaskCategoryLabel(category: string) {
