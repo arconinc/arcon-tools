@@ -27,7 +27,7 @@ export async function POST(request: Request) {
   }
 
   const ext = file.name.split('.').pop() ?? 'jpg'
-  const filename = `cover-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
+  const filename = `news-${Date.now()}-${Math.random().toString(36).slice(2)}.${ext}`
   const buffer = Buffer.from(await file.arrayBuffer())
 
   const { error: uploadErr } = await adminClient.storage

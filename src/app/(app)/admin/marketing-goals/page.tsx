@@ -163,7 +163,7 @@ export default function CrmGoalsPage() {
                     Fill All
                   </th>
                   {MONTHS.map((m) => (
-                    <th key={m} className="text-right px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide min-w-[90px]">
+                    <th key={m} className="text-right px-3 py-3 text-xs font-semibold text-slate-500 uppercase tracking-wide min-w-[120px]">
                       {m}
                     </th>
                   ))}
@@ -201,7 +201,7 @@ export default function CrmGoalsPage() {
                               onChange={(e) => setFillValues((prev) => ({ ...prev, [u.id]: e.target.value }))}
                               onKeyDown={(e) => { if (e.key === 'Enter') handleFillRow(u.id) }}
                               placeholder="0"
-                              className="w-20 pl-5 pr-2 py-1.5 text-right text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
+                              className="w-28 pl-5 pr-2 py-1.5 text-right text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
                             />
                           </div>
                           <button

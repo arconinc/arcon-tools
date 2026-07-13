@@ -8,7 +8,143 @@ import TextAlign from '@tiptap/extension-text-align'
 import Underline from '@tiptap/extension-underline'
 import { TextStyle } from '@tiptap/extension-text-style'
 import Typography from '@tiptap/extension-typography'
-import { useCallback, useEffect, useState } from 'react'
+import Image from '@tiptap/extension-image'
+import { Node } from '@tiptap/core'
+import { useCallback, useEffect, useRef, useState } from 'react'
+
+const ClearFloat = Node.create({
+  name: 'clearFloat',
+  group: 'block',
+  atom: true,
+  parseHTML() { return [{ tag: 'div[data-clear-float]' }] },
+  renderHTML() { return ['div', { 'data-clear-float': '', style: 'clear:both;height:0;line-height:0;font-size:0' }] },
+  addNodeView() {
+    return () => {
+      const dom = document.createElement('div')
+      dom.setAttribute('data-clear-float', '')
+      dom.style.cssText = 'clear:both;height:0;line-height:0;font-size:0'
+      return { dom }
+    }
+  },
+})
+
+function applyContainerStyle(el: HTMLElement, attrs: Record<string, unknown>) {
+  el.style.cssText = containerStyleStr((attrs.float as string) ?? 'none') + ';position:relative;line-height:0'
+}
+
+function applyImgStyle(img: HTMLImageElement, attrs: Record<string, unknown>) {
+  img.className = 'rounded-xl'
+  img.style.width = attrs.width ? `${attrs.width}px` : '100%'
+  img.style.maxWidth = '100%'
+  img.style.display = 'block'
+  img.style.cursor = 'pointer'
+}
+
+function containerStyleStr(float: string | null) {
+  if (!float || float === 'none') return 'display:block;overflow:hidden;margin:0.75rem 0'
+  const left = float === 'left'
+  return `float:${float};overflow:hidden;max-width:45%;margin:${left ? '0 1.5rem 0.75rem 0' : '0 0 0.75rem 1.5rem'}`
+}
+
+// Extends Image with `float` + `width` attributes and a NodeView for click-select + resize
+const ImageWithFloat = Image.extend({
+  addAttributes() {
+    return {
+      ...this.parent?.(),
+      float: {
+        default: 'none',
+        // stored on img as data-float; float itself goes on wrapper div in renderHTML
+        renderHTML: (attrs) => ({ 'data-float': attrs.float ?? 'none' }),
+        parseHTML: (el) => (el as HTMLElement).getAttribute('data-float') ?? 'none',
+      },
+      width: {
+        default: null,
+        renderHTML: (attrs) => attrs.width ? { width: attrs.width } : {},
+        parseHTML: (el) => (el as HTMLImageElement).getAttribute('width') ?? null,
+      },
+    }
+  },
+
+  renderHTML({ node, HTMLAttributes }) {
+    const { 'data-float': float, width, src, alt, title } = HTMLAttributes
+    const imgAttrs: Record<string, unknown> = { src, class: 'rounded-xl', style: 'display:block;width:100%;max-width:100%', 'data-float': float }
+    if (alt) imgAttrs.alt = alt
+    if (title) imgAttrs.title = title
+    if (width) imgAttrs.width = width
+    return ['div', { style: containerStyleStr(float as string) }, ['img', imgAttrs]]
+  },
+
+  addNodeView() {
+    return ({ node, getPos, editor: tiptapEditor }) => {
+      const container = document.createElement('div')
+      applyContainerStyle(container, node.attrs)
+
+      const img = document.createElement('img')
+      img.src = node.attrs.src ?? ''
+      if (node.attrs.alt) img.alt = node.attrs.alt
+      applyImgStyle(img, node.attrs)
+
+      // Resize handle
+      const handle = document.createElement('div')
+      handle.style.cssText = 'position:absolute;bottom:6px;right:6px;width:14px;height:14px;background:#7c3aed;border-radius:3px;cursor:se-resize;opacity:0;transition:opacity 0.15s;z-index:10'
+      handle.title = 'Drag to resize'
+
+      container.addEventListener('mouseenter', () => { handle.style.opacity = '1' })
+      container.addEventListener('mouseleave', () => { handle.style.opacity = '0' })
+
+      handle.addEventListener('mousedown', (e) => {
+        e.preventDefault()
+        const startX = e.clientX
+        const startWidth = img.offsetWidth
+
+        const onMove = (ev: MouseEvent) => {
+          img.style.width = `${Math.max(80, startWidth + ev.clientX - startX)}px`
+        }
+        const onUp = (ev: MouseEvent) => {
+          document.removeEventListener('mousemove', onMove)
+          document.removeEventListener('mouseup', onUp)
+          const newWidth = Math.max(80, startWidth + ev.clientX - startX)
+          const pos = typeof getPos === 'function' ? getPos() : undefined
+          if (pos !== undefined) {
+            tiptapEditor.chain().setNodeSelection(pos).updateAttributes('image', { width: newWidth }).run()
+          }
+        }
+        document.addEventListener('mousemove', onMove)
+        document.addEventListener('mouseup', onUp)
+      })
+
+      img.addEventListener('click', () => {
+        const pos = typeof getPos === 'function' ? getPos() : undefined
+        if (pos !== undefined) tiptapEditor.commands.setNodeSelection(pos)
+      })
+
+      container.appendChild(img)
+      container.appendChild(handle)
+
+      return {
+        dom: container,
+        update(updatedNode) {
+          if (updatedNode.type.name !== 'image') return false
+          img.src = updatedNode.attrs.src ?? ''
+          if (updatedNode.attrs.alt) img.alt = updatedNode.attrs.alt
+          applyContainerStyle(container, updatedNode.attrs)
+          applyImgStyle(img, updatedNode.attrs)
+          return true
+        },
+        selectNode() {
+          img.style.outline = '3px solid #7c3aed'
+          img.style.outlineOffset = '2px'
+          handle.style.opacity = '1'
+        },
+        deselectNode() {
+          img.style.outline = ''
+          img.style.outlineOffset = ''
+          handle.style.opacity = '0'
+        },
+      }
+    }
+  },
+})
 
 interface TiptapEditorProps {
   content?: Record<string, unknown>
@@ -59,6 +195,8 @@ function Divider() {
 export function TiptapEditor({ content, onChange, placeholder, minHeight = '320px', disabled }: TiptapEditorProps) {
   const [linkUrl, setLinkUrl] = useState('')
   const [showLinkInput, setShowLinkInput] = useState(false)
+  const [uploadingImage, setUploadingImage] = useState(false)
+  const imageInputRef = useRef<HTMLInputElement>(null)
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -70,9 +208,17 @@ export function TiptapEditor({ content, onChange, placeholder, minHeight = '320p
       Typography,
       Placeholder.configure({ placeholder: placeholder ?? 'Write your article content here...' }),
       Link.configure({ openOnClick: false, HTMLAttributes: { class: 'text-purple-600 underline' } }),
+      ImageWithFloat.configure({ inline: false, allowBase64: false }),
+      ClearFloat,
     ],
     content: content && Object.keys(content).length > 0 ? content : '',
     editable: !disabled,
+    editorProps: {
+      attributes: {
+        class: 'focus:outline-none after:block after:clear-both after:content-[""]',
+        style: `padding: 1.5rem 2rem; min-height: ${minHeight}`,
+      },
+    },
     onUpdate: ({ editor }) => {
       onChange?.(editor.getJSON() as Record<string, unknown>, editor.getHTML())
     },
@@ -98,10 +244,28 @@ export function TiptapEditor({ content, onChange, placeholder, minHeight = '320p
     setLinkUrl('')
   }, [editor, linkUrl])
 
+  const handleImageUpload = useCallback(async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0]
+    if (!file || !editor) return
+    setUploadingImage(true)
+    try {
+      const fd = new FormData()
+      fd.append('file', file)
+      const res = await fetch('/api/admin/news/upload', { method: 'POST', body: fd })
+      const data = await res.json()
+      if (data.url) {
+        editor.chain().focus().setImage({ src: data.url }).run()
+      }
+    } finally {
+      setUploadingImage(false)
+      if (imageInputRef.current) imageInputRef.current.value = ''
+    }
+  }, [editor])
+
   if (!editor) return null
 
   return (
-    <div className="border border-slate-200 rounded-xl overflow-hidden">
+    <div className="border border-slate-200 rounded-xl">
       {/* Toolbar */}
       <div className="flex flex-wrap items-center gap-0.5 px-3 py-2 bg-slate-50 border-b border-slate-200">
         <ToolbarBtn onClick={() => editor.chain().focus().toggleBold().run()} active={editor.isActive('bold')} title="Bold">
@@ -162,6 +326,21 @@ export function TiptapEditor({ content, onChange, placeholder, minHeight = '320p
         <ToolbarBtn onClick={() => editor.chain().focus().setHorizontalRule().run()} title="Horizontal rule" active={false}>
           —
         </ToolbarBtn>
+        <ToolbarBtn
+          onClick={() => imageInputRef.current?.click()}
+          disabled={uploadingImage || !!disabled}
+          title="Insert image"
+          active={false}
+        >
+          {uploadingImage ? '⏳' : '🖼️'}
+        </ToolbarBtn>
+        <input
+          ref={imageInputRef}
+          type="file"
+          accept="image/*"
+          className="hidden"
+          onChange={handleImageUpload}
+        />
 
         <Divider />
 
@@ -197,11 +376,57 @@ export function TiptapEditor({ content, onChange, placeholder, minHeight = '320p
         </div>
       )}
 
+      {/* Image float controls — shown when an image is selected */}
+      {editor.isActive('image') && (
+        <div className="flex items-center gap-1 px-3 py-1.5 bg-slate-50 border-b border-slate-200">
+          <span className="text-xs text-slate-400 mr-1">Image wrap:</span>
+          <ToolbarBtn
+            onClick={() => editor.chain().focus().updateAttributes('image', { float: 'left' }).run()}
+            active={editor.getAttributes('image').float === 'left'}
+            title="Float left — text wraps right"
+          >
+            ◧
+          </ToolbarBtn>
+          <ToolbarBtn
+            onClick={() => editor.chain().focus().updateAttributes('image', { float: 'none' }).run()}
+            active={!editor.getAttributes('image').float || editor.getAttributes('image').float === 'none'}
+            title="No wrap — full width"
+          >
+            ▣
+          </ToolbarBtn>
+          <ToolbarBtn
+            onClick={() => editor.chain().focus().updateAttributes('image', { float: 'right' }).run()}
+            active={editor.getAttributes('image').float === 'right'}
+            title="Float right — text wraps left"
+          >
+            ◨
+          </ToolbarBtn>
+          <Divider />
+          <ToolbarBtn
+            onClick={() => {
+              const { selection, schema } = editor.state
+              const pos = selection.from + (selection as { node?: { nodeSize: number } }).node!.nodeSize
+              editor.chain()
+                .insertContentAt(pos, [
+                  { type: 'clearFloat' },
+                  { type: 'paragraph' },
+                ])
+                .setTextSelection(pos + 2)
+                .focus()
+                .run()
+            }}
+            active={false}
+            title="Start new paragraph below (clear float)"
+          >
+            ↵ below
+          </ToolbarBtn>
+        </div>
+      )}
+
       {/* Editor content */}
       <EditorContent
         editor={editor}
-        className="prose prose-slate max-w-none px-4 py-3 focus-within:outline-none"
-        style={{ minHeight }}
+        className="prose prose-slate max-w-none"
       />
     </div>
   )
