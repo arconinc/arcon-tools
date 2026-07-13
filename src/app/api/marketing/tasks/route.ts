@@ -15,6 +15,9 @@ function quotePostgrestValue(value: string) {
 function normalizeTaskAssignment(task: Record<string, unknown>) {
   const normalized = { ...task }
 
+  // ponytail: migrate legacy 'General' → 'Order Management' from pre-rename DB rows
+  if (normalized.department === 'General') normalized.department = 'Order Management'
+
   if (
     typeof normalized.department === 'string' &&
     normalized.department &&

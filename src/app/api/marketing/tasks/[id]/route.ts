@@ -38,6 +38,9 @@ function pickTaskUpdates(body: Record<string, unknown>) {
 function normalizeTaskAssignment(updates: Record<string, unknown>, current: Record<string, unknown>) {
   const normalized = { ...updates }
 
+  // ponytail: migrate legacy 'General' → 'Order Management' from pre-rename DB rows
+  if (normalized.department === 'General') normalized.department = 'Order Management'
+
   if (
     'department' in normalized &&
     typeof normalized.department === 'string' &&
