@@ -125,7 +125,8 @@ export async function appendProductShowcaseRows(registration: ProductShowcaseReg
   }
 
   const token = await getGoogleSheetsToken()
-  const range = encodeURIComponent('Sheet1')
+  const sheetName = process.env.PRODUCT_SHOWCASE_SHEET_NAME ?? 'Sheet1'
+  const range = encodeURIComponent(sheetName)
   const url = `https://sheets.googleapis.com/v4/spreadsheets/${spreadsheetId}/values/${range}:append?valueInputOption=USER_ENTERED`
 
   const res = await fetch(url, {

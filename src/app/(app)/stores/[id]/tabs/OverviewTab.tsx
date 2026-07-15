@@ -7,7 +7,7 @@ import { StoreDetail } from '@/types'
 // ── Multi-select chip ─────────────────────────────────────────────────────────
 
 const OPTIONS: Record<string, string[]> = {
-  store_types: ['Corporate', 'Employee'],
+  store_types: ['Corporate', 'Employee', 'Event Store'],
   who_pays: ['Corporate', 'User'],
   payment_methods: ['Credit Card', 'Bill Corp', 'Budget'],
   freight: ['Corporate Covers', 'User Pays', 'Split'],
@@ -104,6 +104,7 @@ export function OverviewTab({ store, onSaved }: { store: StoreDetail; onSaved: (
     who_pays: store.who_pays,
     payment_methods: store.payment_methods,
     freight: store.freight,
+    freight_amount: store.freight_amount != null ? store.freight_amount.toFixed(2) : '',
     unique_incentives: store.unique_incentives ?? '',
     product_types: store.product_types,
     allowances: store.allowances ?? '',
@@ -125,6 +126,7 @@ export function OverviewTab({ store, onSaved }: { store: StoreDetail; onSaved: (
         takedown_date: form.takedown_date || null,
         unique_incentives: form.unique_incentives || null,
         allowances: form.allowances || null,
+        freight_amount: form.freight_amount ? parseFloat(form.freight_amount) : null,
       }),
     })
     setSaving(false)
@@ -187,7 +189,19 @@ export function OverviewTab({ store, onSaved }: { store: StoreDetail; onSaved: (
         <MultiSelect field="store_types" label="Store Type" value={form.store_types} onChange={v => set('store_types', v)} />
         <MultiSelect field="who_pays" label="Who is Paying" value={form.who_pays} onChange={v => set('who_pays', v)} />
         <MultiSelect field="payment_methods" label="Payment Methods" value={form.payment_methods} onChange={v => set('payment_methods', v)} />
-        <MultiSelect field="freight" label="Freight" value={form.freight} onChange={v => set('freight', v)} />
+        <div>
+          <MultiSelect field="freight" label="Freight" value={form.freight} onChange={v => set('freight', v)} />
+          {(form.freight.includes('User Pays') || form.freight.includes('Split')) && (
+            <div className="relative mt-2">
+              <span className="absolute left-3 top-1/2 -translate-y-1/2 text-sm text-slate-400">$</span>
+              <input type="number" step="0.01" min="0" value={form.freight_amount}
+                onChange={e => set('freight_amount', e.target.value)}
+                onBlur={e => { const v = e.target.value; if (v) set('freight_amount', parseFloat(v).toFixed(2)) }}
+                placeholder="0.00"
+                className="w-full pl-6 pr-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
+            </div>
+          )}
+        </div>
         <MultiSelect field="product_types" label="Product Types" value={form.product_types} onChange={v => set('product_types', v)} />
       </div>
 

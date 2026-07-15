@@ -35,8 +35,8 @@ export function TeamTab({ store }: { store: StoreDetail }) {
     setSelectedUserId('')
   }
 
-  async function removeAssignment(assignmentId: string) {
-    const res = await fetch(`/api/stores/${store.id}/assignments/${assignmentId}`, { method: 'DELETE' })
+  async function removeAssignment(assignmentId: string, userId: string) {
+    const res = await fetch(`/api/stores/${store.id}/assignments?user_id=${userId}`, { method: 'DELETE' })
     if (res.ok) setAssignments(a => a.filter(x => x.id !== assignmentId))
   }
 
@@ -57,7 +57,7 @@ export function TeamTab({ store }: { store: StoreDetail }) {
                 <p className="text-sm font-medium text-slate-800">{a.user?.display_name}</p>
                 <p className="text-xs text-slate-400">{a.role}</p>
               </div>
-              <button onClick={() => removeAssignment(a.id)}
+              <button onClick={() => removeAssignment(a.id, a.user_id)}
                 className="text-slate-300 hover:text-red-500 transition-colors p-1">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />

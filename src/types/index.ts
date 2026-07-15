@@ -214,6 +214,7 @@ export interface Store {
   who_pays: string[]
   payment_methods: string[]
   freight: string[]
+  freight_amount: number | null
   unique_incentives: string | null
   product_types: string[]
   allowances: string | null

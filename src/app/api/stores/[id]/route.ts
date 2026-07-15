@@ -65,7 +65,7 @@ export async function PUT(request: Request, { params }: { params: Promise<{ id: 
   const allowed = [
     'store_id', 'store_name', 'is_active', 'domain', 'status', 'in_production',
     'launch_date', 'takedown_date', 'last_order_at',
-    'store_types', 'who_pays', 'payment_methods', 'freight',
+    'store_types', 'who_pays', 'payment_methods', 'freight', 'freight_amount',
     'unique_incentives', 'product_types', 'allowances', 'mandatory_notes',
   ]
   const update: Record<string, unknown> = { updated_at: new Date().toISOString() }
