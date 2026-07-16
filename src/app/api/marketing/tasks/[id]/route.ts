@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 import { DEPARTMENTS, getDepartmentForTaskCategory } from '@/lib/task-constants'
@@ -350,6 +351,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
   } catch (err) {
     console.error('[notifications] task PATCH dispatch failed:', err)
+    Sentry.captureException(err)
   }
 
   return NextResponse.json(data)

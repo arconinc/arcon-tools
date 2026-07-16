@@ -1,4 +1,5 @@
 import { NextRequest } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 import { unauthorized, badRequest, serverError, created, ok } from '@/lib/api/respond'
@@ -213,6 +214,7 @@ export async function POST(req: NextRequest) {
           })
         } catch (err) {
           console.error('[customers/POST] aturian notification failed:', err)
+          Sentry.captureException(err)
         }
       }
     }

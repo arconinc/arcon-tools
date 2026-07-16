@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 import { dispatchNotification } from '@/lib/notifications/dispatch'
@@ -94,7 +95,9 @@ export async function POST(_req: NextRequest, { params }: { params: Promise<{ id
         recipientSpec: { userId: reviewerUserId },
         suppressUserIds: [appUser.id],
       })
-    } catch {}
+    } catch (err) {
+      Sentry.captureException(err)
+    }
   }
 
   return NextResponse.json({ report: updated })

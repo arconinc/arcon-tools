@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getAuthHeader } from '@/lib/credentials'
@@ -42,6 +43,7 @@ export async function POST() {
   try {
     remoteStores = await listStores(authHeader)
   } catch (err) {
+    Sentry.captureException(err)
     const msg = err instanceof Error ? err.message : 'Unknown error'
     return NextResponse.json({ error: `Failed to fetch stores from Uducat: ${msg}` }, { status: 502 })
   }

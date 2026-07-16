@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { GROUP_CAPABILITY_KEYS } from '@/lib/groups/constants'
@@ -106,6 +107,7 @@ export async function GET(request: Request) {
   try {
     return NextResponse.json(await attachGroupDetails((data ?? []) as Group[]))
   } catch (detailError) {
+    Sentry.captureException(detailError)
     return NextResponse.json({ error: detailError instanceof Error ? detailError.message : 'Failed to load group details' }, { status: 500 })
   }
 }
@@ -153,6 +155,7 @@ export async function POST(request: Request) {
     const [group] = await attachGroupDetails([data as Group])
     return NextResponse.json(group, { status: 201 })
   } catch (detailError) {
+    Sentry.captureException(detailError)
     return NextResponse.json({ error: detailError instanceof Error ? detailError.message : 'Failed to load group details' }, { status: 500 })
   }
 }
