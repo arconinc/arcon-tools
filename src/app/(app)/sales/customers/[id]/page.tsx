@@ -21,7 +21,7 @@ import { useFormValidation, inputCls, selectCls, FieldError } from '@/lib/form-v
 import { CrmForm } from '@/types'
 import { getCustomerFormsByState, getGeneralForms, US_STATES } from '@/lib/forms-utils'
 import { buildCompanySummary } from '@/lib/customer/helpers'
-import { useCustomer, useCrmUsers, useCrmTags, useArtwork, useCustomerEdit, type CustomerDetail, type BrandDataLocal, type TagOption } from '@/hooks'
+import { useCustomer, useCrmUsers, useArtwork, useCustomerEdit, type CustomerDetail, type BrandDataLocal } from '@/hooks'
 import type { PlacesAddress, PlacesDetails } from '@/lib/google-places'
 
 type DropdownUser = { id: string; display_name: string; email: string }
@@ -44,8 +44,6 @@ export default function CustomerDetailPage() {
   const { customer, loading, error, setCustomer } = useCustomer(isNew ? null : id)
   const { data: crmUsersData } = useCrmUsers()
   const crmUsers = crmUsersData ?? []
-  const { data: allCrmTagsData, setData: setAllCrmTags } = useCrmTags()
-  const allCrmTags = allCrmTagsData ?? []
   const edit = useCustomerEdit(customer, setCustomer)
   const [activeTab, setActiveTab] = useState<'details' | 'related' | 'activity' | 'artwork' | 'specs'>('details')
   const [createTaskOpen, setCreateTaskOpen] = useState(false)
@@ -119,38 +117,7 @@ export default function CustomerDetailPage() {
     } finally { setBrandFetching(false) }
   }
 
-  const ATURIAN_TAG_NAME = 'Add to Aturian'
-
   async function handleTagsChange(newIds: string[]) {
-    edit.setAturianError(null)
-    if (customer) {
-      const addedIds = newIds.filter((tid) => !tagIds.includes(tid))
-      if (addedIds.length > 0) {
-        const aturianTag = allCrmTags.find(
-          (t) => t.name.trim().toLowerCase() === ATURIAN_TAG_NAME.toLowerCase()
-        )
-        if (aturianTag && addedIds.includes(aturianTag.id)) {
-          const missing: string[] = []
-          if (!customer.name?.trim()) missing.push('Company Name')
-          if (!customer.phone?.trim()) missing.push('Corporate Phone')
-          if (!customer.billing_address1?.trim()) missing.push('Billing Address')
-          if (!customer.assigned_to) missing.push('Sales Consultant (Assigned To)')
-          if (!customer.commissioned_client?.trim()) missing.push('Commissioned Client')
-          if (customer.tax_exempt === null || customer.tax_exempt === undefined) missing.push('Tax Exempt')
-          const hasAPContact = customer.contacts.some(
-            (c) => c.department === 'Accounting' && c.email?.trim()
-          )
-          if (!hasAPContact) missing.push('AP Contact (Accounting dept. contact with email)')
-
-          if (missing.length > 0) {
-            edit.setAturianError(
-              `Cannot add "Add to Aturian" — complete these first: ${missing.join(', ')}`
-            )
-            return
-          }
-        }
-      }
-    }
     setTagIds(newIds)
     if (!customer?.id) return
     setTagSaving(true)
@@ -245,28 +212,9 @@ export default function CustomerDetailPage() {
   async function handleCreate(e: React.FormEvent) {
     e.preventDefault()
 
-    const aturianTag = allCrmTags.find((t) => t.name.trim().toLowerCase() === 'add to aturian')
-    const aturianActive = !!(aturianTag && createTagIds.includes(aturianTag.id))
-
     const req = (msg: string) => ({ test: (v: string) => !!v?.trim(), message: msg })
     const rules = {
       name: [req('Company name is required')],
-      ...(aturianActive && {
-        assigned_to:         [{ test: (v: string) => !!v, message: 'Sales Consultant is required' }],
-        commissioned_client: [req('Commissioned Client is required')],
-        tax_exempt:          [{ test: (v: string) => v === 'yes' || v === 'no', message: 'Please select Yes or No' }],
-        billing_address1:    [req('Street address is required')],
-        billing_city:        [req('City is required')],
-        billing_state:       [req('State is required')],
-        billing_zip:         [req('ZIP code is required')],
-        phone:               [req('Corporate phone is required')],
-        orderer_first_name:  [req('Orderer first name is required')],
-        orderer_last_name:   [req('Orderer last name is required')],
-        orderer_email:       [req('Orderer email is required')],
-        ap_first_name:       [req('AP contact first name is required')],
-        ap_last_name:        [req('AP contact last name is required')],
-        ap_email:            [req('AP contact email is required')],
-      }),
     }
 
     if (!validateCreate(createForm, rules)) return
@@ -582,42 +530,6 @@ export default function CustomerDetailPage() {
               <h2 className="text-sm font-semibold text-slate-700">Tags</h2>
             </div>
             <div className="px-5 py-4 space-y-3">
-              <div className="flex items-start gap-3 p-3.5 bg-purple-50 border border-purple-200 rounded-xl">
-                <svg className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
-                </svg>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-purple-800">
-                    If this customer needs to be added to Aturian, click the button below. This will require all fields on this form to be filled out completely before saving.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      let tag = allCrmTags.find((t) => t.name.trim().toLowerCase() === 'add to aturian')
-                      if (!tag) {
-                        const res = await fetch('/api/marketing/tags', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ name: 'Add to Aturian' }),
-                        })
-                        if (res.ok) {
-                          tag = await res.json()
-                          setAllCrmTags((prev) => [...(prev ?? []), tag!])
-                        }
-                      }
-                      if (tag && !createTagIds.includes(tag.id)) {
-                        setCreateTagIds((prev) => [...prev, tag!.id])
-                      }
-                    }}
-                    disabled={!!allCrmTags.find((t) => t.name.trim().toLowerCase() === 'add to aturian') && createTagIds.includes(allCrmTags.find((t) => t.name.trim().toLowerCase() === 'add to aturian')!.id)}
-                    className="mt-2.5 px-3 py-1.5 text-xs font-semibold bg-purple-700 hover:bg-purple-800 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
-                  >
-                    {allCrmTags.find((t) => t.name.trim().toLowerCase() === 'add to aturian') && createTagIds.includes(allCrmTags.find((t) => t.name.trim().toLowerCase() === 'add to aturian')!.id)
-                      ? '✓ "Add to Aturian" tag added'
-                      : 'Add "Add to Aturian" Tag'}
-                  </button>
-                </div>
-              </div>
               <TagPicker value={createTagIds} onChange={setCreateTagIds} placeholder="Add tags…" />
             </div>
           </div>
@@ -993,11 +905,6 @@ export default function CustomerDetailPage() {
               </div>
               <div className="p-3">
                 <TagPicker value={tagIds} onChange={handleTagsChange} placeholder="Add tags…" />
-                {edit.aturianError && (
-                  <div className="mt-2 p-2.5 bg-red-50 border border-red-200 rounded-lg text-xs text-red-700 leading-relaxed">
-                    {edit.aturianError}
-                  </div>
-                )}
               </div>
             </div>
 

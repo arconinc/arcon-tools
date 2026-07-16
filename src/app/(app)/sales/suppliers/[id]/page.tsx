@@ -14,6 +14,7 @@ import { useCrmTags } from '@/hooks'
 import { formatPhoneInput } from '@/lib/phone'
 import { CrmForm } from '@/types'
 import { recommendTaxForms, US_STATES } from '@/lib/forms-utils'
+import { buildSupplierAturianPayload, sendAturianTransferPayload } from '@/lib/aturian-transfer'
 import type { PlacesAddress, PlacesDetails } from '@/lib/google-places'
 
 type TagOption = { id: string; name: string; color: string }
@@ -237,6 +238,7 @@ export default function VendorDetailPage() {
   const [editForm, setEditForm] = useState<Partial<VendorDetail>>({})
   const [createTaskOpen, setCreateTaskOpen] = useState(false)
   const [taskCreatedToastOpen, setTaskCreatedToastOpen] = useState(false)
+  const [aturianAssistSent, setAturianAssistSent] = useState(false)
   const [saving, setSaving] = useState(false)
 
   const [tagIds, setTagIds] = useState<string[]>([])
@@ -819,6 +821,14 @@ export default function VendorDetailPage() {
       })()
     : undefined
 
+  const sendSupplierToAturianAssist = async () => {
+    if (!vendor) return
+
+    await sendAturianTransferPayload(buildSupplierAturianPayload(vendor))
+    setAturianAssistSent(true)
+    window.setTimeout(() => setAturianAssistSent(false), 3500)
+  }
+
   return (
     <div className="px-6 py-5">
       <Link href="/sales/suppliers" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-3">
@@ -854,12 +864,23 @@ export default function VendorDetailPage() {
               )}
             </div>
           </div>
+          <button
+            onClick={sendSupplierToAturianAssist}
+            className="px-3 py-1.5 border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors"
+          >
+            Aturian Assist
+          </button>
           <CrmDetailActions
             onCreateTask={() => setCreateTaskOpen(true)}
             extraAction={vendorRelationsMailto ? { label: 'Email Vendor Relations Signup', href: vendorRelationsMailto } : undefined}
           />
         </div>
       </div>
+      {aturianAssistSent && (
+        <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-800">
+          Sent to Aturian Assist. Open Aturian, then use the Chrome extension to fill the current page.
+        </div>
+      )}
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200 mb-3">

@@ -1,6 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
+import { dispatchNotification, fetchActor } from '@/lib/notifications/dispatch'
+import { taskCommentAdded } from '@/lib/notifications/registry'
 
 // GET /api/marketing/tasks/[id]/comments
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -61,6 +63,34 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Notify the assignee when someone else adds a comment
+  try {
+    const { data: task } = await adminClient
+      .from('crm_tasks')
+      .select('title, assigned_to, department')
+      .eq('id', taskId)
+      .single()
+    if (task?.assigned_to && task.assigned_to !== appUser.id) {
+      const actor = await fetchActor(appUser.id)
+      await dispatchNotification({
+        definition: taskCommentAdded,
+        payload: {
+          task_id: taskId,
+          task_title: task.title,
+          actor_id: appUser.id,
+          actor_name: actor.display_name,
+          comment_preview: comment.trim().slice(0, 120),
+          department: task.department ?? null,
+        },
+        recipientSpec: { userId: task.assigned_to },
+        suppressUserIds: [appUser.id],
+      })
+    }
+  } catch (err) {
+    console.error('[notifications] task comment dispatch failed:', err)
+  }
+
   return NextResponse.json(data, { status: 201 })
 }
 

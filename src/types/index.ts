@@ -953,8 +953,51 @@ export interface CrmFile {
   vendor_id: string | null
   contact_id: string | null
   opportunity_id: string | null
+  aturian_queue_id: string | null
   added_by: string
   created_at: string
+}
+
+export type AturianQueueStatus = 'new' | 'claimed' | 'complete'
+export type AturianCommissionedClient = 'Standard' | 'Standard with Split' | 'Credit Card Store' | 'Non-Credit card store'
+
+export interface AturianCustomerQueueEntry {
+  id: string
+  company_name: string
+  assigned_to: string | null
+  is_online_client: boolean
+  online_uses_cc: boolean | null
+  commissioned_client: AturianCommissionedClient
+  tax_exempt: boolean
+  address1: string | null
+  address2: string | null
+  city: string | null
+  state: string | null
+  zip: string | null
+  phone: string | null
+  website: string | null
+  orderer_first_name: string | null
+  orderer_last_name: string | null
+  orderer_email: string | null
+  ap_first_name: string | null
+  ap_last_name: string | null
+  ap_email: string | null
+  status: AturianQueueStatus
+  task_id: string | null
+  claimed_by: string | null
+  claimed_at: string | null
+  completed_by: string | null
+  completed_at: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AturianCustomerQueueDetail extends AturianCustomerQueueEntry {
+  assigned_user: { id: string; display_name: string } | null
+  claimed_user: { id: string; display_name: string } | null
+  created_by_user: { id: string; display_name: string } | null
+  files: CrmFile[]
 }
 
 export interface CrmArtwork {

@@ -438,6 +438,90 @@ export const taskCompleted: NotificationDefinition<TaskCompletedPayload> = {
   },
 }
 
+// ─── task_updated ─────────────────────────────────────────────────────────────
+
+export interface TaskUpdatedPayload {
+  task_id: string
+  task_title: string
+  actor_id: string
+  actor_name: string
+  department: string | null
+  changed_fields: string[]
+}
+
+export const taskUpdated: NotificationDefinition<TaskUpdatedPayload> = {
+  type: 'task_updated',
+  label: 'A task assigned to me was updated',
+  description: 'When someone else edits a task that is assigned to you.',
+  defaultEmail: false,
+  render: (p) => ({
+    title: `${p.actor_name} updated: ${p.task_title}`,
+    body: p.changed_fields.length > 0 ? `Changed: ${p.changed_fields.join(', ')}` : 'Task was updated',
+    linkUrl: `/tasks/${p.task_id}`,
+  }),
+  email: (p, recipient) => {
+    const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
+    return {
+      subject: `Task updated: ${p.task_title}`,
+      html: renderGenericEmail({
+        preheader: `${p.actor_name} made changes to a task assigned to you`,
+        heading: 'Task Updated',
+        greeting: `Hi ${firstName},`,
+        bodyLines: [
+          `<strong>${p.actor_name}</strong> updated a task assigned to you:`,
+          `<strong style="font-size:16px;color:#1e293b">${p.task_title}</strong>`,
+          ...(p.changed_fields.length > 0 ? [`<strong>Changed:</strong> ${p.changed_fields.join(', ')}`] : []),
+          ...(p.department ? [`<strong>Department:</strong> ${p.department}`] : []),
+        ],
+        ctaText: 'View task',
+        ctaUrl: `${appUrl()}/tasks/${p.task_id}`,
+      }),
+    }
+  },
+}
+
+// ─── task_comment_added ───────────────────────────────────────────────────────
+
+export interface TaskCommentAddedPayload {
+  task_id: string
+  task_title: string
+  actor_id: string
+  actor_name: string
+  comment_preview: string
+  department: string | null
+}
+
+export const taskCommentAdded: NotificationDefinition<TaskCommentAddedPayload> = {
+  type: 'task_comment_added',
+  label: 'A note was added to my task',
+  description: 'When someone adds a note/comment to a task assigned to you.',
+  defaultEmail: false,
+  render: (p) => ({
+    title: `${p.actor_name} commented on: ${p.task_title}`,
+    body: p.comment_preview,
+    linkUrl: `/tasks/${p.task_id}`,
+  }),
+  email: (p, recipient) => {
+    const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
+    return {
+      subject: `New note on task: ${p.task_title}`,
+      html: renderGenericEmail({
+        preheader: `${p.actor_name} added a note to a task assigned to you`,
+        heading: 'Task Note Added',
+        greeting: `Hi ${firstName},`,
+        bodyLines: [
+          `<strong>${p.actor_name}</strong> added a note to a task assigned to you:`,
+          `<strong style="font-size:16px;color:#1e293b">${p.task_title}</strong>`,
+          `<em>${p.comment_preview}</em>`,
+          ...(p.department ? [`<strong>Department:</strong> ${p.department}`] : []),
+        ],
+        ctaText: 'View task',
+        ctaUrl: `${appUrl()}/tasks/${p.task_id}`,
+      }),
+    }
+  },
+}
+
 // ─── spec.follow_up_due ───────────────────────────────────────────────────────
 
 export interface SpecFollowUpDuePayload {
@@ -654,45 +738,46 @@ export const supplierAddedToAturian: NotificationDefinition<SupplierAturianPaylo
   },
 }
 
-// ─── customer.added_to_aturian ────────────────────────────────────────────────
+// ─── aturian_customer_queue.new_entry ──────────────────────────────────────────
 
-export interface CustomerAturianPayload {
-  customer_id: string
-  customer_name: string
+export interface AturianQueueNewEntryPayload {
+  queue_id: string
+  company_name: string
   requestor_name: string
   phone: string | null
-  billing_address1: string | null
-  billing_city: string | null
-  billing_state: string | null
+  address1: string | null
+  city: string | null
+  state: string | null
 }
 
-export const customerAddedToAturian: NotificationDefinition<CustomerAturianPayload> = {
-  type: 'customer.added_to_aturian',
-  label: 'New customer needs Aturian setup',
-  description: 'When a new customer is submitted with "Add to Aturian" checked.',
+export const aturianCustomerQueueNewEntry: NotificationDefinition<AturianQueueNewEntryPayload> = {
+  type: 'aturian_customer_queue.new_entry',
+  label: 'New Aturian customer queue entry',
+  description: 'When a new Aturian customer intake is submitted and needs to be claimed.',
   defaultEmail: true,
   render: (p) => ({
-    title: `New customer to add to Aturian: ${p.customer_name}`,
+    title: `New Aturian customer request: ${p.company_name}`,
     body: `Requested by ${p.requestor_name}`,
-    linkUrl: `/sales/customers/${p.customer_id}`,
+    linkUrl: `/aturian/customers/queue/${p.queue_id}`,
   }),
   email: (p, recipient) => {
     const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
-    const addr = [p.billing_address1, p.billing_city, p.billing_state].filter(Boolean).join(', ')
+    const addr = [p.address1, p.city, p.state].filter(Boolean).join(', ')
     return {
-      subject: `New customer for Aturian: ${p.customer_name}`,
+      subject: `New Aturian customer request: ${p.company_name}`,
       html: renderGenericEmail({
-        preheader: `${p.customer_name} needs to be added to Aturian`,
-        heading: 'New Customer — Add to Aturian',
+        preheader: `${p.company_name} needs to be created in Aturian`,
+        heading: 'New Customer — Aturian Queue',
         greeting: `Hi ${firstName},`,
         bodyLines: [
-          `<strong>${p.requestor_name}</strong> submitted a new customer that needs to be added to Aturian.`,
-          `<strong style="font-size:16px;color:#1e293b">${p.customer_name}</strong>`,
+          `<strong>${p.requestor_name}</strong> submitted a new customer request for the Aturian queue.`,
+          `<strong style="font-size:16px;color:#1e293b">${p.company_name}</strong>`,
           ...(p.phone ? [`<strong>Phone:</strong> ${p.phone}`] : []),
-          ...(addr ? [`<strong>Billing Address:</strong> ${addr}`] : []),
+          ...(addr ? [`<strong>Address:</strong> ${addr}`] : []),
+          `Claim this request so the other person knows not to duplicate it.`,
         ],
-        ctaText: 'View Customer',
-        ctaUrl: `${appUrl()}/sales/customers/${p.customer_id}`,
+        ctaText: 'View in Customer Queue',
+        ctaUrl: `${appUrl()}/aturian/customers/queue/${p.queue_id}`,
       }),
     }
   },
@@ -709,6 +794,8 @@ export const customerAddedToAturian: NotificationDefinition<CustomerAturianPaylo
 export const NOTIFICATION_REGISTRY = {
   task_assigned: taskAssigned,
   task_completed: taskCompleted,
+  task_updated: taskUpdated,
+  task_comment_added: taskCommentAdded,
   'access_request.new': accessRequestNew,
   'access_request.approved': accessRequestApproved,
   'access_request.denied': accessRequestDenied,
@@ -722,7 +809,7 @@ export const NOTIFICATION_REGISTRY = {
   'pto.reviewed': ptoReviewed,
   'contact_form.submitted': contactFormSubmitted,
   'supplier.added_to_aturian': supplierAddedToAturian,
-  'customer.added_to_aturian': customerAddedToAturian,
+  'aturian_customer_queue.new_entry': aturianCustomerQueueNewEntry,
 } as const
 
 export type NotificationType = keyof typeof NOTIFICATION_REGISTRY

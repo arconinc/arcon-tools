@@ -10,19 +10,16 @@ export function useCustomerEdit(customer: CustomerDetail | null, setCustomer: Se
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState<Partial<CustomerDetail>>({})
   const [saving, setSaving] = useState(false)
-  const [aturianError, setAturianError] = useState<string | null>(null)
 
   function startEdit() {
     if (!customer) return
     setEditForm({ ...customer })
-    setAturianError(null)
     setEditing(true)
   }
 
   function cancelEdit() {
     setEditing(false)
     setEditForm({})
-    setAturianError(null)
   }
 
   function handleEditChange(field: string, value: string) {
@@ -56,8 +53,6 @@ export function useCustomerEdit(customer: CustomerDetail | null, setCustomer: Se
     editing,
     editForm,
     saving,
-    aturianError,
-    setAturianError,
     startEdit,
     cancelEdit,
     handleEditChange,

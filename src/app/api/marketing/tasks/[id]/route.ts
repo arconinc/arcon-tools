@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 import { DEPARTMENTS, getDepartmentForTaskCategory } from '@/lib/task-constants'
 import { dispatchNotification, fetchActor } from '@/lib/notifications/dispatch'
-import { taskAssigned, taskCompleted } from '@/lib/notifications/registry'
+import { taskAssigned, taskCompleted, taskUpdated } from '@/lib/notifications/registry'
 
 const TRACKED_FIELDS = ['status', 'assigned_to', 'department', 'priority', 'category', 'due_date', 'progress'] as const
 const TASK_UPDATE_FIELDS = [
@@ -325,6 +325,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           fanout_kind: 'department',
         },
         recipientSpec: { department: data.department },
+        suppressUserIds: [appUser.id],
+      })
+    }
+
+    // Notify the assignee when someone else updates the task (and it wasn't just a reassignment handled above)
+    const hasFieldChanges = historyInserts.length > 0
+    const assigneeIsNotEditor = data.assigned_to && data.assigned_to !== appUser.id
+    const wasReassignedAway = newAssigneeChanged && data.assigned_to !== current.assigned_to
+    if (hasFieldChanges && assigneeIsNotEditor && !wasReassignedAway) {
+      const actor = await fetchActor(appUser.id)
+      const changedFields = historyInserts.map((h) => h.field_changed)
+      await dispatchNotification({
+        definition: taskUpdated,
+        payload: {
+          task_id: data.id,
+          task_title: data.title,
+          actor_id: appUser.id,
+          actor_name: actor.display_name,
+          department: data.department ?? null,
+          changed_fields: changedFields,
+        },
+        recipientSpec: { userId: data.assigned_to },
         suppressUserIds: [appUser.id],
       })
     }

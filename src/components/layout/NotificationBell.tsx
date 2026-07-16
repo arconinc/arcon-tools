@@ -25,6 +25,24 @@ interface ListResponse {
 
 const POLL_MS = 60_000
 
+function requestNotifPermission() {
+  if (typeof Notification !== 'undefined' && Notification.permission === 'default') {
+    Notification.requestPermission().catch(() => {})
+  }
+}
+
+function fireSystemNotif(n: NotificationRow) {
+  if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
+  try {
+    const notif = new Notification(n.title, { body: n.body, icon: '/favicon.ico' })
+    if (n.link_url) {
+      notif.onclick = () => { window.focus(); window.location.href = n.link_url! }
+    }
+  } catch {
+    // Safari may throw even with permission
+  }
+}
+
 function formatRelative(iso: string): string {
   const t = new Date(iso).getTime()
   if (Number.isNaN(t)) return ''
@@ -49,6 +67,8 @@ export function NotificationBell() {
   const [items, setItems] = useState<NotificationRow[]>([])
   const [unread, setUnread] = useState(0)
   const [loading, setLoading] = useState(false)
+  // IDs we've already seen — undefined means first load (don't fire notifs on initial fetch)
+  const seenIds = useRef<Set<string> | undefined>(undefined)
 
   const load = useCallback(async () => {
     try {
@@ -57,12 +77,26 @@ export function NotificationBell() {
       const data = (await res.json()) as ListResponse
       setItems(data.notifications)
       setUnread(data.unreadCount)
+
+      if (seenIds.current === undefined) {
+        // First load — seed seen set, no system alerts
+        seenIds.current = new Set(data.notifications.map(n => n.id))
+      } else {
+        // Subsequent polls — fire system notif for truly new items
+        for (const n of data.notifications) {
+          if (!seenIds.current.has(n.id)) {
+            seenIds.current.add(n.id)
+            fireSystemNotif(n)
+          }
+        }
+      }
     } catch {
       // Silent — keep last good state
     }
   }, [])
 
   useEffect(() => {
+    requestNotifPermission()
     load()
     const id = setInterval(load, POLL_MS)
     return () => clearInterval(id)

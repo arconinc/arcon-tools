@@ -1,0 +1,30 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Aturian Assist</title>
+    <link rel="stylesheet" href="popup.css">
+  </head>
+  <body>
+    <main>
+      <div class="header">
+        <div>
+          <h1>Aturian Assist</h1>
+          <p id="status">Waiting for a The Arc record.</p>
+        </div>
+        <button id="clear" type="button" title="Clear saved record">Clear</button>
+      </div>
+
+      <section id="record" class="record hidden">
+        <div class="record-title" id="record-title"></div>
+        <div class="record-meta" id="record-meta"></div>
+        <dl id="field-list"></dl>
+      </section>
+
+      <button id="fill" type="button" class="primary" disabled>Fill current Aturian page</button>
+      <p class="note">The extension fills visible fields only. It never clicks Save or Create.</p>
+    </main>
+    <script src="popup.js"></script>
+  </body>
+</html>

@@ -1,0 +1,25 @@
+{
+  "manifest_version": 3,
+  "name": "Arcon Aturian Assist",
+  "description": "Copies prepared The Arc CRM records into Aturian forms without submitting them.",
+  "version": "0.1.0",
+  "permissions": ["activeTab", "scripting", "storage"],
+  "host_permissions": [
+    "http://localhost:3000/*",
+    "https://thearc.arconinc.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "http://localhost:3000/*",
+        "https://thearc.arconinc.com/*"
+      ],
+      "js": ["scripts/arc-capture.js"],
+      "run_at": "document_idle"
+    }
+  ],
+  "action": {
+    "default_title": "Aturian Assist",
+    "default_popup": "popup.html"
+  }
+}

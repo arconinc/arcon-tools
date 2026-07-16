@@ -120,7 +120,8 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
       label: 'Aturian',
       items: [
         { href: 'https://arcon.erp.network/', label: 'Login', icon: LoginIcon },
-        { href: '/sales/customers/new', label: 'Add Customer', icon: CrmCustomersIcon },
+        { href: '/aturian/customers/new', label: 'Add Customer', icon: CrmCustomersIcon },
+        { href: '/aturian/customers/queue', label: 'Customer Queue', icon: ClipboardListIcon },
         { href: '/sales/suppliers/new', label: 'Add Supplier', icon: BuildingIcon },
       ],
     },

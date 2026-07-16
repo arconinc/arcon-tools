@@ -9,6 +9,7 @@ type PlacesAddressAutocompleteProps = {
   placeholder?: string
   initialQuery?: string | null
   onAddressSelect: (address: PlacesAddress) => void
+  onPlaceSelect?: (place: any) => void
 }
 
 export function PlacesAddressAutocomplete({
@@ -16,6 +17,7 @@ export function PlacesAddressAutocomplete({
   placeholder = 'Search Google Places...',
   initialQuery,
   onAddressSelect,
+  onPlaceSelect,
 }: PlacesAddressAutocompleteProps) {
   const [value, setValue] = useState('')
   const [expanded, setExpanded] = useState(false)
@@ -88,6 +90,7 @@ export function PlacesAddressAutocomplete({
       const data = await res.json()
       if (!res.ok) throw new Error(data.error ?? 'Could not load place details')
       onAddressSelect(data.place.address)
+      onPlaceSelect?.(data.place)
       setValue(suggestion.description)
       setExpanded(false)
       setOpen(false)
