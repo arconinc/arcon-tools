@@ -48,7 +48,7 @@ export function renderGenericEmail(p: GenericEmailParams): string {
                 <a href="${encodeURI(p.ctaUrl)}" style="display:inline-block;padding:12px 24px;color:#fff;font-size:15px;font-weight:600;text-decoration:none">${escape(p.ctaText)}</a>
               </td></tr>
             </table>
-            <p style="margin:24px 0 0;font-size:13px;color:#94a3b8;line-height:1.6">You're receiving this because email notifications are enabled for this event. You can change this anytime in your <a href="${encodeURI((process.env.NEXT_PUBLIC_APP_URL ?? '') + '/profile')}" style="color:#6b1e98;text-decoration:underline">profile preferences</a>.</p>
+            <p style="margin:24px 0 0;font-size:13px;color:#94a3b8;line-height:1.6">You're receiving this because this activity is relevant to your Arcon Tools account.</p>
           </td>
         </tr>
         <tr>

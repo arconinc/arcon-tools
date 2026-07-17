@@ -47,11 +47,24 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { id: taskId } = await params
   const body = await req.json()
-  const { comment } = body
+  const { comment, reassignToCreator } = body
 
   if (!comment?.trim()) return NextResponse.json({ error: 'Comment text is required' }, { status: 400 })
 
   const adminClient = createAdminClient()
+  const { data: task, error: taskError } = await adminClient
+    .from('crm_tasks')
+    .select('id, title, assigned_to, created_by, department, delegators')
+    .eq('id', taskId)
+    .single()
+
+  if (taskError || !task) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+
+  const shouldReassignToCreator = reassignToCreator === true
+  if (shouldReassignToCreator && (!task.created_by || task.assigned_to !== appUser.id || task.created_by === appUser.id)) {
+    return NextResponse.json({ error: 'This task cannot be reassigned back to its assigner.' }, { status: 400 })
+  }
+
   const { data, error } = await adminClient
     .from('crm_task_comments')
     .insert({
@@ -64,15 +77,53 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  // Notify the assignee when someone else adds a comment
-  try {
-    const { data: task } = await adminClient
+  if (shouldReassignToCreator && task.created_by && task.assigned_to !== task.created_by) {
+    const changedAt = new Date().toISOString()
+    const { error: reassignError } = await adminClient
       .from('crm_tasks')
-      .select('title, assigned_to, department')
+      .update({
+        assigned_to: task.created_by,
+        delegators: task.assigned_to
+          ? [...new Set([...(task.delegators ?? []), task.assigned_to])]
+          : task.delegators,
+        updated_at: changedAt,
+      })
       .eq('id', taskId)
-      .single()
-    if (task?.assigned_to && task.assigned_to !== appUser.id) {
+
+    if (reassignError) {
+      return NextResponse.json({ error: reassignError.message }, { status: 500 })
+    }
+
+    await adminClient.from('crm_task_history').insert({
+      task_id: taskId,
+      user_id: appUser.id,
+      field_changed: 'assigned_to',
+      old_value: task.assigned_to,
+      new_value: task.created_by,
+      changed_at: changedAt,
+    })
+  }
+
+  // Notify the person who assigned the task when someone else adds a comment.
+  try {
+    if (task.created_by && task.created_by !== appUser.id) {
       const actor = await fetchActor(appUser.id)
+      const { data: commentRows } = await adminClient
+        .from('crm_task_comments')
+        .select('comment, created_at, user_id')
+        .eq('task_id', taskId)
+        .order('created_at', { ascending: true })
+
+      const commentUserIds = [...new Set((commentRows ?? []).map((c: any) => c.user_id).filter(Boolean))]
+      const commentUsersMap: Record<string, string> = {}
+      if (commentUserIds.length > 0) {
+        const { data: commentUsers } = await adminClient
+          .from('users')
+          .select('id, display_name')
+          .in('id', commentUserIds)
+        for (const u of commentUsers ?? []) commentUsersMap[u.id] = u.display_name
+      }
+
       await dispatchNotification({
         definition: taskCommentAdded,
         payload: {
@@ -81,9 +132,14 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           actor_id: appUser.id,
           actor_name: actor.display_name,
           comment_preview: comment.trim().slice(0, 120),
+          comments: (commentRows ?? []).map((c: any) => ({
+            author_name: commentUsersMap[c.user_id] ?? 'Unknown',
+            comment: c.comment,
+            created_at: c.created_at,
+          })),
           department: task.department ?? null,
         },
-        recipientSpec: { userId: task.assigned_to },
+        recipientSpec: { userId: task.created_by },
         suppressUserIds: [appUser.id],
       })
     }

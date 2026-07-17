@@ -13,12 +13,18 @@ export function CommentsTab({
   taskId,
   comments,
   currentUserId,
+  assignedTo,
+  createdBy,
+  createdByName,
   isAdmin,
   onRefresh,
 }: {
   taskId: string
   comments: Comment[]
   currentUserId: string
+  assignedTo: string | null
+  createdBy: string | null
+  createdByName?: string | null
   isAdmin: boolean
   onRefresh: () => void
 }) {
@@ -32,14 +38,17 @@ export function CommentsTab({
   const [uploadingCommentId, setUploadingCommentId] = useState<string | null>(null)
   const fileInputRef = useRef<HTMLInputElement>(null)
 
-  async function submitComment() {
+  const canReassignToCreator = !!createdBy && assignedTo === currentUserId && createdBy !== currentUserId
+  const assignerName = createdByName ?? 'the person who assigned it'
+
+  async function submitComment(reassignToCreator = false) {
     if (!text.trim()) return
     setSubmitting(true)
     try {
       const res = await fetch(`/api/marketing/tasks/${taskId}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ comment: text.trim() }),
+        body: JSON.stringify({ comment: text.trim(), reassignToCreator }),
       })
       if (res.ok) {
         setText('')
@@ -112,14 +121,24 @@ export function CommentsTab({
           placeholder="Write a comment…"
           className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none mb-3"
         />
-        <div className="flex items-center gap-2">
+        <div className="flex items-center gap-2 flex-wrap">
           <button
-            onClick={submitComment}
+            onClick={() => submitComment(false)}
             disabled={submitting || !text.trim()}
             className="px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-lg disabled:opacity-60 transition-colors"
           >
-            {submitting ? 'Posting…' : 'Post Comment'}
+            {submitting ? 'Saving…' : 'Save Comment'}
           </button>
+          {canReassignToCreator && (
+            <button
+              onClick={() => submitComment(true)}
+              disabled={submitting || !text.trim()}
+              title={`Comment and reassign to ${assignerName}`}
+              className="px-4 py-2 border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 text-sm font-semibold rounded-lg disabled:opacity-60 transition-colors"
+            >
+              Comment & Reassign
+            </button>
+          )}
         </div>
       </div>
 

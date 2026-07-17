@@ -167,31 +167,33 @@ export function NotificationBell() {
     }
   }
 
-  const badge = unread > 9 ? '9+' : unread > 0 ? String(unread) : ''
+  const hasUnread = unread > 0
+  const badge = unread > 99 ? '99+' : hasUnread ? String(unread) : ''
 
   return (
     <div ref={ref} style={{ position: 'relative' }}>
       <button
         onClick={toggleOpen}
         title="Notifications"
-        aria-label="Notifications"
+        aria-label={hasUnread ? `Notifications, ${unread} unread` : 'Notifications'}
         style={{
-          width: 34,
-          height: 34,
+          width: 38,
+          height: 38,
           borderRadius: 6,
-          background: '#f5f5f5',
-          border: '1px solid #e5e7eb',
+          background: hasUnread ? '#fff1f2' : '#f5f5f5',
+          border: hasUnread ? '1px solid #fecaca' : '1px solid #e5e7eb',
           display: 'flex',
           alignItems: 'center',
           justifyContent: 'center',
           cursor: 'pointer',
-          color: '#777',
+          color: hasUnread ? '#b91c1c' : '#555',
           position: 'relative',
           flexShrink: 0,
           padding: 0,
+          boxShadow: hasUnread ? '0 0 0 3px rgba(220, 38, 38, 0.10)' : 'none',
         }}
       >
-        <svg width="16" height="16" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <svg width="18" height="18" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2}
                 d="M15 17h5l-1.405-1.405A2.032 2.032 0 0118 14.158V11a6.002 6.002 0 00-4-5.659V5a2 2 0 10-4 0v.341C7.67 6.165 6 8.388 6 11v3.159c0 .538-.214 1.055-.595 1.436L4 17h5m6 0v1a3 3 0 11-6 0v-1m6 0H9" />
         </svg>
@@ -199,20 +201,21 @@ export function NotificationBell() {
           <div
             style={{
               position: 'absolute',
-              top: -4,
-              right: -4,
-              minWidth: 16,
-              height: 16,
-              padding: '0 4px',
-              background: '#6b1e98',
-              borderRadius: 8,
-              border: '1.5px solid #fff',
+              top: -9,
+              right: -9,
+              minWidth: 22,
+              height: 22,
+              padding: '0 6px',
+              background: '#dc2626',
+              borderRadius: 999,
+              border: '2px solid #fff',
               color: '#fff',
-              fontSize: 10,
-              fontWeight: 700,
-              lineHeight: '13px',
+              fontSize: 12,
+              fontWeight: 800,
+              lineHeight: '18px',
               textAlign: 'center',
               boxSizing: 'border-box',
+              boxShadow: '0 2px 5px rgba(185, 28, 28, 0.35)',
             }}
           >
             {badge}

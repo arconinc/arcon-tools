@@ -239,8 +239,13 @@ export function TaskFormModal({
   const initialFormRef = useRef<TaskForm>(task ? formFromTask(task) : emptyForm(defaultDepartment))
   const [editingField, setEditingField] = useState<'title' | 'dept' | 'assigned_to' | 'description' | null>(null)
   const [attachmentsExpanded, setAttachmentsExpanded] = useState(false)
-  const [notesExpanded, setNotesExpanded] = useState(false)
+  const [notesExpanded, setNotesExpanded] = useState(mode === 'edit')
   const dueDateRef = useRef<HTMLInputElement>(null)
+  const canReassignToCreator = mode === 'edit' &&
+    !!task?.created_by &&
+    task.assigned_to === appUser?.id &&
+    task.created_by !== appUser?.id
+  const assignerName = task?.created_user?.display_name ?? 'the person who assigned it'
 
   useEffect(() => {
     if (!open) return
@@ -253,7 +258,7 @@ export function TaskFormModal({
     setError(null)
     setEditingField(mode === 'create' ? 'title' : null)
     setAttachmentsExpanded(false)
-    setNotesExpanded(false)
+    setNotesExpanded(mode === 'edit')
     if (mode === 'edit' && task?.id) {
       fetch(`/api/marketing/tasks/${task.id}/attachments`)
         .then((r) => r.json())
@@ -296,18 +301,23 @@ export function TaskFormModal({
     setTimeout(() => notesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
   }
 
-  async function submitNote() {
+  async function submitNote(reassignToCreator = false) {
     if (!noteText.trim() || !task?.id) return
     setSubmittingNote(true)
     try {
       const res = await fetch(`/api/marketing/tasks/${task.id}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ comment: noteText.trim() }),
+        body: JSON.stringify({ comment: noteText.trim(), reassignToCreator }),
       })
       if (res.ok) {
         setNoteText('')
         await refreshNotes(task.id)
+        if (reassignToCreator) {
+          const saved = await fetchSavedTask(task.id, task)
+          onSaved(saved as TaskFormTask)
+          setForm(formFromTask(saved as TaskFormTask))
+        }
       }
     } finally {
       setSubmittingNote(false)
@@ -743,7 +753,7 @@ export function TaskFormModal({
             </div>
           </div>
 
-          {/* Description — grows to fill remaining space */}
+          {/* Description */}
           <div className="flex-1 flex flex-col min-h-0 px-6 pt-3 pb-1">
             <div className="flex-shrink-0 flex items-center justify-between mb-1">
               <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Description</span>
@@ -795,6 +805,80 @@ export function TaskFormModal({
               </div>
             )}
           </div>
+
+          {/* Collapsible Comments (edit mode only) */}
+          {mode === 'edit' && task?.id && (
+            <div className="flex-shrink-0 border-t border-slate-100">
+              <button
+                type="button"
+                onClick={() => setNotesExpanded((p) => !p)}
+                className="w-full flex items-center gap-2 px-6 py-2 text-left hover:bg-slate-50 transition-colors"
+              >
+                <svg className={`h-3 w-3 text-slate-400 transition-transform flex-shrink-0 ${notesExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                </svg>
+                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Comments</span>
+                {notes.length > 0 && (
+                  <span className="ml-0.5 px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-full leading-none">
+                    {notes.length}
+                  </span>
+                )}
+              </button>
+              {notesExpanded && (
+                <div className="px-6 pb-3 space-y-3">
+                  <div className="flex gap-2 items-start">
+                    <textarea
+                      rows={3}
+                      value={noteText}
+                      onChange={(e) => setNoteText(e.target.value)}
+                      onKeyDown={(e) => {
+                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submitNote()
+                      }}
+                      placeholder="Add a comment…"
+                      className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none"
+                    />
+                    <div className="flex flex-col gap-1.5">
+                      <button
+                        type="button"
+                        onClick={() => submitNote(false)}
+                        disabled={submittingNote || !noteText.trim()}
+                        className="px-3 py-2 bg-purple-700 text-white text-xs font-semibold rounded-lg hover:bg-purple-800 disabled:opacity-50 transition-colors whitespace-nowrap"
+                      >
+                        {submittingNote ? 'Saving…' : 'Save Comment'}
+                      </button>
+                      {canReassignToCreator && (
+                        <button
+                          type="button"
+                          onClick={() => submitNote(true)}
+                          disabled={submittingNote || !noteText.trim()}
+                          title={`Comment and reassign to ${assignerName}`}
+                          className="px-3 py-2 border border-amber-300 bg-amber-50 text-amber-800 text-xs font-semibold rounded-lg hover:bg-amber-100 disabled:opacity-50 transition-colors whitespace-nowrap"
+                        >
+                          Comment & Reassign
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                  {notes.length === 0 ? (
+                    <p className="text-xs text-slate-400">No comments yet.</p>
+                  ) : (
+                    <div className="max-h-[50vh] overflow-y-auto space-y-2.5 pr-1">
+                      {[...notes].reverse().map((n) => (
+                        <div key={n.id} className="bg-slate-50 rounded-lg px-3 py-2">
+                          <div className="flex items-center gap-1.5 mb-0.5">
+                            <span className="text-xs font-semibold text-slate-700">{n.user.display_name}</span>
+                            <span className="text-xs text-slate-400">{relativeTime(n.created_at)}</span>
+                          </div>
+                          <p className="text-xs text-slate-600 whitespace-pre-wrap">{n.comment}</p>
+                        </div>
+                      ))}
+                      <div ref={notesEndRef} />
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Collapsible Attachments */}
           <div className="flex-shrink-0 border-t border-slate-100">
@@ -863,69 +947,8 @@ export function TaskFormModal({
             )}
           </div>
 
-          {/* Collapsible Notes (edit mode only) */}
-          {mode === 'edit' && task?.id && (
-            <div className="flex-shrink-0 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setNotesExpanded((p) => !p)}
-                className="w-full flex items-center gap-2 px-6 py-2 text-left hover:bg-slate-50 transition-colors"
-              >
-                <svg className={`h-3 w-3 text-slate-400 transition-transform flex-shrink-0 ${notesExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Notes</span>
-                {notes.length > 0 && (
-                  <span className="ml-0.5 px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-full leading-none">
-                    {notes.length}
-                  </span>
-                )}
-              </button>
-              {notesExpanded && (
-                <div className="px-6 pb-3 space-y-3">
-                  <div className="flex gap-2 items-start">
-                    <textarea
-                      rows={2}
-                      value={noteText}
-                      onChange={(e) => setNoteText(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submitNote()
-                      }}
-                      placeholder="Add a note…"
-                      className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none"
-                    />
-                    <button
-                      type="button"
-                      onClick={submitNote}
-                      disabled={submittingNote || !noteText.trim()}
-                      className="px-3 py-2 bg-purple-700 text-white text-xs font-semibold rounded-lg hover:bg-purple-800 disabled:opacity-50 transition-colors whitespace-nowrap"
-                    >
-                      {submittingNote ? 'Saving…' : 'Add Note'}
-                    </button>
-                  </div>
-                  {notes.length === 0 ? (
-                    <p className="text-xs text-slate-400">No notes yet.</p>
-                  ) : (
-                    <div className="max-h-40 overflow-y-auto space-y-2.5 pr-1">
-                      {[...notes].reverse().map((n) => (
-                        <div key={n.id} className="bg-slate-50 rounded-lg px-3 py-2">
-                          <div className="flex items-center gap-1.5 mb-0.5">
-                            <span className="text-xs font-semibold text-slate-700">{n.user.display_name}</span>
-                            <span className="text-xs text-slate-400">{relativeTime(n.created_at)}</span>
-                          </div>
-                          <p className="text-xs text-slate-600 whitespace-pre-wrap">{n.comment}</p>
-                        </div>
-                      ))}
-                      <div ref={notesEndRef} />
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
           {/* Footer */}
-          <div className="flex-shrink-0 flex items-center justify-between gap-3 px-6 py-3 border-t border-slate-100">
+          <div className="mt-auto flex-shrink-0 flex items-center justify-between gap-3 px-6 py-3 border-t border-slate-100">
             <div>
               {mode === 'edit' && task?.id && (appUser?.is_admin || task.created_by === appUser?.id || task.task_owner === appUser?.id) && (
                 <button

@@ -6,7 +6,6 @@ import { useAppUser } from '@/components/layout/AppShell'
 import { TiptapEditor } from '@/components/news/TiptapEditor'
 import TagInput from '@/components/employees/TagInput'
 import EmployeeAvatar from '@/components/employees/EmployeeAvatar'
-import { NotificationPreferences } from '@/components/profile/NotificationPreferences'
 import { formatPhoneInput } from '@/lib/phone'
 
 const US_TIMEZONES = [
@@ -306,9 +305,6 @@ export default function MyProfilePage() {
           />
           <p className="my-prof-hint" style={{ marginTop: '0.5rem' }}>Press Enter or comma to add</p>
         </div>
-
-        {/* Notification preferences (independent — saves on toggle) */}
-        <NotificationPreferences />
 
         <div style={{ display: 'flex', justifyContent: 'flex-end', paddingBottom: '2rem' }}>
           <button className="my-prof-save-btn" onClick={handleSave} disabled={saving}>

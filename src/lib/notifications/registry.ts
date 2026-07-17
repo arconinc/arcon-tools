@@ -488,14 +488,37 @@ export interface TaskCommentAddedPayload {
   actor_id: string
   actor_name: string
   comment_preview: string
+  comments: Array<{
+    author_name: string
+    comment: string
+    created_at: string
+  }>
   department: string | null
+}
+
+function escapeHtml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;')
+}
+
+function formatCommentDate(iso: string): string {
+  return new Date(iso).toLocaleString('en-US', {
+    month: 'short',
+    day: 'numeric',
+    hour: 'numeric',
+    minute: '2-digit',
+  })
 }
 
 export const taskCommentAdded: NotificationDefinition<TaskCommentAddedPayload> = {
   type: 'task_comment_added',
-  label: 'A note was added to my task',
-  description: 'When someone adds a note/comment to a task assigned to you.',
-  defaultEmail: false,
+  label: 'A comment was added to a task I assigned',
+  description: 'When someone adds a comment to a task you assigned.',
+  defaultEmail: true,
   render: (p) => ({
     title: `${p.actor_name} commented on: ${p.task_title}`,
     body: p.comment_preview,
@@ -503,17 +526,29 @@ export const taskCommentAdded: NotificationDefinition<TaskCommentAddedPayload> =
   }),
   email: (p, recipient) => {
     const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
+    const commentHistory = p.comments.length > 0
+      ? `<span style="display:block;margin:18px 0 0;padding:14px 16px;background:#f8fafc;border:1px solid #e2e8f0;border-radius:8px">
+          <span style="display:block;margin:0 0 10px;font-size:13px;font-weight:700;color:#334155;text-transform:uppercase;letter-spacing:.04em">All Comments</span>
+          ${p.comments.map((comment) => `
+            <span style="display:block;padding:10px 0;border-top:1px solid #e2e8f0">
+              <span style="display:block;margin:0 0 4px;font-size:13px;color:#64748b"><strong>${escapeHtml(comment.author_name)}</strong> &middot; ${escapeHtml(formatCommentDate(comment.created_at))}</span>
+              <span style="display:block;margin:0;font-size:14px;color:#334155;line-height:1.55;white-space:pre-wrap">${escapeHtml(comment.comment)}</span>
+            </span>
+          `).join('')}
+        </span>`
+      : ''
     return {
-      subject: `New note on task: ${p.task_title}`,
+      subject: `New comment on task: ${p.task_title}`,
       html: renderGenericEmail({
-        preheader: `${p.actor_name} added a note to a task assigned to you`,
-        heading: 'Task Note Added',
+        preheader: `${p.actor_name} added a comment to a task you assigned`,
+        heading: 'Task Comment Added',
         greeting: `Hi ${firstName},`,
         bodyLines: [
-          `<strong>${p.actor_name}</strong> added a note to a task assigned to you:`,
-          `<strong style="font-size:16px;color:#1e293b">${p.task_title}</strong>`,
-          `<em>${p.comment_preview}</em>`,
-          ...(p.department ? [`<strong>Department:</strong> ${p.department}`] : []),
+          `<strong>${escapeHtml(p.actor_name)}</strong> added a comment to a task you assigned:`,
+          `<strong style="font-size:16px;color:#1e293b">${escapeHtml(p.task_title)}</strong>`,
+          `<em>${escapeHtml(p.comment_preview)}</em>`,
+          ...(p.department ? [`<strong>Department:</strong> ${escapeHtml(p.department)}`] : []),
+          commentHistory,
         ],
         ctaText: 'View task',
         ctaUrl: `${appUrl()}/tasks/${p.task_id}`,

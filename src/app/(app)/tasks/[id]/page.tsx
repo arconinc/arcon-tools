@@ -354,7 +354,7 @@ export default function TaskDetailPage() {
               activeTab === tab ? 'font-bold text-purple-700 border-purple-700' : 'font-medium text-slate-500 border-transparent hover:text-slate-700'
             }`}
           >
-            {tab === 'comments' ? 'Notes' : tab}
+            {tab === 'comments' ? 'Comments' : tab}
             {tab === 'comments' && task.comments.length > 0 && (
               <span className="ml-1.5 text-xs opacity-70">{task.comments.length}</span>
             )}
@@ -828,6 +828,9 @@ export default function TaskDetailPage() {
           taskId={task.id}
           comments={task.comments}
           currentUserId={appUser.id}
+          assignedTo={task.assigned_to}
+          createdBy={task.created_by}
+          createdByName={task.created_user?.display_name}
           isAdmin={appUser.is_admin}
           onRefresh={refetch}
         />
