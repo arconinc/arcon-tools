@@ -2,12 +2,12 @@ import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 import { unauthorized, forbidden, notFound, badRequest, serverError, ok } from '@/lib/api/respond'
-import { resolveAturianQueueAssignees } from '@/lib/crm/aturian-assignees'
+import { resolveAturianQueueAssignee } from '@/lib/crm/aturian-assignees'
 
 async function canActOnQueue(adminClient: ReturnType<typeof createAdminClient>, userId: string, isAdmin: boolean) {
   if (isAdmin) return true
-  const assignees = await resolveAturianQueueAssignees(adminClient)
-  return assignees.some(a => a.id === userId)
+  const amy = await resolveAturianQueueAssignee(adminClient)
+  return amy?.id === userId
 }
 
 // GET /api/marketing/aturian-queue/[id]
@@ -20,7 +20,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const { data, error } = await adminClient.from('aturian_customer_queue').select('*').eq('id', id).single()
   if (error || !data) return notFound('Queue entry not found')
 
-  const userIds = [...new Set([data.assigned_to, data.claimed_by, data.created_by].filter(Boolean))]
+  const userIds = [...new Set([data.assigned_to, data.created_by, data.completed_by].filter(Boolean))]
   const [{ data: users }, { data: files }] = await Promise.all([
     userIds.length > 0
       ? adminClient.from('users').select('id, display_name').in('id', userIds)
@@ -35,6 +35,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     assigned_user: data.assigned_to ? { id: data.assigned_to, display_name: usersMap[data.assigned_to] ?? null } : null,
     claimed_user: data.claimed_by ? { id: data.claimed_by, display_name: usersMap[data.claimed_by] ?? null } : null,
     created_by_user: data.created_by ? { id: data.created_by, display_name: usersMap[data.created_by] ?? null } : null,
+    completed_by_user: data.completed_by ? { id: data.completed_by, display_name: usersMap[data.completed_by] ?? null } : null,
     files: files ?? [],
   })
 }
@@ -59,23 +60,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   const { action } = await req.json()
 
-  if (action === 'claim') {
-    if (current.status !== 'new') return badRequest('Already claimed')
-    const { data, error } = await adminClient
-      .from('aturian_customer_queue')
-      .update({ status: 'claimed', claimed_by: appUser.id, claimed_at: new Date().toISOString(), updated_at: new Date().toISOString() })
-      .eq('id', id)
-      .select()
-      .single()
-    if (error) return serverError(error.message)
-    if (current.task_id) {
-      await adminClient.from('crm_tasks').update({ assigned_to: appUser.id }).eq('id', current.task_id)
-    }
-    return ok(data)
-  }
-
   if (action === 'complete') {
-    if (current.status !== 'claimed') return badRequest('Must be claimed before completing')
+    if (current.status !== 'new') return badRequest('Can only complete new entries')
     const { data, error } = await adminClient
       .from('aturian_customer_queue')
       .update({ status: 'complete', completed_by: appUser.id, completed_at: new Date().toISOString(), updated_at: new Date().toISOString() })

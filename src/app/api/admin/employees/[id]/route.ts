@@ -91,7 +91,7 @@ export async function PATCH(
 
   if ('department' in body) {
     const deptList: string[] = Array.isArray(body.department) ? body.department : []
-    const nextGroupKeys = [...new Set(deptList.map((name: string) => ASSIGNMENT_GROUP_BY_DEPARTMENT[name]).filter((key: string | undefined): key is string => !!key))]
+    const nextGroupKeys = [...new Set(deptList.map((name: string) => ASSIGNMENT_GROUP_BY_DEPARTMENT[name]).filter((key): key is string => !!key))]
     const directDepts = deptList.filter((name: string) => ASSIGNMENT_GROUP_BY_DEPARTMENT[name] === null)
 
     const { data: assignmentGroups } = await adminClient

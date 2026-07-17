@@ -6,6 +6,7 @@ import Link from 'next/link'
 import TagPicker from '@/components/crm/TagPicker'
 import { CreateTaskModal } from '@/components/crm/CreateTaskModal'
 import { CrmDetailActions } from '@/components/crm/CrmDetailActions'
+import { CallLogCard } from '@/components/crm/CallLogCard'
 import { PlacesCompanyAutocomplete } from '@/components/crm/PlacesCompanyAutocomplete'
 import { PlacesAddressAutocomplete } from '@/components/crm/PlacesAddressAutocomplete'
 import { TaskCreatedToast } from '@/components/crm/TaskCreatedToast'
@@ -1144,6 +1145,8 @@ export default function VendorDetailPage() {
 
           {/* Sidebar — 25% */}
           <div className="space-y-3">
+            <CallLogCard entityType="vendor" entityId={vendor.id} />
+
             {/* Tags card */}
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">

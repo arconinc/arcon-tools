@@ -2,31 +2,27 @@
   if (window.__arconAturianAssistInstalled) return
   window.__arconAturianAssistInstalled = true
 
+  // customer map: field key → array of Aturian input[name] values (matched case-insensitively, ALL matches filled)
+  const CUSTOMER_NAME_MAP = {
+    company_name:       ['name', 'Mcompanyname', 'Scompanyname', 'bcompanyname'],
+    phone:              ['btelephone', 'Gtelephone'],
+    website:            ['Gwebaddress'],
+    address1:           ['MstreetLine1', 'SstreetLine1', 'bstreetLine1'],
+    address2:           ['MstreetLine2', 'SstreetLine2', 'bstreetLine2'],
+    city:               ['Mcity', 'Scity', 'bcity'],
+    state:              ['MstateId', 'SstateId', 'bstateId'],
+    zip:                ['Mpostalcode', 'Spostalcode', 'bpostalcode'],
+    orderer_full_name:  ['Mattention', 'Sattention'],
+    orderer_first_name: ['Gfname'],
+    orderer_last_name:  ['Glastname'],
+    orderer_email:      ['toUserId'],
+    ap_first_name:      ['bfname'],
+    ap_last_name:       ['blastname'],
+    ap_email:           ['toUserId'],
+  }
+
   const FIELD_MAPS = {
-    customer: {
-      name: ['input[name="CustomerName"]', 'input[name="Name"]', 'input[aria-label*="customer" i]', 'input[placeholder*="customer" i]'],
-      phone: ['input[name="Phone"]', 'input[type="tel"]', 'input[aria-label*="phone" i]'],
-      website: ['input[name="Website"]', 'input[type="url"]', 'input[aria-label*="website" i]'],
-      sales_consultant: ['input[name="SalesConsultant"]', 'select[name="SalesConsultant"]'],
-      commissioned_client: ['select[name="CommissionedClient"]', 'input[name="CommissionedClient"]'],
-      tax_exempt: ['input[name="TaxExempt"]', 'select[name="TaxExempt"]'],
-      billing_address1: ['input[name="BillingAddress1"]', 'input[aria-label*="billing address" i]'],
-      billing_address2: ['input[name="BillingAddress2"]'],
-      billing_city: ['input[name="BillingCity"]', 'input[aria-label*="billing city" i]'],
-      billing_state: ['input[name="BillingState"]', 'select[name="BillingState"]'],
-      billing_zip: ['input[name="BillingZip"]', 'input[name="BillingPostalCode"]'],
-      billing_country: ['input[name="BillingCountry"]', 'select[name="BillingCountry"]'],
-      shipping_address1: ['input[name="ShippingAddress1"]', 'input[aria-label*="shipping address" i]'],
-      shipping_address2: ['input[name="ShippingAddress2"]'],
-      shipping_city: ['input[name="ShippingCity"]'],
-      shipping_state: ['input[name="ShippingState"]', 'select[name="ShippingState"]'],
-      shipping_zip: ['input[name="ShippingZip"]', 'input[name="ShippingPostalCode"]'],
-      shipping_country: ['input[name="ShippingCountry"]', 'select[name="ShippingCountry"]'],
-      orderer_name: ['input[name="OrdererName"]', 'input[aria-label*="orderer" i]'],
-      orderer_email: ['input[name="OrdererEmail"]'],
-      ap_name: ['input[name="APContactName"]', 'input[name="AccountsPayableName"]'],
-      ap_email: ['input[name="APEmail"]', 'input[name="AccountsPayableEmail"]'],
-    },
+    customer: null, // handled via CUSTOMER_NAME_MAP
     supplier: {
       name: ['input[name="SupplierName"]', 'input[name="VendorName"]', 'input[name="Name"]', 'input[aria-label*="supplier" i]', 'input[aria-label*="vendor" i]'],
       phone: ['input[name="Phone"]', 'input[type="tel"]', 'input[aria-label*="phone" i]'],
@@ -54,7 +50,7 @@
   }
 
   function isFillable(element) {
-    return element && !element.disabled && element.offsetParent !== null
+    return element && !element.disabled
   }
 
   function normalizeLabel(value) {
@@ -95,9 +91,18 @@
     return null
   }
 
+  function findAllByNames(fieldNames) {
+    const lower = fieldNames.map((n) => n.toLowerCase())
+    // ponytail: skip disabled check — ExtJS marks inactive-tab inputs disabled; JS value assignment still works
+    return Array.from(document.querySelectorAll('input, select, textarea')).filter(
+      (el) => el && lower.includes((el.getAttribute('name') ?? '').toLowerCase())
+    )
+  }
+
   function findField(selectors, labelText) {
     for (const selector of selectors) {
       const element = document.querySelector(selector)
+        console.log('element:', selector, element);
       if (isFillable(element)) return element
     }
     return findFieldByLabel(labelText)
@@ -180,26 +185,61 @@
     window.setTimeout(() => summary.remove(), 9000)
   }
 
+  async function renderAllTabs() {
+    const tabs = Array.from(document.querySelectorAll('[role="tab"]'))
+    if (tabs.length === 0) return
+    const activeTab = tabs.find((t) => t.getAttribute('aria-selected') === 'true' || t.classList.contains('x-tab-active'))
+    for (const tab of tabs) {
+      tab.click()
+      await new Promise((r) => setTimeout(r, 80))
+    }
+    if (activeTab) {
+      activeTab.click()
+      await new Promise((r) => setTimeout(r, 80))
+    }
+  }
+
   chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
     if (message?.type !== 'ATURIAN_FILL_FORM') return
 
     const payload = message.payload
-    const fieldMap = FIELD_MAPS[payload.entityType]
     const filled = []
     const missing = []
 
-    Object.entries(payload.fields).forEach(([key, field]) => {
-      if (!fieldMap?.[key]) return
-      if (field.value === null || field.value === undefined || field.value === '') return
+    if (payload.entityType === 'customer') {
+      renderAllTabs().then(() => {
+        Object.entries(payload.fields).forEach(([key, field]) => {
+          const nameList = CUSTOMER_NAME_MAP[key]
+          if (!nameList) return
+          if (field.value === null || field.value === undefined || field.value === '') return
 
-      const element = findField(fieldMap[key], field.label)
-      if (!element) {
-        missing.push(field.label)
-        return
-      }
+          const elements = findAllByNames(nameList)
+          if (elements.length === 0) {
+            missing.push(field.label)
+            return
+          }
+          elements.forEach((el) => { if (fillField(el, field.value)) filled.push(field.label) })
+        })
+        showSummary(filled, missing)
+        sendResponse({ ok: true, filledCount: filled.length, missing })
+      })
+      return true // async response
+    } else {
+      const fieldMap = FIELD_MAPS[payload.entityType]
+        console.log('fieldMap:', fieldMap);
+      Object.entries(payload.fields).forEach(([key, field]) => {
+        if (!fieldMap?.[key]) return
+        if (field.value === null || field.value === undefined || field.value === '') return
 
-      if (fillField(element, field.value)) filled.push(field.label)
-    })
+        const element = findField(fieldMap[key], field.label)
+          console.log('element:', element);
+        if (!element) {
+          missing.push(field.label)
+          return
+        }
+        if (fillField(element, field.value)) filled.push(field.label)
+      })
+    }
 
     showSummary(filled, missing)
     sendResponse({ ok: true, filledCount: filled.length, missing })

@@ -997,6 +997,7 @@ export interface AturianCustomerQueueDetail extends AturianCustomerQueueEntry {
   assigned_user: { id: string; display_name: string } | null
   claimed_user: { id: string; display_name: string } | null
   created_by_user: { id: string; display_name: string } | null
+  completed_by_user: { id: string; display_name: string } | null
   files: CrmFile[]
 }
 

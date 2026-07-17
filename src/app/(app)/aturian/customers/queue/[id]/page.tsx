@@ -29,7 +29,7 @@ export default function AturianCustomerQueueDetailPage() {
 
   useEffect(() => { load() }, [load])
 
-  async function runAction(action: 'claim' | 'complete') {
+  async function runAction(action: 'complete') {
     setActionError(null)
     const res = await fetch(`/api/marketing/aturian-queue/${id}`, {
       method: 'PATCH',
@@ -40,7 +40,7 @@ export default function AturianCustomerQueueDetailPage() {
     if (!res.ok) {
       setActionError(
         res.status === 403
-          ? 'Only Amy, Jill, or an admin can claim or complete requests.'
+          ? 'Only Amy or an admin can complete requests.'
           : (data.error ?? 'Action failed')
       )
       return
@@ -90,18 +90,29 @@ export default function AturianCustomerQueueDetailPage() {
         <h1 className="text-xl font-bold text-slate-900">{entry.company_name}</h1>
         <div className="flex items-center gap-2">
           {entry.status === 'new' && (
-            <ConfirmButton idleLabel="Claim" variant="purple" onConfirm={() => runAction('claim')} />
-          )}
-          {entry.status !== 'new' && (
-            <button
-              onClick={sendToAturianAssist}
-              className="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors"
-            >
-              Aturian Assist
-            </button>
+            <>
+              <button
+                onClick={sendToAturianAssist}
+                className="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors"
+              >
+                Aturian Assist
+              </button>
+              <ConfirmButton idleLabel="Mark Complete" variant="green" onConfirm={() => runAction('complete')} />
+            </>
           )}
           {entry.status === 'claimed' && (
-            <ConfirmButton idleLabel="Mark Complete" variant="green" onConfirm={() => runAction('complete')} />
+            <>
+              <button
+                onClick={sendToAturianAssist}
+                className="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors"
+              >
+                Aturian Assist
+              </button>
+              <ConfirmButton idleLabel="Mark Complete" variant="green" onConfirm={() => runAction('complete')} />
+            </>
+          )}
+          {entry.status === 'complete' && (
+            <span className="text-sm text-green-700 font-medium">Completed by {entry.completed_by_user?.display_name ?? '—'}</span>
           )}
         </div>
       </div>
@@ -119,7 +130,7 @@ export default function AturianCustomerQueueDetailPage() {
 
       <div className="mb-4 p-3 rounded-xl border border-slate-200 bg-white flex items-center gap-3 text-sm">
         <span className="font-semibold text-slate-500">Status:</span>
-        {entry.status === 'new' && <span className="text-slate-600">New — waiting to be claimed</span>}
+        {entry.status === 'new' && <span className="text-slate-600">New — waiting for processing</span>}
         {entry.status === 'claimed' && <span className="text-blue-700">Claimed by {entry.claimed_user?.display_name ?? '—'}</span>}
         {entry.status === 'complete' && <span className="text-green-700">Complete</span>}
         <span className="text-slate-400 ml-auto">Requested by {entry.created_by_user?.display_name ?? '—'} on {new Date(entry.created_at).toLocaleDateString()}</span>

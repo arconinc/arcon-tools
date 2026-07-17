@@ -7,6 +7,7 @@ import TagPicker from '@/components/crm/TagPicker'
 import EntitySearchPicker from '@/components/crm/EntitySearchPicker'
 import { CreateTaskModal } from '@/components/crm/CreateTaskModal'
 import { CrmDetailActions } from '@/components/crm/CrmDetailActions'
+import { CallLogCard } from '@/components/crm/CallLogCard'
 import { TaskCreatedToast } from '@/components/crm/TaskCreatedToast'
 import { opportunityStatusBadge, taskStatusBadge } from '@/lib/badges'
 import { Field, FieldInput } from '@/components/ui'
@@ -637,6 +638,8 @@ export default function OpportunityDetailPage() {
 
           {/* Sidebar */}
           <div className="space-y-3">
+            <CallLogCard entityType="opportunity" entityId={opp.id} contactCustomerId={opp.customer_id} />
+
             {/* Tags card */}
             <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
               <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">

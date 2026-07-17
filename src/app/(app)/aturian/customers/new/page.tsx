@@ -96,8 +96,21 @@ export default function AturianAddCustomerPage() {
     const req = (msg: string) => ({ test: (v: string) => !!v?.trim(), message: msg })
     const rules = {
       company_name: [req('Company Name is required')],
+      assigned_to: [req('Sales Consultant is required')],
       commissioned_client: [req('Commissioned Client is required')],
       tax_exempt: [{ test: (v: string) => v === 'yes' || v === 'no', message: 'Please select Yes or No' }],
+      address1: [req('Address Line 1 is required')],
+      city: [req('City is required')],
+      state: [req('State is required')],
+      zip: [req('ZIP is required')],
+      phone: [req('Corporate Phone is required')],
+      website: [req('Website is required')],
+      orderer_first_name: [req('Orderer First Name is required')],
+      orderer_last_name: [req('Orderer Last Name is required')],
+      orderer_email: [req('Orderer Email is required')],
+      ap_first_name: [req('AP Contact First Name is required')],
+      ap_last_name: [req('AP Contact Last Name is required')],
+      ap_email: [req('AP Contact Email is required')],
     }
     if (!validate(form, rules)) return
 
@@ -200,13 +213,14 @@ export default function AturianAddCustomerPage() {
             <div className="col-span-2">
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">Sales Consultant</label>
               <select value={form.assigned_to}
-                onChange={(e) => setForm((p) => ({ ...p, assigned_to: e.target.value }))}
-                className={selectCls()}>
+                onChange={(e) => { setForm((p) => ({ ...p, assigned_to: e.target.value })); clearError('assigned_to') }}
+                className={selectCls(errors.assigned_to)}>
                 <option value="">— Unassigned —</option>
                 {crmUsers.map((u) => (
                   <option key={u.id} value={u.id}>{u.display_name}</option>
                 ))}
               </select>
+              <FieldError error={errors.assigned_to} />
             </div>
             <div className="col-span-3 flex items-center gap-2 pt-1">
               <input type="checkbox" id="is_online_client" checked={form.is_online_client}
@@ -278,8 +292,9 @@ export default function AturianAddCustomerPage() {
             <div className="col-span-3">
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">Address Line 1</label>
               <input type="text" value={form.address1}
-                onChange={(e) => setForm((p) => ({ ...p, address1: e.target.value }))}
-                className={inputCls()} />
+                onChange={(e) => { setForm((p) => ({ ...p, address1: e.target.value })); clearError('address1') }}
+                className={inputCls(errors.address1)} />
+              <FieldError error={errors.address1} />
             </div>
             <div className="col-span-3">
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">Address Line 2</label>
@@ -290,32 +305,37 @@ export default function AturianAddCustomerPage() {
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">City</label>
               <input type="text" value={form.city}
-                onChange={(e) => setForm((p) => ({ ...p, city: e.target.value }))}
-                className={inputCls()} />
+                onChange={(e) => { setForm((p) => ({ ...p, city: e.target.value })); clearError('city') }}
+                className={inputCls(errors.city)} />
+              <FieldError error={errors.city} />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">State</label>
               <input type="text" value={form.state}
-                onChange={(e) => setForm((p) => ({ ...p, state: e.target.value }))}
-                className={inputCls()} />
+                onChange={(e) => { setForm((p) => ({ ...p, state: e.target.value })); clearError('state') }}
+                className={inputCls(errors.state)} />
+              <FieldError error={errors.state} />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">ZIP</label>
               <input type="text" value={form.zip}
-                onChange={(e) => setForm((p) => ({ ...p, zip: e.target.value }))}
-                className={inputCls()} />
+                onChange={(e) => { setForm((p) => ({ ...p, zip: e.target.value })); clearError('zip') }}
+                className={inputCls(errors.zip)} />
+              <FieldError error={errors.zip} />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">Corporate Phone</label>
               <input type="tel" value={form.phone}
-                onChange={(e) => setForm((p) => ({ ...p, phone: formatPhoneInput(e.target.value) }))}
-                className={inputCls()} />
+                onChange={(e) => { setForm((p) => ({ ...p, phone: formatPhoneInput(e.target.value) })); clearError('phone') }}
+                className={inputCls(errors.phone)} />
+              <FieldError error={errors.phone} />
             </div>
             <div className="col-span-2">
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Website</label>
               <input type="url" value={form.website}
-                onChange={(e) => setForm((p) => ({ ...p, website: e.target.value }))}
-                className={inputCls()} />
+                onChange={(e) => { setForm((p) => ({ ...p, website: e.target.value })); clearError('website') }}
+                className={inputCls(errors.website)} />
+              <FieldError error={errors.website} />
             </div>
           </div>
         </div>
@@ -329,21 +349,24 @@ export default function AturianAddCustomerPage() {
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">First Name</label>
               <input type="text" value={form.orderer_first_name}
-                onChange={(e) => setForm((p) => ({ ...p, orderer_first_name: e.target.value }))}
-                className={inputCls()} />
+                onChange={(e) => { setForm((p) => ({ ...p, orderer_first_name: e.target.value })); clearError('orderer_first_name') }}
+                className={inputCls(errors.orderer_first_name)} />
+              <FieldError error={errors.orderer_first_name} />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Last Name</label>
               <input type="text" value={form.orderer_last_name}
-                onChange={(e) => setForm((p) => ({ ...p, orderer_last_name: e.target.value }))}
-                className={inputCls()} />
+                onChange={(e) => { setForm((p) => ({ ...p, orderer_last_name: e.target.value })); clearError('orderer_last_name') }}
+                className={inputCls(errors.orderer_last_name)} />
+              <FieldError error={errors.orderer_last_name} />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Email</label>
               <input type="email" value={form.orderer_email}
-                onChange={(e) => { setForm((p) => ({ ...p, orderer_email: e.target.value })); setApDuplicateError(null) }}
+                onChange={(e) => { setForm((p) => ({ ...p, orderer_email: e.target.value })); clearError('orderer_email'); setApDuplicateError(null) }}
                 onBlur={validateApContactDifference}
-                className={inputCls()} />
+                className={inputCls(errors.orderer_email)} />
+              <FieldError error={errors.orderer_email} />
             </div>
           </div>
         </div>
@@ -357,22 +380,24 @@ export default function AturianAddCustomerPage() {
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">First Name</label>
               <input type="text" value={form.ap_first_name}
-                onChange={(e) => setForm((p) => ({ ...p, ap_first_name: e.target.value }))}
-                className={inputCls()} />
+                onChange={(e) => { setForm((p) => ({ ...p, ap_first_name: e.target.value })); clearError('ap_first_name') }}
+                className={inputCls(errors.ap_first_name)} />
+              <FieldError error={errors.ap_first_name} />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Last Name</label>
               <input type="text" value={form.ap_last_name}
-                onChange={(e) => setForm((p) => ({ ...p, ap_last_name: e.target.value }))}
-                className={inputCls()} />
+                onChange={(e) => { setForm((p) => ({ ...p, ap_last_name: e.target.value })); clearError('ap_last_name') }}
+                className={inputCls(errors.ap_last_name)} />
+              <FieldError error={errors.ap_last_name} />
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide mb-1">Email</label>
               <input type="email" value={form.ap_email}
-                onChange={(e) => { setForm((p) => ({ ...p, ap_email: e.target.value })); setApDuplicateError(null) }}
+                onChange={(e) => { setForm((p) => ({ ...p, ap_email: e.target.value })); clearError('ap_email'); setApDuplicateError(null) }}
                 onBlur={validateApContactDifference}
-                className={inputCls(apDuplicateError ?? undefined)} />
-              <FieldError error={apDuplicateError ?? undefined} />
+                className={inputCls(errors.ap_email ?? apDuplicateError ?? undefined)} />
+              <FieldError error={errors.ap_email ?? apDuplicateError ?? undefined} />
             </div>
             <p className="text-xs text-slate-400 italic col-span-3">AP contact MUST be different than the orderer&apos;s contact.</p>
           </div>

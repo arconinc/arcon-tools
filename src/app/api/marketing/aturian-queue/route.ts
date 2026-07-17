@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 import { unauthorized, badRequest, serverError, created, ok } from '@/lib/api/respond'
 import { isUserCrmAttachmentUrl } from '@/lib/crm/attachments'
-import { resolveAturianQueueAssignees } from '@/lib/crm/aturian-assignees'
+import { resolveAturianQueueAssignee } from '@/lib/crm/aturian-assignees'
 import { dispatchNotification, fetchActor } from '@/lib/notifications/dispatch'
 import { aturianCustomerQueueNewEntry } from '@/lib/notifications/registry'
 
@@ -26,7 +26,7 @@ export async function GET(req: NextRequest) {
   if (error) return serverError(error.message)
 
   const rows = data ?? []
-  const userIds = [...new Set(rows.flatMap((r: any) => [r.assigned_to, r.claimed_by, r.created_by]).filter(Boolean))]
+  const userIds = [...new Set(rows.flatMap((r: any) => [r.assigned_to, r.created_by, r.completed_by]).filter(Boolean))]
   const { data: users } = userIds.length > 0
     ? await adminClient.from('users').select('id, display_name').in('id', userIds)
     : { data: [] }
@@ -38,6 +38,7 @@ export async function GET(req: NextRequest) {
     assigned_user: r.assigned_to ? { id: r.assigned_to, display_name: usersMap[r.assigned_to] ?? null } : null,
     claimed_user: r.claimed_by ? { id: r.claimed_by, display_name: usersMap[r.claimed_by] ?? null } : null,
     created_by_user: r.created_by ? { id: r.created_by, display_name: usersMap[r.created_by] ?? null } : null,
+    completed_by_user: r.completed_by ? { id: r.completed_by, display_name: usersMap[r.completed_by] ?? null } : null,
   }))
 
   return ok({ entries: enriched })
@@ -70,11 +71,13 @@ export async function POST(req: NextRequest) {
   }
 
   const adminClient = createAdminClient()
+  const amy = await resolveAturianQueueAssignee(adminClient)
+
   const { data, error } = await adminClient
     .from('aturian_customer_queue')
     .insert({
       company_name: company_name.trim(),
-      assigned_to: assigned_to || null,
+      assigned_to: amy?.id || null,
       is_online_client: !!is_online_client,
       online_uses_cc: is_online_client ? !!online_uses_cc : null,
       commissioned_client,
@@ -127,7 +130,7 @@ export async function POST(req: NextRequest) {
     .insert({
       title: `Add ${company_name.trim()} to Aturian`,
       department: 'Accounting',
-      assigned_to: null,
+      assigned_to: amy?.id || null,
       description: descLines || null,
       status: 'not_started',
       priority: 'medium',
@@ -143,13 +146,9 @@ export async function POST(req: NextRequest) {
     data.task_id = task.id
   }
 
-  const actor = await fetchActor(appUser.id)
-  const assignees = await resolveAturianQueueAssignees(adminClient)
-  if (assignees.length === 0) {
-    console.error('[aturian-queue/POST] No queue assignees resolved — no notification sent')
-  }
-  for (const assignee of assignees) {
+  if (amy) {
     try {
+      const actor = await fetchActor(appUser.id)
       await dispatchNotification({
         definition: aturianCustomerQueueNewEntry,
         payload: {
@@ -161,7 +160,7 @@ export async function POST(req: NextRequest) {
           city: data.city ?? null,
           state: data.state ?? null,
         },
-        recipientSpec: { userId: assignee.id },
+        recipientSpec: { userId: amy.id },
         suppressUserIds: [appUser.id],
       })
     } catch (err) {

@@ -46,7 +46,7 @@ export async function GET(
       ? adminClient.from('users').select('id, display_name, job_title, profile_image_url, avatar_url').eq('id', data.manager_id).single()
       : Promise.resolve({ data: null }),
     adminClient.from('users')
-      .select('id, email, display_name, job_title, office_location, employment_type, profile_image_url, avatar_url, start_date, department, group_memberships!group_memberships_user_id_fkey(groups(id, key, is_active, source_type))')
+      .select('id, email, display_name, job_title, office_location, employment_type, profile_image_url, avatar_url, start_date, phone, bio_html, department, group_memberships!group_memberships_user_id_fkey(groups(id, key, is_active, source_type))')
       .eq('manager_id', id)
       .order('display_name'),
   ])

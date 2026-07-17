@@ -8,6 +8,7 @@ import { CreateTaskModal } from '@/components/crm/CreateTaskModal'
 import { PlacesCompanyAutocomplete } from '@/components/crm/PlacesCompanyAutocomplete'
 import { PlacesAddressAutocomplete } from '@/components/crm/PlacesAddressAutocomplete'
 import { TaskCreatedToast } from '@/components/crm/TaskCreatedToast'
+import { CallLogCard } from '@/components/crm/CallLogCard'
 import { Modal, Field, FieldInput, SocialIcon } from '@/components/ui'
 import { CustomerHeader } from '@/components/crm/customer/CustomerHeader'
 import { CustomerContactsList } from '@/components/crm/customer/CustomerContactsList'
@@ -892,6 +893,8 @@ export default function CustomerDetailPage() {
 
           {/* Sidebar — 25% */}
           <div className="space-y-3">
+            <CallLogCard entityType="customer" entityId={customer.id} />
+
             {/* Tags card */}
             <div className="bg-white border border-slate-200 rounded-2xl">
               <div className="flex items-center justify-between px-4 py-3 border-b border-slate-100 bg-slate-50">

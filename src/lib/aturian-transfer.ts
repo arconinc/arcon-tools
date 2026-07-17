@@ -3,6 +3,7 @@ type TransferValue = string | boolean | null
 export type AturianTransferField = {
   label: string
   value: TransferValue
+  aturian_field_id?: string
 }
 
 export type AturianTransferPayload = {
@@ -89,9 +90,6 @@ function currentUrl() {
 }
 
 export function buildAturianQueuePayload(entry: QueueTransferSource): AturianTransferPayload {
-  const ordererName = [entry.orderer_first_name, entry.orderer_last_name].filter(Boolean).join(' ') || null
-  const apName = [entry.ap_first_name, entry.ap_last_name].filter(Boolean).join(' ') || null
-
   return {
     version: 1,
     entityType: 'customer',
@@ -100,21 +98,21 @@ export function buildAturianQueuePayload(entry: QueueTransferSource): AturianTra
     recordUrl: currentUrl(),
     exportedAt: new Date().toISOString(),
     fields: {
-      name: { label: 'Customer Name', value: entry.company_name },
-      phone: { label: 'Phone', value: entry.phone },
-      website: { label: 'Website', value: entry.website },
-      sales_consultant: { label: 'Sales Consultant', value: entry.assigned_user?.display_name ?? null },
-      commissioned_client: { label: 'Commissioned Client', value: entry.commissioned_client },
-      tax_exempt: { label: 'Tax Exempt', value: entry.tax_exempt },
-      billing_address1: { label: 'Billing Address 1', value: entry.address1 },
-      billing_address2: { label: 'Billing Address 2', value: entry.address2 },
-      billing_city: { label: 'Billing City', value: entry.city },
-      billing_state: { label: 'Billing State', value: entry.state },
-      billing_zip: { label: 'Billing ZIP', value: entry.zip },
-      orderer_name: { label: 'Orderer Name', value: ordererName },
-      orderer_email: { label: 'Orderer Email', value: entry.orderer_email },
-      ap_name: { label: 'AP Contact Name', value: apName },
-      ap_email: { label: 'AP Email', value: entry.ap_email },
+      company_name:       { label: 'Company Name',       value: entry.company_name },
+      phone:              { label: 'Phone',               value: entry.phone },
+      website:            { label: 'Website',             value: entry.website },
+      address1:           { label: 'Address Line 1',      value: entry.address1 },
+      address2:           { label: 'Address Line 2',      value: entry.address2 },
+      city:               { label: 'City',                value: entry.city },
+      state:              { label: 'State',               value: entry.state },
+      zip:                { label: 'ZIP Code',            value: entry.zip },
+      orderer_full_name:  { label: 'Orderer Name',        value: [entry.orderer_first_name, entry.orderer_last_name].filter(Boolean).join(' ') || null },
+      orderer_first_name: { label: 'Orderer First Name',  value: entry.orderer_first_name },
+      orderer_last_name:  { label: 'Orderer Last Name',   value: entry.orderer_last_name },
+      orderer_email:      { label: 'Orderer Email',       value: entry.orderer_email },
+      ap_first_name:      { label: 'AP First Name',       value: entry.ap_first_name },
+      ap_last_name:       { label: 'AP Last Name',        value: entry.ap_last_name },
+      ap_email:           { label: 'AP Email',            value: entry.ap_email },
     },
   }
 }

@@ -5,3 +5,4 @@ export { useCustomer, type CustomerDetail, type BrandDataLocal, type TagOption }
 export { useArtwork, type ArtworkItem } from './useArtwork'
 export { useCustomerEdit } from './useCustomerEdit'
 export { useTask, type TaskDetail, type TaskStatus, type TaskPriority, type Comment, type Attachment, type TaskAttachment, type HistoryEntry } from './useTask'
+export { useCallLogs, type CallLogEntityType, type CallLogActivityType, type CallLogEntry, type CallLogContact } from './useCallLogs'

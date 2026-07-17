@@ -42,19 +42,23 @@ export async function resolveAturianAssignee(adminClient: ReturnType<typeof crea
   return data[0] as AturianAssignee
 }
 
-const QUEUE_ASSIGNEE_NAMES = ['Amy Wheatcraft', 'Jill Begley']
-
-export async function resolveAturianQueueAssignees(adminClient: ReturnType<typeof createAdminClient>): Promise<AturianAssignee[]> {
+export async function resolveAturianQueueAssignee(adminClient: ReturnType<typeof createAdminClient>): Promise<AturianAssignee | null> {
   const { data, error } = await adminClient
     .from('users')
     .select('id, display_name, email')
-    .in('display_name', QUEUE_ASSIGNEE_NAMES)
+    .ilike('display_name', 'Amy Wheatcraft')
     .is('deactivated_at', null)
+    .limit(1)
 
   if (error) {
-    console.error('[aturian-assignees] Failed to resolve queue assignees:', error)
-    return []
+    console.error('[aturian-assignees] Failed to resolve Amy Wheatcraft:', error)
+    return null
   }
 
-  return (data ?? []) as AturianAssignee[]
+  if (!data || data.length === 0) {
+    console.error('[aturian-assignees] Amy Wheatcraft not found')
+    return null
+  }
+
+  return data[0] as AturianAssignee
 }
