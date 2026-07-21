@@ -631,6 +631,18 @@ export default function AppShell({ children, user, isImpersonating, impersonated
 
               {/* Right side */}
               <div style={{ marginLeft: 'auto', display: 'flex', alignItems: 'center', gap: 8 }}>
+                {/* Help */}
+                <Link
+                  href="/help"
+                  title="Help"
+                  aria-label="Help"
+                  style={{ width: 34, height: 34, borderRadius: 6, background: '#f5f5f5', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#777', textDecoration: 'none', flexShrink: 0 }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#faf5ff'; e.currentTarget.style.color = '#6b1e98'; e.currentTarget.style.borderColor = '#e9d5ff' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#f5f5f5'; e.currentTarget.style.color = '#777'; e.currentTarget.style.borderColor = '#e5e7eb' }}
+                >
+                  <HelpIcon className="w-4 h-4" />
+                </Link>
+
                 {/* Gmail */}
                 <a
                   href="https://mail.google.com"
@@ -896,6 +908,10 @@ function HomeIcon({ className }: { className?: string }) {
 
 function SearchIcon({ className }: { className?: string }) {
   return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="11" cy="11" r="8" strokeWidth={2} /><path strokeLinecap="round" strokeWidth={2} d="M21 21l-4.35-4.35" /></svg>
+}
+
+function HelpIcon({ className }: { className?: string }) {
+  return <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9" strokeWidth={2} /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9.75 9a2.25 2.25 0 114.22 1.08c-.72.47-1.22.91-1.22 1.92" /><path strokeLinecap="round" strokeWidth={2.5} d="M12 16h.01" /></svg>
 }
 
 function ClipboardListIcon({ className }: { className?: string }) {
