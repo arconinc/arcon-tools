@@ -7,7 +7,7 @@ import Link from 'next/link'
 import type { DocSectionWithTree, DocFolderNode, DriveDocument } from '@/types'
 import { PermissionModal } from '@/components/documents/PermissionModal'
 import { FolderTreeNode } from '@/components/documents/FolderTreeNode'
-import { DocumentNameCell, DocumentActionsCell } from '@/components/documents/DocumentRow'
+import { DocumentNameCell, DocumentActionsCell, DocIconCard } from '@/components/documents/DocumentRow'
 import { DataTable, type DataTableColumn } from '@/components/ui'
 
 declare global {
@@ -98,6 +98,9 @@ export default function SectionDocumentsPage() {
     searchFolders(section.folders, query, [], out)
     return out
   }, [searchQuery, section])
+
+  // View mode
+  const [docView, setDocView] = useState<'list' | 'icons'>('list')
 
   // Resizable sidebar
   const [sidebarWidth, setSidebarWidth] = useState(240)
@@ -1004,9 +1007,27 @@ export default function SectionDocumentsPage() {
                       {selectedFolder.documents.length} doc{selectedFolder.documents.length !== 1 ? 's' : ''}
                     </span>
                   </div>
-                  {canCreate && (
-                    <button className="btn-sm btn-primary" onClick={openAddDoc}>+ Add Document</button>
-                  )}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                    <div style={{ display: 'flex', border: '1px solid #e5e7eb', borderRadius: 7, overflow: 'hidden' }}>
+                      <button
+                        title="List view"
+                        onClick={() => setDocView('list')}
+                        style={{ padding: '0.3rem 0.5rem', background: docView === 'list' ? '#7c3aed' : '#fff', color: docView === 'list' ? '#fff' : '#6b7280', border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                      >
+                        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
+                      </button>
+                      <button
+                        title="Icon view"
+                        onClick={() => setDocView('icons')}
+                        style={{ padding: '0.3rem 0.5rem', background: docView === 'icons' ? '#7c3aed' : '#fff', color: docView === 'icons' ? '#fff' : '#6b7280', border: 'none', borderLeft: '1px solid #e5e7eb', cursor: 'pointer', display: 'flex', alignItems: 'center' }}
+                      >
+                        <svg width="15" height="15" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V6zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zm10 0a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+                      </button>
+                    </div>
+                    {canCreate && (
+                      <button className="btn-sm btn-primary" onClick={openAddDoc}>+ Add Document</button>
+                    )}
+                  </div>
                 </>
               ) : (
                 <span className="content-doc-count">Select a folder</span>
@@ -1019,6 +1040,32 @@ export default function SectionDocumentsPage() {
                   <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7a2 2 0 012-2h4l2 2h8a2 2 0 012 2v8a2 2 0 01-2 2H5a2 2 0 01-2-2V7z" /></svg>
                   <p>Select a folder to view documents.</p>
                 </div>
+              ) : docView === 'icons' ? (
+                selectedFolder.documents.length === 0 ? (
+                  <div className="empty-state">
+                    <svg width="40" height="40" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    <p>{canCreate ? 'No documents in this folder. Click "+ Add Document" to add one.' : 'No documents in this folder.'}</p>
+                  </div>
+                ) : (
+                  <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem', padding: '0.75rem' }}>
+                    {selectedFolder.documents.map(doc => (
+                      <DocIconCard
+                        key={doc.id}
+                        doc={doc}
+                        canManage={canManage}
+                        sectionSlug={sectionSlug}
+                        folderId={selectedFolder.id}
+                        isHighlighted={highlightedDocId === doc.id}
+                        onEdit={() => { setEditDocModal(doc); setEditDocTitle(doc.title); setEditDocDescription(doc.description ?? '') }}
+                        onReplace={() => openReplaceDoc(doc)}
+                        onDelete={() => handleDeleteDoc(doc)}
+                        onPermissions={() => setPermModal(doc)}
+                        onMove={() => openMoveDoc(doc)}
+                        onShareCopied={() => showToast('Link copied to clipboard')}
+                      />
+                    ))}
+                  </div>
+                )
               ) : (
                 <DataTable
                   rows={selectedFolder.documents}
