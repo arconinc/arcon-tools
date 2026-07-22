@@ -44,7 +44,7 @@ async function renderPdfThumbnail(url: string, canvas: HTMLCanvasElement, size =
   const scaled = page.getViewport({ scale })
   canvas.width = scaled.width
   canvas.height = scaled.height
-  await page.render({ canvasContext: canvas.getContext('2d')!, viewport: scaled }).promise
+  await page.render({ canvas, canvasContext: canvas.getContext('2d')!, viewport: scaled }).promise
 }
 
 function PdfThumbnail({ docId, size = 48 }: { docId: string; size?: number }) {
