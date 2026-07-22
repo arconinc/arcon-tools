@@ -1,0 +1,13 @@
+node_modules/
+.next/
+out/
+dist/
+*.lock
+*.log
+coverage/
+.turbo/
+public/
+*.svg
+*.png
+*.jpg
+*.ico
