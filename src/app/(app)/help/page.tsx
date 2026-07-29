@@ -75,13 +75,13 @@ const tutorials = [
     ],
   },
   {
-    title: 'Submit an expense report',
+    title: 'Submit a PTO request',
     steps: [
-      'Open Expense Reports under Accounting.',
-      'Create the report for the correct month.',
-      'Add each expense with date, vendor, category, description, and amount.',
-      'Attach receipt photos or PDFs.',
-      'Submit for review and watch notifications for changes or approval.',
+      'Open PTO under HR.',
+      'Select New Request and click a start date, then an end date on the calendar.',
+      'Mark half day for the start or end date if needed.',
+      'Choose a request type (vacation, personal, medical, etc.) and add notes.',
+      'Type your name to confirm and submit — watch notifications for approval.',
     ],
   },
 ]
