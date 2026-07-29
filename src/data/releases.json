@@ -1,5 +1,433 @@
 [
   {
+    "version": "1.0.0",
+    "date": "2026-07-29",
+    "title": "The Arc Launch",
+    "summary": "The Arc launches — Arcon's new intranet hub for CRM, HR, documents, and e-commerce tools in one place.",
+    "changes": [
+      {
+        "category": "feature",
+        "description": "Update help page"
+      },
+      {
+        "category": "feature",
+        "description": "New background"
+      },
+      {
+        "category": "feature",
+        "description": "Thumbnails for documents"
+      },
+      {
+        "category": "feature",
+        "description": "Help"
+      },
+      {
+        "category": "feature",
+        "description": "Notes to Comments"
+      },
+      {
+        "category": "feature",
+        "description": "Aturian Add Customer"
+      },
+      {
+        "category": "feature",
+        "description": "Sentry server errors"
+      },
+      {
+        "category": "feature",
+        "description": "ECommerce store enhancements"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Fix saving a task"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Employee directory fixes"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Employee directory sizing"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Images on news articles and wider entry for numbers"
+      },
+      {
+        "category": "feature",
+        "description": "New categories for expense reports and images on the spec samples"
+      },
+      {
+        "category": "feature",
+        "description": "Make banner taller"
+      },
+      {
+        "category": "feature",
+        "description": "Create calendar event for Vendor Relations"
+      },
+      {
+        "category": "feature",
+        "description": "Assign demos to Marketing department"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Fix URL in notifications"
+      },
+      {
+        "category": "feature",
+        "description": "Employee Links for HR"
+      },
+      {
+        "category": "bug_fix",
+        "description": "App shell wrapping"
+      },
+      {
+        "category": "feature",
+        "description": "Edit expense reports"
+      },
+      {
+        "category": "feature",
+        "description": "Attach file to supplier"
+      },
+      {
+        "category": "feature",
+        "description": "Vendor relations"
+      },
+      {
+        "category": "feature",
+        "description": "Add Self Promo under Marketing"
+      },
+      {
+        "category": "feature",
+        "description": "Document Search and Marketing Calendar"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Remove roles"
+      },
+      {
+        "category": "feature",
+        "description": "Sales"
+      },
+      {
+        "category": "feature",
+        "description": "Make groups look better"
+      },
+      {
+        "category": "feature",
+        "description": "Use Groups"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Fix: disambiguate group user embeds"
+      },
+      {
+        "category": "improvement",
+        "description": "Docs: add group migration test notes (Task 10)"
+      },
+      {
+        "category": "feature",
+        "description": "Feat: show groups in admin users (Task 9)"
+      },
+      {
+        "category": "feature",
+        "description": "Feat: wire opportunity owner pool (Task 8)"
+      },
+      {
+        "category": "feature",
+        "description": "Feat: add admin groups page (Task 7)"
+      },
+      {
+        "category": "feature",
+        "description": "Feat: validate opportunity owners (Task 6)"
+      },
+      {
+        "category": "feature",
+        "description": "Feat: add assignment pool users API (Task 5)"
+      },
+      {
+        "category": "feature",
+        "description": "Feat: add group membership API (Task 4)"
+      },
+      {
+        "category": "feature",
+        "description": "Feat: add admin groups API (Task 3)"
+      },
+      {
+        "category": "feature",
+        "description": "Feat: add group shared types (Task 2)"
+      },
+      {
+        "category": "feature",
+        "description": "Db: add group schema migration (Task 1)"
+      },
+      {
+        "category": "feature",
+        "description": "Refactor contexts"
+      },
+      {
+        "category": "feature",
+        "description": "Added PDF filling"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Change rendering of pages to use router and not redraw entire page"
+      },
+      {
+        "category": "feature",
+        "description": "Use google places search for all addresses"
+      },
+      {
+        "category": "feature",
+        "description": "Add details to universal search"
+      },
+      {
+        "category": "feature",
+        "description": "Filters on task list"
+      },
+      {
+        "category": "improvement",
+        "description": "Universal Search"
+      },
+      {
+        "category": "feature",
+        "description": "Add a poll type of news article"
+      },
+      {
+        "category": "feature",
+        "description": "Countdown month display"
+      },
+      {
+        "category": "feature",
+        "description": "Updates to home page to move elements around"
+      },
+      {
+        "category": "feature",
+        "description": "Move left nav items around"
+      },
+      {
+        "category": "feature",
+        "description": "Select boxes"
+      },
+      {
+        "category": "feature",
+        "description": "Confirmations"
+      },
+      {
+        "category": "feature",
+        "description": "Assign to individuals"
+      },
+      {
+        "category": "feature",
+        "description": "Add google places to help look up addresses"
+      },
+      {
+        "category": "feature",
+        "description": "Add Supplier to Aturian"
+      },
+      {
+        "category": "feature",
+        "description": "POST contact us form"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Fix datatables"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Dev login now works"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Dev login"
+      },
+      {
+        "category": "feature",
+        "description": "Gmail add on"
+      },
+      {
+        "category": "feature",
+        "description": "Added Send for Approval button"
+      },
+      {
+        "category": "feature",
+        "description": "Feature flags"
+      },
+      {
+        "category": "feature",
+        "description": "Migrate feature flags from custom DB implementation to Vercel flags SDK"
+      },
+      {
+        "category": "feature",
+        "description": "Task sort order on home page"
+      },
+      {
+        "category": "feature",
+        "description": "Change Vendors -> Suppliers"
+      },
+      {
+        "category": "feature",
+        "description": "Change to Black Pearl"
+      },
+      {
+        "category": "feature",
+        "description": "PTO Requests"
+      },
+      {
+        "category": "feature",
+        "description": "PTO Requests"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Fix calculations on the Rapala form"
+      },
+      {
+        "category": "feature",
+        "description": "D3: Extract read-only section components from customer detail page"
+      },
+      {
+        "category": "feature",
+        "description": "Phase B+D1-D2: Extract UI components, data hooks, customer helper, useCustomer hook"
+      },
+      {
+        "category": "feature",
+        "description": "Phase B of refactor"
+      },
+      {
+        "category": "feature",
+        "description": "Phase A of refactor"
+      },
+      {
+        "category": "feature",
+        "description": "More with specs"
+      },
+      {
+        "category": "feature",
+        "description": "Specs"
+      },
+      {
+        "category": "feature",
+        "description": "Expense categories"
+      },
+      {
+        "category": "feature",
+        "description": "Expense categories"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Fix broken build."
+      },
+      {
+        "category": "bug_fix",
+        "description": "Updates to rapala lure form"
+      },
+      {
+        "category": "feature",
+        "description": "Use External Config"
+      },
+      {
+        "category": "feature",
+        "description": "Updates to Expense Reporting"
+      },
+      {
+        "category": "feature",
+        "description": "New Expense Reporting process"
+      },
+      {
+        "category": "feature",
+        "description": "Import expense report"
+      },
+      {
+        "category": "feature",
+        "description": "Add user to sentry context"
+      },
+      {
+        "category": "feature",
+        "description": "Reorder folders and right click menu"
+      },
+      {
+        "category": "feature",
+        "description": "Reorder folders"
+      },
+      {
+        "category": "feature",
+        "description": "Add Sentry"
+      },
+      {
+        "category": "feature",
+        "description": "Tasks enhancements"
+      },
+      {
+        "category": "feature",
+        "description": "Use video and more USA"
+      },
+      {
+        "category": "feature",
+        "description": "Add tasks to home page and hide completed tasks in table."
+      },
+      {
+        "category": "feature",
+        "description": "Email from"
+      },
+      {
+        "category": "feature",
+        "description": "Delete task"
+      },
+      {
+        "category": "feature",
+        "description": "Attachments"
+      },
+      {
+        "category": "feature",
+        "description": "Expense reporting"
+      },
+      {
+        "category": "feature",
+        "description": "Scrollable news"
+      },
+      {
+        "category": "feature",
+        "description": "Make Notes viewable"
+      },
+      {
+        "category": "feature",
+        "description": "Add Product Showcase to Google Sheet"
+      },
+      {
+        "category": "feature",
+        "description": "Product Showcase Checkin"
+      },
+      {
+        "category": "feature",
+        "description": "Product Showcase"
+      },
+      {
+        "category": "feature",
+        "description": "Cache store and countdown data in AppShell"
+      },
+      {
+        "category": "feature",
+        "description": "Update rapala order form to redirect to arconinc.com page"
+      },
+      {
+        "category": "feature",
+        "description": "Update rapala order form to move branding and Contact info down."
+      },
+      {
+        "category": "feature",
+        "description": "Reduce login background size"
+      },
+      {
+        "category": "feature",
+        "description": "Extract DashboardCalendar to standalone component"
+      },
+      {
+        "category": "feature",
+        "description": "Add public banner endpoint and restrict admin route"
+      }
+    ]
+  },
+  {
     "version": "0.4.0",
     "date": "2026-05-16",
     "title": "v0.4.0 Release",
