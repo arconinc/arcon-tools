@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { dispatchNotification } from '@/lib/notifications/dispatch'
 import { ptoReviewed } from '@/lib/notifications/registry'
 import { userHasAccessGroup } from '@/lib/auth/group-access'
+import { resolveAturianAssignee } from '@/lib/crm/aturian-assignees'
 
 type Params = { params: Promise<{ id: string }> }
 
@@ -91,7 +92,17 @@ export async function PUT(req: NextRequest, { params }: Params) {
       })
   }
 
-  // Notify requester
+  // Notify requester, plus Amy & Jill (always cc'd on PTO decisions)
+  const [amy, jill] = await Promise.all([
+    resolveAturianAssignee(adminClient, 'customer'),
+    resolveAturianAssignee(adminClient, 'supplier'),
+  ])
+  const recipientIds = Array.from(new Set([
+    existing.user_id,
+    ...(amy ? [amy.id] : []),
+    ...(jill ? [jill.id] : []),
+  ]))
+
   await dispatchNotification({
     definition: ptoReviewed,
     payload: {
@@ -102,7 +113,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       start_date: existing.start_date,
       end_date: existing.end_date,
     },
-    recipientSpec: { userId: existing.user_id },
+    recipientSpec: { userIds: recipientIds },
     suppressUserIds: [dbUser.id],
   })
 

@@ -14,8 +14,14 @@ export function CrmLinksTab({ store, onSaved }: { store: StoreDetail; onSaved: (
   const [err, setErr] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/marketing/customers?limit=200').then(r => r.json()).then(d => { if (d?.customers) setCustomers(d.customers) })
-  }, [])
+    if (!customerSearch.trim()) { setCustomers([]); return }
+    const t = setTimeout(() => {
+      fetch(`/api/marketing/customers?search=${encodeURIComponent(customerSearch.trim())}&limit=10`)
+        .then(r => r.json())
+        .then(d => { if (d?.customers) setCustomers(d.customers) })
+    }, 250)
+    return () => clearTimeout(t)
+  }, [customerSearch])
 
   useEffect(() => {
     if (!linkedCustomer) { setContacts([]); return }
@@ -60,9 +66,6 @@ export function CrmLinksTab({ store, onSaved }: { store: StoreDetail; onSaved: (
     if (res.ok) setLinkedContacts(lc => lc.filter(c => c.id !== contactId))
   }
 
-  const filteredCustomers = customers.filter(c =>
-    !customerSearch || c.name.toLowerCase().includes(customerSearch.toLowerCase())
-  )
   const unlinkedContacts = contacts.filter(c => !linkedContacts.find(lc => lc.id === c.id))
 
   return (
@@ -94,13 +97,13 @@ export function CrmLinksTab({ store, onSaved }: { store: StoreDetail; onSaved: (
               className="w-full px-3 py-2 border border-slate-200 rounded-xl text-sm focus:outline-none focus:ring-2 focus:ring-purple-400" />
             {customerSearch && (
               <div className="border border-slate-200 rounded-xl overflow-hidden max-h-48 overflow-y-auto bg-white">
-                {filteredCustomers.slice(0, 10).map(c => (
+                {customers.map(c => (
                   <button key={c.id} type="button" onClick={() => { setCustomer(c.id); setCustomerSearch('') }}
                     className="w-full text-left px-4 py-2.5 text-sm hover:bg-purple-50 hover:text-purple-700 transition-colors border-b border-slate-50 last:border-0">
                     {c.name}
                   </button>
                 ))}
-                {filteredCustomers.length === 0 && <p className="px-4 py-2.5 text-sm text-slate-400">No customers found</p>}
+                {customers.length === 0 && <p className="px-4 py-2.5 text-sm text-slate-400">No customers found</p>}
               </div>
             )}
           </div>

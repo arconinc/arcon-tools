@@ -76,7 +76,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   const validReasons: PtoReason[] = [
     'vacation', 'personal_leave', 'funeral_bereavement',
-    'jury_duty', 'family_reasons', 'medical_leave', 'to_vote', 'other',
+    'jury_duty', 'family_reasons', 'medical_leave', 'to_vote', 'sales', 'other',
   ]
   if (!validReasons.includes(reason)) {
     return NextResponse.json({ error: 'Invalid reason' }, { status: 400 })

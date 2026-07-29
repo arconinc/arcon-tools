@@ -17,6 +17,7 @@ const REASON_TILES: { value: PtoReason; label: string }[] = [
   { value: 'family_reasons',      label: 'Family' },
   { value: 'jury_duty',           label: 'Jury Duty' },
   { value: 'to_vote',             label: 'To Vote' },
+  { value: 'sales',               label: 'Sales' },
   { value: 'other',               label: 'Other' },
 ]
 

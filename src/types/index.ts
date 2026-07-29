@@ -1342,6 +1342,7 @@ export type PtoReason =
   | 'family_reasons'
   | 'medical_leave'
   | 'to_vote'
+  | 'sales'
   | 'other'
 
 export const PTO_REASON_LABELS: Record<PtoReason, string> = {
@@ -1352,6 +1353,7 @@ export const PTO_REASON_LABELS: Record<PtoReason, string> = {
   family_reasons: 'Family Reasons',
   medical_leave: 'Medical Leave',
   to_vote: 'To Vote',
+  sales: 'Sales',
   other: 'Other',
 }
 

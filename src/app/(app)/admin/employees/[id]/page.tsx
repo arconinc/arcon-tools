@@ -251,7 +251,7 @@ export default function AdminEmployeeEditPage({ params }: Props) {
             <div className="emp-field emp-field-full">
               <label className="emp-label">Department</label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem 1.25rem', paddingTop: '0.25rem' }}>
-                {DEPARTMENTS.map((d) => (
+                {DEPARTMENTS.filter((d) => d !== 'CRM').map((d) => (
                   <label key={d} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.9375rem', color: '#374151', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
