@@ -85,7 +85,7 @@ export interface EmployeeSummary {
   display_name: string
   email: string
   job_title: string | null
-  department: string[] | null
+  teams: { id: string; name: string; color: string }[]
   office_location: OfficeLocation | null
   employment_type: EmploymentType | null
   profile_image_url: string | null
@@ -882,6 +882,7 @@ export interface CrmTask {
   title: string
   assigned_to: string | null
   task_owner: string | null
+  team_id: string | null
   department: CrmTaskDepartment | null
   category: CrmTaskCategory | null
   priority: CrmTaskPriority

@@ -2,16 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import * as Sentry from '@sentry/nextjs'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
-import { DEPARTMENTS, getDepartmentForTaskCategory } from '@/lib/task-constants'
+import { ALL_CATEGORIES } from '@/lib/task-constants'
+import { validateTeamId } from '@/lib/team-assignment'
 import { dispatchNotification, fetchActor } from '@/lib/notifications/dispatch'
 import { taskAssigned, taskCompleted, taskUpdated } from '@/lib/notifications/registry'
 
-const TRACKED_FIELDS = ['status', 'assigned_to', 'department', 'priority', 'category', 'due_date', 'progress'] as const
+const TRACKED_FIELDS = ['status', 'assigned_to', 'team_id', 'department', 'priority', 'category', 'due_date', 'progress'] as const
 const TASK_UPDATE_FIELDS = [
   'title',
   'assigned_to',
   'task_owner',
-  'department',
+  'team_id',
   'category',
   'priority',
   'due_date',
@@ -36,39 +37,16 @@ function pickTaskUpdates(body: Record<string, unknown>) {
   return updates
 }
 
-function normalizeTaskAssignment(updates: Record<string, unknown>, current: Record<string, unknown>) {
+function normalizeTaskAssignment(updates: Record<string, unknown>) {
   const normalized = { ...updates }
 
-  // ponytail: migrate legacy 'General' → 'Order Management' from pre-rename DB rows
-  if (normalized.department === 'General') normalized.department = 'Order Management'
-
   if (
-    'department' in normalized &&
-    typeof normalized.department === 'string' &&
-    !(DEPARTMENTS as string[]).includes(normalized.department)
+    'category' in normalized &&
+    typeof normalized.category === 'string' &&
+    normalized.category &&
+    !(ALL_CATEGORIES as string[]).includes(normalized.category)
   ) {
-    return { error: 'Invalid department' }
-  }
-
-  if ('category' in normalized && typeof normalized.category === 'string' && normalized.category) {
-    const categoryDepartment = getDepartmentForTaskCategory(normalized.category)
-    if (!categoryDepartment) {
-      normalized.category = null
-    } else {
-      if (normalized.department && normalized.department !== categoryDepartment) {
-        return { error: 'Category does not belong to selected department' }
-      }
-      normalized.department = categoryDepartment
-    }
-  }
-
-  if (
-    'department' in normalized &&
-    !('category' in normalized) &&
-    typeof current.category === 'string'
-  ) {
-    const currentCategoryDepartment = getDepartmentForTaskCategory(current.category)
-    if (normalized.department !== currentCategoryDepartment) normalized.category = null
+    normalized.category = null
   }
 
   return { updates: normalized }
@@ -91,7 +69,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (error || !task) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
   // Fetch all related data in parallel
-  const [commentsRes, historyRes, attachmentsRes, oppRes, custRes, vendRes, contRes, assignedUserRes, specRes] = await Promise.all([
+  const [commentsRes, historyRes, attachmentsRes, oppRes, custRes, vendRes, contRes, assignedUserRes, specRes, teamRes] = await Promise.all([
     adminClient
       .from('crm_task_comments')
       .select('*, crm_comment_attachments(*)')
@@ -128,6 +106,9 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       .or(`linked_task_id.eq.${id},artwork_task_id.eq.${id}`)
       .limit(1)
       .maybeSingle(),
+    task.team_id
+      ? adminClient.from('groups').select('id, name, color').eq('id', task.team_id).single()
+      : Promise.resolve({ data: null }),
   ])
 
   // Resolve created_by and delegators to display names
@@ -216,6 +197,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     created_user: createdUser,
     delegator_users: delegatorUsers,
     linked_spec: specRes.data ?? null,
+    team: teamRes.data ?? null,
   })
 }
 
@@ -239,9 +221,12 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   if (fetchErr || !current) return NextResponse.json({ error: 'Not found' }, { status: 404 })
 
-  const normalized = normalizeTaskAssignment(updates, current)
-  if ('error' in normalized) return NextResponse.json({ error: normalized.error }, { status: 400 })
+  const normalized = normalizeTaskAssignment(updates)
   const safeUpdates = normalized.updates
+
+  if (safeUpdates.team_id && !(await validateTeamId(adminClient, safeUpdates.team_id as string))) {
+    return NextResponse.json({ error: 'Invalid team' }, { status: 400 })
+  }
 
   // Insert history rows for each tracked field that changed
   const historyInserts = TRACKED_FIELDS
@@ -286,8 +271,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   try {
     const newAssigneeChanged =
       'assigned_to' in safeUpdates && data.assigned_to !== current.assigned_to
-    const deptChanged =
-      'department' in safeUpdates && data.department !== current.department
+    const teamChanged =
+      'team_id' in safeUpdates && data.team_id !== current.team_id
 
     if (newAssigneeChanged && data.assigned_to && data.assigned_to !== appUser.id) {
       const actor = await fetchActor(appUser.id)
@@ -299,6 +284,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           actor_id: appUser.id,
           actor_name: actor.display_name,
           department: data.department ?? null,
+          team_id: data.team_id ?? null,
+          team_name: null,
           due_date: data.due_date ?? null,
           priority: data.priority ?? null,
           status: data.status ?? null,
@@ -308,8 +295,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
         recipientSpec: { userId: data.assigned_to },
         suppressUserIds: [appUser.id],
       })
-    } else if (deptChanged && !data.assigned_to && data.department) {
+    } else if (teamChanged && !data.assigned_to && data.team_id) {
       const actor = await fetchActor(appUser.id)
+      const { data: team } = await adminClient.from('groups').select('name').eq('id', data.team_id).single()
       await dispatchNotification({
         definition: taskAssigned,
         payload: {
@@ -317,14 +305,16 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           task_title: data.title,
           actor_id: appUser.id,
           actor_name: actor.display_name,
-          department: data.department,
+          department: data.department ?? null,
+          team_id: data.team_id,
+          team_name: team?.name ?? null,
           due_date: data.due_date ?? null,
           priority: data.priority ?? null,
           status: data.status ?? null,
           description: data.description ?? null,
-          fanout_kind: 'department',
+          fanout_kind: 'team',
         },
-        recipientSpec: { department: data.department },
+        recipientSpec: { teamId: data.team_id },
         suppressUserIds: [appUser.id],
       })
     }

@@ -4,6 +4,7 @@ import { ASSIGNMENT_GROUP_BY_DEPARTMENT } from '@/lib/auth/group-access'
 export interface RecipientSpec {
   userId?: string | null
   userIds?: string[]
+  teamId?: string | null
   department?: string | null
   admins?: boolean   // send to all active admin users
 }
@@ -32,6 +33,16 @@ export async function resolveRecipients(spec: RecipientSpec): Promise<ResolvedRe
       .select('id, email, display_name, deactivated_at')
       .in('id', spec.userIds)
     rows = data ?? []
+  } else if (spec.teamId) {
+    const { data } = await adminClient
+      .from('group_memberships')
+      .select('users!group_memberships_user_id_fkey(id, email, display_name, deactivated_at), groups!group_memberships_group_id_fkey!inner(is_active)')
+      .eq('group_id', spec.teamId)
+      .eq('groups.is_active', true)
+    rows = (data ?? []).flatMap((membership) => {
+      const users = membership.users
+      return Array.isArray(users) ? users : users ? [users] : []
+    }) as typeof rows
   } else if (spec.department) {
     const groupKey = ASSIGNMENT_GROUP_BY_DEPARTMENT[spec.department]
     if (groupKey) {

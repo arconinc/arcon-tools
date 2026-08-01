@@ -41,7 +41,7 @@ export type HistoryEntry = {
 
 export type TaskDetail = {
   id: string; title: string; assigned_to: string | null; task_owner: string | null
-  department: string | null; category: string | null; priority: TaskPriority; due_date: string | null
+  team_id: string | null; department: string | null; category: string | null; priority: TaskPriority; due_date: string | null
   status: TaskStatus; progress: number; description: string | null
   opportunity_id: string | null; customer_id: string | null
   vendor_id: string | null; contact_id: string | null
@@ -54,6 +54,7 @@ export type TaskDetail = {
   contact: { id: string; first_name: string; last_name: string } | null
   assigned_user: { id: string; display_name: string; email: string } | null
   created_user: { id: string; display_name: string } | null
+  team: { id: string; name: string; color: string } | null
   delegator_users: { id: string; display_name: string }[]
   attachments: TaskAttachment[]
   linked_spec: { id: string; item_name: string; status: string } | null

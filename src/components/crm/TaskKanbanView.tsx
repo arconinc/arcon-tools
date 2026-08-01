@@ -3,8 +3,6 @@
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
 import { avatarThumbnailUrl } from '@/lib/format'
-import { DEPARTMENT_DISPLAY_NAMES } from '@/lib/task-constants'
-import type { CrmTaskDepartment } from '@/types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -21,7 +19,9 @@ export type KanbanPriority = 'low' | 'medium' | 'high'
 export type KanbanTask = {
   id: string
   title: string
-  department: string | null
+  team_id: string | null
+  team_name: string | null
+  team_color: string | null
   category: string | null
   priority: KanbanPriority
   status: KanbanStatus
@@ -366,14 +366,14 @@ function KanbanCard({
 
       {/* Meta row */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 5, alignItems: 'center' }}>
-        {task.department && (
+        {task.team_name && (
           <span style={{
             fontSize: 9, fontWeight: 700,
-            background: '#f3e8ff', color: '#7c3aed',
+            background: (task.team_color ?? '#7c3aed') + '18', color: task.team_color ?? '#7c3aed',
             padding: '1px 6px', borderRadius: 4,
             textTransform: 'uppercase', letterSpacing: '0.05em',
           }}>
-            {DEPARTMENT_DISPLAY_NAMES[task.department as CrmTaskDepartment] ?? task.department}
+            {task.team_name}
           </span>
         )}
 

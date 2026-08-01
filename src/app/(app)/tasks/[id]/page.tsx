@@ -4,9 +4,9 @@ import { useState, useEffect, useRef } from 'react'
 import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import EntitySearchPicker from '@/components/crm/EntitySearchPicker'
-import { TaskAssignmentSelect } from '@/components/crm/TaskAssignmentSelect'
+import { TeamAssigneeSelect } from '@/components/crm/TeamAssigneeSelect'
 import { TaskDescriptionEditor } from '@/components/crm/TaskDescriptionEditor'
-import { getTaskCategoryLabel } from '@/lib/task-constants'
+import { ALL_CATEGORIES, getTaskCategoryLabel } from '@/lib/task-constants'
 import { useAppUser } from '@/components/layout/AppShell'
 import { formatDate, formatDateTime, formatBytes } from '@/lib/format'
 import { useTask } from '@/hooks/useTask'
@@ -20,6 +20,7 @@ import { ConfirmButton } from '@/components/ui/ConfirmButton'
 
 type DropdownUser = { id: string; display_name: string; email: string }
 type DropdownContact = { id: string; first_name: string; last_name: string }
+type DropdownTeam = { id: string; key: string; name: string; color: string }
 
 // ── Local Constants ───────────────────────────────────────────────────────────
 
@@ -30,11 +31,6 @@ const PRIORITY_BADGE: Record<TaskPriority, string> = {
 }
 
 // ── Local Helpers ─────────────────────────────────────────────────────────────
-
-function formatTaskAssignment(department: string | null, category: string | null) {
-  if (department && category) return `${department} / ${getTaskCategoryLabel(category)}`
-  return department ?? category ?? null
-}
 
 function isHtmlContent(str: string) {
   return str.trim().startsWith('<')
@@ -65,7 +61,7 @@ export default function TaskDetailPage() {
   const { task, setTask, loading, error, refetch, load } = useTask(id)
 
   const [activeTab, setActiveTab] = useState<'details' | 'related' | 'comments'>('details')
-  const [editingField, setEditingField] = useState<'title' | 'priority' | 'dept' | 'due_date' | 'assigned_to' | 'description' | null>(null)
+  const [editingField, setEditingField] = useState<'title' | 'priority' | 'category' | 'due_date' | 'assigned_to' | 'description' | null>(null)
   const descriptionDraftRef = useRef<string | null>(null)
   const dueDateRef = useRef<HTMLInputElement>(null)
   const [editingLinked, setEditingLinked] = useState(false)
@@ -77,14 +73,17 @@ export default function TaskDetailPage() {
 
   const [crmUsers, setCrmUsers] = useState<DropdownUser[]>([])
   const [contacts, setContacts] = useState<DropdownContact[]>([])
+  const [teams, setTeams] = useState<DropdownTeam[]>([])
 
   useEffect(() => {
     Promise.all([
       fetch('/api/marketing/users').then((r) => r.json()),
       fetch('/api/marketing/contacts').then((r) => r.json()),
-    ]).then(([users, conts]) => {
+      fetch('/api/teams').then((r) => r.json()),
+    ]).then(([users, conts, teamsData]) => {
       if (Array.isArray(users)) setCrmUsers(users)
       if (Array.isArray(conts)) setContacts(conts)
+      if (Array.isArray(teamsData)) setTeams(teamsData)
     })
   }, [])
 
@@ -434,29 +433,33 @@ export default function TaskDetailPage() {
                 )}
               </div>
 
-              {/* Department / Category */}
+              {/* Category */}
               <div className="group flex items-center gap-3 px-6 py-3">
-                <div className="w-36 flex-shrink-0 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Dept / Category</div>
+                <div className="w-36 flex-shrink-0 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Category</div>
                 <div className="flex-1 min-w-0">
-                  {editingField === 'dept' ? (
-                    <TaskAssignmentSelect
-                      department={task.department ?? null}
-                      category={task.category ?? null}
-                      onChange={(a) => {
-                        saveFieldValues({ department: a.department ?? null, category: a.category ?? null })
-                        setEditingField(null)
-                      }}
-                    />
+                  {editingField === 'category' ? (
+                    <select
+                      defaultValue={task.category ?? ''}
+                      autoFocus
+                      onChange={(e) => { saveFieldValue('category', e.target.value || null); setEditingField(null) }}
+                      onBlur={() => setEditingField(null)}
+                      className="w-full px-2 py-1 text-sm border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
+                    >
+                      <option value="">- None -</option>
+                      {ALL_CATEGORIES.map((c) => (
+                        <option key={c} value={c}>{getTaskCategoryLabel(c)}</option>
+                      ))}
+                    </select>
                   ) : (
                     <span className="text-sm text-slate-800">
-                      {formatTaskAssignment(task.department, task.category) ?? <span className="italic text-slate-400">Not set</span>}
+                      {task.category ? getTaskCategoryLabel(task.category) : <span className="italic text-slate-400">Not set</span>}
                     </span>
                   )}
                 </div>
-                {editingField !== 'dept' && (
-                  <button type="button" onClick={() => setEditingField('dept')}
+                {editingField !== 'category' && (
+                  <button type="button" onClick={() => setEditingField('category')}
                     className="flex-shrink-0 p-1 text-slate-300 hover:text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity rounded"
-                    aria-label="Edit department">
+                    aria-label="Edit category">
                     <PencilIcon />
                   </button>
                 )}
@@ -494,26 +497,26 @@ export default function TaskDetailPage() {
                 </div>
               </div>
 
-              {/* Assigned To */}
+              {/* Assigned To (Team or Individual) */}
               <div className="group flex items-center gap-3 px-6 py-3">
                 <div className="w-36 flex-shrink-0 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Assigned To</div>
                 <div className="flex-1 min-w-0">
                   {editingField === 'assigned_to' ? (
-                    <select
-                      defaultValue={task.assigned_to ?? ''}
-                      autoFocus
-                      onChange={(e) => { saveFieldValue('assigned_to', e.target.value || null); setEditingField(null) }}
-                      onBlur={() => setEditingField(null)}
-                      className="w-full px-2 py-1 text-sm border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
-                    >
-                      <option value="">— Unassigned —</option>
-                      {crmUsers.map((u) => (
-                        <option key={u.id} value={u.id}>{u.display_name}</option>
-                      ))}
-                    </select>
+                    <TeamAssigneeSelect
+                      teamId={task.team_id ?? null}
+                      assignedTo={task.assigned_to ?? null}
+                      teams={teams}
+                      users={crmUsers}
+                      onChange={(assignment) => {
+                        saveFieldValues({ team_id: assignment.teamId ?? null, assigned_to: assignment.assignedTo ?? null })
+                        setEditingField(null)
+                      }}
+                    />
                   ) : (
                     <span className="text-sm text-slate-800">
-                      {task.assigned_user?.display_name ?? <span className="italic text-slate-400">Unassigned</span>}
+                      {task.assigned_user?.display_name
+                        ?? task.team?.name
+                        ?? <span className="italic text-slate-400">Unassigned</span>}
                     </span>
                   )}
                 </div>

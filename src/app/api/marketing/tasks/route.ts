@@ -1,8 +1,8 @@
 import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
-import { DEPARTMENTS, DEPARTMENT_CATEGORIES, getDepartmentForTaskCategory } from '@/lib/task-constants'
-import type { CrmTaskDepartment } from '@/types'
+import { ALL_CATEGORIES } from '@/lib/task-constants'
+import { validateTeamId } from '@/lib/team-assignment'
 import { dispatchNotification, fetchActor } from '@/lib/notifications/dispatch'
 import { taskAssigned } from '@/lib/notifications/registry'
 import { unauthorized, badRequest, serverError, created, ok } from '@/lib/api/respond'
@@ -15,34 +15,19 @@ function quotePostgrestValue(value: string) {
 function normalizeTaskAssignment(task: Record<string, unknown>) {
   const normalized = { ...task }
 
-  // ponytail: migrate legacy 'General' → 'Order Management' from pre-rename DB rows
-  if (normalized.department === 'General') normalized.department = 'Order Management'
-
   if (
-    typeof normalized.department === 'string' &&
-    normalized.department &&
-    !(DEPARTMENTS as string[]).includes(normalized.department)
+    typeof normalized.category === 'string' &&
+    normalized.category &&
+    !(ALL_CATEGORIES as string[]).includes(normalized.category)
   ) {
-    return { error: 'Invalid department' }
-  }
-
-  if (typeof normalized.category === 'string' && normalized.category) {
-    const categoryDepartment = getDepartmentForTaskCategory(normalized.category)
-    if (!categoryDepartment) {
-      normalized.category = null
-    } else {
-      if (normalized.department && normalized.department !== categoryDepartment) {
-        return { error: 'Category does not belong to selected department' }
-      }
-      normalized.department = categoryDepartment
-    }
+    normalized.category = null
   }
 
   return { task: normalized }
 }
 
 // GET /api/marketing/tasks
-// ?assigned_to=me|all|<uuid>|<uuid1>,<uuid2>  ?status=  ?category=  ?department=  ?delegated_by_me=true  ?due_before=  ?opportunity_id=  ?customer_id=  ?vendor_id=  ?order_by=created|due_date|sort_order  ?page=1&limit=50
+// ?assigned_to=me|all|<uuid>|<uuid1>,<uuid2>  ?status=  ?category=  ?team_id=  ?delegated_by_me=true  ?due_before=  ?opportunity_id=  ?customer_id=  ?vendor_id=  ?order_by=created|due_date|sort_order  ?page=1&limit=50
 export async function GET(req: NextRequest) {
   const appUser = await requireUser()
   if (!appUser) return unauthorized()
@@ -52,7 +37,7 @@ export async function GET(req: NextRequest) {
   const status = searchParams.get('status')
   const columnStatus = searchParams.get('column_status')
   const category = searchParams.get('category')
-  const department = searchParams.get('department')
+  const teamId = searchParams.get('team_id')
   const titleSearch = searchParams.get('title_search')?.trim()
   const assignmentSearch = searchParams.get('assignment_search')?.trim()
   const priority = searchParams.get('priority')
@@ -140,20 +125,12 @@ export async function GET(req: NextRequest) {
         q = q.in('assigned_to', assignedToIds)
       }
     }
-    if (category) {
-      q = q.eq('category', category)
-    } else if (department) {
-      const departmentCategories = DEPARTMENT_CATEGORIES[department as CrmTaskDepartment] ?? []
-      if (departmentCategories.length > 0) {
-        q = q.or(`department.eq.${quotePostgrestValue(department)},category.in.(${departmentCategories.map(quotePostgrestValue).join(',')})`)
-      } else {
-        q = q.eq('department', department)
-      }
-    }
+    if (category) q = q.eq('category', category)
+    if (teamId) q = q.eq('team_id', teamId)
     if (titleSearch) q = q.ilike('title', `%${titleSearch}%`)
     if (assignmentSearch) {
       const value = quotePostgrestValue(`%${assignmentSearch}%`)
-      q = q.or(`department.ilike.${value},category.ilike.${value}`)
+      q = q.or(`category.ilike.${value}`)
     }
     if (priorityValues.length === 1) q = q.eq('priority', priorityValues[0])
     else if (priorityValues.length > 1) q = q.in('priority', priorityValues)
@@ -191,7 +168,7 @@ export async function GET(req: NextRequest) {
     applyFilters(
       adminClient
         .from('crm_tasks')
-        .select('id, title, assigned_to, task_owner, department, category, priority, due_date, status, progress, delegators, opportunity_id, customer_id, vendor_id, contact_id, sort_order, created_by, created_at, updated_at')
+        .select('id, title, assigned_to, task_owner, department, team_id, category, priority, due_date, status, progress, delegators, opportunity_id, customer_id, vendor_id, contact_id, sort_order, created_by, created_at, updated_at')
         .order(orderBy === 'created' ? 'created_at' : orderBy === 'due_date' ? 'due_date' : 'sort_order', { ascending: orderBy === 'created' ? false : true, nullsFirst: false })
         .order(orderBy === 'created' ? 'due_date' : orderBy === 'due_date' ? 'sort_order' : 'due_date', { ascending: true, nullsFirst: false })
     ).range(from, to),
@@ -211,8 +188,9 @@ export async function GET(req: NextRequest) {
   const custIds = [...new Set(rows.map((t: any) => t.customer_id).filter(Boolean))]
   const vendIds = [...new Set(rows.map((t: any) => t.vendor_id).filter(Boolean))]
   const contIds = [...new Set(rows.map((t: any) => t.contact_id).filter(Boolean))]
+  const teamIds = [...new Set(rows.map((t: any) => t.team_id).filter(Boolean))]
 
-  const [usersRes, oppsRes, custsRes, vendsRes, contsRes] = await Promise.all([
+  const [usersRes, oppsRes, custsRes, vendsRes, contsRes, teamsRes] = await Promise.all([
     userIds.length > 0
       ? adminClient.from('users').select('id, display_name').in('id', userIds)
       : Promise.resolve({ data: [] }),
@@ -228,6 +206,9 @@ export async function GET(req: NextRequest) {
     contIds.length > 0
       ? adminClient.from('crm_contacts').select('id, first_name, last_name').in('id', contIds)
       : Promise.resolve({ data: [] }),
+    teamIds.length > 0
+      ? adminClient.from('groups').select('id, name, color').in('id', teamIds)
+      : Promise.resolve({ data: [] }),
   ])
 
   const usersMap: Record<string, string> = {}
@@ -240,11 +221,15 @@ export async function GET(req: NextRequest) {
   for (const v of vendsRes.data ?? []) vendsMap[v.id] = v.name
   const contsMap: Record<string, string> = {}
   for (const c of contsRes.data ?? []) contsMap[c.id] = `${c.first_name} ${c.last_name}`
+  const teamsMap: Record<string, { name: string; color: string }> = {}
+  for (const g of teamsRes.data ?? []) teamsMap[g.id] = { name: g.name, color: g.color }
 
   const enriched = rows.map((t: any) => ({
     ...t,
     assigned_user_name: t.assigned_to ? (usersMap[t.assigned_to] ?? null) : null,
     created_by_name: t.created_by ? (usersMap[t.created_by] ?? null) : null,
+    team_name: t.team_id ? (teamsMap[t.team_id]?.name ?? null) : null,
+    team_color: t.team_id ? (teamsMap[t.team_id]?.color ?? null) : null,
     linked_to_name: t.opportunity_id
       ? oppsMap[t.opportunity_id] ?? null
       : t.customer_id
@@ -280,9 +265,13 @@ export async function POST(req: NextRequest) {
   const safeRest = stripReadOnly(rest, ['assigned_user_name', 'linked_to_name', 'linked_to_type'])
 
   const normalized = normalizeTaskAssignment(safeRest)
-  if ('error' in normalized) return badRequest(normalized.error)
 
   const adminClient = createAdminClient()
+
+  if (normalized.task.team_id && !(await validateTeamId(adminClient, normalized.task.team_id as string))) {
+    return badRequest('Invalid team')
+  }
+
   const { data, error } = await adminClient
     .from('crm_tasks')
     .insert({
@@ -304,9 +293,14 @@ export async function POST(req: NextRequest) {
   // failure (or missing migration) never blocks the task creation response.
   try {
     const isUserAssigned = !!data.assigned_to && data.assigned_to !== appUser.id
-    const isDeptOnly = !data.assigned_to && !!data.department
-    if (isUserAssigned || isDeptOnly) {
+    const isTeamOnly = !data.assigned_to && !!data.team_id
+    if (isUserAssigned || isTeamOnly) {
       const actor = await fetchActor(appUser.id)
+      let teamName: string | null = null
+      if (isTeamOnly) {
+        const { data: team } = await adminClient.from('groups').select('name').eq('id', data.team_id).single()
+        teamName = team?.name ?? null
+      }
       await dispatchNotification({
         definition: taskAssigned,
         payload: {
@@ -314,15 +308,17 @@ export async function POST(req: NextRequest) {
           task_title: data.title,
           actor_id: appUser.id,
           actor_name: actor.display_name,
-          department: isDeptOnly ? data.department : (data.department ?? null),
+          department: data.department ?? null,
+          team_id: data.team_id ?? null,
+          team_name: teamName,
           due_date: data.due_date ?? null,
           priority: data.priority ?? null,
           status: data.status ?? null,
           description: data.description ?? null,
-          fanout_kind: isDeptOnly ? 'department' : 'user',
+          fanout_kind: isTeamOnly ? 'team' : 'user',
         },
-        recipientSpec: isDeptOnly
-          ? { department: data.department }
+        recipientSpec: isTeamOnly
+          ? { teamId: data.team_id }
           : { userId: data.assigned_to },
         suppressUserIds: [appUser.id],
       })

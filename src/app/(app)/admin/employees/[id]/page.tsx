@@ -7,7 +7,8 @@ import TagInput from '@/components/employees/TagInput'
 import EmployeeAvatar from '@/components/employees/EmployeeAvatar'
 import { formatPhoneInput } from '@/lib/phone'
 import type { OfficeLocation, EmploymentType, EmployeeSummary } from '@/types'
-import { DEPARTMENTS, DEPARTMENT_DISPLAY_NAMES } from '@/lib/task-constants'
+
+type Team = { id: string; key: string; name: string; color: string }
 
 const OFFICE_LOCATIONS: OfficeLocation[] = ['Remote', 'Minnesota', 'Arizona', 'Colorado']
 const EMPLOYMENT_TYPES: EmploymentType[] = ['full-time', 'part-time', 'contractor']
@@ -36,12 +37,13 @@ export default function AdminEmployeeEditPage({ params }: Props) {
   const [success, setSuccess] = useState<string | null>(null)
   const [uploadingPhoto, setUploadingPhoto] = useState(false)
   const [allEmployees, setAllEmployees] = useState<EmployeeSummary[]>([])
+  const [teams, setTeams] = useState<Team[]>([])
 
   // Form state
   const [displayName, setDisplayName] = useState('')
   const [jobTitle, setJobTitle] = useState('')
   const [employmentType, setEmploymentType] = useState<EmploymentType | ''>('')
-  const [departments, setDepartments] = useState<string[]>([])
+  const [teamIds, setTeamIds] = useState<string[]>([])
   const [officeLocation, setOfficeLocation] = useState<OfficeLocation | ''>('')
   const [timezone, setTimezone] = useState('')
   const [managerId, setManagerId] = useState('')
@@ -66,7 +68,7 @@ export default function AdminEmployeeEditPage({ params }: Props) {
         setDisplayName(data.display_name ?? '')
         setJobTitle(data.job_title ?? '')
         setEmploymentType(data.employment_type ?? '')
-        setDepartments(data.department ?? [])
+        setTeamIds(Array.isArray(data.teams) ? data.teams.map((t: Team) => t.id) : [])
         setOfficeLocation(data.office_location ?? '')
         setTimezone(data.timezone ?? '')
         setManagerId(data.manager_id ?? '')
@@ -87,6 +89,11 @@ export default function AdminEmployeeEditPage({ params }: Props) {
     fetch('/api/employees')
       .then((r) => r.json())
       .then((data: EmployeeSummary[]) => setAllEmployees(data.filter((e) => e.id !== id)))
+      .catch(() => {})
+
+    fetch('/api/teams')
+      .then((r) => r.json())
+      .then((data) => { if (Array.isArray(data)) setTeams(data) })
       .catch(() => {})
   }, [id])
 
@@ -117,7 +124,7 @@ export default function AdminEmployeeEditPage({ params }: Props) {
         display_name: displayName,
         job_title: jobTitle || null,
         employment_type: employmentType || null,
-        department: departments.length > 0 ? departments : null,
+        teamIds,
         office_location: officeLocation || null,
         timezone: timezone || null,
         manager_id: managerId || null,
@@ -244,25 +251,25 @@ export default function AdminEmployeeEditPage({ params }: Props) {
           </div>
         </div>
 
-        {/* Section 2: Department & Location */}
+        {/* Section 2: Team & Location */}
         <div className="emp-section">
-          <div className="emp-section-title">Department &amp; Location</div>
+          <div className="emp-section-title">Team &amp; Location</div>
           <div className="emp-field-grid">
             <div className="emp-field emp-field-full">
-              <label className="emp-label">Department</label>
+              <label className="emp-label">Teams</label>
               <div style={{ display: 'flex', flexWrap: 'wrap', gap: '0.25rem 1.25rem', paddingTop: '0.25rem' }}>
-                {DEPARTMENTS.filter((d) => d !== 'CRM').map((d) => (
-                  <label key={d} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.9375rem', color: '#374151', cursor: 'pointer' }}>
+                {teams.map((t) => (
+                  <label key={t.id} style={{ display: 'flex', alignItems: 'center', gap: '0.375rem', fontSize: '0.9375rem', color: '#374151', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
-                      checked={departments.includes(d)}
+                      checked={teamIds.includes(t.id)}
                       onChange={(e) => {
-                        setDepartments((prev) => e.target.checked ? [...prev, d] : prev.filter((x) => x !== d))
+                        setTeamIds((prev) => e.target.checked ? [...prev, t.id] : prev.filter((x) => x !== t.id))
                         isDirty.current = true
                       }}
                       style={{ accentColor: '#7c3aed' }}
                     />
-                    {DEPARTMENT_DISPLAY_NAMES[d]}
+                    {t.name}
                   </label>
                 ))}
               </div>

@@ -4,10 +4,8 @@ import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useAppUser } from '@/components/layout/AppShell'
-import { DEPARTMENT_DISPLAY_NAMES } from '@/lib/task-constants'
 import { DataTable, type DataTableColumn } from '@/components/ui'
 import type { KanbanTask } from '@/components/crm/TaskKanbanView'
-import type { CrmTaskDepartment } from '@/types'
 
 const STATUSES = [
   { value: 'not_started', label: 'Not Started', cls: 'bg-slate-100 text-slate-600' },
@@ -61,15 +59,15 @@ const COLUMNS: DataTableColumn<KanbanTask>[] = [
     ),
   },
   {
-    key: 'dept',
-    header: 'Dept / Category',
+    key: 'team',
+    header: 'Team / Category',
     className: 'hidden md:table-cell',
     headerClassName: 'hidden md:table-cell',
     render: (t) => (
       <div style={{ display: 'flex', gap: 4, flexWrap: 'wrap' }}>
-        {t.department && (
-          <span style={{ fontSize: 11, background: '#ede9fe', color: '#5b21b6', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>
-            {DEPARTMENT_DISPLAY_NAMES[t.department as CrmTaskDepartment] ?? t.department}
+        {t.team_name && (
+          <span style={{ fontSize: 11, background: (t.team_color ?? '#7c3aed') + '18', color: t.team_color ?? '#5b21b6', padding: '2px 6px', borderRadius: 4, fontWeight: 600 }}>
+            {t.team_name}
           </span>
         )}
         {t.category && (
@@ -77,7 +75,7 @@ const COLUMNS: DataTableColumn<KanbanTask>[] = [
             {t.category}
           </span>
         )}
-        {!t.department && !t.category && <span style={{ color: '#d1d5db' }}>—</span>}
+        {!t.team_name && !t.category && <span style={{ color: '#d1d5db' }}>—</span>}
       </div>
     ),
   },

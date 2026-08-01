@@ -3,13 +3,14 @@
 import Link from 'next/link'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useAppUser } from '@/components/layout/AppShell'
-import { TaskAssignmentSelect } from '@/components/crm/TaskAssignmentSelect'
+import { TeamAssigneeSelect } from '@/components/crm/TeamAssigneeSelect'
 import { TaskDescriptionEditor } from '@/components/crm/TaskDescriptionEditor'
 import { ConfirmButton } from '@/components/ui/ConfirmButton'
-import { DEPARTMENT_DISPLAY_NAMES } from '@/lib/task-constants'
-import type { CrmTask, CrmTaskDepartment } from '@/types'
+import { ALL_CATEGORIES, getTaskCategoryLabel } from '@/lib/task-constants'
+import type { CrmTask } from '@/types'
 
 type DropdownUser = { id: string; display_name: string; email: string }
+type Team = { id: string; key: string; name: string; color: string }
 
 type TaskNote = {
   id: string
@@ -48,7 +49,7 @@ function relativeTime(iso: string): string {
 type TaskForm = {
   title: string
   assigned_to: string
-  department: string
+  team_id: string
   category: string
   priority: string
   due_date: string
@@ -67,7 +68,7 @@ export type TaskFormTask = CrmTask & {
   id: string
   title: string
   assigned_to: string | null
-  department: string | null
+  team_id: string | null
   category: string | null
   priority: string
   due_date: string | null
@@ -80,6 +81,7 @@ export type TaskFormTask = CrmTask & {
   contact?: { id: string; first_name: string; last_name: string } | null
   assigned_user?: { id: string; display_name: string; email: string } | null
   created_user?: { id: string; display_name: string } | null
+  team?: { id: string; name: string; color: string } | null
   comments?: TaskNote[]
 }
 
@@ -160,11 +162,11 @@ function StatusIcon({ value }: { value: string }) {
   }
 }
 
-function emptyForm(defaultDepartment?: CrmTaskDepartment): TaskForm {
+function emptyForm(defaultTeamId?: string): TaskForm {
   return {
     title: '',
     assigned_to: '',
-    department: defaultDepartment ?? '',
+    team_id: defaultTeamId ?? '',
     category: '',
     priority: 'medium',
     due_date: '',
@@ -178,7 +180,7 @@ function formFromTask(task: TaskFormTask): TaskForm {
   return {
     title: task.title ?? '',
     assigned_to: task.assigned_to ?? '',
-    department: task.department ?? '',
+    team_id: task.team_id ?? '',
     category: task.category ?? '',
     priority: task.priority ?? 'medium',
     due_date: task.due_date?.slice(0, 10) ?? '',
@@ -207,7 +209,7 @@ export function TaskFormModal({
   onClose,
   onSaved,
   onDeleted,
-  defaultDepartment,
+  defaultTeamId,
   linkedEntity,
   task,
 }: {
@@ -216,13 +218,14 @@ export function TaskFormModal({
   onClose: () => void
   onSaved: (task: TaskFormTask) => void
   onDeleted?: () => void
-  defaultDepartment?: CrmTaskDepartment
+  defaultTeamId?: string
   linkedEntity?: TaskLinkedEntity
   task?: TaskFormTask | null
 }) {
   const { user: appUser } = useAppUser()
   const [crmUsers, setCrmUsers] = useState<DropdownUser[]>([])
-  const [form, setForm] = useState<TaskForm>(() => task ? formFromTask(task) : emptyForm(defaultDepartment))
+  const [teams, setTeams] = useState<Team[]>([])
+  const [form, setForm] = useState<TaskForm>(() => task ? formFromTask(task) : emptyForm(defaultTeamId))
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [existingAttachments, setExistingAttachments] = useState<TaskAttachment[]>([])
   const [saving, setSaving] = useState(false)
@@ -236,8 +239,8 @@ export function TaskFormModal({
   const [deleting, setDeleting] = useState(false)
   const [openDropdown, setOpenDropdown] = useState<'priority' | 'status' | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
-  const initialFormRef = useRef<TaskForm>(task ? formFromTask(task) : emptyForm(defaultDepartment))
-  const [editingField, setEditingField] = useState<'title' | 'dept' | 'assigned_to' | 'description' | null>(null)
+  const initialFormRef = useRef<TaskForm>(task ? formFromTask(task) : emptyForm(defaultTeamId))
+  const [editingField, setEditingField] = useState<'title' | 'assigned_to' | 'category' | 'description' | null>(null)
   const [attachmentsExpanded, setAttachmentsExpanded] = useState(false)
   const [notesExpanded, setNotesExpanded] = useState(mode === 'edit')
   const dueDateRef = useRef<HTMLInputElement>(null)
@@ -250,7 +253,7 @@ export function TaskFormModal({
   useEffect(() => {
     if (!open) return
     let active = true
-    const initial = task ? formFromTask(task) : emptyForm(defaultDepartment)
+    const initial = task ? formFromTask(task) : emptyForm(defaultTeamId)
     initialFormRef.current = initial
     setForm(initial)
     setPendingFiles([])
@@ -276,8 +279,12 @@ export function TaskFormModal({
         }
       })
       .catch(() => {})
+    fetch('/api/teams')
+      .then((r) => r.json())
+      .then((data) => { if (active && Array.isArray(data)) setTeams(data) })
+      .catch(() => {})
     return () => { active = false }
-  }, [open, mode, task?.id, appUser?.email, defaultDepartment])
+  }, [open, mode, task?.id, appUser?.email, defaultTeamId])
 
   useEffect(() => {
     if (!openDropdown) return
@@ -438,7 +445,7 @@ export function TaskFormModal({
       const payload = {
         title: form.title.trim(),
         assigned_to: form.assigned_to || null,
-        department: form.department || null,
+        team_id: form.team_id || null,
         category: form.category || null,
         priority: form.priority || 'medium',
         due_date: form.due_date || null,
@@ -630,35 +637,39 @@ export function TaskFormModal({
               )}
             </div>
 
-            {/* Dept/Category + Due Date */}
+            {/* Assigned To (Team or Individual) + Due Date */}
             <div className="grid grid-cols-2 border-b border-slate-100">
               <div className="group flex items-center gap-2 py-2 pr-3 border-r border-slate-100">
-                <div className="flex-shrink-0 w-20 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Dept</div>
+                <div className="flex-shrink-0 w-20 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Assigned To</div>
                 <div className="flex-1 min-w-0">
-                  {editingField === 'dept' ? (
-                    <TaskAssignmentSelect
-                      department={form.department || null}
-                      category={form.category || null}
+                  {editingField === 'assigned_to' ? (
+                    <TeamAssigneeSelect
+                      teamId={form.team_id || null}
+                      assignedTo={form.assigned_to || null}
+                      teams={teams}
+                      users={crmUsers}
                       onChange={(assignment) => {
-                        setForm((p) => ({ ...p, department: assignment.department ?? '', category: assignment.category ?? '' }))
+                        setForm((p) => ({ ...p, team_id: assignment.teamId ?? '', assigned_to: assignment.assignedTo ?? '' }))
                         setEditingField(null)
                       }}
                     />
                   ) : (
                     <span className="text-sm text-slate-700 leading-tight">
-                      {form.department
-                        ? <>{DEPARTMENT_DISPLAY_NAMES[form.department as CrmTaskDepartment] || form.department}{form.category && <span className="text-slate-400"> · {form.category}</span>}</>
-                        : <span className="text-slate-400 italic">Not set</span>
+                      {form.assigned_to
+                        ? (crmUsers.find((u) => u.id === form.assigned_to)?.display_name ?? 'Unknown')
+                        : form.team_id
+                        ? (teams.find((t) => t.id === form.team_id)?.name ?? 'Unknown team')
+                        : <span className="text-slate-400 italic">Unassigned</span>
                       }
                     </span>
                   )}
                 </div>
-                {editingField !== 'dept' && (
+                {editingField !== 'assigned_to' && (
                   <button
                     type="button"
-                    onClick={() => setEditingField('dept')}
+                    onClick={() => setEditingField('assigned_to')}
                     className="flex-shrink-0 p-1 text-slate-300 hover:text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity rounded"
-                    aria-label="Edit department"
+                    aria-label="Edit assignee"
                   >
                     <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -701,39 +712,36 @@ export function TaskFormModal({
               </div>
             </div>
 
-            {/* Assigned To + Assigned By */}
+            {/* Category + Assigned By */}
             <div className="grid grid-cols-2">
               <div className="group flex items-center gap-2 py-2 pr-3 border-r border-slate-100">
-                <div className="flex-shrink-0 w-20 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Assigned To</div>
+                <div className="flex-shrink-0 w-20 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Category</div>
                 <div className="flex-1 min-w-0">
-                  {editingField === 'assigned_to' ? (
+                  {editingField === 'category' ? (
                     <select
-                      value={form.assigned_to}
+                      value={form.category}
                       autoFocus
-                      onChange={(e) => { setForm((p) => ({ ...p, assigned_to: e.target.value })); setEditingField(null) }}
+                      onChange={(e) => { setForm((p) => ({ ...p, category: e.target.value })); setEditingField(null) }}
                       onBlur={() => setEditingField(null)}
                       className="w-full px-2 py-1 text-sm border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
                     >
-                      <option value="">- Unassigned -</option>
-                      {crmUsers.map((u) => (
-                        <option key={u.id} value={u.id}>{u.display_name}</option>
+                      <option value="">- None -</option>
+                      {ALL_CATEGORIES.map((c) => (
+                        <option key={c} value={c}>{getTaskCategoryLabel(c)}</option>
                       ))}
                     </select>
                   ) : (
                     <span className="text-sm text-slate-700 leading-tight">
-                      {form.assigned_to
-                        ? (crmUsers.find((u) => u.id === form.assigned_to)?.display_name ?? 'Unknown')
-                        : <span className="text-slate-400 italic">Unassigned</span>
-                      }
+                      {form.category ? getTaskCategoryLabel(form.category) : <span className="text-slate-400 italic">Not set</span>}
                     </span>
                   )}
                 </div>
-                {editingField !== 'assigned_to' && (
+                {editingField !== 'category' && (
                   <button
                     type="button"
-                    onClick={() => setEditingField('assigned_to')}
+                    onClick={() => setEditingField('category')}
                     className="flex-shrink-0 p-1 text-slate-300 hover:text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity rounded"
-                    aria-label="Edit assignee"
+                    aria-label="Edit category"
                   >
                     <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
@@ -1075,13 +1083,13 @@ export function CreateTaskModal({
   open,
   onClose,
   onCreated,
-  defaultDepartment,
+  defaultTeamId,
   linkedEntity,
 }: {
   open: boolean
   onClose: () => void
   onCreated: (task: TaskFormTask) => void
-  defaultDepartment?: CrmTaskDepartment
+  defaultTeamId?: string
   linkedEntity?: TaskLinkedEntity
 }) {
   return (
@@ -1090,7 +1098,7 @@ export function CreateTaskModal({
       mode="create"
       onClose={onClose}
       onSaved={onCreated}
-      defaultDepartment={defaultDepartment}
+      defaultTeamId={defaultTeamId}
       linkedEntity={linkedEntity}
     />
   )

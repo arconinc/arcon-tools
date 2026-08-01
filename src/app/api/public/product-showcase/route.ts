@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { sendProductShowcaseConfirmation } from '@/lib/email-product-showcase'
 import { ensureTag, applyEntityTag, upsertCustomer, upsertContact } from '@/lib/crm/tags'
 import { appendProductShowcaseRows } from '@/lib/google-sheets'
+import { getTeamIdByKey } from '@/lib/team-assignment'
 
 export const runtime = 'nodejs'
 
@@ -161,6 +162,7 @@ export async function POST(request: Request) {
     // 7. Create CRM task assigned to the salesperson
     const dueDate = new Date()
     dueDate.setDate(dueDate.getDate() + 7)
+    const teamId = await getTeamIdByKey(adminClient, 'sales')
     const { data: task, error: taskErr } = await adminClient
       .from('crm_tasks')
       .insert({
@@ -168,6 +170,7 @@ export async function POST(request: Request) {
         description,
         customer_id: customerId,
         department: 'Sales',
+        team_id: teamId,
         category: 'Sales',
         assigned_to: arconSalespersonId,
         task_owner: arconSalespersonId,

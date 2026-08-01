@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { dispatchNotification } from '@/lib/notifications/dispatch'
 import { contactFormSubmitted } from '@/lib/notifications/registry'
+import { getTeamIdByKey } from '@/lib/team-assignment'
 
 const RESERVED_KEYS = new Set(['title', 'source'])
 
@@ -70,11 +71,14 @@ export async function POST(req: NextRequest) {
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 
+  const teamId = await getTeamIdByKey(adminClient, 'sales')
+
   const { data: task, error } = await adminClient
     .from('crm_tasks')
     .insert({
       title,
       department: 'CRM',
+      team_id: teamId,
       description: description || null,
       status: 'not_started',
       priority: 'medium',

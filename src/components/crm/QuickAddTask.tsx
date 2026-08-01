@@ -5,7 +5,7 @@ import { useState, useRef } from 'react'
 type CreatedTask = {
   id: string
   title: string
-  department: string | null
+  team_id: string | null
   category: string | null
   priority: string
   status: string
@@ -15,11 +15,11 @@ type CreatedTask = {
 }
 
 interface QuickAddTaskProps {
-  defaultDepartment?: string
+  defaultTeamId?: string
   onTaskCreated: (task: CreatedTask) => void
 }
 
-export default function QuickAddTask({ defaultDepartment, onTaskCreated }: QuickAddTaskProps) {
+export default function QuickAddTask({ defaultTeamId, onTaskCreated }: QuickAddTaskProps) {
   const [value, setValue] = useState('')
   const [adding, setAdding] = useState(false)
   const [error, setError] = useState<string | null>(null)
@@ -33,12 +33,7 @@ export default function QuickAddTask({ defaultDepartment, onTaskCreated }: Quick
     setError(null)
     try {
       const body: Record<string, unknown> = { title }
-      if (defaultDepartment) {
-        body.department = defaultDepartment
-      } else {
-        body.department = 'Order Management'
-        body.category = 'To Do General'
-      }
+      if (defaultTeamId) body.team_id = defaultTeamId
       const res = await fetch('/api/marketing/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

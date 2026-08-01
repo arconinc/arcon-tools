@@ -7,6 +7,7 @@ import { isUserCrmAttachmentUrl } from '@/lib/crm/attachments'
 import { resolveAturianQueueAssignee } from '@/lib/crm/aturian-assignees'
 import { dispatchNotification, fetchActor } from '@/lib/notifications/dispatch'
 import { aturianCustomerQueueNewEntry } from '@/lib/notifications/registry'
+import { getTeamIdByKey } from '@/lib/team-assignment'
 
 const COMMISSIONED_CLIENT_OPTIONS = ['Standard', 'Standard with Split', 'Credit Card Store', 'Non-Credit card store']
 
@@ -125,11 +126,14 @@ export async function POST(req: NextRequest) {
     address1 ? `Address: ${[address1, city, state, zip].filter(Boolean).join(', ')}` : null,
   ].filter(Boolean).join('\n')
 
+  const teamId = await getTeamIdByKey(adminClient, 'accounting')
+
   const { data: task } = await adminClient
     .from('crm_tasks')
     .insert({
       title: `Add ${company_name.trim()} to Aturian`,
       department: 'Accounting',
+      team_id: teamId,
       assigned_to: amy?.id || null,
       description: descLines || null,
       status: 'not_started',

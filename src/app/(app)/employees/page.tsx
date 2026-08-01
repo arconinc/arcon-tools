@@ -3,41 +3,46 @@
 import { useState, useEffect, useMemo } from 'react'
 import { EmployeeSummary, OfficeLocation } from '@/types'
 import EmployeeCard from '@/components/employees/EmployeeCard'
-import { DEPARTMENTS, DEPARTMENT_DISPLAY_NAMES } from '@/lib/task-constants'
-import type { CrmTaskDepartment } from '@/types'
 import { MultiSelect, type MultiSelectOption } from '@/components/ui/MultiSelect'
 
 const OFFICE_LOCATIONS: OfficeLocation[] = ['Remote', 'Minnesota', 'Arizona', 'Colorado']
 
+type Team = { id: string; key: string; name: string; color: string }
+
 export default function EmployeeDirectoryPage() {
   const [employees, setEmployees] = useState<EmployeeSummary[]>([])
+  const [teams, setTeams] = useState<Team[]>([])
   const [loading, setLoading] = useState(true)
   const [search, setSearch] = useState('')
   const [locationFilter, setLocationFilter] = useState<OfficeLocation | 'All'>('All')
-  const [departmentFilter, setDepartmentFilter] = useState<string[]>([])
+  const [teamFilter, setTeamFilter] = useState<string[]>([])
 
   useEffect(() => {
     fetch('/api/employees')
       .then((r) => r.json())
       .then((data) => { setEmployees(data); setLoading(false) })
       .catch(() => setLoading(false))
+    fetch('/api/teams')
+      .then((r) => r.json())
+      .then((data) => { if (Array.isArray(data)) setTeams(data) })
+      .catch(() => {})
   }, [])
 
   const filtered = useMemo(() => {
     return employees.filter((e) => {
       if (locationFilter !== 'All' && e.office_location !== locationFilter) return false
-      if (departmentFilter.length > 0 && !e.department?.some((d) => departmentFilter.includes(d))) return false
+      if (teamFilter.length > 0 && !e.teams.some((t) => teamFilter.includes(t.id))) return false
       if (search.trim()) {
         const q = search.toLowerCase()
         return (
           e.display_name.toLowerCase().includes(q) ||
           (e.job_title?.toLowerCase().includes(q) ?? false) ||
-          (e.department?.some((d) => d.toLowerCase().includes(q) || DEPARTMENT_DISPLAY_NAMES[d as CrmTaskDepartment]?.toLowerCase().includes(q)) ?? false)
+          e.teams.some((t) => t.name.toLowerCase().includes(q))
         )
       }
       return true
     })
-  }, [employees, locationFilter, departmentFilter, search])
+  }, [employees, locationFilter, teamFilter, search])
 
   return (
     <>
@@ -77,7 +82,7 @@ export default function EmployeeDirectoryPage() {
             </svg>
             <input
               type="text"
-              placeholder="Search by name, title, or department…"
+              placeholder="Search by name, title, or team…"
               value={search}
               onChange={(e) => setSearch(e.target.value)}
             />
@@ -96,11 +101,11 @@ export default function EmployeeDirectoryPage() {
           </div>
 
           <MultiSelect
-            options={DEPARTMENTS.map((d): MultiSelectOption => ({ value: d, label: DEPARTMENT_DISPLAY_NAMES[d] }))}
-            value={departmentFilter}
-            onChange={setDepartmentFilter}
-            placeholder="All Departments"
-            label="Filter by department"
+            options={teams.map((t): MultiSelectOption => ({ value: t.id, label: t.name }))}
+            value={teamFilter}
+            onChange={setTeamFilter}
+            placeholder="All Teams"
+            label="Filter by team"
           />
         </div>
 

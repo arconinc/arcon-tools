@@ -4,6 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { dispatchNotification } from '@/lib/notifications/dispatch'
 import { ptoSubmitted } from '@/lib/notifications/registry'
 import { PtoReason, PTO_REASON_LABELS } from '@/types'
+import { getTeamIdByKey } from '@/lib/team-assignment'
 
 // GET /api/hr/pto — list the current user's own PTO requests
 export async function GET() {
@@ -95,11 +96,13 @@ export async function POST(req: NextRequest) {
   // Create HR task
   const taskTitle = `PTO Request: ${dbUser.display_name} (${start_date} – ${end_date})`
   const reasonLabel = PTO_REASON_LABELS[reason as PtoReason] ?? reason
+  const teamId = await getTeamIdByKey(adminClient, 'hr')
   const { data: task } = await adminClient
     .from('crm_tasks')
     .insert({
       title: taskTitle,
       department: 'HR',
+      team_id: teamId,
       status: 'not_started',
       priority: 'medium',
       progress: 0,

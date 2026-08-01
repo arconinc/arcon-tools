@@ -3,23 +3,10 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { redirect, notFound } from 'next/navigation'
 import Link from 'next/link'
 import { EmployeeProfile } from '@/types'
-import { DEPARTMENT_DISPLAY_NAMES } from '@/lib/task-constants'
-import type { CrmTaskDepartment } from '@/types'
 import EmployeeAvatar from '@/components/employees/EmployeeAvatar'
 import OfficeLocationBadge from '@/components/employees/OfficeLocationBadge'
 import { TiptapRenderer } from '@/components/news/TiptapRenderer'
-import { DEPARTMENT_BY_ASSIGNMENT_GROUP } from '@/lib/auth/group-access'
-
-function assignmentDepartments(user: { group_memberships?: unknown; department?: unknown }) {
-  const memberships = Array.isArray(user.group_memberships) ? user.group_memberships : []
-  const groupDepts = memberships
-    .map((membership: any) => membership.groups)
-    .filter((group: any) => group?.is_active && group?.source_type === 'assignment_pool')
-    .map((group: any) => DEPARTMENT_BY_ASSIGNMENT_GROUP[group.key])
-    .filter(Boolean)
-  const directDepts = Array.isArray(user.department) ? user.department : []
-  return [...new Set([...groupDepts, ...directDepts])]
-}
+import { userTeamsFromMemberships } from '@/lib/auth/user-teams'
 
 function yearsOfService(startDate: string | null): string | null {
   if (!startDate) return null
@@ -79,8 +66,8 @@ export default async function EmployeeProfilePage({
       profile_image_url, avatar_url, start_date,
       phone, linkedin_url, timezone,
       bio_html, bio_json, skills, interests,
-      manager_id, department,
-      group_memberships!group_memberships_user_id_fkey(groups(id, key, is_active, source_type))
+      manager_id,
+      group_memberships!group_memberships_user_id_fkey(groups(id, name, color, is_active, source_type))
     `)
     .eq('id', id)
     .single()
@@ -93,7 +80,7 @@ export default async function EmployeeProfilePage({
       ? adminClient.from('users').select('id, display_name, job_title, profile_image_url, avatar_url').eq('id', emp.manager_id).single()
       : Promise.resolve({ data: null }),
     adminClient.from('users')
-      .select('id, email, display_name, job_title, office_location, employment_type, profile_image_url, avatar_url, start_date, phone, bio_html, department, group_memberships!group_memberships_user_id_fkey(groups(id, key, is_active, source_type))')
+      .select('id, email, display_name, job_title, office_location, employment_type, profile_image_url, avatar_url, start_date, phone, bio_html, group_memberships!group_memberships_user_id_fkey(groups(id, name, color, is_active, source_type))')
       .eq('manager_id', id)
       .order('display_name'),
   ])
@@ -102,11 +89,11 @@ export default async function EmployeeProfilePage({
   void _groupMemberships
   const profile: EmployeeProfile = {
     ...employeeData,
-    department: assignmentDepartments(emp),
+    teams: userTeamsFromMemberships(emp.group_memberships),
     manager: managerResult.data ?? null,
     direct_reports: (directReportsResult.data ?? []).map((report) => ({
       ...report,
-      department: assignmentDepartments(report),
+      teams: userTeamsFromMemberships(report.group_memberships),
     })),
   }
   const isOwnProfile = viewerUser.id === profile.id
@@ -174,9 +161,9 @@ export default async function EmployeeProfilePage({
                 {profile.office_location && (
                   <span className="prof-badge-emp">{profile.office_location}</span>
                 )}
-                {profile.department?.map((d) => (
-                  <span key={d} className="prof-badge-emp">
-                    {DEPARTMENT_DISPLAY_NAMES[d as CrmTaskDepartment] ?? d}
+                {profile.teams.map((t) => (
+                  <span key={t.id} className="prof-badge-emp">
+                    {t.name}
                   </span>
                 ))}
                 {profile.employment_type && (

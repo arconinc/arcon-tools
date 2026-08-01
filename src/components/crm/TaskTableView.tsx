@@ -14,8 +14,6 @@ import {
   type SortingState,
 } from '@tanstack/react-table'
 import type { KanbanTask } from './TaskKanbanView'
-import { DEPARTMENT_DISPLAY_NAMES } from '@/lib/task-constants'
-import type { CrmTaskDepartment } from '@/types'
 
 const PAGE_SIZE = 50
 
@@ -301,7 +299,7 @@ export function TaskTableView({ tasks, loading, total, page, search, onPageChang
 
   function isColumnFiltered(columnId: string) {
     if (columnId === 'title') return Boolean(columnFilters.title)
-    if (columnId === 'department') return Boolean(columnFilters.assignment)
+    if (columnId === 'team') return Boolean(columnFilters.assignment)
     if (columnId === 'priority') return columnFilters.priorities.length > 0
     if (columnId === 'status') return columnFilters.statuses.length > 0
     if (columnId === 'due_date') return Boolean(columnFilters.dueFrom || columnFilters.dueTo)
@@ -336,8 +334,8 @@ export function TaskTableView({ tasks, loading, total, page, search, onPageChang
     if (columnId === 'title') {
       return <input className={baseClass} value={columnFilters.title} onChange={(e) => updateColumnFilters({ title: e.target.value })} onClick={(e) => e.stopPropagation()} placeholder="Filter task" />
     }
-    if (columnId === 'department') {
-      return <input className={baseClass} value={columnFilters.assignment} onChange={(e) => updateColumnFilters({ assignment: e.target.value })} onClick={(e) => e.stopPropagation()} placeholder="Dept/category" />
+    if (columnId === 'team') {
+      return <input className={baseClass} value={columnFilters.assignment} onChange={(e) => updateColumnFilters({ assignment: e.target.value })} onClick={(e) => e.stopPropagation()} placeholder="Category" />
     }
     if (columnId === 'priority') {
       return (
@@ -409,7 +407,7 @@ export function TaskTableView({ tasks, loading, total, page, search, onPageChang
             onClick={(e) => {
               e.stopPropagation()
               if (columnId === 'title') updateColumnFilters({ title: '' })
-              if (columnId === 'department') updateColumnFilters({ assignment: '' })
+              if (columnId === 'team') updateColumnFilters({ assignment: '' })
               if (columnId === 'priority') updateColumnFilters({ priorities: [] })
               if (columnId === 'status') updateColumnFilters({ statuses: [] })
               if (columnId === 'due_date') updateColumnFilters({ dueFrom: '', dueTo: '' })
@@ -457,9 +455,9 @@ export function TaskTableView({ tasks, loading, total, page, search, onPageChang
       },
     },
     {
-      id: 'department',
-      accessorFn: (task) => `${task.department ?? ''} ${task.category ?? ''}`,
-      header: 'Dept / Category',
+      id: 'team',
+      accessorFn: (task) => `${task.team_name ?? ''} ${task.category ?? ''}`,
+      header: 'Team / Category',
       size: 170,
       minSize: 140,
       meta: { className: 'hidden md:table-cell whitespace-nowrap', headerClassName: 'hidden md:table-cell' },
@@ -467,13 +465,13 @@ export function TaskTableView({ tasks, loading, total, page, search, onPageChang
         const task = row.original
         return (
           <div className="flex gap-1">
-            {task.department && (
-              <span className="text-xs bg-purple-100 text-purple-700 px-2 py-0.5 rounded font-semibold w-fit">{DEPARTMENT_DISPLAY_NAMES[task.department as CrmTaskDepartment] ?? task.department}</span>
+            {task.team_name && (
+              <span className="text-xs px-2 py-0.5 rounded font-semibold w-fit" style={{ background: (task.team_color ?? '#7c3aed') + '18', color: task.team_color ?? '#7c3aed' }}>{task.team_name}</span>
             )}
             {task.category && (
               <span className="text-xs bg-slate-100 text-slate-600 px-2 py-0.5 rounded font-medium">{task.category}</span>
             )}
-            {!task.department && !task.category && <span className="text-slate-300">—</span>}
+            {!task.team_name && !task.category && <span className="text-slate-300">—</span>}
           </div>
         )
       },
@@ -635,7 +633,7 @@ export function TaskTableView({ tasks, loading, total, page, search, onPageChang
         (task.assigned_user_name ?? '').toLowerCase().includes(q) ||
         (task.linked_to_name ?? '').toLowerCase().includes(q) ||
         (task.category ?? '').toLowerCase().includes(q) ||
-        (task.department ?? '').toLowerCase().includes(q)
+        (task.team_name ?? '').toLowerCase().includes(q)
       )
     },
   })

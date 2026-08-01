@@ -1,22 +1,14 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
-import {
-  DEPARTMENTS,
-  DEPARTMENT_CATEGORIES,
-  DEPARTMENT_DISPLAY_NAMES,
-  encodeTaskAssignmentValue,
-  getTaskCategoryLabel,
-  parseTaskAssignmentValue,
-} from '@/lib/task-constants'
-import type { CrmTaskDepartment } from '@/types'
+import { ALL_CATEGORIES, getTaskCategoryLabel } from '@/lib/task-constants'
 
 export type Priority = 'low' | 'medium' | 'high'
 
 type TaskItem = {
   id: string
   title: string
-  department: string | null
+  team_id: string | null
   category: string | null
   priority: Priority
   assigned_to: string | null
@@ -32,7 +24,9 @@ type UserOption = {
   profile_image_url: string | null
 }
 
-type MenuField = 'assignee' | 'assignment' | 'priority' | 'due_date' | 'delete'
+type TeamOption = { id: string; key: string; name: string; color: string }
+
+type MenuField = 'assigned_to' | 'category' | 'priority' | 'due_date' | 'delete'
 
 interface TaskQuickEditPanelProps {
   task: TaskItem
@@ -41,20 +35,14 @@ interface TaskQuickEditPanelProps {
   onUpdate: (field: string, value: unknown) => Promise<void>
   onDelete?: (taskId: string) => Promise<void>
   allUsers: UserOption[]
+  teams: TeamOption[]
 }
 
-export function TaskQuickEditPanel({ task, position, onClose, onUpdate, onDelete, allUsers }: TaskQuickEditPanelProps) {
+export function TaskQuickEditPanel({ task, position, onClose, onUpdate, onDelete, allUsers, teams }: TaskQuickEditPanelProps) {
   const [selectedField, setSelectedField] = useState<MenuField | null>(null)
   const [loading, setLoading] = useState<string | null>(null)
   const [assigneeSearch, setAssigneeSearch] = useState('')
-  const [assignmentSearch, setAssignmentSearch] = useState('')
-  const [localAssignment, setLocalAssignment] = useState<{
-    department: CrmTaskDepartment | null
-    category: string | null
-  }>({
-    department: (task.department as CrmTaskDepartment | null) ?? null,
-    category: task.category,
-  })
+  const [categorySearch, setCategorySearch] = useState('')
   const panelRef = useRef<HTMLDivElement>(null)
 
   useEffect(() => {
@@ -70,13 +58,6 @@ export function TaskQuickEditPanel({ task, position, onClose, onUpdate, onDelete
     }
   }, [onClose])
 
-  useEffect(() => {
-    setLocalAssignment({
-      department: (task.department as CrmTaskDepartment | null) ?? null,
-      category: task.category,
-    })
-  }, [task.id, task.department, task.category])
-
   const handleFieldChange = async (field: string, value: unknown) => {
     setLoading(field)
     try {
@@ -89,28 +70,24 @@ export function TaskQuickEditPanel({ task, position, onClose, onUpdate, onDelete
     }
   }
 
-  const handleAssignmentChange = async (value: string) => {
-    const assignment = parseTaskAssignmentValue(value)
-    setLocalAssignment(assignment)
-    await handleFieldChange('assignment', assignment)
-  }
+  const handleAssignTeam = (teamId: string) => handleFieldChange('assigned_to', { team_id: teamId, assigned_to: null })
+  const handleAssignUser = (userId: string) => handleFieldChange('assigned_to', { assigned_to: userId, team_id: null })
+  const handleAssignNone = () => handleFieldChange('assigned_to', { assigned_to: null, team_id: null })
 
-  const activeAssignmentValue = encodeTaskAssignmentValue(localAssignment.department, localAssignment.category)
-  const assignmentQuery = assignmentSearch.trim().toLowerCase()
-
-  const filteredUsers = assigneeSearch.trim()
-    ? allUsers.filter((u) => u.display_name.toLowerCase().includes(assigneeSearch.toLowerCase()))
+  const assigneeQuery = assigneeSearch.trim().toLowerCase()
+  const filteredTeams = assigneeQuery
+    ? teams.filter((t) => t.name.toLowerCase().includes(assigneeQuery))
+    : teams
+  const filteredUsers = assigneeQuery
+    ? allUsers.filter((u) => u.display_name.toLowerCase().includes(assigneeQuery))
     : allUsers
 
-  const filteredDepartments = DEPARTMENTS.map((department) => {
-    const categories = DEPARTMENT_CATEGORIES[department].filter((category) =>
-      !assignmentQuery ||
-      category.toLowerCase().includes(assignmentQuery) ||
-      getTaskCategoryLabel(category).toLowerCase().includes(assignmentQuery)
-    )
-    const departmentMatches = !assignmentQuery || department.toLowerCase().includes(assignmentQuery)
-    return { department, categories: departmentMatches ? DEPARTMENT_CATEGORIES[department] : categories, departmentMatches }
-  }).filter(({ categories, departmentMatches }) => departmentMatches || categories.length > 0)
+  const categoryQuery = categorySearch.trim().toLowerCase()
+  const filteredCategories = ALL_CATEGORIES.filter((c) =>
+    !categoryQuery ||
+    c.toLowerCase().includes(categoryQuery) ||
+    getTaskCategoryLabel(c).toLowerCase().includes(categoryQuery)
+  )
 
   // Adjust position to stay within viewport
   const adjustedPosition = { ...position }
@@ -136,8 +113,8 @@ export function TaskQuickEditPanel({ task, position, onClose, onUpdate, onDelete
   }
 
   const menuItems: Array<{ id: MenuField; label: string; destructive?: boolean }> = [
-    { id: 'assignee', label: 'Assign to' },
-    { id: 'assignment', label: 'Category' },
+    { id: 'assigned_to', label: 'Assign to' },
+    { id: 'category', label: 'Category' },
     { id: 'priority', label: 'Priority' },
     { id: 'due_date', label: 'Due Date' },
     { id: 'delete', label: 'Delete', destructive: true },
@@ -193,64 +170,74 @@ export function TaskQuickEditPanel({ task, position, onClose, onUpdate, onDelete
       {selectedField && (
         <div style={{ width: selectedField === 'delete' ? 220 : 250, padding: '8px 0', maxHeight: 340, overflowY: 'auto' }}>
 
-          {selectedField === 'assignee' && (
+          {selectedField === 'assigned_to' && (
             <div>
               <div style={{ padding: '8px 12px', borderBottom: '1px solid #e5e7eb' }}>
                 <input type="text" value={assigneeSearch} onChange={(e) => setAssigneeSearch(e.target.value)}
                   placeholder="Search…" autoFocus
                   style={{ width: '100%', padding: '6px 8px', fontSize: 12, border: '1px solid #d1d5db', borderRadius: 4, outline: 'none' }} />
               </div>
-              {filteredUsers.map((user) => (
-                <button key={user.id} onClick={() => handleFieldChange('assigned_to', user.id)}
-                  style={{ width: '100%', padding: '8px 12px', fontSize: 12, border: 'none', background: 'transparent', textAlign: 'left', cursor: 'pointer', color: '#222', fontWeight: task.assigned_to === user.id ? 600 : 400 }}
-                  onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#f5f3ff' }}
-                  onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}>
-                  {user.display_name}
-                  {user.department && user.department.length > 0 && <span style={{ fontSize: 10, color: '#aaa', marginLeft: 6 }}>{user.department.join(', ')}</span>}
-                </button>
-              ))}
+              <button onClick={handleAssignNone}
+                disabled={loading === 'assigned_to'}
+                style={{ width: '100%', padding: '8px 12px', fontSize: 12, border: 'none', background: (!task.team_id && !task.assigned_to) ? '#f5f3ff' : 'transparent', textAlign: 'left', cursor: 'pointer', color: (!task.team_id && !task.assigned_to) ? '#6b1e98' : '#999', fontWeight: (!task.team_id && !task.assigned_to) ? 600 : 400 }}>
+                Unassigned
+              </button>
+              {filteredTeams.length > 0 && (
+                <>
+                  <div style={{ padding: '6px 12px 2px', fontSize: 10, fontWeight: 700, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Teams</div>
+                  {filteredTeams.map((team) => (
+                    <button key={team.id} onClick={() => handleAssignTeam(team.id)}
+                      disabled={loading === 'assigned_to'}
+                      style={{ width: '100%', padding: '8px 12px', fontSize: 12, border: 'none', background: task.team_id === team.id ? '#f5f3ff' : 'transparent', textAlign: 'left', cursor: 'pointer', color: task.team_id === team.id ? '#6b1e98' : '#222', fontWeight: task.team_id === team.id ? 600 : 400 }}
+                      onMouseEnter={(e) => { if (task.team_id !== team.id) (e.currentTarget as HTMLButtonElement).style.background = '#f5f3ff' }}
+                      onMouseLeave={(e) => { if (task.team_id !== team.id) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}>
+                      {team.name}
+                    </button>
+                  ))}
+                </>
+              )}
+              {filteredUsers.length > 0 && (
+                <>
+                  <div style={{ padding: '6px 12px 2px', fontSize: 10, fontWeight: 700, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Individuals</div>
+                  {filteredUsers.map((user) => (
+                    <button key={user.id} onClick={() => handleAssignUser(user.id)}
+                      style={{ width: '100%', padding: '8px 12px', fontSize: 12, border: 'none', background: 'transparent', textAlign: 'left', cursor: 'pointer', color: '#222', fontWeight: task.assigned_to === user.id ? 600 : 400 }}
+                      onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#f5f3ff' }}
+                      onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}>
+                      {user.display_name}
+                    </button>
+                  ))}
+                </>
+              )}
             </div>
           )}
 
-          {selectedField === 'assignment' && (
+          {selectedField === 'category' && (
             <div>
               <div style={{ padding: '8px 12px', borderBottom: '1px solid #e5e7eb' }}>
-                <input type="text" value={assignmentSearch} onChange={(e) => setAssignmentSearch(e.target.value)}
+                <input type="text" value={categorySearch} onChange={(e) => setCategorySearch(e.target.value)}
                   placeholder="Search…" autoFocus
                   style={{ width: '100%', padding: '6px 8px', fontSize: 12, border: '1px solid #d1d5db', borderRadius: 4, outline: 'none' }} />
               </div>
-              <button onClick={() => handleAssignmentChange('')}
-                disabled={loading === 'assignment'}
-                style={{ width: '100%', padding: '8px 12px', fontSize: 12, border: 'none', background: !activeAssignmentValue ? '#f5f3ff' : 'transparent', textAlign: 'left', cursor: 'pointer', color: !activeAssignmentValue ? '#6b1e98' : '#999', fontWeight: !activeAssignmentValue ? 600 : 400 }}>
+              <button onClick={() => handleFieldChange('category', null)}
+                disabled={loading === 'category'}
+                style={{ width: '100%', padding: '8px 12px', fontSize: 12, border: 'none', background: !task.category ? '#f5f3ff' : 'transparent', textAlign: 'left', cursor: 'pointer', color: !task.category ? '#6b1e98' : '#999', fontWeight: !task.category ? 600 : 400 }}>
                 None
               </button>
-              {filteredDepartments.map(({ department, categories }) => (
-                <div key={department}>
-                  <button
-                    onClick={() => handleAssignmentChange(`department:${department}`)}
-                    disabled={loading === 'assignment'}
-                    style={{ width: '100%', padding: '8px 12px', fontSize: 12, border: 'none', background: activeAssignmentValue === `department:${department}` ? '#f5f3ff' : 'transparent', textAlign: 'left', cursor: 'pointer', color: activeAssignmentValue === `department:${department}` ? '#6b1e98' : '#222', fontWeight: 700 }}
-                    onMouseEnter={(e) => { if (activeAssignmentValue !== `department:${department}`) (e.currentTarget as HTMLButtonElement).style.background = '#f5f3ff' }}
-                    onMouseLeave={(e) => { if (activeAssignmentValue !== `department:${department}`) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
-                  >
-                    {DEPARTMENT_DISPLAY_NAMES[department as CrmTaskDepartment] ?? department}
-                  </button>
-                  {categories.map((category) => (
-                    <button
-                      key={category}
-                      onClick={() => handleAssignmentChange(`category:${category}`)}
-                      disabled={loading === 'assignment'}
-                      style={{ width: '100%', padding: '7px 12px 7px 28px', fontSize: 12, border: 'none', background: activeAssignmentValue === `category:${category}` ? '#f5f3ff' : 'transparent', textAlign: 'left', cursor: 'pointer', color: activeAssignmentValue === `category:${category}` ? '#6b1e98' : '#222', fontWeight: activeAssignmentValue === `category:${category}` ? 600 : 400 }}
-                      onMouseEnter={(e) => { if (activeAssignmentValue !== `category:${category}`) (e.currentTarget as HTMLButtonElement).style.background = '#f5f3ff' }}
-                      onMouseLeave={(e) => { if (activeAssignmentValue !== `category:${category}`) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
-                    >
-                      {getTaskCategoryLabel(category)}
-                    </button>
-                  ))}
-                </div>
+              {filteredCategories.map((category) => (
+                <button
+                  key={category}
+                  onClick={() => handleFieldChange('category', category)}
+                  disabled={loading === 'category'}
+                  style={{ width: '100%', padding: '8px 12px', fontSize: 12, border: 'none', background: task.category === category ? '#f5f3ff' : 'transparent', textAlign: 'left', cursor: 'pointer', color: task.category === category ? '#6b1e98' : '#222', fontWeight: task.category === category ? 600 : 400 }}
+                  onMouseEnter={(e) => { if (task.category !== category) (e.currentTarget as HTMLButtonElement).style.background = '#f5f3ff' }}
+                  onMouseLeave={(e) => { if (task.category !== category) (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}
+                >
+                  {getTaskCategoryLabel(category)}
+                </button>
               ))}
-              {filteredDepartments.length === 0 && (
-                <div style={{ padding: '12px', fontSize: 12, color: '#aaa', textAlign: 'center' }}>No departments or categories</div>
+              {filteredCategories.length === 0 && (
+                <div style={{ padding: '12px', fontSize: 12, color: '#aaa', textAlign: 'center' }}>No categories</div>
               )}
             </div>
           )}

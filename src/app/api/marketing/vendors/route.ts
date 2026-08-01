@@ -4,6 +4,7 @@ import { requireUser } from '@/lib/crm/require-user'
 import { dispatchNotification } from '@/lib/notifications/dispatch'
 import { supplierAddedToAturian } from '@/lib/notifications/registry'
 import { resolveAturianAssignee } from '@/lib/crm/aturian-assignees'
+import { getTeamIdByKey } from '@/lib/team-assignment'
 
 // GET /api/marketing/vendors?search=&tag_id=&page=1&limit=50
 export async function GET(req: NextRequest) {
@@ -134,12 +135,14 @@ export async function POST(req: NextRequest) {
       data.sales_rep_name ? `Sales Rep: ${data.sales_rep_name}${data.sales_rep_email ? ` (${data.sales_rep_email})` : ''}` : null,
     ].filter(Boolean).join('\n')
     const assignee = await resolveAturianAssignee(adminClient, 'supplier')
+    const teamId = await getTeamIdByKey(adminClient, 'accounting')
 
     const { data: task } = await adminClient
       .from('crm_tasks')
       .insert({
         title: `Add ${name.trim()} to Aturian`,
         department: 'Accounting',
+        team_id: teamId,
         assigned_to: assignee?.id ?? null,
         description: descLines || null,
         status: 'not_started',

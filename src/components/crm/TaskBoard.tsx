@@ -11,8 +11,7 @@ import QuickAddTask from './QuickAddTask'
 import { CreateTaskModal } from './CreateTaskModal'
 import { TaskCreatedToast } from './TaskCreatedToast'
 import { TaskDetailModal } from './TaskDetailModal'
-import { DEPARTMENTS, DEPARTMENT_CATEGORIES, DEPARTMENT_DISPLAY_NAMES } from '@/lib/task-constants'
-import type { CrmTaskDepartment } from '@/types'
+import { ALL_CATEGORIES, getTaskCategoryLabel } from '@/lib/task-constants'
 import { SavedFiltersMenu } from '@/components/ui/SavedFiltersMenu'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -24,6 +23,8 @@ type UserOption = {
   avatar_url: string | null
   profile_image_url: string | null
 }
+
+type Team = { id: string; key: string; name: string; color: string }
 
 type UserSelection = 'all' | Set<string>
 
@@ -63,11 +64,11 @@ function normalizeColumnFilters(value: unknown): TaskColumnFilters {
 // ── TaskBoard (inner) ─────────────────────────────────────────────────────────
 
 interface TaskBoardProps {
-  defaultDepartment?: CrmTaskDepartment
+  defaultTeamKey?: string
   defaultAssignee?: 'me' | 'all'
 }
 
-function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoardProps) {
+function TaskBoardInner({ defaultTeamKey, defaultAssignee = 'all' }: TaskBoardProps) {
   const router = useRouter()
   const pathname = usePathname()
   const searchParams = useSearchParams()
@@ -84,10 +85,9 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
     return 'kanban'
   })
 
-  // Filters — initialized from URL params, with prop defaults as fallback
-  const [department, setDepartment] = useState<CrmTaskDepartment | ''>(
-    () => (searchParams.get('department') as CrmTaskDepartment | null) ?? defaultDepartment ?? ''
-  )
+  // Filters — initialized from URL params
+  const [teamId, setTeamId] = useState<string>(() => searchParams.get('team') ?? '')
+  const [teamIdInitialized, setTeamIdInitialized] = useState(false)
   const [category, setCategory] = useState(searchParams.get('category') ?? '')
   const [selectedUserIds, setSelectedUserIds] = useState<UserSelection>(() => {
     const p = searchParams.get('assignees')
@@ -120,6 +120,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [allUsers, setAllUsers] = useState<UserOption[]>([])
+  const [teams, setTeams] = useState<Team[]>([])
   const [initialized, setInitialized] = useState(false)
   const [createTaskOpen, setCreateTaskOpen] = useState(false)
   const [taskCreatedToastOpen, setTaskCreatedToastOpen] = useState(false)
@@ -141,12 +142,12 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
     } catch {}
   }, [activeFilterId, pageKey])
 
-  // (dept and assignee dropdowns managed by MultiSelect component)
+  // (team and assignee dropdowns managed by MultiSelect component)
 
   // Context menu
   const [contextMenu, setContextMenu] = useState<{ taskId: string; position: { x: number; y: number } } | null>(null)
 
-  const isDepartmentLocked = !!defaultDepartment
+  const isTeamLocked = !!defaultTeamKey
 
   // Sync URL params on filter changes
   const syncUrl = useCallback((updates: Record<string, string | null>) => {
@@ -168,6 +169,24 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
       .catch(() => {})
   }, [])
 
+  // Load teams
+  useEffect(() => {
+    fetch('/api/teams')
+      .then((r) => r.json())
+      .then((data: Team[]) => setTeams(Array.isArray(data) ? data : []))
+      .catch(() => {})
+  }, [])
+
+  // Resolve defaultTeamKey to a team id once teams have loaded (locked boards only)
+  useEffect(() => {
+    if (teamIdInitialized || teams.length === 0) return
+    if (defaultTeamKey && !searchParams.get('team')) {
+      const match = teams.find((t) => t.key === defaultTeamKey)
+      if (match) setTeamId(match.id)
+    }
+    setTeamIdInitialized(true)
+  }, [teams, defaultTeamKey, teamIdInitialized, searchParams])
+
   // Set initial filter from props once user is loaded
   useEffect(() => {
     if (currentUser && !initialized) {
@@ -188,6 +207,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
   // Fetch tasks
   useEffect(() => {
     if (!initialized) return
+    if (isTeamLocked && !teamIdInitialized) return
 
     const params = new URLSearchParams()
 
@@ -206,7 +226,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
     }
 
     if (hideCompleted) params.set('hide_completed', 'true')
-    if (department) params.set('department', department)
+    if (teamId) params.set('team_id', teamId)
     if (category) params.set('category', category)
     if (view === 'table') {
       if (columnFilters.title) params.set('title_search', columnFilters.title)
@@ -235,18 +255,16 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
       .catch(() => setTasks([]))
       .finally(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usersKey, department, category, showDelegated, hideCompleted, initialized, view, page, refreshKey, columnFiltersKey])
+  }, [usersKey, teamId, category, showDelegated, hideCompleted, initialized, view, page, refreshKey, columnFiltersKey, isTeamLocked, teamIdInitialized])
 
   // ── Filter helpers ─────────────────────────────────────────────────────────
-
-  const availableCategories = department ? DEPARTMENT_CATEGORIES[department as CrmTaskDepartment] ?? [] : []
 
   const isMeOnly = selectedUserIds !== 'all' &&
     (selectedUserIds as Set<string>).size === 1 &&
     (selectedUserIds as Set<string>).has(currentUser?.id ?? '')
 
-  const pageTitle = defaultDepartment
-    ? `${DEPARTMENT_DISPLAY_NAMES[defaultDepartment] ?? defaultDepartment} Tasks`
+  const pageTitle = defaultTeamKey
+    ? `${teams.find((t) => t.key === defaultTeamKey)?.name ?? 'Team'} Tasks`
     : isMeOnly
     ? 'My Tasks'
     : 'Task Board'
@@ -264,11 +282,11 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
 
   // ── Filter setters (sync to URL) ───────────────────────────────────────────
 
-  function handleDeptChange(d: CrmTaskDepartment | '') {
-    setDepartment(d)
+  function handleTeamChange(id: string) {
+    setTeamId(id)
     setCategory('')
     setPage(1)
-    syncUrl({ department: d || null, category: null })
+    syncUrl({ team: id || null, category: null })
   }
 
   function handleCategoryChange(c: string) {
@@ -362,7 +380,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
   function getCurrentFilterConfig(): Record<string, unknown> {
     return {
       view,
-      department: department || null,
+      team: teamId || null,
       category: category || null,
       assignees: selectedUserIds === 'all' ? 'all' : [...(selectedUserIds as Set<string>)],
       showDelegated,
@@ -375,7 +393,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
 
   function handleLoadFilter(config: Record<string, unknown>) {
     const newView = (config.view as 'kanban' | 'table') ?? 'kanban'
-    const newDept = (config.department as CrmTaskDepartment | null) ?? ''
+    const newTeamId = (config.team as string | null) ?? ''
     const newCategory = (config.category as string | null) ?? ''
     const newAssignees = config.assignees
     const newShowDelegated = config.showDelegated === true
@@ -392,7 +410,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
     }
 
     setView(newView)
-    setDepartment(newDept)
+    setTeamId(newTeamId)
     setCategory(newCategory)
     setSelectedUserIds(newSelectedUserIds)
     setShowDelegated(newShowDelegated)
@@ -406,7 +424,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
     const assigneesStr = newSelectedUserIds === 'all' ? null : [...(newSelectedUserIds as Set<string>)].join(',')
     syncUrl({
       view: newView === 'kanban' ? null : newView,
-      department: newDept || null,
+      team: newTeamId || null,
       category: newCategory || null,
       assignees: assigneesStr,
       delegated: newShowDelegated ? 'true' : null,
@@ -507,8 +525,8 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
   async function handleQuickUpdate(field: string, value: unknown) {
     if (!contextMenu) return
     const taskId = contextMenu.taskId
-    const patch = field === 'assignment' && value && typeof value === 'object'
-      ? value as { department: string | null; category: string | null }
+    const patch = value && typeof value === 'object'
+      ? value as Record<string, unknown>
       : { [field]: value }
 
     setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, ...patch } : t))
@@ -604,7 +622,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
           </div>
         </div>
 
-        {/* Filter row 1: Department + Category */}
+        {/* Filter row 1: Team + Category */}
         <div style={{ display: 'flex', gap: 8, marginBottom: 8, flexWrap: 'wrap' }}>
           {/* Saved filter views */}
           <SavedFiltersMenu
@@ -616,36 +634,33 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
             defaultActiveFilterId={activeFilterId}
           />
 
-          {/* Department dropdown */}
-          {!isDepartmentLocked && (
+          {/* Team dropdown */}
+          {!isTeamLocked && (
             <MultiSelect
               single
-              options={DEPARTMENTS.map((d): MultiSelectOption => ({
-                value: d,
-                label: DEPARTMENT_DISPLAY_NAMES[d],
-                meta: DEPARTMENT_CATEGORIES[d].length > 0 ? String(DEPARTMENT_CATEGORIES[d].length) : undefined,
+              options={teams.map((t): MultiSelectOption => ({
+                value: t.id,
+                label: t.name,
               }))}
-              value={department ? [department] : []}
-              onChange={([d]) => handleDeptChange((d ?? '') as CrmTaskDepartment | '')}
-              placeholder="All departments"
-              label="Filter by department"
+              value={teamId ? [teamId] : []}
+              onChange={([id]) => handleTeamChange(id ?? '')}
+              placeholder="All teams"
+              label="Filter by team"
               dropdownWidth={220}
             />
           )}
 
-          {/* Category dropdown (only when a dept is selected) */}
-          {(department || isDepartmentLocked) && availableCategories.length > 0 && (
-            <select
-              value={category}
-              onChange={(e) => handleCategoryChange(e.target.value)}
-              className="h-9 cursor-pointer rounded-lg border border-gray-200 bg-white px-3 text-[13px] text-gray-700 outline-none transition-colors focus:border-purple-500 focus:ring-2 focus:ring-purple-300"
-            >
-              <option value="">All categories</option>
-              {availableCategories.map((c) => (
-                <option key={c} value={c}>{c}</option>
-              ))}
-            </select>
-          )}
+          {/* Category dropdown (independent of team) */}
+          <select
+            value={category}
+            onChange={(e) => handleCategoryChange(e.target.value)}
+            className="h-9 cursor-pointer rounded-lg border border-gray-200 bg-white px-3 text-[13px] text-gray-700 outline-none transition-colors focus:border-purple-500 focus:ring-2 focus:ring-purple-300"
+          >
+            <option value="">All categories</option>
+            {ALL_CATEGORIES.map((c) => (
+              <option key={c} value={c}>{getTaskCategoryLabel(c)}</option>
+            ))}
+          </select>
 
           {/* Delegated tasks toggle */}
           <button
@@ -756,12 +771,15 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
         {/* Quick-add */}
         <div style={{ marginBottom: 12 }}>
           <QuickAddTask
-            defaultDepartment={department || undefined}
+            defaultTeamId={teamId || undefined}
             onTaskCreated={(created) => {
+              const createdTeam = created.team_id ? teams.find((t) => t.id === created.team_id) : undefined
               setTasks((prev) => [...prev, {
                 id: created.id,
                 title: created.title,
-                department: created.department ?? null,
+                team_id: created.team_id ?? null,
+                team_name: createdTeam?.name ?? null,
+                team_color: createdTeam?.color ?? null,
                 category: created.category,
                 priority: created.priority as KanbanTask['priority'],
                 status: created.status as KanbanTask['status'],
@@ -795,7 +813,7 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
           sortBy={sortBy}
           search={search}
           showAssignee={!isMeOnly}
-          showAssignToMe={!!defaultDepartment}
+          showAssignToMe={!!defaultTeamKey}
           userPhotoMap={userPhotoMap}
           onCardClick={(id) => setSelectedTaskId(id)}
           onCardContextMenu={handleTaskContextMenu}
@@ -833,13 +851,14 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
             onUpdate={handleQuickUpdate}
             onDelete={handleDeleteTask}
             allUsers={allUsers}
+            teams={teams}
           />
         ) : null
       })()}
       <CreateTaskModal
         open={createTaskOpen}
         onClose={() => setCreateTaskOpen(false)}
-        defaultDepartment={defaultDepartment}
+        defaultTeamId={teamId || undefined}
         onCreated={() => {
           setRefreshKey((key) => key + 1)
           setTaskCreatedToastOpen(true)
@@ -856,7 +875,9 @@ function TaskBoardInner({ defaultDepartment, defaultAssignee = 'all' }: TaskBoar
           setTasks((prev) => prev.map((task) => task.id === updated.id ? {
             ...task,
             title: updated.title,
-            department: updated.department,
+            team_id: updated.team_id,
+            team_name: updated.team?.name ?? null,
+            team_color: updated.team?.color ?? null,
             category: updated.category,
             priority: updated.priority as KanbanTask['priority'],
             status: updated.status as KanbanTask['status'],

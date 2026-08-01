@@ -4,6 +4,7 @@ import { requireUser } from '@/lib/crm/require-user'
 import { dispatchNotification } from '@/lib/notifications/dispatch'
 import { taskAssigned } from '@/lib/notifications/registry'
 import { fetchAndStoreOgImage } from '@/lib/specs/fetch-og-image'
+import { getTeamIdByKey } from '@/lib/team-assignment'
 
 // GET /api/marketing/specs?customer_id=&csr_id=&status=&vendor=&month=YYYY-MM&page=1&limit=50
 export async function GET(req: NextRequest) {
@@ -153,6 +154,8 @@ export async function POST(req: NextRequest) {
         : null
       const customerName = custRes?.data?.name ?? 'Customer'
 
+      const teamId = await getTeamIdByKey(adminClient, 'sales')
+
       const { data: task, error: taskErr } = await adminClient
         .from('crm_tasks')
         .insert({
@@ -160,6 +163,7 @@ export async function POST(req: NextRequest) {
           assigned_to: csrId,
           task_owner: appUser.id,
           department: 'CRM',
+          team_id: teamId,
           category: 'CSR To Do',
           priority: 'medium',
           due_date: follow_up_date,

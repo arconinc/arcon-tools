@@ -2,38 +2,33 @@
 
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { DataTable, FilterPillGroup, Modal, type DataTableColumn, type FilterPillOption } from '@/components/ui'
-import { GROUP_CAPABILITY_KEYS, GROUP_CAPABILITY_LABELS } from '@/lib/groups/constants'
-import type { AppUser, Group, GroupCapability, GroupCapabilityKey, GroupMembership } from '@/types'
+import type { AppUser, Group, GroupCapability, GroupMembership } from '@/types'
 
-type GroupStatusFilter = 'active' | 'inactive'
+type TeamStatusFilter = 'active' | 'inactive'
 
-type GroupWithDetails = Group & {
+type TeamWithDetails = Group & {
   capabilities: GroupCapability[]
   member_count: number
 }
 
-type GroupMember = GroupMembership & {
+type TeamMember = GroupMembership & {
   user: Pick<AppUser, 'id' | 'display_name' | 'email' | 'avatar_url' | 'profile_image_url' | 'deactivated_at'> | null
 }
 
 type MemberOption = Pick<AppUser, 'id' | 'display_name' | 'email' | 'avatar_url' | 'profile_image_url' | 'deactivated_at'>
 
-type GroupForm = {
+type TeamForm = {
   key: string
   name: string
   description: string
   color: string
-  capabilities: GroupCapabilityKey[]
-  poolKey: string
 }
 
-const EMPTY_FORM: GroupForm = {
+const EMPTY_FORM: TeamForm = {
   key: '',
   name: '',
   description: '',
   color: '#6b7280',
-  capabilities: [],
-  poolKey: '',
 }
 
 async function responseErrorMessage(res: Response, fallback: string) {
@@ -49,13 +44,8 @@ function slugify(value: string) {
   return value.trim().toLowerCase().replace(/[^a-z0-9]+/g, '_').replace(/^_+|_+$/g, '')
 }
 
-function capabilityPayload(group: GroupWithDetails | null, capabilityKeys: GroupCapabilityKey[], poolKey: string) {
-  return capabilityKeys.map((capability) => ({
-    capability,
-    config: capability === 'assignment_pool'
-      ? { ...(group?.capabilities.find((item) => item.capability === capability)?.config ?? {}), pool_key: poolKey.trim() || undefined }
-      : (group?.capabilities.find((item) => item.capability === capability)?.config ?? {}),
-  }))
+function isTeam(group: TeamWithDetails) {
+  return group.capabilities.some((c) => c.capability === 'assignment_pool')
 }
 
 function sortByName<T extends { name: string }>(a: T, b: T) {
@@ -71,16 +61,16 @@ function sortUsersByLastName(a: MemberOption, b: MemberOption) {
   return getSortName(a).localeCompare(getSortName(b))
 }
 
-export default function AdminGroupsPage() {
-  const [groups, setGroups] = useState<GroupWithDetails[]>([])
+export default function AdminTeamsPage() {
+  const [teams, setTeams] = useState<TeamWithDetails[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [statusFilter, setStatusFilter] = useState<GroupStatusFilter>('active')
+  const [statusFilter, setStatusFilter] = useState<TeamStatusFilter>('active')
   const [search, setSearch] = useState('')
 
   const [modalOpen, setModalOpen] = useState(false)
-  const [editingGroup, setEditingGroup] = useState<GroupWithDetails | null>(null)
-  const [form, setForm] = useState<GroupForm>(EMPTY_FORM)
+  const [editingTeam, setEditingTeam] = useState<TeamWithDetails | null>(null)
+  const [form, setForm] = useState<TeamForm>(EMPTY_FORM)
   const [formError, setFormError] = useState<string | null>(null)
   const [saving, setSaving] = useState(false)
 
@@ -91,31 +81,31 @@ export default function AdminGroupsPage() {
   const [togglingId, setTogglingId] = useState<string | null>(null)
   const [rowErrors, setRowErrors] = useState<Record<string, string>>({})
 
-  const loadGroups = useCallback(async () => {
+  const loadTeams = useCallback(async () => {
     setLoading(true)
     setError(null)
     try {
       const res = await fetch('/api/admin/groups?include_inactive=true')
       if (!res.ok) {
-        throw new Error(await responseErrorMessage(res, 'Failed to load groups.'))
+        throw new Error(await responseErrorMessage(res, 'Failed to load teams.'))
       }
       const data = await res.json()
       if (Array.isArray(data)) {
-        setGroups(data)
+        setTeams(data.filter(isTeam))
       } else {
-        setError(data.error ?? 'Failed to load groups.')
+        setError(data.error ?? 'Failed to load teams.')
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to load groups.')
+      setError(err instanceof Error ? err.message : 'Failed to load teams.')
     } finally {
       setLoading(false)
     }
   }, [])
 
-  useEffect(() => { loadGroups() }, [loadGroups])
+  useEffect(() => { loadTeams() }, [loadTeams])
 
   function openCreateModal() {
-    setEditingGroup(null)
+    setEditingTeam(null)
     setForm(EMPTY_FORM)
     setMemberOptions([])
     setMemberIds([])
@@ -124,16 +114,13 @@ export default function AdminGroupsPage() {
     setModalOpen(true)
   }
 
-  async function openEditModal(group: GroupWithDetails) {
-    setEditingGroup(group)
-    const existingPoolCap = group.capabilities.find((c) => c.capability === 'assignment_pool')
+  async function openEditModal(team: TeamWithDetails) {
+    setEditingTeam(team)
     setForm({
-      key: group.key,
-      name: group.name,
-      description: group.description ?? '',
-      color: group.color,
-      capabilities: group.capabilities.map((capability) => capability.capability),
-      poolKey: (existingPoolCap?.config as Record<string, string> | undefined)?.pool_key ?? '',
+      key: team.key,
+      name: team.name,
+      description: team.description ?? '',
+      color: team.color,
     })
     setMemberOptions([])
     setMemberIds([])
@@ -142,21 +129,21 @@ export default function AdminGroupsPage() {
     setModalOpen(true)
     setMembersLoading(true)
     try {
-      const res = await fetch(`/api/admin/groups/${group.id}/members`)
+      const res = await fetch(`/api/admin/groups/${team.id}/members`)
       if (!res.ok) {
-        throw new Error(await responseErrorMessage(res, 'Failed to load group members.'))
+        throw new Error(await responseErrorMessage(res, 'Failed to load team members.'))
       }
-      const data: { users?: MemberOption[]; members?: GroupMember[] } = await res.json()
+      const data: { users?: MemberOption[]; members?: TeamMember[] } = await res.json()
       setMemberOptions(Array.isArray(data.users) ? data.users.sort(sortUsersByLastName) : [])
       setMemberIds(Array.isArray(data.members) ? data.members.map((member) => member.user_id) : [])
     } catch (err) {
-      setMembersError(err instanceof Error ? err.message : 'Failed to load group members.')
+      setMembersError(err instanceof Error ? err.message : 'Failed to load team members.')
     } finally {
       setMembersLoading(false)
     }
   }
 
-  async function saveGroup(e: FormEvent) {
+  async function saveTeam(e: FormEvent) {
     e.preventDefault()
     setSaving(true)
     setFormError(null)
@@ -167,74 +154,65 @@ export default function AdminGroupsPage() {
         name: form.name.trim(),
         description: form.description.trim() || null,
         color: form.color || '#6b7280',
-        capabilities: capabilityPayload(editingGroup, form.capabilities, form.poolKey),
+        capabilities: [{ capability: 'assignment_pool', config: {} }],
       }
-      const res = await fetch(editingGroup ? `/api/admin/groups/${editingGroup.id}` : '/api/admin/groups', {
-        method: editingGroup ? 'PATCH' : 'POST',
+      const res = await fetch(editingTeam ? `/api/admin/groups/${editingTeam.id}` : '/api/admin/groups', {
+        method: editingTeam ? 'PATCH' : 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload),
       })
       if (!res.ok) {
-        throw new Error(await responseErrorMessage(res, 'Failed to save group.'))
+        throw new Error(await responseErrorMessage(res, 'Failed to save team.'))
       }
-      const savedGroup: GroupWithDetails = await res.json()
+      const savedTeam: TeamWithDetails = await res.json()
 
-      if (editingGroup) {
-        const memberRes = await fetch(`/api/admin/groups/${editingGroup.id}/members`, {
+      if (editingTeam) {
+        const memberRes = await fetch(`/api/admin/groups/${editingTeam.id}/members`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ userIds: memberIds }),
         })
         if (!memberRes.ok) {
-          throw new Error(await responseErrorMessage(memberRes, 'Group saved, but members failed to save.'))
+          throw new Error(await responseErrorMessage(memberRes, 'Team saved, but members failed to save.'))
         }
       }
 
       setModalOpen(false)
-      setEditingGroup(null)
+      setEditingTeam(null)
       setForm(EMPTY_FORM)
-      if (editingGroup) {
-        await loadGroups()
+      if (editingTeam) {
+        await loadTeams()
       } else {
-        setGroups((current) => [...current, savedGroup].sort(sortByName))
+        setTeams((current) => [...current, savedTeam].sort(sortByName))
       }
     } catch (err) {
-      setFormError(err instanceof Error ? err.message : 'Failed to save group.')
+      setFormError(err instanceof Error ? err.message : 'Failed to save team.')
     } finally {
       setSaving(false)
     }
   }
 
-  async function toggleActive(group: GroupWithDetails) {
-    setTogglingId(group.id)
-    setRowErrors((current) => ({ ...current, [group.id]: '' }))
+  async function toggleActive(team: TeamWithDetails) {
+    setTogglingId(team.id)
+    setRowErrors((current) => ({ ...current, [team.id]: '' }))
     try {
-      const res = await fetch(`/api/admin/groups/${group.id}`, {
+      const res = await fetch(`/api/admin/groups/${team.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ is_active: !group.is_active }),
+        body: JSON.stringify({ is_active: !team.is_active }),
       })
       if (!res.ok) {
-        throw new Error(await responseErrorMessage(res, group.is_active ? 'Failed to deactivate group.' : 'Failed to reactivate group.'))
+        throw new Error(await responseErrorMessage(res, team.is_active ? 'Failed to archive team.' : 'Failed to reactivate team.'))
       }
-      loadGroups()
+      loadTeams()
     } catch (err) {
       setRowErrors((current) => ({
         ...current,
-        [group.id]: err instanceof Error ? err.message : group.is_active ? 'Failed to deactivate group.' : 'Failed to reactivate group.',
+        [team.id]: err instanceof Error ? err.message : team.is_active ? 'Failed to archive team.' : 'Failed to reactivate team.',
       }))
     } finally {
       setTogglingId(null)
     }
-  }
-
-  function renderCapabilityBadges(group: GroupWithDetails) {
-    if (group.capabilities.length === 0) return <span className="text-xs text-slate-400">—</span>
-    return group.capabilities.map((capability) => (
-      <span key={capability.id} className="rounded-full bg-purple-100 px-2 py-0.5 text-xs font-semibold leading-none text-purple-700">
-        {GROUP_CAPABILITY_LABELS[capability.capability] ?? capability.capability}
-      </span>
-    ))
   }
 
   function renderMemberAvatar(user: MemberOption) {
@@ -249,37 +227,34 @@ export default function AdminGroupsPage() {
     )
   }
 
-  const activeGroups = groups.filter((group) => group.is_active).sort(sortByName)
-  const inactiveGroups = groups.filter((group) => !group.is_active).sort(sortByName)
-  const visibleGroups = statusFilter === 'active' ? activeGroups : inactiveGroups
+  const activeTeams = teams.filter((team) => team.is_active).sort(sortByName)
+  const inactiveTeams = teams.filter((team) => !team.is_active).sort(sortByName)
+  const visibleTeams = statusFilter === 'active' ? activeTeams : inactiveTeams
   const searchTerm = search.trim().toLocaleLowerCase()
-  const filteredGroups = searchTerm
-    ? visibleGroups.filter((group) => {
-        const capabilities = group.capabilities.map((capability) => GROUP_CAPABILITY_LABELS[capability.capability] ?? capability.capability).join(' ')
-        return `${group.name} ${group.key} ${group.description ?? ''} ${capabilities}`.toLocaleLowerCase().includes(searchTerm)
-      })
-    : visibleGroups
+  const filteredTeams = searchTerm
+    ? visibleTeams.filter((team) => `${team.name} ${team.key} ${team.description ?? ''}`.toLocaleLowerCase().includes(searchTerm))
+    : visibleTeams
 
-  const filterOptions: FilterPillOption<GroupStatusFilter>[] = [
-    { value: 'active', label: 'Active', color: 'green', count: activeGroups.length },
-    { value: 'inactive', label: 'Inactive', color: 'slate', count: inactiveGroups.length },
+  const filterOptions: FilterPillOption<TeamStatusFilter>[] = [
+    { value: 'active', label: 'Active', color: 'green', count: activeTeams.length },
+    { value: 'inactive', label: 'Archived', color: 'slate', count: inactiveTeams.length },
   ]
 
-  const columns: DataTableColumn<GroupWithDetails>[] = [
+  const columns: DataTableColumn<TeamWithDetails>[] = [
     {
       key: 'name',
-      header: 'Group',
-      sortValue: (group) => group.name,
-      render: (group) => (
-        <div className={group.is_active ? '' : 'opacity-60'}>
+      header: 'Team',
+      sortValue: (team) => team.name,
+      render: (team) => (
+        <div className={team.is_active ? '' : 'opacity-60'}>
           <div className="flex items-center gap-2">
-            <span className="h-3 w-3 rounded-full" style={{ backgroundColor: group.color }} />
-            <p className="text-sm font-semibold leading-tight text-slate-900">{group.name}</p>
+            <span className="h-3 w-3 rounded-full" style={{ backgroundColor: team.color }} />
+            <p className="text-sm font-semibold leading-tight text-slate-900">{team.name}</p>
           </div>
           <div className="mt-1 flex flex-wrap items-center gap-1">
-            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold leading-none text-slate-600">{group.key}</span>
-            {group.is_system && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold leading-none text-amber-700">System</span>}
-            {!group.is_active && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold leading-none text-slate-600">Inactive</span>}
+            <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold leading-none text-slate-600">{team.key}</span>
+            {team.is_system && <span className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold leading-none text-amber-700">System</span>}
+            {!team.is_active && <span className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-semibold leading-none text-slate-600">Archived</span>}
           </div>
         </div>
       ),
@@ -288,45 +263,39 @@ export default function AdminGroupsPage() {
     {
       key: 'description',
       header: 'Description',
-      sortValue: (group) => group.description ?? '',
-      render: (group) => <span className="text-xs text-slate-600">{group.description || '—'}</span>,
-    },
-    {
-      key: 'capabilities',
-      header: 'Capabilities',
-      sortValue: (group) => group.capabilities.map((capability) => capability.capability).join(', '),
-      render: (group) => <div className="flex flex-wrap gap-1">{renderCapabilityBadges(group)}</div>,
+      sortValue: (team) => team.description ?? '',
+      render: (team) => <span className="text-xs text-slate-600">{team.description || '—'}</span>,
     },
     {
       key: 'members',
       header: 'Members',
-      sortValue: (group) => group.member_count,
-      render: (group) => <span className="text-xs font-semibold text-slate-600">{group.member_count}</span>,
+      sortValue: (team) => team.member_count,
+      render: (team) => <span className="text-xs font-semibold text-slate-600">{team.member_count}</span>,
     },
     {
       key: 'actions',
       header: 'Actions',
       className: 'w-[190px]',
       headerClassName: 'text-right',
-      render: (group) => {
-        const rowError = rowErrors[group.id]
+      render: (team) => {
+        const rowError = rowErrors[team.id]
         return (
           <div>
             <div className="flex flex-wrap justify-end gap-1.5">
               <button
                 type="button"
-                onClick={() => openEditModal(group)}
+                onClick={() => openEditModal(team)}
                 className="rounded-lg border border-slate-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-600 transition-colors hover:bg-slate-50 focus:outline-none focus:ring-2 focus:ring-purple-300"
               >
                 Edit
               </button>
               <button
                 type="button"
-                onClick={() => toggleActive(group)}
-                disabled={togglingId === group.id || (group.is_system && group.is_active)}
+                onClick={() => toggleActive(team)}
+                disabled={togglingId === team.id || (team.is_system && team.is_active)}
                 className="rounded-lg border border-purple-200 bg-white px-2.5 py-1.5 text-xs font-semibold text-purple-700 transition-colors hover:bg-purple-50 focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:opacity-50"
               >
-                {togglingId === group.id ? 'Updating…' : group.is_active ? 'Deactivate' : 'Reactivate'}
+                {togglingId === team.id ? 'Updating…' : team.is_active ? 'Archive' : 'Reactivate'}
               </button>
             </div>
             {rowError && (
@@ -344,9 +313,9 @@ export default function AdminGroupsPage() {
     <div className="mx-auto max-w-screen-xl">
       <div className="mb-6 flex items-start justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-slate-900">Access Control</h1>
+          <h1 className="text-2xl font-bold text-slate-900">Teams</h1>
           <p className="mt-1 text-sm text-slate-500">
-            Manage access controls and assignment-pool membership.
+            Manage assignable teams and their membership. Anyone can assign tasks to a team; only admins can create or edit teams.
           </p>
         </div>
         <button
@@ -354,14 +323,8 @@ export default function AdminGroupsPage() {
           onClick={openCreateModal}
           className="rounded-lg border border-purple-200 px-3 py-1.5 text-xs font-medium text-purple-600 transition-colors hover:bg-purple-50"
         >
-          + Add Group
+          + Add Team
         </button>
-      </div>
-
-      <div className="mb-5 rounded-lg border border-purple-100 bg-purple-50/50 px-4 py-3 text-xs leading-relaxed text-purple-950/75">
-        <strong className="font-semibold text-purple-950">Capabilities</strong> define how groups are used: Access Control or Assignment Pool.
-        <span className="mx-2 text-purple-300" aria-hidden="true">•</span>
-        <strong className="font-semibold text-purple-950">Members</strong> control who has access or can receive assigned work.
       </div>
 
       {error && (
@@ -369,13 +332,13 @@ export default function AdminGroupsPage() {
       )}
 
       {!error && (
-        <section aria-label="Group directory">
+        <section aria-label="Team directory">
           <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
             <FilterPillGroup
               options={filterOptions}
               value={statusFilter}
               onChange={setStatusFilter}
-              label="Filter groups by status"
+              label="Filter teams by status"
             />
             <div className="flex flex-wrap items-center gap-2">
               <div className="relative">
@@ -387,24 +350,24 @@ export default function AdminGroupsPage() {
                   type="search"
                   value={search}
                   onChange={(e) => setSearch(e.target.value)}
-                  placeholder="Search groups…"
-                  aria-label="Search groups"
+                  placeholder="Search teams…"
+                  aria-label="Search teams"
                   className="h-[34px] min-w-[220px] rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-500 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-300"
                 />
               </div>
               <p className="text-xs text-slate-500">
-                Showing {loading ? '…' : filteredGroups.length} of {loading ? '…' : visibleGroups.length}
+                Showing {loading ? '…' : filteredTeams.length} of {loading ? '…' : visibleTeams.length}
               </p>
             </div>
           </div>
 
           <DataTable
-            rows={filteredGroups}
+            rows={filteredTeams}
             columns={columns}
             loading={loading}
-            emptyMessage={searchTerm ? 'No groups match this search.' : statusFilter === 'active' ? 'No active groups found.' : 'No inactive groups found.'}
-            getRowKey={(group) => group.id}
-            minWidth="980px"
+            emptyMessage={searchTerm ? 'No teams match this search.' : statusFilter === 'active' ? 'No active teams found.' : 'No archived teams found.'}
+            getRowKey={(team) => team.id}
+            minWidth="820px"
           />
         </section>
       )}
@@ -412,9 +375,9 @@ export default function AdminGroupsPage() {
       <Modal
         open={modalOpen}
         onClose={() => setModalOpen(false)}
-        title={editingGroup ? 'Edit group' : 'Add group'}
+        title={editingTeam ? 'Edit team' : 'Add team'}
       >
-        <form onSubmit={saveGroup} className="space-y-4">
+        <form onSubmit={saveTeam} className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div>
               <label className="mb-1 block text-xs text-slate-500">Name *</label>
@@ -424,10 +387,10 @@ export default function AdminGroupsPage() {
                 onChange={(e) => setForm((current) => ({
                   ...current,
                   name: e.target.value,
-                  key: editingGroup ? current.key : slugify(e.target.value),
+                  key: editingTeam ? current.key : slugify(e.target.value),
                 }))}
                 className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-purple-400 focus:outline-none"
-                placeholder="Sales"
+                placeholder="Art"
               />
             </div>
             <div>
@@ -435,10 +398,10 @@ export default function AdminGroupsPage() {
               <input
                 required
                 value={form.key}
-                disabled={!!editingGroup?.is_system}
+                disabled={!!editingTeam?.is_system}
                 onChange={(e) => setForm((current) => ({ ...current, key: slugify(e.target.value) }))}
                 className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-purple-400 focus:outline-none disabled:bg-slate-50 disabled:text-slate-500"
-                placeholder="sales"
+                placeholder="art"
               />
             </div>
             <div>
@@ -456,46 +419,12 @@ export default function AdminGroupsPage() {
                 value={form.description}
                 onChange={(e) => setForm((current) => ({ ...current, description: e.target.value }))}
                 className="min-h-20 w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-purple-400 focus:outline-none"
-                placeholder="What this group controls"
+                placeholder="What this team works on"
               />
             </div>
           </div>
 
-          <div>
-            <p className="mb-2 text-xs font-semibold text-slate-600">Capabilities</p>
-            <div className="flex flex-wrap gap-x-4 gap-y-1.5">
-              {GROUP_CAPABILITY_KEYS.map((capability) => (
-                <label key={capability} className="flex cursor-pointer items-center gap-1.5 text-xs text-slate-600">
-                  <input
-                    type="checkbox"
-                    checked={form.capabilities.includes(capability)}
-                    onChange={(e) => setForm((current) => ({
-                      ...current,
-                      capabilities: e.target.checked
-                        ? [...current.capabilities, capability]
-                        : current.capabilities.filter((item) => item !== capability),
-                    }))}
-                    className="accent-purple-600"
-                  />
-                  {GROUP_CAPABILITY_LABELS[capability]}
-                </label>
-              ))}
-            </div>
-            {form.capabilities.includes('assignment_pool') && (
-              <div className="mt-2">
-                <label className="mb-1 block text-xs text-slate-500">Pool Key <span className="text-slate-400">(e.g. <code>sales</code>)</span></label>
-                <input
-                  type="text"
-                  value={form.poolKey}
-                  onChange={(e) => setForm((current) => ({ ...current, poolKey: e.target.value }))}
-                  placeholder="sales"
-                  className="w-full rounded-lg border border-slate-200 px-3 py-1.5 text-sm focus:border-purple-400 focus:outline-none font-mono"
-                />
-              </div>
-            )}
-          </div>
-
-          {editingGroup && (
+          {editingTeam && (
             <div>
               <p className="mb-2 text-xs font-semibold text-slate-600">Members</p>
               {membersLoading ? (
@@ -541,7 +470,7 @@ export default function AdminGroupsPage() {
               disabled={saving || membersLoading}
               className="rounded-lg bg-purple-700 px-3 py-1.5 text-xs font-semibold text-white transition-colors hover:bg-purple-800 focus:outline-none focus:ring-2 focus:ring-purple-300 disabled:opacity-50"
             >
-              {saving ? 'Saving…' : 'Save group'}
+              {saving ? 'Saving…' : 'Save team'}
             </button>
           </div>
         </form>

@@ -20,11 +20,13 @@ export interface TaskAssignedPayload {
   actor_id: string
   actor_name: string
   department: string | null
+  team_id?: string | null
+  team_name?: string | null
   due_date: string | null
   priority: string | null
   status: string | null
   description: string | null
-  fanout_kind: 'user' | 'department'
+  fanout_kind: 'user' | 'department' | 'team'
 }
 
 function appUrl(): string {
@@ -45,7 +47,9 @@ export const taskAssigned: NotificationDefinition<TaskAssignedPayload> = {
   defaultEmail: false,
   render: (p) => ({
     title:
-      p.fanout_kind === 'department'
+      p.fanout_kind === 'team'
+        ? `New ${p.team_name} task: ${p.task_title}`
+        : p.fanout_kind === 'department'
         ? `New ${p.department} task: ${p.task_title}`
         : `${p.actor_name} assigned you: ${p.task_title}`,
     body: fmtDueDate(p.due_date) ? `Due ${fmtDueDate(p.due_date)}` : 'No due date',
@@ -55,7 +59,9 @@ export const taskAssigned: NotificationDefinition<TaskAssignedPayload> = {
     const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
     const due = fmtDueDate(p.due_date)
     const lines: string[] = []
-    if (p.fanout_kind === 'department') {
+    if (p.fanout_kind === 'team') {
+      lines.push(`A new task was posted to <strong>${p.team_name}</strong>.`)
+    } else if (p.fanout_kind === 'department') {
       lines.push(`A new task was posted to <strong>${p.department}</strong>.`)
     } else {
       lines.push(`<strong>${p.actor_name}</strong> assigned you a new task.`)
@@ -68,17 +74,20 @@ export const taskAssigned: NotificationDefinition<TaskAssignedPayload> = {
     if (due) meta.push(`<strong>Due:</strong> ${due}`)
     if (p.priority) meta.push(`<strong>Priority:</strong> ${p.priority}`)
     if (p.status) meta.push(`<strong>Status:</strong> ${p.status}`)
-    if (p.department && p.fanout_kind !== 'department') meta.push(`<strong>Department:</strong> ${p.department}`)
+    if (p.team_name && p.fanout_kind !== 'team') meta.push(`<strong>Team:</strong> ${p.team_name}`)
+    else if (p.department && p.fanout_kind !== 'department') meta.push(`<strong>Department:</strong> ${p.department}`)
     if (meta.length > 0) lines.push(meta.join(' &nbsp;·&nbsp; '))
 
     return {
       subject:
-        p.fanout_kind === 'department'
+        p.fanout_kind === 'team'
+          ? `[${p.team_name}] New task: ${p.task_title}`
+          : p.fanout_kind === 'department'
           ? `[${p.department}] New task: ${p.task_title}`
           : `${p.actor_name} assigned you a task: ${p.task_title}`,
       html: renderGenericEmail({
         preheader: p.task_title,
-        heading: p.fanout_kind === 'department' ? 'New department task' : 'New task assigned to you',
+        heading: p.fanout_kind === 'team' ? 'New team task' : p.fanout_kind === 'department' ? 'New department task' : 'New task assigned to you',
         greeting: `Hi ${firstName},`,
         bodyLines: lines,
         ctaText: 'View task',
