@@ -7,7 +7,10 @@ import { TeamAssigneeSelect } from '@/components/crm/TeamAssigneeSelect'
 import { TaskDescriptionEditor } from '@/components/crm/TaskDescriptionEditor'
 import { ConfirmButton } from '@/components/ui/ConfirmButton'
 import { ALL_CATEGORIES, getTaskCategoryLabel } from '@/lib/task-constants'
-import type { CrmTask } from '@/types'
+import { TaskFlowStepper } from '@/components/crm/task/TaskFlowStepper'
+import EmployeeAvatar from '@/components/employees/EmployeeAvatar'
+import { TASK_STATUS_LABELS, TASK_STATUS_COLORS, getTaskNextActions } from '@/lib/task-workflow'
+import type { CrmTask, CrmTaskStatus } from '@/types'
 
 type DropdownUser = { id: string; display_name: string; email: string }
 type Team = { id: string; key: string; name: string; color: string }
@@ -79,8 +82,10 @@ export type TaskFormTask = CrmTask & {
   customer?: { id: string; name: string } | null
   vendor?: { id: string; name: string } | null
   contact?: { id: string; first_name: string; last_name: string } | null
-  assigned_user?: { id: string; display_name: string; email: string } | null
-  created_user?: { id: string; display_name: string } | null
+  last_worked_by?: string | null
+  assigned_user?: { id: string; display_name: string; email: string; avatar_url?: string | null; profile_image_url?: string | null } | null
+  created_user?: { id: string; display_name: string; avatar_url?: string | null; profile_image_url?: string | null } | null
+  last_worked_user?: { id: string; display_name: string; avatar_url?: string | null; profile_image_url?: string | null } | null
   team?: { id: string; name: string; color: string } | null
   comments?: TaskNote[]
 }
@@ -337,14 +342,17 @@ export function TaskFormModal({
     setExistingAttachments((prev) => prev.filter((a) => a.id !== attachmentId))
   }
 
-  async function handleSendForApproval() {
-    if (!task?.id || !task.created_by) return
+  // The action is just the target status — reassignment (who it goes to next)
+  // is computed server-side by the guided workflow state machine. See
+  // src/lib/task-workflow.ts and the PATCH handler.
+  async function handleStatusAction(toStatus: CrmTaskStatus) {
+    if (!task?.id) return
     setSaving(true)
     try {
       const res = await fetch(`/api/marketing/tasks/${task.id}`, {
         method: 'PATCH',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ assigned_to: task.created_by, status: 'waiting_on_approval' }),
+        body: JSON.stringify({ status: toStatus }),
       })
       if (!res.ok) {
         const data = await res.json()
@@ -359,26 +367,21 @@ export function TaskFormModal({
     }
   }
 
-  async function handleMarkCompleted() {
-    if (!task?.id) return
-    setSaving(true)
-    try {
-      const res = await fetch(`/api/marketing/tasks/${task.id}`, {
-        method: 'PATCH',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ status: 'completed' }),
-      })
-      if (!res.ok) {
-        const data = await res.json()
-        setError(data.error ?? 'Save failed')
-        return
-      }
-      const saved = await fetchSavedTask(task.id, task)
-      onSaved(saved as TaskFormTask)
-      onClose()
-    } finally {
-      setSaving(false)
-    }
+  // Preview text for the guided status buttons — who the task will go to next.
+  function describeNextOwner(toStatus: CrmTaskStatus): string | null {
+    if (!task || !appUser) return null
+    const targetId =
+      toStatus === 'in_progress' ? appUser.id
+      : toStatus === 'waiting_on_approval' ? task.created_by
+      : toStatus === 'need_changes' ? (task.last_worked_by ?? task.assigned_to ?? null)
+      : toStatus === 'completed' && task.status === 'not_started' ? appUser.id
+      : null
+    if (!targetId) return null
+    if (targetId === appUser.id) return 'you'
+    if (targetId === task.created_user?.id) return task.created_user.display_name
+    if (targetId === task.assigned_user?.id) return task.assigned_user.display_name
+    if (targetId === task.last_worked_user?.id) return task.last_worked_user.display_name
+    return null
   }
 
   async function handleDeleteTask() {
@@ -497,17 +500,100 @@ export function TaskFormModal({
       <div className="w-full max-w-4xl h-[90vh] flex flex-col rounded-2xl bg-white shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
 
         {/* Header */}
-        <div className="flex-shrink-0 flex items-center justify-between gap-3 border-b border-slate-100 bg-white px-6 py-4">
-          <div className="min-w-0 flex-1">
-            <h2 className="text-xl font-bold text-slate-900">{title}</h2>
-            {displayLinkedEntity && (
-              <p className="mt-0.5 text-xs font-medium text-slate-500">{linkedEntityLabel(displayLinkedEntity)}</p>
-            )}
+        <div className="flex-shrink-0 border-b border-slate-100 bg-white px-8 py-4">
+          <div className="flex items-start justify-between gap-5">
+            <div className="min-w-0">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-purple-700 mb-1">
+                {mode === 'edit' && task?.id
+                  ? [`Task #${task.id.slice(0, 4).toUpperCase()}`, task.department].filter(Boolean).join(' · ')
+                  : title}
+              </div>
+              {editingField === 'title' ? (
+                <input
+                  type="text"
+                  value={form.title}
+                  required
+                  autoFocus
+                  onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
+                  onBlur={() => setEditingField(null)}
+                  onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); setEditingField(null) } }}
+                  className="w-full text-lg font-bold text-slate-900 border border-purple-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                />
+              ) : (
+                <h2
+                  className="text-lg font-bold text-slate-900 leading-tight cursor-text"
+                  onClick={() => setEditingField('title')}
+                >
+                  {form.title || <span className="text-slate-400 italic">Untitled task</span>}
+                </h2>
+              )}
+              {displayLinkedEntity && (
+                <p className="mt-0.5 text-xs font-medium text-slate-500">{linkedEntityLabel(displayLinkedEntity)}</p>
+              )}
+            </div>
+            <div className="flex items-center gap-2 flex-shrink-0">
+              {mode === 'edit' && task?.id && (
+                <Link
+                  href={`/tasks/${task.id}`}
+                  className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                  aria-label="Open full task view"
+                >
+                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 3h6v6M10 14L21 3" />
+                  </svg>
+                </Link>
+              )}
+              <button
+                type="button"
+                onClick={handleClose}
+                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                aria-label="Close"
+              >
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18 18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
           </div>
 
-          {/* Priority + Status pills */}
-          <div ref={dropdownRef} className="flex items-center gap-2 relative">
-            {/* Priority pill */}
+          {/* Status + priority badges, requestor→owner, Reassign */}
+          <div ref={dropdownRef} className="flex items-center gap-2 mt-2 flex-wrap">
+            {mode === 'create' ? (
+              <div className="relative">
+                <button
+                  type="button"
+                  onClick={() => setOpenDropdown(openDropdown === 'status' ? null : 'status')}
+                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold transition-colors ${currentStatus.pill}`}
+                >
+                  <StatusIcon value={form.status} />
+                  {currentStatus.label}
+                  <svg className="h-3 w-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {openDropdown === 'status' && (
+                  <div className="absolute left-0 top-full mt-1 w-52 rounded-xl border border-slate-200 bg-white shadow-lg z-20 py-1 overflow-hidden">
+                    {STATUSES.map((s) => (
+                      <button
+                        key={s.value}
+                        type="button"
+                        onClick={() => { setForm((prev) => ({ ...prev, status: s.value })); setOpenDropdown(null) }}
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold transition-colors ${s.value === form.status ? s.pill : 'text-slate-600 hover:bg-slate-50'}`}
+                      >
+                        <StatusIcon value={s.value} />
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+            ) : (
+              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${TASK_STATUS_COLORS[(task?.status ?? 'not_started') as CrmTaskStatus]}`}>
+                {TASK_STATUS_LABELS[(task?.status ?? 'not_started') as CrmTaskStatus]}
+              </span>
+            )}
+
             <div className="relative">
               <button
                 type="button"
@@ -521,7 +607,7 @@ export function TaskFormModal({
                 </svg>
               </button>
               {openDropdown === 'priority' && (
-                <div className="absolute right-0 top-full mt-1 w-36 rounded-xl border border-slate-200 bg-white shadow-lg z-20 py-1 overflow-hidden">
+                <div className="absolute left-0 top-full mt-1 w-36 rounded-xl border border-slate-200 bg-white shadow-lg z-20 py-1 overflow-hidden">
                   {PRIORITIES.map((p) => (
                     <button
                       key={p.value}
@@ -537,59 +623,47 @@ export function TaskFormModal({
               )}
             </div>
 
-            {/* Status pill */}
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setOpenDropdown(openDropdown === 'status' ? null : 'status')}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold transition-colors ${currentStatus.pill}`}
-              >
-                <StatusIcon value={form.status} />
-                {currentStatus.label}
-                <svg className="h-3 w-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-              {openDropdown === 'status' && (
-                <div className="absolute right-0 top-full mt-1 w-52 rounded-xl border border-slate-200 bg-white shadow-lg z-20 py-1 overflow-hidden">
-                  {STATUSES.map((s) => (
-                    <button
-                      key={s.value}
-                      type="button"
-                      onClick={() => { setForm((prev) => ({ ...prev, status: s.value })); setOpenDropdown(null) }}
-                      className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold transition-colors ${s.value === form.status ? s.pill : 'text-slate-600 hover:bg-slate-50'}`}
-                    >
-                      <StatusIcon value={s.value} />
-                      {s.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            {mode === 'edit' && task?.id && (
-              <Link
-                href={`/tasks/${task.id}`}
-                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
-                aria-label="Open full task view"
-              >
-                <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
-                </svg>
-              </Link>
+            {mode === 'edit' && task?.created_user && (
+              <>
+                <span className="text-xs text-slate-300">·</span>
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                  <EmployeeAvatar displayName={task.created_user.display_name} avatarUrl={task.created_user.avatar_url} profileImageUrl={task.created_user.profile_image_url} size="xs" />
+                  <span className="text-slate-700 font-semibold">{task.created_user.display_name}</span>
+                  {(task.assigned_user || task.team) && (
+                    <>
+                      →
+                      {task.assigned_user ? (
+                        <>
+                          <EmployeeAvatar displayName={task.assigned_user.display_name} avatarUrl={task.assigned_user.avatar_url} profileImageUrl={task.assigned_user.profile_image_url} size="xs" />
+                          <span className="text-slate-700 font-semibold">{task.assigned_user.display_name}</span>
+                        </>
+                      ) : (
+                        <span className="text-slate-700 font-semibold">{task.team?.name}</span>
+                      )}
+                    </>
+                  )}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setEditingField('assigned_to')}
+                  className="text-xs font-semibold text-purple-700 hover:text-purple-900 ml-auto px-2 py-0.5 rounded transition-colors"
+                >
+                  Reassign
+                </button>
+              </>
             )}
-            <button
-              type="button"
-              onClick={handleClose}
-              className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-              aria-label="Close"
-            >
-              <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18 18 6M6 6l12 12" />
-              </svg>
-            </button>
           </div>
         </div>
+
+        {mode === 'edit' && task && (
+          <TaskFlowStepper
+            status={task.status as CrmTaskStatus}
+            ownerName={task.assigned_user?.display_name}
+            requestorName={task.created_user?.display_name}
+            onAction={handleStatusAction}
+            disabled={saving}
+          />
+        )}
 
         {/* Form — flex column so description can grow */}
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 relative">
@@ -599,43 +673,6 @@ export function TaskFormModal({
             {error && (
               <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
             )}
-
-            {/* Task Title */}
-            <div className="group flex items-center gap-2 py-2 border-b border-slate-100">
-              <div className="flex-shrink-0 w-28 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">
-                Task Title <span className="text-red-400">*</span>
-              </div>
-              <div className="flex-1 min-w-0">
-                {editingField === 'title' ? (
-                  <input
-                    type="text"
-                    value={form.title}
-                    required
-                    autoFocus
-                    onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
-                    onBlur={() => setEditingField(null)}
-                    onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); setEditingField(null) } }}
-                    className="w-full px-2 py-1 text-sm border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
-                  />
-                ) : (
-                  <span className="text-sm font-medium text-slate-800 leading-tight">
-                    {form.title || <span className="text-slate-400 italic">Untitled task</span>}
-                  </span>
-                )}
-              </div>
-              {editingField !== 'title' && (
-                <button
-                  type="button"
-                  onClick={() => setEditingField('title')}
-                  className="flex-shrink-0 p-1 text-slate-300 hover:text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity rounded"
-                  aria-label="Edit title"
-                >
-                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
-                </button>
-              )}
-            </div>
 
             {/* Assigned To (Team or Individual) + Due Date */}
             <div className="grid grid-cols-2 border-b border-slate-100">
@@ -712,52 +749,41 @@ export function TaskFormModal({
               </div>
             </div>
 
-            {/* Category + Assigned By */}
-            <div className="grid grid-cols-2">
-              <div className="group flex items-center gap-2 py-2 pr-3 border-r border-slate-100">
-                <div className="flex-shrink-0 w-20 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Category</div>
-                <div className="flex-1 min-w-0">
-                  {editingField === 'category' ? (
-                    <select
-                      value={form.category}
-                      autoFocus
-                      onChange={(e) => { setForm((p) => ({ ...p, category: e.target.value })); setEditingField(null) }}
-                      onBlur={() => setEditingField(null)}
-                      className="w-full px-2 py-1 text-sm border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
-                    >
-                      <option value="">- None -</option>
-                      {ALL_CATEGORIES.map((c) => (
-                        <option key={c} value={c}>{getTaskCategoryLabel(c)}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <span className="text-sm text-slate-700 leading-tight">
-                      {form.category ? getTaskCategoryLabel(form.category) : <span className="text-slate-400 italic">Not set</span>}
-                    </span>
-                  )}
-                </div>
-                {editingField !== 'category' && (
-                  <button
-                    type="button"
-                    onClick={() => setEditingField('category')}
-                    className="flex-shrink-0 p-1 text-slate-300 hover:text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity rounded"
-                    aria-label="Edit category"
+            {/* Category */}
+            <div className="group flex items-center gap-2 py-2">
+              <div className="flex-shrink-0 w-20 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Category</div>
+              <div className="flex-1 min-w-0">
+                {editingField === 'category' ? (
+                  <select
+                    value={form.category}
+                    autoFocus
+                    onChange={(e) => { setForm((p) => ({ ...p, category: e.target.value })); setEditingField(null) }}
+                    onBlur={() => setEditingField(null)}
+                    className="w-full px-2 py-1 text-sm border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
                   >
-                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                    </svg>
-                  </button>
+                    <option value="">- None -</option>
+                    {ALL_CATEGORIES.map((c) => (
+                      <option key={c} value={c}>{getTaskCategoryLabel(c)}</option>
+                    ))}
+                  </select>
+                ) : (
+                  <span className="text-sm text-slate-700 leading-tight">
+                    {form.category ? getTaskCategoryLabel(form.category) : <span className="text-slate-400 italic">Not set</span>}
+                  </span>
                 )}
               </div>
-              <div className="flex items-center gap-2 py-2 pl-3">
-                <div className="flex-shrink-0 w-20 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Assigned By</div>
-                <span className="text-sm text-slate-700 leading-tight">
-                  {mode === 'edit' && task?.created_user
-                    ? task.created_user.display_name
-                    : <span className="text-slate-400 italic">—</span>
-                  }
-                </span>
-              </div>
+              {editingField !== 'category' && (
+                <button
+                  type="button"
+                  onClick={() => setEditingField('category')}
+                  className="flex-shrink-0 p-1 text-slate-300 hover:text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity rounded"
+                  aria-label="Edit category"
+                >
+                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
+                  </svg>
+                </button>
+              )}
             </div>
           </div>
 
@@ -969,24 +995,22 @@ export function TaskFormModal({
               )}
             </div>
             <div className="flex gap-3">
-              {mode === 'edit' && task?.id && task.status !== 'completed' && (
+              {mode === 'edit' && task?.id && getTaskNextActions(task.status as CrmTaskStatus).map((action) => (
                 <ConfirmButton
-                  idleLabel="Mark Complete"
-                  confirmLabel="Yes, complete it?"
-                  onConfirm={handleMarkCompleted}
-                  variant="green"
+                  key={action.toStatus}
+                  idleLabel={action.label}
+                  subLabel={describeNextOwner(action.toStatus) ? `→ ${describeNextOwner(action.toStatus)}` : undefined}
+                  confirmLabel={`Confirm: ${action.label}?`}
+                  onConfirm={() => handleStatusAction(action.toStatus)}
+                  variant={
+                    action.toStatus === 'in_progress' ? 'blue'
+                      : action.toStatus === 'completed' ? 'green'
+                      : action.toStatus === 'need_changes' ? 'red'
+                      : 'yellow'
+                  }
                   disabled={saving}
                 />
-              )}
-              {mode === 'edit' && task?.created_by && task.assigned_to !== task.created_by && (
-                <ConfirmButton
-                  idleLabel="Send for Approval"
-                  confirmLabel="Yes, send it?"
-                  onConfirm={handleSendForApproval}
-                  variant="yellow"
-                  disabled={saving}
-                />
-              )}
+              ))}
               <button
                 type="button"
                 onClick={handleClose}

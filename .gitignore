@@ -55,3 +55,6 @@ next-env.d.ts
 /supabase/migrations/20260101000000_baseline.sql
 /supabase/prod_data.sql
 /supabase/prod_dump.sql
+/outputs/arcon-launch-demo-overview.pptx
+/outputs/arcon-launch-demo-overview.pptx.inspect.ndjson
+/outputs/arcon-launch-demo-presenter-notes.docx

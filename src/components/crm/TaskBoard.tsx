@@ -148,6 +148,11 @@ function TaskBoardInner({ defaultTeamKey, defaultAssignee = 'all' }: TaskBoardPr
   const [contextMenu, setContextMenu] = useState<{ taskId: string; position: { x: number; y: number } } | null>(null)
 
   const isTeamLocked = !!defaultTeamKey
+  // "My Tasks" mode (defaultAssignee="me"): the board also folds in unclaimed
+  // tasks assigned to any of the user's own teams, so long as the assignee
+  // filter is still at its default (a manual assignee pick is treated as an
+  // intentional override of that behavior).
+  const myTasksMode = defaultAssignee === 'me'
 
   // Sync URL params on filter changes
   const syncUrl = useCallback((updates: Record<string, string | null>) => {
@@ -211,7 +216,17 @@ function TaskBoardInner({ defaultTeamKey, defaultAssignee = 'all' }: TaskBoardPr
 
     const params = new URLSearchParams()
 
-    if (showDelegated) {
+    const isMeOnlySelected = selectedUserIds !== 'all' &&
+      (selectedUserIds as Set<string>).size === 1 &&
+      (selectedUserIds as Set<string>).has(currentUser?.id ?? '')
+
+    if (myTasksMode && isMeOnlySelected) {
+      // Default My Tasks view: mine + unclaimed tasks on my teams. Toggling
+      // "Tasks I've Delegated" adds tasks I created/own/delegated on top of
+      // that, rather than replacing it.
+      params.set('my_teams', 'true')
+      if (showDelegated) params.set('delegated_by_me', 'true')
+    } else if (showDelegated) {
       params.set('delegated_by_me', 'true')
       // Also apply assigned_to filter when delegated is true
       if (selectedUserIds !== 'all') {
@@ -255,7 +270,7 @@ function TaskBoardInner({ defaultTeamKey, defaultAssignee = 'all' }: TaskBoardPr
       .catch(() => setTasks([]))
       .finally(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usersKey, teamId, category, showDelegated, hideCompleted, initialized, view, page, refreshKey, columnFiltersKey, isTeamLocked, teamIdInitialized])
+  }, [usersKey, teamId, category, showDelegated, hideCompleted, initialized, view, page, refreshKey, columnFiltersKey, isTeamLocked, teamIdInitialized, myTasksMode, currentUser?.id])
 
   // ── Filter helpers ─────────────────────────────────────────────────────────
 
@@ -328,7 +343,10 @@ function TaskBoardInner({ defaultTeamKey, defaultAssignee = 'all' }: TaskBoardPr
     const next = !showDelegated
     setShowDelegated(next)
     if (next) {
-      setSelectedUserIds('all')
+      // In My Tasks mode, leave the assignee filter at "me" so the fetch
+      // still unions in mine + my teams alongside what I delegated — only
+      // reset it to "all" on generic boards, where there's no such base view.
+      if (!myTasksMode) setSelectedUserIds('all')
       syncUrl({ delegated: 'true', assignees: null })
     } else {
       syncUrl({ delegated: null })
@@ -447,17 +465,53 @@ function TaskBoardInner({ defaultTeamKey, defaultAssignee = 'all' }: TaskBoardPr
   // ── Kanban reorder ─────────────────────────────────────────────────────────
 
   async function handleReorder(updates: { id: string; sort_order: number; status?: string }[]) {
+    // A cross-column drop includes a status change for the dragged card, mixed
+    // in with pure sort_order updates for the rest of the affected columns.
+    const statusChange = updates.find((u) => u.status)
+    const prevTask = statusChange ? tasks.find((t) => t.id === statusChange.id) : undefined
+
     // Optimistically update local tasks
     setTasks((prev) => prev.map((t) => {
       const u = updates.find((u) => u.id === t.id)
       if (!u) return t
       return { ...t, sort_order: u.sort_order, ...(u.status ? { status: u.status as KanbanTask['status'] } : {}) }
     }))
-    await fetch('/api/marketing/tasks/reorder', {
+
+    const sortOnlyUpdates = updates.map(({ id, sort_order }) => ({ id, sort_order }))
+    const reorderPromise = fetch('/api/marketing/tasks/reorder', {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ updates }),
+      body: JSON.stringify({ updates: sortOnlyUpdates }),
     })
+
+    if (!statusChange) {
+      await reorderPromise
+      return
+    }
+
+    // Route the status change through the single-task PATCH endpoint so a
+    // cross-column drag gets the exact same guided-workflow reassignment,
+    // transition validation, and notifications as the status action buttons —
+    // the reorder endpoint itself just moves sort_order, no business logic.
+    const [, statusRes] = await Promise.all([
+      reorderPromise,
+      fetch(`/api/marketing/tasks/${statusChange.id}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: statusChange.status }),
+      }),
+    ])
+
+    if (!statusRes.ok) {
+      // Guided workflow rejected the move (e.g. an illegal transition) — revert.
+      if (prevTask) setTasks((prev) => prev.map((t) => t.id === statusChange.id ? prevTask : t))
+      return
+    }
+    // Merge everything except sort_order — that's owned by the concurrent
+    // reorder call, and taking it here risks a stale overwrite if these two
+    // requests resolve out of order.
+    const { sort_order: _droppedSortOrder, ...workflowFields } = await statusRes.json()
+    setTasks((prev) => prev.map((t) => t.id === statusChange.id ? { ...t, ...workflowFields } : t))
   }
 
   // ── Assign to me ──────────────────────────────────────────────────────────
@@ -482,18 +536,14 @@ function TaskBoardInner({ defaultTeamKey, defaultAssignee = 'all' }: TaskBoardPr
 
   // ── Row actions (table view) ───────────────────────────────────────────────
 
+  // The action is the target status; reassignment (who it goes to next) is
+  // computed server-side by the guided workflow state machine — see
+  // src/lib/task-workflow.ts and the PATCH handler.
   async function handleRowAction(taskId: string, action: TableRowAction) {
     const task = tasks.find((t) => t.id === taskId)
     if (!task) return
 
-    let patch: Record<string, unknown>
-    if (action === 'send_for_approval') {
-      patch = { status: 'waiting_on_approval' }
-      // Reassign to creator when creator is known (mirrors task detail page behaviour)
-      if (task.created_by) patch.assigned_to = task.created_by
-    } else {
-      patch = { status: 'completed' }
-    }
+    const patch = { status: action }
 
     // Optimistic update
     setTasks((prev) => prev.map((t) => t.id === taskId ? { ...t, ...patch } : t))
@@ -679,7 +729,7 @@ function TaskBoardInner({ defaultTeamKey, defaultAssignee = 'all' }: TaskBoardPr
             <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
             </svg>
-              Tasks I've Delegated
+              Show Delegated Tasks
           </button>
         </div>
 
@@ -812,7 +862,7 @@ function TaskBoardInner({ defaultTeamKey, defaultAssignee = 'all' }: TaskBoardPr
           hideCompleted={hideCompleted}
           sortBy={sortBy}
           search={search}
-          showAssignee={!isMeOnly}
+          showAssignee
           showAssignToMe={!!defaultTeamKey}
           userPhotoMap={userPhotoMap}
           onCardClick={(id) => setSelectedTaskId(id)}

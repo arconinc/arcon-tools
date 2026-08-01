@@ -882,6 +882,7 @@ export interface CrmTask {
   title: string
   assigned_to: string | null
   task_owner: string | null
+  last_worked_by: string | null
   team_id: string | null
   department: CrmTaskDepartment | null
   category: CrmTaskCategory | null
@@ -1074,7 +1075,9 @@ export interface CrmTaskDetail extends CrmTask {
   customer: { id: string; name: string } | null
   vendor: { id: string; name: string } | null
   contact: { id: string; first_name: string; last_name: string } | null
-  assigned_user: { id: string; display_name: string; email: string } | null
+  assigned_user: { id: string; display_name: string; email: string; avatar_url?: string | null; profile_image_url?: string | null } | null
+  created_user: { id: string; display_name: string; email: string; avatar_url?: string | null; profile_image_url?: string | null } | null
+  last_worked_user: { id: string; display_name: string; email: string; avatar_url?: string | null; profile_image_url?: string | null } | null
 }
 
 // ─── Forms ────────────────────────────────────────────────────────────────────

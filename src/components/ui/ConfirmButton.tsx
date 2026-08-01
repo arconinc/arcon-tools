@@ -5,12 +5,14 @@ import { useEffect, useRef, useState } from 'react'
 export interface ConfirmButtonProps {
   /** Label shown in idle state */
   idleLabel: string
+  /** Small note rendered below the label in idle state (e.g. "→ Cami Johnson") */
+  subLabel?: string
   /** Label shown after first click, prompting confirmation */
   confirmLabel?: string
   /** Called on second (confirming) click */
   onConfirm: () => void
   /** Tailwind/style variant controlling color */
-  variant?: 'green' | 'yellow' | 'red' | 'purple'
+  variant?: 'green' | 'yellow' | 'red' | 'purple' | 'blue'
   /** Size variant. Default 'md' */
   size?: 'sm' | 'md'
   /** Whether the button is disabled */
@@ -29,6 +31,7 @@ const VARIANT_IDLE: Record<string, string> = {
   red: 'border border-red-300 bg-red-50 text-red-600 hover:bg-red-100',
   purple:
     'border border-purple-300 bg-purple-50 text-purple-700 hover:bg-purple-100',
+  blue: 'border border-blue-300 bg-blue-50 text-blue-700 hover:bg-blue-100',
 }
 
 const VARIANT_CONFIRM: Record<string, string> = {
@@ -36,10 +39,12 @@ const VARIANT_CONFIRM: Record<string, string> = {
   yellow: 'border border-yellow-400 bg-yellow-100 text-yellow-800 hover:bg-yellow-200',
   red:    'border border-red-400 bg-red-100 text-red-700 hover:bg-red-200',
   purple: 'border border-purple-500 bg-purple-100 text-purple-800 hover:bg-purple-200',
+  blue:   'border border-blue-400 bg-blue-100 text-blue-800 hover:bg-blue-200',
 }
 
 export function ConfirmButton({
   idleLabel,
+  subLabel,
   confirmLabel,
   onConfirm,
   variant = 'green',
@@ -92,7 +97,10 @@ export function ConfirmButton({
         className,
       ].join(' ')}
     >
-      {pending ? resolvedConfirmLabel : idleLabel}
+      <div>{pending ? resolvedConfirmLabel : idleLabel}</div>
+      {!pending && subLabel && (
+        <div className="text-[11px] font-normal mt-0.5 opacity-70">{subLabel}</div>
+      )}
     </button>
   )
 }

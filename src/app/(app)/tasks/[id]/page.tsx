@@ -11,10 +11,14 @@ import { useAppUser } from '@/components/layout/AppShell'
 import { formatDate, formatDateTime, formatBytes } from '@/lib/format'
 import { useTask } from '@/hooks/useTask'
 import type { TaskPriority } from '@/hooks/useTask'
-import { TaskStatusBar, STATUSES } from '@/components/crm/task/TaskStatusBar'
+import { TaskStatusBar } from '@/components/crm/task/TaskStatusBar'
+import { TaskFlowStepper } from '@/components/crm/task/TaskFlowStepper'
+import EmployeeAvatar from '@/components/employees/EmployeeAvatar'
 import { TaskNotesPreview } from '@/components/crm/task/TaskNotesPreview'
 import { CommentsTab } from '@/components/crm/task/CommentsTab'
 import { ConfirmButton } from '@/components/ui/ConfirmButton'
+import { TASK_STATUS_LABELS, TASK_STATUS_COLORS, computeTransitionPatch } from '@/lib/task-workflow'
+import type { CrmTaskStatus } from '@/types'
 
 // ── Local Types ───────────────────────────────────────────────────────────────
 
@@ -155,7 +159,7 @@ export default function TaskDetailPage() {
     }
   }
 
-  async function quickUpdateStatus(newStatus: string) {
+  async function quickUpdateStatus(newStatus: CrmTaskStatus) {
     if (!task) return
     const prev = task.status
     setTask((t) => t ? { ...t, status: newStatus as typeof task.status } : t)
@@ -165,11 +169,34 @@ export default function TaskDetailPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ status: newStatus }),
       })
-      if (!res.ok) setTask((t) => t ? { ...t, status: prev } : t)
-      else await refetch()
+      if (!res.ok) {
+        const data = await res.json()
+        alert(data.error ?? 'Could not change status')
+        setTask((t) => t ? { ...t, status: prev } : t)
+      } else {
+        await refetch()
+      }
     } catch {
       setTask((t) => t ? { ...t, status: prev } : t)
     }
+  }
+
+  // Preview text for the guided status buttons — who the task will go to next.
+  function describeNextOwner(toStatus: CrmTaskStatus): string | null {
+    if (!task || !appUser) return null
+    const patch = computeTransitionPatch(
+      { assigned_to: task.assigned_to, created_by: task.created_by, last_worked_by: task.last_worked_by },
+      task.status as CrmTaskStatus,
+      toStatus,
+      appUser.id
+    )
+    const targetId = patch.assigned_to
+    if (targetId === undefined) return null
+    if (targetId === appUser.id) return 'you'
+    if (targetId === task.created_user?.id) return task.created_user.display_name
+    if (targetId === task.assigned_user?.id) return task.assigned_user.display_name
+    if (targetId === task.last_worked_user?.id) return task.last_worked_user.display_name
+    return null
   }
 
   async function uploadTaskAttachment(file: File) {
@@ -247,7 +274,8 @@ export default function TaskDetailPage() {
   }
 
   const isOverdue = task.due_date && new Date(task.due_date) < new Date() && task.status !== 'completed'
-  const statusInfo = STATUSES.find((s) => s.value === task.status)
+  const statusLabel = TASK_STATUS_LABELS[task.status as CrmTaskStatus] ?? task.status
+  const statusColorCls = TASK_STATUS_COLORS[task.status as CrmTaskStatus] ?? 'bg-slate-100 text-slate-600'
 
   const linkedObj = task.opportunity
     ? { type: 'opportunity', label: 'Opportunity', href: `/sales/opportunities/${task.opportunity.id}`, name: task.opportunity.name, color: 'bg-purple-100 text-purple-700' }
@@ -273,54 +301,15 @@ export default function TaskDetailPage() {
 
 
       {/* Header card */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-6 mb-5">
-        <div className="flex items-start justify-between gap-4">
-          <div className="min-w-0 flex-1">
-            <h1 className="text-2xl font-bold text-slate-900">{task.title}</h1>
-            <div className="flex items-center gap-3 mt-2 flex-wrap">
-              {statusInfo && (
-                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold ${statusInfo.cls}`}>
-                  {statusInfo.label}
-                </span>
-              )}
-              <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold capitalize ${PRIORITY_BADGE[task.priority]}`}>
-                {task.priority} priority
-              </span>
-              {task.due_date && (
-                <span className={`text-sm ${isOverdue ? 'text-red-600 font-semibold' : 'text-slate-500'}`}>
-                  {isOverdue ? '⚠️ ' : ''}Due {formatDate(task.due_date)}
-                </span>
-              )}
-              {task.assigned_user && (
-                <span className="text-sm text-slate-500">
-                  Assigned to <span className="font-medium text-slate-700">{task.assigned_user.display_name}</span>
-                </span>
-              )}
+      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden mb-5">
+        <div className="px-8 py-4">
+          <div className="flex items-start justify-between gap-5">
+            <div className="min-w-0">
+              <div className="text-[11px] font-bold uppercase tracking-wider text-purple-700 mb-1">
+                {[`Task #${task.id.slice(0, 4).toUpperCase()}`, task.department].filter(Boolean).join(' · ')}
+              </div>
+              <h1 className="text-lg font-bold text-slate-900 leading-tight">{task.title}</h1>
             </div>
-            <div className="flex items-center gap-4 mt-3 flex-wrap text-xs text-slate-400">
-              {task.created_user && (
-                <span>Created by <span className="font-medium text-slate-600">{task.created_user.display_name}</span></span>
-              )}
-              {task.delegator_users.length > 0 && (
-                <span>
-                  Delegated by{' '}
-                  <span className="font-medium text-slate-600">
-                    {task.delegator_users.map((u) => u.display_name).join(' → ')}
-                  </span>
-                </span>
-              )}
-            </div>
-          </div>
-          <div className="flex-shrink-0 flex gap-2">
-            {task.created_by && task.assigned_to !== task.created_by && (
-              <button
-                onClick={() => saveFieldValues({ assigned_to: task.created_by, status: 'waiting_on_approval' })}
-                disabled={saving}
-                className="px-3 py-1.5 text-xs font-semibold text-yellow-700 border border-yellow-300 bg-yellow-50 rounded-lg hover:bg-yellow-100 disabled:opacity-60 transition-colors"
-              >
-                Send for Approval
-              </button>
-            )}
             {(appUser?.is_admin || task.created_by === appUser?.id || task.task_owner === appUser?.id) && (
               <ConfirmButton
                 idleLabel="Delete"
@@ -332,15 +321,75 @@ export default function TaskDetailPage() {
               />
             )}
           </div>
-        </div>
-      </div>
 
-      {/* Status bar */}
-      <div className="bg-white border border-slate-200 rounded-2xl p-5 mb-5">
-        <div className="flex items-center gap-2 mb-3">
-          <span className="text-sm font-semibold text-slate-700">Status</span>
+          {/* Status + priority badges, requestor→owner */}
+          <div className="flex items-center gap-2 mt-2 flex-wrap">
+            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${statusColorCls}`}>
+              {statusLabel}
+            </span>
+            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${PRIORITY_BADGE[task.priority]}`}>
+              {task.priority}
+            </span>
+            {task.due_date && (
+              <span className={`text-xs ${isOverdue ? 'text-red-600 font-semibold' : 'text-slate-500'}`}>
+                {isOverdue ? '⚠️ ' : ''}Due {formatDate(task.due_date)}
+              </span>
+            )}
+            {task.created_user && (
+              <>
+                <span className="text-xs text-slate-300">·</span>
+                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                  <EmployeeAvatar displayName={task.created_user.display_name} avatarUrl={task.created_user.avatar_url} profileImageUrl={task.created_user.profile_image_url} size="xs" />
+                  <span className="text-slate-700 font-semibold">{task.created_user.display_name}</span>
+                  {(task.assigned_user || task.team) && (
+                    <>
+                      →
+                      {task.assigned_user ? (
+                        <>
+                          <EmployeeAvatar displayName={task.assigned_user.display_name} avatarUrl={task.assigned_user.avatar_url} profileImageUrl={task.assigned_user.profile_image_url} size="xs" />
+                          <span className="text-slate-700 font-semibold">{task.assigned_user.display_name}</span>
+                        </>
+                      ) : (
+                        <span className="text-slate-700 font-semibold">{task.team?.name}</span>
+                      )}
+                    </>
+                  )}
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setEditingField('assigned_to')}
+                  className="text-xs font-semibold text-purple-700 hover:text-purple-900 ml-auto px-2 py-0.5 rounded transition-colors"
+                >
+                  Reassign
+                </button>
+              </>
+            )}
+          </div>
+          {task.delegator_users.length > 0 && (
+            <div className="mt-2 text-xs text-slate-400">
+              Delegated by{' '}
+              <span className="font-medium text-slate-600">
+                {task.delegator_users.map((u) => u.display_name).join(' → ')}
+              </span>
+            </div>
+          )}
         </div>
-        <TaskStatusBar currentStatus={task.status} onStatusClick={quickUpdateStatus} disabled={false} />
+
+        <TaskFlowStepper
+          status={task.status as CrmTaskStatus}
+          ownerName={task.assigned_user?.display_name}
+          requestorName={task.created_user?.display_name}
+          onAction={quickUpdateStatus}
+          describeNext={describeNextOwner}
+        />
+
+        <div className="px-8 py-4">
+          <TaskStatusBar
+            currentStatus={task.status as CrmTaskStatus}
+            onAction={quickUpdateStatus}
+            describeNext={describeNextOwner}
+          />
+        </div>
       </div>
 
       {/* Tabs */}

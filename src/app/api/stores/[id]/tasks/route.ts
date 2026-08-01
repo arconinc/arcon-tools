@@ -47,7 +47,7 @@ export async function POST(request: Request, { params }: { params: Promise<{ id:
       description: description ?? null,
       assigned_to: assigned_to ?? null,
       store_id: id,
-      status: 'open',
+      status: 'not_started',
       progress: 0,
       created_by: appUser.id,
     })

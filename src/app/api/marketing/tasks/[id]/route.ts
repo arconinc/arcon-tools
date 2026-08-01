@@ -5,13 +5,16 @@ import { requireUser } from '@/lib/crm/require-user'
 import { ALL_CATEGORIES } from '@/lib/task-constants'
 import { validateTeamId } from '@/lib/team-assignment'
 import { dispatchNotification, fetchActor } from '@/lib/notifications/dispatch'
-import { taskAssigned, taskCompleted, taskUpdated } from '@/lib/notifications/registry'
+import { taskAssigned, taskCompleted, taskUpdated, taskWaitingOnApproval, taskNeedsChanges } from '@/lib/notifications/registry'
+import { isTransitionAllowed, computeTransitionPatch } from '@/lib/task-workflow'
+import type { CrmTaskStatus } from '@/types'
 
-const TRACKED_FIELDS = ['status', 'assigned_to', 'team_id', 'department', 'priority', 'category', 'due_date', 'progress'] as const
+const TRACKED_FIELDS = ['status', 'assigned_to', 'last_worked_by', 'team_id', 'department', 'priority', 'category', 'due_date', 'progress'] as const
 const TASK_UPDATE_FIELDS = [
   'title',
   'assigned_to',
   'task_owner',
+  'last_worked_by',
   'team_id',
   'category',
   'priority',
@@ -98,7 +101,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       ? adminClient.from('crm_contacts').select('id, first_name, last_name').eq('id', task.contact_id).single()
       : Promise.resolve({ data: null }),
     task.assigned_to
-      ? adminClient.from('users').select('id, display_name, email').eq('id', task.assigned_to).single()
+      ? adminClient.from('users').select('id, display_name, email, avatar_url, profile_image_url').eq('id', task.assigned_to).single()
       : Promise.resolve({ data: null }),
     adminClient
       .from('spec_samples')
@@ -111,21 +114,23 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       : Promise.resolve({ data: null }),
   ])
 
-  // Resolve created_by and delegators to display names
+  // Resolve created_by, last_worked_by, and delegators to display names
   const peopleIds = [...new Set([
     task.created_by,
+    task.last_worked_by,
     ...(task.delegators ?? []),
   ].filter(Boolean))]
-  let peopleMap: Record<string, { id: string; display_name: string }> = {}
+  let peopleMap: Record<string, { id: string; display_name: string; email?: string; avatar_url?: string | null; profile_image_url?: string | null }> = {}
   if (peopleIds.length > 0) {
     const { data: people } = await adminClient
       .from('users')
-      .select('id, display_name')
+      .select('id, display_name, email, avatar_url, profile_image_url')
       .in('id', peopleIds)
     for (const u of people ?? []) peopleMap[u.id] = u
   }
 
   const createdUser = task.created_by ? (peopleMap[task.created_by] ?? null) : null
+  const lastWorkedUser = task.last_worked_by ? (peopleMap[task.last_worked_by] ?? null) : null
   const delegatorUsers = (task.delegators ?? [])
     .map((uid: string) => peopleMap[uid])
     .filter(Boolean)
@@ -195,6 +200,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     contact: contact ? { id: contact.id, first_name: contact.first_name, last_name: contact.last_name } : null,
     assigned_user: assignedUserRes.data ?? null,
     created_user: createdUser,
+    last_worked_user: lastWorkedUser,
     delegator_users: delegatorUsers,
     linked_spec: specRes.data ?? null,
     team: teamRes.data ?? null,
@@ -226,6 +232,28 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
   if (safeUpdates.team_id && !(await validateTeamId(adminClient, safeUpdates.team_id as string))) {
     return NextResponse.json({ error: 'Invalid team' }, { status: 400 })
+  }
+
+  // Guided status workflow: validate the transition and compute the reassignment
+  // it triggers (see src/lib/task-workflow.ts for the rules). This is the single
+  // enforcement point — clients only ever send the target status, never assigned_to
+  // alongside it; the server decides who the task goes to next.
+  if ('status' in safeUpdates && safeUpdates.status !== current.status) {
+    const fromStatus = current.status as CrmTaskStatus
+    const toStatus = safeUpdates.status as CrmTaskStatus
+    if (!isTransitionAllowed(fromStatus, toStatus)) {
+      return NextResponse.json(
+        { error: `Cannot move a task from "${fromStatus}" to "${toStatus}"` },
+        { status: 400 }
+      )
+    }
+    const reassignment = computeTransitionPatch(
+      { assigned_to: current.assigned_to, created_by: current.created_by, last_worked_by: current.last_worked_by },
+      fromStatus,
+      toStatus,
+      appUser.id
+    )
+    Object.assign(safeUpdates, reassignment)
   }
 
   // Insert history rows for each tracked field that changed
@@ -319,11 +347,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       })
     }
 
-    // Notify the assignee when someone else updates the task (and it wasn't just a reassignment handled above)
+    // Notify the assignee when someone else updates the task (and it wasn't just a
+    // reassignment or status transition — those have their own dedicated notifications below).
+    const statusChanged = 'status' in safeUpdates && data.status !== current.status
     const hasFieldChanges = historyInserts.length > 0
     const assigneeIsNotEditor = data.assigned_to && data.assigned_to !== appUser.id
     const wasReassignedAway = newAssigneeChanged && data.assigned_to !== current.assigned_to
-    if (hasFieldChanges && assigneeIsNotEditor && !wasReassignedAway) {
+    if (hasFieldChanges && assigneeIsNotEditor && !wasReassignedAway && !statusChanged) {
       const actor = await fetchActor(appUser.id)
       const changedFields = historyInserts.map((h) => h.field_changed)
       await dispatchNotification({
@@ -341,11 +371,44 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       })
     }
 
-    // Notify the task creator when someone else marks the task complete
-    const statusChangedToCompleted =
-      'status' in safeUpdates &&
-      data.status === 'completed' &&
-      current.status !== 'completed'
+    // Notify the requestor when a task is sent to them for review
+    const statusChangedToWaitingOnApproval = statusChanged && data.status === 'waiting_on_approval'
+    if (statusChangedToWaitingOnApproval && current.created_by && current.created_by !== appUser.id) {
+      const actor = await fetchActor(appUser.id)
+      await dispatchNotification({
+        definition: taskWaitingOnApproval,
+        payload: {
+          task_id: data.id,
+          task_title: data.title,
+          actor_id: appUser.id,
+          actor_name: actor.display_name,
+          department: data.department ?? null,
+        },
+        recipientSpec: { userId: current.created_by },
+        suppressUserIds: [appUser.id],
+      })
+    }
+
+    // Notify the reassigned worker when a task is sent back for changes
+    const statusChangedToNeedChanges = statusChanged && data.status === 'need_changes'
+    if (statusChangedToNeedChanges && data.assigned_to && data.assigned_to !== appUser.id) {
+      const actor = await fetchActor(appUser.id)
+      await dispatchNotification({
+        definition: taskNeedsChanges,
+        payload: {
+          task_id: data.id,
+          task_title: data.title,
+          actor_id: appUser.id,
+          actor_name: actor.display_name,
+          department: data.department ?? null,
+        },
+        recipientSpec: { userId: data.assigned_to },
+        suppressUserIds: [appUser.id],
+      })
+    }
+
+    // Notify the task creator when someone else marks the task complete directly
+    const statusChangedToCompleted = statusChanged && data.status === 'completed'
     if (statusChangedToCompleted && current.created_by && current.created_by !== appUser.id) {
       const actor = await fetchActor(appUser.id)
       await dispatchNotification({
@@ -358,6 +421,25 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           department: data.department ?? null,
         },
         recipientSpec: { userId: current.created_by },
+        suppressUserIds: [appUser.id],
+      })
+    }
+
+    // Waiting on Approval -> Complete: the requestor completed it themselves, so
+    // notify the person who actually did the work instead of the requestor.
+    const completedFromApproval = statusChangedToCompleted && current.status === 'waiting_on_approval'
+    if (completedFromApproval && current.last_worked_by && current.last_worked_by !== appUser.id) {
+      const actor = await fetchActor(appUser.id)
+      await dispatchNotification({
+        definition: taskCompleted,
+        payload: {
+          task_id: data.id,
+          task_title: data.title,
+          actor_id: appUser.id,
+          actor_name: actor.display_name,
+          department: data.department ?? null,
+        },
+        recipientSpec: { userId: current.last_worked_by },
         suppressUserIds: [appUser.id],
       })
     }

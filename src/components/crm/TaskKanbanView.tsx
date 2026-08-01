@@ -2,7 +2,9 @@
 
 import { useState, useRef, useEffect } from 'react'
 import { createPortal } from 'react-dom'
-import { avatarThumbnailUrl } from '@/lib/format'
+import EmployeeAvatar from '@/components/employees/EmployeeAvatar'
+import { getTaskNextActions } from '@/lib/task-workflow'
+import type { CrmTaskStatus } from '@/types'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -110,35 +112,6 @@ export function PriorityIcon({ priority }: { priority: KanbanPriority }) {
   )
 }
 
-// ── UserAvatar ────────────────────────────────────────────────────────────────
-
-export function UserAvatar({ name, avatarUrl, size = 20 }: { name: string; avatarUrl: string | null; size?: number }) {
-  if (avatarUrl) {
-    const src = avatarThumbnailUrl(avatarUrl, size * 2) // 2× for retina
-    return (
-      <img
-        src={src ?? avatarUrl}
-        alt={name}
-        loading="lazy"
-        width={size}
-        height={size}
-        style={{ borderRadius: '50%', objectFit: 'cover', flexShrink: 0 }}
-      />
-    )
-  }
-  const initials = name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()
-  return (
-    <div style={{
-      width: size, height: size, borderRadius: '50%',
-      background: '#e9d5ff', color: '#6b21a8',
-      display: 'flex', alignItems: 'center', justifyContent: 'center',
-      fontSize: Math.floor(size * 0.42), fontWeight: 700, flexShrink: 0,
-    }}>
-      {initials}
-    </div>
-  )
-}
-
 // ── Card action icons ─────────────────────────────────────────────────────────
 
 function CardIconApproval() {
@@ -165,6 +138,32 @@ function CardIconConfirm() {
       <line x1="12" y1="17" x2="12.01" y2="17" />
     </svg>
   )
+}
+
+function CardIconResume() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="5 3 19 12 5 21 5 3" />
+    </svg>
+  )
+}
+
+function CardIconChanges() {
+  return (
+    <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="9 10 4 15 9 20" />
+      <path d="M4 15h11a4 4 0 0 0 4-4V5" />
+    </svg>
+  )
+}
+
+const CARD_ACTION_ICONS: Record<CrmTaskStatus, React.ReactNode> = {
+  not_started: <CardIconResume />,
+  in_progress: <CardIconResume />,
+  waiting_on_approval: <CardIconApproval />,
+  need_changes: <CardIconChanges />,
+  completed: <CardIconComplete />,
+  waiting_on_client_approval: <CardIconApproval />,
 }
 
 // Two-click confirm button for kanban cards — same pattern as ConfirmIconButton
@@ -276,7 +275,8 @@ function CardConfirmButton({
 
 // ── KanbanCard ────────────────────────────────────────────────────────────────
 
-export type KanbanCardAction = 'send_for_approval' | 'mark_completed'
+// A card action is the target status the task should move to.
+export type KanbanCardAction = CrmTaskStatus
 
 function KanbanCard({
   task,
@@ -410,7 +410,7 @@ function KanbanCard({
         <div style={{ display: 'flex', alignItems: 'center', gap: 5, minWidth: 0, flex: 1 }}>
           {showAssignee && task.assigned_user_name && (
             <>
-              <UserAvatar name={task.assigned_user_name} avatarUrl={assigneePhoto} size={16} />
+              <EmployeeAvatar displayName={task.assigned_user_name} avatarUrl={assigneePhoto} size="xs" />
               <span style={{ fontSize: 10, color: '#888', fontWeight: 500, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', flex: 1 }}>
                 {task.assigned_user_name}
               </span>
@@ -476,24 +476,16 @@ function KanbanCard({
               borderRadius: '50%', animation: 'kanban-spin 0.7s linear infinite',
             }} />
           ) : (
-            <>
+            getTaskNextActions(task.status as CrmTaskStatus).map((action) => (
               <CardConfirmButton
-                idleIcon={<CardIconApproval />}
-                idleLabel="Send for Approval"
-                confirmLabel="Confirm approval?"
-                onConfirm={() => handleAction('send_for_approval')}
-                confirmColor="yellow"
-                disabled={task.status === 'waiting_on_approval' || task.status === 'completed' || task.assigned_to === task.created_by}
+                key={action.toStatus}
+                idleIcon={CARD_ACTION_ICONS[action.toStatus]}
+                idleLabel={action.label}
+                confirmLabel={`Confirm: ${action.label}?`}
+                onConfirm={() => handleAction(action.toStatus)}
+                confirmColor={action.toStatus === 'completed' ? 'green' : 'yellow'}
               />
-              <CardConfirmButton
-                idleIcon={<CardIconComplete />}
-                idleLabel="Mark as Completed"
-                confirmLabel="Confirm complete?"
-                onConfirm={() => handleAction('mark_completed')}
-                confirmColor="green"
-                disabled={task.status === 'completed'}
-              />
-            </>
+            ))
           )}
         </div>
       )}

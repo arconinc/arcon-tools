@@ -421,7 +421,7 @@ export const taskCompleted: NotificationDefinition<TaskCompletedPayload> = {
   type: 'task_completed',
   label: 'My task was completed by someone else',
   description: 'When a task you created is marked complete by another person.',
-  defaultEmail: false,
+  defaultEmail: true,
   render: (p) => ({
     title: `${p.actor_name} completed: ${p.task_title}`,
     body: p.department ? `${p.department} task marked complete` : 'Task marked complete',
@@ -437,6 +437,86 @@ export const taskCompleted: NotificationDefinition<TaskCompletedPayload> = {
         greeting: `Hi ${firstName},`,
         bodyLines: [
           `<strong>${p.actor_name}</strong> marked the following task as complete:`,
+          `<strong style="font-size:16px;color:#1e293b">${p.task_title}</strong>`,
+          ...(p.department ? [`<strong>Department:</strong> ${p.department}`] : []),
+        ],
+        ctaText: 'View task',
+        ctaUrl: `${appUrl()}/tasks/${p.task_id}`,
+      }),
+    }
+  },
+}
+
+// ─── task_waiting_on_approval ─────────────────────────────────────────────────
+
+export interface TaskWaitingOnApprovalPayload {
+  task_id: string
+  task_title: string
+  actor_id: string
+  actor_name: string
+  department: string | null
+}
+
+export const taskWaitingOnApproval: NotificationDefinition<TaskWaitingOnApprovalPayload> = {
+  type: 'task_waiting_on_approval',
+  label: 'A task is waiting on my approval',
+  description: 'When a task you requested is submitted back to you for review.',
+  defaultEmail: false,
+  render: (p) => ({
+    title: `${p.actor_name} sent for approval: ${p.task_title}`,
+    body: 'Waiting on your review',
+    linkUrl: `/tasks/${p.task_id}`,
+  }),
+  email: (p, recipient) => {
+    const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
+    return {
+      subject: `Waiting on your approval: ${p.task_title}`,
+      html: renderGenericEmail({
+        preheader: `${p.actor_name} submitted a task for your review`,
+        heading: 'Task Waiting on Your Approval',
+        greeting: `Hi ${firstName},`,
+        bodyLines: [
+          `<strong>${p.actor_name}</strong> submitted the following task for your review:`,
+          `<strong style="font-size:16px;color:#1e293b">${p.task_title}</strong>`,
+          ...(p.department ? [`<strong>Department:</strong> ${p.department}`] : []),
+        ],
+        ctaText: 'Review task',
+        ctaUrl: `${appUrl()}/tasks/${p.task_id}`,
+      }),
+    }
+  },
+}
+
+// ─── task_needs_changes ───────────────────────────────────────────────────────
+
+export interface TaskNeedsChangesPayload {
+  task_id: string
+  task_title: string
+  actor_id: string
+  actor_name: string
+  department: string | null
+}
+
+export const taskNeedsChanges: NotificationDefinition<TaskNeedsChangesPayload> = {
+  type: 'task_needs_changes',
+  label: 'A task was sent back to me for changes',
+  description: 'When a requestor sends your work back for revision.',
+  defaultEmail: false,
+  render: (p) => ({
+    title: `${p.actor_name} requested changes: ${p.task_title}`,
+    body: 'Sent back for revision',
+    linkUrl: `/tasks/${p.task_id}`,
+  }),
+  email: (p, recipient) => {
+    const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
+    return {
+      subject: `Changes requested: ${p.task_title}`,
+      html: renderGenericEmail({
+        preheader: `${p.actor_name} sent a task back to you for revision`,
+        heading: 'Task Needs Changes',
+        greeting: `Hi ${firstName},`,
+        bodyLines: [
+          `<strong>${p.actor_name}</strong> sent the following task back to you for revision:`,
           `<strong style="font-size:16px;color:#1e293b">${p.task_title}</strong>`,
           ...(p.department ? [`<strong>Department:</strong> ${p.department}`] : []),
         ],
@@ -838,6 +918,8 @@ export const aturianCustomerQueueNewEntry: NotificationDefinition<AturianQueueNe
 export const NOTIFICATION_REGISTRY = {
   task_assigned: taskAssigned,
   task_completed: taskCompleted,
+  task_waiting_on_approval: taskWaitingOnApproval,
+  task_needs_changes: taskNeedsChanges,
   task_updated: taskUpdated,
   task_comment_added: taskCommentAdded,
   'access_request.new': accessRequestNew,

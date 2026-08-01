@@ -14,17 +14,16 @@ import {
   type SortingState,
 } from '@tanstack/react-table'
 import type { KanbanTask } from './TaskKanbanView'
+import { TASK_STATUS_LABELS, TASK_STATUS_COLORS, getTaskNextActions } from '@/lib/task-workflow'
+import type { CrmTaskStatus } from '@/types'
 
 const PAGE_SIZE = 50
 
-const STATUSES = [
-  { value: 'not_started', label: 'Not Started', cls: 'bg-slate-100 text-slate-600' },
-  { value: 'in_progress', label: 'In Progress', cls: 'bg-blue-100 text-blue-700' },
-  { value: 'completed', label: 'Completed', cls: 'bg-green-100 text-green-700' },
-  { value: 'waiting_on_approval', label: 'Waiting on Approval', cls: 'bg-yellow-100 text-yellow-700' },
-  { value: 'waiting_on_client_approval', label: 'Waiting on Client', cls: 'bg-orange-100 text-orange-700' },
-  { value: 'need_changes', label: 'Need Changes', cls: 'bg-red-100 text-red-600' },
-]
+const STATUSES = (Object.keys(TASK_STATUS_LABELS) as CrmTaskStatus[]).map((value) => ({
+  value,
+  label: TASK_STATUS_LABELS[value],
+  cls: TASK_STATUS_COLORS[value],
+}))
 
 const PRIORITY_BADGE: Record<string, string> = {
   low: 'bg-slate-100 text-slate-500',
@@ -220,9 +219,38 @@ function IconConfirm() {
   )
 }
 
+/** Play — resume/start-work icon */
+function IconResume() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polygon points="5 3 19 12 5 21 5 3" />
+    </svg>
+  )
+}
+
+/** Reply arrow — send back for changes icon */
+function IconChanges() {
+  return (
+    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+      <polyline points="9 10 4 15 9 20" />
+      <path d="M4 15h11a4 4 0 0 0 4-4V5" />
+    </svg>
+  )
+}
+
+const ROW_ACTION_ICONS: Record<CrmTaskStatus, React.ReactNode> = {
+  not_started: <IconResume />,
+  in_progress: <IconResume />,
+  waiting_on_approval: <IconApproval />,
+  need_changes: <IconChanges />,
+  completed: <IconComplete />,
+  waiting_on_client_approval: <IconApproval />,
+}
+
 // ── TaskTableView ─────────────────────────────────────────────────────────────
 
-export type TableRowAction = 'send_for_approval' | 'mark_completed'
+// A row action is the target status the task should move to.
+export type TableRowAction = CrmTaskStatus
 
 export type TaskColumnFilters = {
   title: string
@@ -574,34 +602,23 @@ export function TaskTableView({ tasks, loading, total, page, search, onPageChang
       cell: ({ row }) => {
         const task = row.original
         const rowActionLoading = actionLoading[task.id]
-        const isCompleted = task.status === 'completed'
-        const isWaitingApproval = task.status === 'waiting_on_approval'
-        const isSelfAssigned = task.assigned_to === task.created_by
+        const nextActions = getTaskNextActions(task.status as CrmTaskStatus)
         return (
           <div className="flex items-center justify-end gap-1.5">
             {rowActionLoading ? (
               <span className="inline-block w-4 h-4 border-2 border-slate-300 border-t-purple-500 rounded-full animate-spin" />
             ) : (
-              <>
+              nextActions.map((action) => (
                 <ConfirmIconButton
-                  idleIcon={<IconApproval />}
+                  key={action.toStatus}
+                  idleIcon={ROW_ACTION_ICONS[action.toStatus]}
                   confirmIcon={<IconConfirm />}
-                  idleLabel="Send for Approval"
-                  confirmLabel="Confirm approval?"
-                  onConfirm={() => handleAction(task.id, 'send_for_approval')}
-                  disabled={isWaitingApproval || isCompleted || isSelfAssigned}
-                  confirmColor="yellow"
+                  idleLabel={action.label}
+                  confirmLabel={`Confirm: ${action.label}?`}
+                  onConfirm={() => handleAction(task.id, action.toStatus)}
+                  confirmColor={action.toStatus === 'completed' ? 'green' : 'yellow'}
                 />
-                <ConfirmIconButton
-                  idleIcon={<IconComplete />}
-                  confirmIcon={<IconConfirm />}
-                  idleLabel="Mark as Completed"
-                  confirmLabel="Confirm complete?"
-                  onConfirm={() => handleAction(task.id, 'mark_completed')}
-                  disabled={isCompleted}
-                  confirmColor="green"
-                />
-              </>
+              ))
             )}
           </div>
         )

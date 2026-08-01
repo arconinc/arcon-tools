@@ -39,8 +39,11 @@ export type HistoryEntry = {
   user: { id: string; display_name: string }
 }
 
+type PersonRef = { id: string; display_name: string; email?: string; avatar_url?: string | null; profile_image_url?: string | null }
+
 export type TaskDetail = {
   id: string; title: string; assigned_to: string | null; task_owner: string | null
+  last_worked_by: string | null
   team_id: string | null; department: string | null; category: string | null; priority: TaskPriority; due_date: string | null
   status: TaskStatus; progress: number; description: string | null
   opportunity_id: string | null; customer_id: string | null
@@ -52,8 +55,9 @@ export type TaskDetail = {
   customer: { id: string; name: string } | null
   vendor: { id: string; name: string } | null
   contact: { id: string; first_name: string; last_name: string } | null
-  assigned_user: { id: string; display_name: string; email: string } | null
-  created_user: { id: string; display_name: string } | null
+  assigned_user: PersonRef | null
+  created_user: PersonRef | null
+  last_worked_user: PersonRef | null
   team: { id: string; name: string; color: string } | null
   delegator_users: { id: string; display_name: string }[]
   attachments: TaskAttachment[]

@@ -5,11 +5,12 @@ interface EmployeeAvatarProps {
   displayName: string
   profileImageUrl?: string | null
   avatarUrl?: string | null
-  size?: 'sm' | 'md' | 'lg' | 'xl'
+  size?: 'xs' | 'sm' | 'md' | 'lg' | 'xl'
   className?: string
 }
 
 const sizeMap = {
+  xs: { px: 20, cls: 'w-5 h-5 text-[9px]' },
   sm: { px: 32, cls: 'w-8 h-8 text-xs' },
   md: { px: 48, cls: 'w-12 h-12 text-sm' },
   lg: { px: 80, cls: 'w-20 h-20 text-xl' },

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { ALL_CATEGORIES, getTaskCategoryLabel } from '@/lib/task-constants'
+import EmployeeAvatar from '@/components/employees/EmployeeAvatar'
 
 export type Priority = 'low' | 'medium' | 'high'
 
@@ -201,9 +202,10 @@ export function TaskQuickEditPanel({ task, position, onClose, onUpdate, onDelete
                   <div style={{ padding: '6px 12px 2px', fontSize: 10, fontWeight: 700, color: '#aaa', textTransform: 'uppercase', letterSpacing: '0.05em' }}>Individuals</div>
                   {filteredUsers.map((user) => (
                     <button key={user.id} onClick={() => handleAssignUser(user.id)}
-                      style={{ width: '100%', padding: '8px 12px', fontSize: 12, border: 'none', background: 'transparent', textAlign: 'left', cursor: 'pointer', color: '#222', fontWeight: task.assigned_to === user.id ? 600 : 400 }}
+                      style={{ width: '100%', padding: '6px 12px', fontSize: 12, border: 'none', background: 'transparent', textAlign: 'left', cursor: 'pointer', color: '#222', fontWeight: task.assigned_to === user.id ? 600 : 400, display: 'flex', alignItems: 'center', gap: 8 }}
                       onMouseEnter={(e) => { (e.currentTarget as HTMLButtonElement).style.background = '#f5f3ff' }}
                       onMouseLeave={(e) => { (e.currentTarget as HTMLButtonElement).style.background = 'transparent' }}>
+                      <EmployeeAvatar displayName={user.display_name} profileImageUrl={user.profile_image_url} avatarUrl={user.avatar_url} size="xs" />
                       {user.display_name}
                     </button>
                   ))}

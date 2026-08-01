@@ -27,7 +27,7 @@ function normalizeTaskAssignment(task: Record<string, unknown>) {
 }
 
 // GET /api/marketing/tasks
-// ?assigned_to=me|all|<uuid>|<uuid1>,<uuid2>  ?status=  ?category=  ?team_id=  ?delegated_by_me=true  ?due_before=  ?opportunity_id=  ?customer_id=  ?vendor_id=  ?order_by=created|due_date|sort_order  ?page=1&limit=50
+// ?assigned_to=me|all|<uuid>|<uuid1>,<uuid2>  ?status=  ?category=  ?team_id=  ?delegated_by_me=true  ?my_teams=true  ?due_before=  ?opportunity_id=  ?customer_id=  ?vendor_id=  ?order_by=created|due_date|sort_order  ?page=1&limit=50
 export async function GET(req: NextRequest) {
   const appUser = await requireUser()
   if (!appUser) return unauthorized()
@@ -46,6 +46,7 @@ export async function GET(req: NextRequest) {
   const linkedType = searchParams.get('linked_type')
   const linkedSearch = searchParams.get('linked_search')?.trim()
   const delegatedByMe = searchParams.get('delegated_by_me') === 'true'
+  const myTeams = searchParams.get('my_teams') === 'true'
   const hideCompleted = searchParams.get('hide_completed') === 'true'
   const dueBefore = searchParams.get('due_before')
   const dueFrom = searchParams.get('due_from')
@@ -100,6 +101,21 @@ export async function GET(req: NextRequest) {
 
   const twoWeeksAgo = new Date(Date.now() - 14 * 24 * 60 * 60 * 1000).toISOString()
 
+  // "My Tasks" mode: mine, plus unclaimed tasks sitting on any team I belong
+  // to (never tasks a teammate already picked up) — optionally unioned with
+  // "delegated by me" when that toggle is on.
+  let myTeamIds: string[] = []
+  if (myTeams) {
+    const { data: memberships } = await adminClient
+      .from('group_memberships')
+      .select('groups!group_memberships_group_id_fkey!inner(id, is_active, source_type)')
+      .eq('user_id', appUser.id)
+    myTeamIds = (memberships ?? [])
+      .map((m: any) => m.groups)
+      .filter((g: any) => g?.is_active && g?.source_type === 'assignment_pool')
+      .map((g: any) => g.id)
+  }
+
   const applyFilters = (q: any) => {
     if (hideCompleted) {
       q = q.neq('status', 'completed')
@@ -107,7 +123,16 @@ export async function GET(req: NextRequest) {
       // Always hide completed tasks that were last updated more than 2 weeks ago
       q = q.or(`status.neq.completed,updated_at.gte.${twoWeeksAgo}`)
     }
-    if (delegatedByMe) {
+    if (myTeams) {
+      const orClauses = [`assigned_to.eq.${appUser.id}`]
+      if (myTeamIds.length > 0) {
+        orClauses.push(`and(team_id.in.(${myTeamIds.join(',')}),assigned_to.is.null)`)
+      }
+      if (delegatedByMe) {
+        orClauses.push(`created_by.eq.${appUser.id}`, `task_owner.eq.${appUser.id}`, `delegators.cs.{${appUser.id}}`)
+      }
+      q = q.or(orClauses.join(','))
+    } else if (delegatedByMe) {
       // Show tasks where current user created, owns, or delegated the task
       q = q.or(`created_by.eq.${appUser.id},task_owner.eq.${appUser.id},delegators.cs.{${appUser.id}}`)
       // Also apply assigned_to filter if specified
@@ -279,7 +304,10 @@ export async function POST(req: NextRequest) {
       ...normalized.task,
       created_by: appUser.id,
       task_owner: normalized.task.task_owner ?? appUser.id,
-      assigned_to: normalized.task.assigned_to ?? appUser.id,
+      // Only default to the creator when the field is omitted entirely —
+      // an explicit `null` (e.g. assigning to a team with no individual
+      // picked yet) must stay unassigned, not silently become "me".
+      assigned_to: 'assigned_to' in normalized.task ? normalized.task.assigned_to : appUser.id,
       status: normalized.task.status ?? 'not_started',
       priority: normalized.task.priority ?? 'medium',
       progress: normalized.task.progress ?? 0,
