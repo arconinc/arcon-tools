@@ -12,12 +12,13 @@ import { formatDate, formatDateTime, formatBytes } from '@/lib/format'
 import { useTask } from '@/hooks/useTask'
 import type { TaskPriority } from '@/hooks/useTask'
 import { TaskStatusBar } from '@/components/crm/task/TaskStatusBar'
-import { TaskFlowStepper } from '@/components/crm/task/TaskFlowStepper'
+import { TaskFlowStepper, flowStepLabel } from '@/components/crm/task/TaskFlowStepper'
 import EmployeeAvatar from '@/components/employees/EmployeeAvatar'
 import { TaskNotesPreview } from '@/components/crm/task/TaskNotesPreview'
 import { CommentsTab } from '@/components/crm/task/CommentsTab'
 import { ConfirmButton } from '@/components/ui/ConfirmButton'
-import { TASK_STATUS_LABELS, TASK_STATUS_COLORS, computeTransitionPatch } from '@/lib/task-workflow'
+import { CalendarGlyph, TagGlyph, ReassignGlyph, TrashGlyph } from '@/components/crm/task/TaskIcons'
+import { TASK_STATUS_LABELS, TASK_STATUS_COLORS, computeTransitionPatch, getTaskNextActions } from '@/lib/task-workflow'
 import type { CrmTaskStatus } from '@/types'
 
 // ── Local Types ───────────────────────────────────────────────────────────────
@@ -64,7 +65,7 @@ export default function TaskDetailPage() {
 
   const { task, setTask, loading, error, refetch, load } = useTask(id)
 
-  const [activeTab, setActiveTab] = useState<'details' | 'related' | 'comments'>('details')
+  const [activeTab, setActiveTab] = useState<'details' | 'comments' | 'attachments' | 'activity' | 'related'>('details')
   const [editingField, setEditingField] = useState<'title' | 'priority' | 'category' | 'due_date' | 'assigned_to' | 'description' | null>(null)
   const descriptionDraftRef = useRef<string | null>(null)
   const dueDateRef = useRef<HTMLInputElement>(null)
@@ -289,7 +290,7 @@ export default function TaskDetailPage() {
 
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8">
+    <div className="max-w-6xl mx-auto px-6 py-8">
       {/* Back */}
       <Link href="/sales/tasks" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-5">
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -312,17 +313,18 @@ export default function TaskDetailPage() {
             </div>
             {(appUser?.is_admin || task.created_by === appUser?.id || task.task_owner === appUser?.id) && (
               <ConfirmButton
-                idleLabel="Delete"
+                idleLabel="Delete Task"
                 confirmLabel="Yes, delete task?"
                 onConfirm={deleteTask}
                 variant="red"
                 size="sm"
+                icon={<TrashGlyph />}
                 disabled={deleting}
               />
             )}
           </div>
 
-          {/* Status + priority badges, requestor→owner */}
+          {/* Status + priority badges, due date, category, requestor→owner */}
           <div className="flex items-center gap-2 mt-2 flex-wrap">
             <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${statusColorCls}`}>
               {statusLabel}
@@ -330,11 +332,14 @@ export default function TaskDetailPage() {
             <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${PRIORITY_BADGE[task.priority]}`}>
               {task.priority}
             </span>
-            {task.due_date && (
-              <span className={`text-xs ${isOverdue ? 'text-red-600 font-semibold' : 'text-slate-500'}`}>
-                {isOverdue ? '⚠️ ' : ''}Due {formatDate(task.due_date)}
-              </span>
-            )}
+            <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${isOverdue ? 'text-red-600 font-semibold' : 'text-slate-500'}`}>
+              <CalendarGlyph />
+              {task.due_date ? `${isOverdue ? '⚠️ ' : ''}${formatDate(task.due_date)}` : 'No date'}
+            </span>
+            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500">
+              <TagGlyph />
+              {task.category ? getTaskCategoryLabel(task.category) : 'Not set'}
+            </span>
             {task.created_user && (
               <>
                 <span className="text-xs text-slate-300">·</span>
@@ -358,8 +363,9 @@ export default function TaskDetailPage() {
                 <button
                   type="button"
                   onClick={() => setEditingField('assigned_to')}
-                  className="text-xs font-semibold text-purple-700 hover:text-purple-900 ml-auto px-2 py-0.5 rounded transition-colors"
+                  className="inline-flex items-center gap-1 text-xs font-semibold text-purple-700 hover:text-purple-900 ml-auto px-2 py-0.5 rounded transition-colors"
                 >
+                  <ReassignGlyph />
                   Reassign
                 </button>
               </>
@@ -382,37 +388,35 @@ export default function TaskDetailPage() {
           onAction={quickUpdateStatus}
           describeNext={describeNextOwner}
         />
-
-        <div className="px-8 py-4">
-          <TaskStatusBar
-            currentStatus={task.status as CrmTaskStatus}
-            onAction={quickUpdateStatus}
-            describeNext={describeNextOwner}
-          />
-        </div>
       </div>
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200 mb-5">
-        {(['details', 'related', 'comments'] as const).map((tab) => (
-          <button
-            key={tab}
-            onClick={() => setActiveTab(tab)}
-            className={`px-4 py-2 text-sm capitalize transition-colors border-b-2 -mb-px ${
-              activeTab === tab ? 'font-bold text-purple-700 border-purple-700' : 'font-medium text-slate-500 border-transparent hover:text-slate-700'
-            }`}
-          >
-            {tab === 'comments' ? 'Comments' : tab}
-            {tab === 'comments' && task.comments.length > 0 && (
-              <span className="ml-1.5 text-xs opacity-70">{task.comments.length}</span>
-            )}
-          </button>
-        ))}
+        {(['details', 'comments', 'attachments', 'activity', 'related'] as const).map((tab) => {
+          const count =
+            tab === 'comments' ? task.comments.length
+              : tab === 'attachments' ? task.attachments.length
+              : tab === 'activity' ? task.history.length
+              : 0
+          return (
+            <button
+              key={tab}
+              onClick={() => setActiveTab(tab)}
+              className={`px-4 py-2 text-sm capitalize transition-colors border-b-2 -mb-px ${
+                activeTab === tab ? 'font-bold text-purple-700 border-purple-700' : 'font-medium text-slate-500 border-transparent hover:text-slate-700'
+              }`}
+            >
+              {tab}
+              {count > 0 && <span className="ml-1.5 text-xs opacity-70">{count}</span>}
+            </button>
+          )
+        })}
       </div>
 
       {/* ── Details Tab ── */}
       {activeTab === 'details' && (
-        <div className="space-y-5">
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        <div className="lg:col-span-2 space-y-5">
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
               <h2 className="text-sm font-semibold text-slate-700">Task Details</h2>
@@ -672,106 +676,200 @@ export default function TaskDetailPage() {
             </div>
           </div>
 
+        </div>
+
+        {/* Sidebar */}
+        <div className="space-y-5">
+          {/* Quick Actions */}
+          {getTaskNextActions(task.status as CrmTaskStatus).length > 0 && (
+            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+              <div className="px-5 py-4 border-b border-slate-100 bg-slate-50">
+                <h2 className="text-sm font-semibold text-slate-700">Quick Actions</h2>
+              </div>
+              <div className="p-4">
+                <TaskStatusBar
+                  currentStatus={task.status as CrmTaskStatus}
+                  onAction={quickUpdateStatus}
+                  describeNext={describeNextOwner}
+                />
+              </div>
+            </div>
+          )}
+
+          {/* Task Information */}
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="px-5 py-4 border-b border-slate-100 bg-slate-50">
+              <h2 className="text-sm font-semibold text-slate-700">Task Information</h2>
+            </div>
+            <div className="divide-y divide-slate-100 text-sm">
+              <div className="flex items-center justify-between px-5 py-2.5">
+                <span className="text-slate-400">Status</span>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded-full text-xs font-semibold ${statusColorCls}`}>{statusLabel}</span>
+              </div>
+              <div className="flex items-center justify-between px-5 py-2.5">
+                <span className="text-slate-400">Priority</span>
+                <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold capitalize ${PRIORITY_BADGE[task.priority]}`}>{task.priority}</span>
+              </div>
+              <div className="flex items-center justify-between px-5 py-2.5">
+                <span className="text-slate-400">Task ID</span>
+                <span className="font-mono text-slate-700">{task.id.slice(0, 4).toUpperCase()}</span>
+              </div>
+              <div className="flex items-center justify-between px-5 py-2.5">
+                <span className="text-slate-400">Flow Step</span>
+                <span className="text-slate-700">{flowStepLabel(task.status as CrmTaskStatus)}</span>
+              </div>
+              <div className="flex items-center justify-between px-5 py-2.5">
+                <span className="text-slate-400">Assigned To</span>
+                <span className="text-slate-700">{task.assigned_user?.display_name ?? task.team?.name ?? '—'}</span>
+              </div>
+              <div className="flex items-center justify-between px-5 py-2.5">
+                <span className="text-slate-400">Assigned By</span>
+                <span className="text-slate-700">{task.created_user?.display_name ?? '—'}</span>
+              </div>
+              <div className="flex items-center justify-between px-5 py-2.5">
+                <span className="text-slate-400">Created</span>
+                <span className="text-slate-700">{formatDate(task.created_at)}</span>
+              </div>
+              <div className="flex items-center justify-between px-5 py-2.5">
+                <span className="text-slate-400">Updated</span>
+                <span className="text-slate-700">{formatDate(task.updated_at)}</span>
+              </div>
+            </div>
+          </div>
+
           <TaskNotesPreview
             comments={task.comments}
             onViewAll={() => setActiveTab('comments')}
           />
 
-          {/* Attachments */}
+          {/* Attachments preview */}
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
+            <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50">
               <h2 className="text-sm font-semibold text-slate-700">
                 Attachments
-                {task.attachments.length > 0 && (
-                  <span className="ml-1.5 text-xs font-normal text-slate-400">({task.attachments.length})</span>
-                )}
+                {task.attachments.length > 0 && <span className="ml-1.5 text-xs font-normal text-slate-400">({task.attachments.length})</span>}
               </h2>
-              <div>
-                <input
-                  ref={attachmentInputRef}
-                  type="file"
-                  className="hidden"
-                  onChange={async (e) => {
-                    const file = e.target.files?.[0]
-                    if (file) await uploadTaskAttachment(file)
-                    e.target.value = ''
-                  }}
-                />
-                <button
-                  onClick={() => attachmentInputRef.current?.click()}
-                  disabled={uploadingAttachment}
-                  className="px-3 py-1.5 text-xs font-semibold border border-slate-300 text-slate-600 rounded-lg hover:bg-white transition-colors disabled:opacity-60"
-                >
-                  {uploadingAttachment ? 'Uploading…' : '+ Attach'}
-                </button>
-              </div>
+              {task.attachments.length > 0 && (
+                <button onClick={() => setActiveTab('attachments')} className="text-xs font-semibold text-purple-700 hover:underline">View all</button>
+              )}
             </div>
             {task.attachments.length === 0 ? (
-              <div className="px-6 py-4 text-sm text-slate-400">No attachments yet.</div>
+              <div className="px-5 py-4 text-sm text-slate-400">No attachments yet.</div>
             ) : (
-              <div className="p-4 flex flex-wrap gap-2">
-                {task.attachments.map((att) => (
-                  <div key={att.id} className="group relative">
-                    {isImageMime(att.mime_type) ? (
-                      <a href={att.url} target="_blank" rel="noopener noreferrer"
-                        className="block w-20 h-20 rounded-lg overflow-hidden border border-slate-200 hover:border-purple-300 transition-colors">
-                        {/* eslint-disable-next-line @next/next/no-img-element */}
-                        <img src={att.url} alt={att.file_name ?? 'attachment'} className="w-full h-full object-cover" />
-                      </a>
-                    ) : (
-                      <a href={att.url} target="_blank" rel="noopener noreferrer"
-                        className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-purple-700 hover:bg-purple-50 hover:border-purple-300 transition-colors">
-                        <svg className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                        </svg>
-                        <span className="truncate max-w-[160px]">{att.file_name ?? 'file'}</span>
-                        {att.file_size && <span className="text-slate-400 flex-shrink-0">{formatBytes(att.file_size)}</span>}
-                      </a>
-                    )}
-                    {(att.uploaded_by === appUser?.id || appUser?.is_admin) && (
-                      <button
-                        onClick={() => deleteTaskAttachment(att.id)}
-                        className="absolute -top-1.5 -right-1.5 hidden group-hover:flex w-5 h-5 bg-red-500 text-white rounded-full items-center justify-center text-xs leading-none"
-                      >
-                        ×
-                      </button>
-                    )}
-                  </div>
+              <div className="p-3 space-y-1.5">
+                {task.attachments.slice(0, 4).map((att) => (
+                  <a key={att.id} href={att.url} target="_blank" rel="noopener noreferrer"
+                    className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-slate-700 hover:bg-slate-50 transition-colors">
+                    <svg className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                    </svg>
+                    <span className="truncate">{att.file_name ?? 'file'}</span>
+                  </a>
                 ))}
               </div>
             )}
           </div>
+        </div>
+        </div>
+      )}
 
-          {/* History timeline */}
-          {task.history.length > 0 && (
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-              <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
-                <h2 className="text-sm font-semibold text-slate-700">Change History</h2>
-              </div>
-              <div className="p-4 space-y-0">
-                {task.history.map((h, idx) => (
-                  <div key={h.id} className={`flex gap-4 ${idx < task.history.length - 1 ? 'pb-4' : ''}`}>
-                    <div className="flex flex-col items-center">
-                      <div className="w-2 h-2 rounded-full bg-purple-400 mt-1.5 flex-shrink-0" />
-                      {idx < task.history.length - 1 && <div className="w-px flex-1 bg-slate-100 my-1" />}
-                    </div>
-                    <div className="flex-1 min-w-0 pb-1">
-                      <div className="text-xs text-slate-500">
-                        <span className="font-medium text-slate-700">{h.user.display_name}</span>
-                        {' changed '}
-                        <span className="font-medium text-slate-700">{h.field_changed.replace(/_/g, ' ')}</span>
-                        {h.old_value != null && (
-                          <> from <span className="font-mono bg-slate-100 px-1 rounded">{h.old_value}</span></>
-                        )}
-                        {h.new_value != null && (
-                          <> to <span className="font-mono bg-purple-50 text-purple-700 px-1 rounded">{h.new_value}</span></>
-                        )}
-                      </div>
-                      <div className="text-xs text-slate-400 mt-0.5">{formatDateTime(h.changed_at)}</div>
-                    </div>
+      {/* ── Attachments Tab ── */}
+      {activeTab === 'attachments' && (
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
+            <h2 className="text-sm font-semibold text-slate-700">
+              Attachments
+              {task.attachments.length > 0 && <span className="ml-1.5 text-xs font-normal text-slate-400">({task.attachments.length})</span>}
+            </h2>
+            <div>
+              <input
+                ref={attachmentInputRef}
+                type="file"
+                className="hidden"
+                onChange={async (e) => {
+                  const file = e.target.files?.[0]
+                  if (file) await uploadTaskAttachment(file)
+                  e.target.value = ''
+                }}
+              />
+              <button
+                onClick={() => attachmentInputRef.current?.click()}
+                disabled={uploadingAttachment}
+                className="px-3 py-1.5 text-xs font-semibold border border-slate-300 text-slate-600 rounded-lg hover:bg-white transition-colors disabled:opacity-60"
+              >
+                {uploadingAttachment ? 'Uploading…' : '+ Attach files'}
+              </button>
+            </div>
+          </div>
+          {task.attachments.length === 0 ? (
+            <div className="px-6 py-4 text-sm text-slate-400">No attachments yet.</div>
+          ) : (
+            <div className="p-4 flex flex-wrap gap-2">
+              {task.attachments.map((att) => (
+                <div key={att.id} className="group relative">
+                  {isImageMime(att.mime_type) ? (
+                    <a href={att.url} target="_blank" rel="noopener noreferrer"
+                      className="block w-20 h-20 rounded-lg overflow-hidden border border-slate-200 hover:border-purple-300 transition-colors">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={att.url} alt={att.file_name ?? 'attachment'} className="w-full h-full object-cover" />
+                    </a>
+                  ) : (
+                    <a href={att.url} target="_blank" rel="noopener noreferrer"
+                      className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-purple-700 hover:bg-purple-50 hover:border-purple-300 transition-colors">
+                      <svg className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                      </svg>
+                      <span className="truncate max-w-[160px]">{att.file_name ?? 'file'}</span>
+                      {att.file_size && <span className="text-slate-400 flex-shrink-0">{formatBytes(att.file_size)}</span>}
+                    </a>
+                  )}
+                  {(att.uploaded_by === appUser?.id || appUser?.is_admin) && (
+                    <button
+                      onClick={() => deleteTaskAttachment(att.id)}
+                      className="absolute -top-1.5 -right-1.5 hidden group-hover:flex w-5 h-5 bg-red-500 text-white rounded-full items-center justify-center text-xs leading-none"
+                    >
+                      ×
+                    </button>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* ── Activity Tab ── */}
+      {activeTab === 'activity' && (
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
+            <h2 className="text-sm font-semibold text-slate-700">Activity</h2>
+          </div>
+          {task.history.length === 0 ? (
+            <div className="px-6 py-4 text-sm text-slate-400">No activity yet.</div>
+          ) : (
+            <div className="p-4 space-y-0">
+              {task.history.map((h, idx) => (
+                <div key={h.id} className={`flex gap-4 ${idx < task.history.length - 1 ? 'pb-4' : ''}`}>
+                  <div className="flex flex-col items-center">
+                    <div className="w-2 h-2 rounded-full bg-purple-400 mt-1.5 flex-shrink-0" />
+                    {idx < task.history.length - 1 && <div className="w-px flex-1 bg-slate-100 my-1" />}
                   </div>
-                ))}
-              </div>
+                  <div className="flex-1 min-w-0 pb-1">
+                    <div className="text-xs text-slate-500">
+                      <span className="font-medium text-slate-700">{h.user.display_name}</span>
+                      {' changed '}
+                      <span className="font-medium text-slate-700">{h.field_changed.replace(/_/g, ' ')}</span>
+                      {h.old_value != null && (
+                        <> from <span className="font-mono bg-slate-100 px-1 rounded">{h.old_value}</span></>
+                      )}
+                      {h.new_value != null && (
+                        <> to <span className="font-mono bg-purple-50 text-purple-700 px-1 rounded">{h.new_value}</span></>
+                      )}
+                    </div>
+                    <div className="text-xs text-slate-400 mt-0.5">{formatDateTime(h.changed_at)}</div>
+                  </div>
+                </div>
+              ))}
             </div>
           )}
         </div>

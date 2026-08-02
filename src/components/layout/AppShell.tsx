@@ -47,6 +47,8 @@ type NavItemDef = {
   requiredRole?: string   // if set, hidden unless user has this role (or is admin)
   adminOnly?: boolean     // if set, hidden unless user is admin
   featureFlag?: string    // if set, hidden unless the named flag is enabled
+  dividerBefore?: boolean // if set, render a separator above this item
+  groupLabel?: string     // if set, render a sub-header above this item (nests items under one section)
 }
 
 type NavSection = {
@@ -104,128 +106,125 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
       href: '/dashboard',
       items: [],
     },
-      {
-          label: 'Company',
-          items: [
-              { href: '/news', label: 'News & Announcements', icon: MegaphoneIcon, adminMatch: true },
-              { href: '/employees', label: 'Employee Directory', icon: UsersIcon, adminMatch: true },
-              { href: '/documents', label: 'Documents', icon: DocumentIcon, adminMatch: true },
-              { href: '/profile', label: 'My Profile', icon: UserAdminIcon },
-          ],
-      },
     {
-      label: 'Teams',
+      label: 'Company',
       items: [
-        { href: '/my-tasks', label: 'My Tasks', icon: BoardIcon },
-        ...teams.map((team): NavItemDef => ({
-          href: `/teams/${team.key}`,
-          label: team.name,
-          icon: UsersIcon,
-        })),
+        { href: '/news', label: 'News & Announcements', icon: MegaphoneIcon, adminMatch: true },
+        { href: '/employees', label: 'Employee Directory', icon: UsersIcon, adminMatch: true },
+        { href: '/birthdays', label: 'Birthdays', icon: CakeIcon },
+        { href: '/documents', label: 'Documents', icon: DocumentIcon, adminMatch: true },
+        { href: '/access-requests/new', label: 'Request Access', icon: LockIcon },
+        { href: '/profile', label: 'My Profile', icon: UserAdminIcon },
       ],
     },
     {
-      label: 'Art',
-      items: [
-        { href: '/teams/art', label: 'My Tasks', icon: BoardIcon },
-        { href: '/documents/art', label: 'Documents', icon: DocumentIcon },
-        { href: 'https://www.dropbox.com/home', label: 'Dropbox', icon: LinkIcon },
-      ],
+      label: 'My Tasks',
+      href: '/my-tasks',
+      items: [],
     },
     {
-      label: 'Aturian',
+      label: 'Aturian ERP',
       items: [
         { href: 'https://arcon.erp.network/', label: 'Login', icon: LoginIcon },
-        { href: '/aturian/customers/new', label: 'Add Customer', icon: CrmCustomersIcon },
+        { href: '/aturian/customers/new', label: 'Add Customer', icon: CrmCustomersIcon, dividerBefore: true },
         { href: '/aturian/customers/queue', label: 'Customer Queue', icon: ClipboardListIcon },
         { href: '/aturian/suppliers/new', label: 'Add Supplier', icon: BuildingIcon },
         { href: '/aturian/suppliers/queue', label: 'Supplier Queue', icon: ClipboardListIcon },
       ],
     },
-      {
-          label: 'Sales',
-          items: [
-              { href: '/sales', label: 'Dashboard', icon: CrmDashIcon },
-              { href: '/sales/opportunities', label: 'Opportunities', icon: CrmOppsIcon },
-              { href: '/sales/customers', label: 'Customers', icon: CrmCustomersIcon},
-              { href: '/sales/suppliers', label: 'Suppliers', icon: BuildingIcon },
-              { href: '/sales/contacts', label: 'Contacts', icon: CrmContactsIcon },
-              { href: '/documents/sales', label: 'Documents', icon: DocumentIcon },
-              { href: '/sales/tasks', label: 'Tasks', icon: TaskCheckIcon },
-          ],
-      },
+    {
+      // Canonical entry point for every team's task board — one dynamic list
+      // (GET /api/teams) instead of a hardcoded section per department.
+      label: 'Teams',
+      items: teams.map((team): NavItemDef => ({
+        href: `/teams/${team.key}`,
+        label: team.name,
+        icon: UsersIcon,
+      })),
+    },
+    {
+      label: 'CRM',
+      items: [
+        { href: '/sales', label: 'Dashboard', icon: CrmDashIcon },
+        { href: '/sales/opportunities', label: 'Opportunities', icon: CrmOppsIcon },
+        { href: '/sales/customers', label: 'Customers', icon: CrmCustomersIcon },
+        { href: '/sales/suppliers', label: 'Suppliers', icon: BuildingIcon },
+        { href: '/sales/contacts', label: 'Contacts', icon: CrmContactsIcon },
+        { href: '/documents/sales', label: 'Documents', icon: DocumentIcon, adminMatch: true },
+      ],
+    },
     {
       label: 'Marketing',
       items: [
         { href: '/marketing', label: 'Dashboard', icon: CrmDashIcon, adminMatch: true },
         { href: '/marketing/calendar', label: 'Calendar', icon: CalendarIcon, adminMatch: true },
-        { href: '/documents/marketing', label: 'Documents', icon: DocumentIcon, adminMatch: true },
         { href: '/marketing/specs', label: 'Spec Samples', icon: SpecSampleIcon, adminMatch: true },
         { href: '/admin/specs/ideas', label: 'Spec Ideas', icon: SpecSampleIcon, adminOnly: true, adminMatch: true },
         { href: '/marketing/vendor-relations', label: 'Vendor Relations', icon: BuildingIcon, adminMatch: true },
         { href: '/marketing/self-promo', label: 'Self-promo', icon: MegaphoneIcon, adminMatch: true },
+        { href: '/documents/marketing', label: 'Documents', icon: DocumentIcon, adminMatch: true },
       ],
     },
     {
-      label: 'E-Commerce',
+      label: 'Commerce',
       items: [
         { href: '/stores', label: 'Stores', icon: StoreIcon, adminMatch: true },
-        { href: '/documents/ecommerce', label: 'Documents', icon: DocumentIcon, adminMatch: true },
-        { href: '/ecommerce/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
+        { href: '/documents/ecommerce', label: 'E-Commerce Documents', icon: DocumentIcon, adminMatch: true },
       ],
     },
     {
       label: 'HR',
       items: [
-        { href: '/hr/links', label: 'Employee Links', icon: LinkIcon, adminMatch: true },
         { href: '/hr/pto', label: 'PTO Requests', icon: CalendarIcon, adminMatch: true },
         { href: '/hr/pto/requests', label: 'Review PTO', icon: TaskCheckIcon, adminMatch: true, requiredRole: 'access:hr_access' },
-        { href: '/documents/hr', label: 'Documents', icon: DocumentIcon, adminMatch: true },
-        { href: '/hr/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true, requiredRole: 'access:hr_access' },
+        { href: '/hr/links', label: 'Employee Links', icon: LinkIcon, adminMatch: true },
+        { href: '/documents/hr', label: 'HR Documents', icon: DocumentIcon, adminMatch: true },
       ],
     },
     {
-      label: 'Accounting',
+      label: 'Finance',
       items: [
-        { href: '/documents/accounting', label: 'Documents', icon: DocumentIcon, adminMatch: true },
         { href: '/expense-reports', label: 'Expense Reports', icon: ClipboardListIcon, adminMatch: true, featureFlag: 'expense-reports' },
         { href: '/admin/expense-reports', label: 'Expense Report Approvals', icon: ClipboardListIcon, adminMatch: true, adminOnly: true, featureFlag: 'expense-reports' },
-        { href: '/accounting/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
+        { href: '/documents/accounting', label: 'Accounting Documents', icon: DocumentIcon, adminMatch: true },
       ],
     },
     {
+      // Warehouse/Technology never had tools beyond Tasks + Documents; Tasks
+      // now lives under Teams, so these are minimal Documents-only sections.
       label: 'Warehouse',
       items: [
         { href: '/documents/warehouse', label: 'Documents', icon: DocumentIcon, adminMatch: true },
-        { href: '/warehouse/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
       ],
     },
-      {
-          label: 'Technology',
-          items: [
-              { href: '/documents/technology', label: 'Documents', icon: DocumentIcon, adminMatch: true },
-              { href: '/it/tasks', label: 'Tasks', icon: TaskCheckIcon, adminMatch: true },
-          ],
-      },
+    {
+      label: 'Technology',
+      items: [
+        { href: '/documents/technology', label: 'Documents', icon: DocumentIcon, adminMatch: true },
+      ],
+    },
   ]
 
   if (isAdmin) {
     sections.push({
       label: 'Admin',
       items: [
-        { href: '/admin/banner', label: 'Banner', icon: BannerIcon, adminMatch: true },
+        { href: '/admin/banner', label: 'Banner', icon: BannerIcon, adminMatch: true, groupLabel: 'Content' },
         { href: '/admin/banner-strip', label: 'Banner Strip', icon: TickerIcon, adminMatch: true },
         { href: '/admin/news', label: 'News', icon: MegaphoneIcon, adminMatch: true },
         { href: '/admin/forms', label: 'Forms', icon: DocumentIcon, adminMatch: true },
-        { href: '/admin/marketing-goals', label: 'Sales Goals', icon: GoalIcon, adminMatch: true },
+
+        { href: '/admin/marketing-goals', label: 'Sales Goals', icon: GoalIcon, adminMatch: true, groupLabel: 'Sales & Marketing' },
         { href: '/admin/marketing-tags', label: 'Marketing Tags', icon: TagIcon, adminMatch: true },
         { href: '/admin/marketing-import', label: 'Marketing Import', icon: UploadIcon, adminMatch: true },
-        { href: '/admin/stores', label: 'Stores', icon: StoreIcon, adminMatch: true },
-        { href: '/admin/hr-links', label: 'Employee Links', icon: LinkIcon, adminMatch: true },
-        { href: '/admin/users', label: 'Manage Users', icon: UserAdminIcon, adminMatch: true },
+
+        { href: '/admin/users', label: 'Manage Users', icon: UserAdminIcon, adminMatch: true, groupLabel: 'People & Access' },
         { href: '/admin/groups', label: 'Access Control', icon: UsersIcon, adminMatch: true },
         { href: '/admin/teams', label: 'Teams', icon: UsersIcon, adminMatch: true },
         { href: '/admin/access-requests', label: 'Access Requests', icon: LockIcon, adminMatch: true },
+        { href: '/admin/hr-links', label: 'Employee Links', icon: LinkIcon, adminMatch: true },
+
+        { href: '/admin/stores', label: 'Stores', icon: StoreIcon, adminMatch: true, groupLabel: 'System' },
         { href: '/releases', label: 'Release Notes', icon: ReleaseIcon, adminMatch: true },
         { href: '/admin/audit-log', label: 'Audit Log', icon: LogIcon, adminMatch: true },
       ],
@@ -527,22 +526,39 @@ export default function AppShell({ children, user, isImpersonating, impersonated
                         const bestAdminMatchHref = section.items
                           .filter(i => i.adminMatch && i.href !== '#' && pathname.startsWith(i.href))
                           .sort((a, b) => b.href.length - a.href.length)[0]?.href ?? null
-                        return section.items.map((item) => {
+                        return section.items.map((item, ii) => {
                         const active = item.href !== '#' && (
                           item.adminMatch
                             ? item.href === bestAdminMatchHref
                             : pathname === item.href
                         )
                         return (
-                          <SidebarNavItem
-                            key={item.href + item.label}
-                            item={item}
-                            active={active}
-                            onClick={() => setSidebarOpen(false)}
-                            collapsed={sidebarCollapsed}
-                            onHover={sidebarCollapsed ? (y) => setTooltip({ label: item.label, y }) : undefined}
-                            onHoverEnd={sidebarCollapsed ? () => setTooltip(null) : undefined}
-                          />
+                          <div key={item.href + item.label}>
+                            {item.dividerBefore && (
+                              <div style={{ height: 1, background: '#2a2a2a', margin: sidebarCollapsed ? '4px 8px' : '4px 12px' }} />
+                            )}
+                            {item.groupLabel && (
+                              sidebarCollapsed ? (
+                                ii > 0 && <div style={{ height: 1, background: '#2a2a2a', margin: '4px 8px' }} />
+                              ) : (
+                                <div style={{
+                                  padding: ii > 0 ? '10px 16px 4px' : '0 16px 4px',
+                                  color: '#666', fontSize: 10, fontWeight: 700,
+                                  letterSpacing: '0.08em', textTransform: 'uppercase',
+                                }}>
+                                  {item.groupLabel}
+                                </div>
+                              )
+                            )}
+                            <SidebarNavItem
+                              item={item}
+                              active={active}
+                              onClick={() => setSidebarOpen(false)}
+                              collapsed={sidebarCollapsed}
+                              onHover={sidebarCollapsed ? (y) => setTooltip({ label: item.label, y }) : undefined}
+                              onHoverEnd={sidebarCollapsed ? () => setTooltip(null) : undefined}
+                            />
+                          </div>
                         )
                       })
                         })()}

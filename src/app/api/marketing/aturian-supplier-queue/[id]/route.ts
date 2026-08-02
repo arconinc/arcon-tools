@@ -23,7 +23,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   const { data, error } = await adminClient.from('aturian_supplier_queue').select('*').eq('id', id).single()
   if (error || !data) return notFound('Queue entry not found')
 
-  const userIds = [...new Set([data.claimed_by, data.created_by, data.completed_by].filter(Boolean))]
+  const userIds = [...new Set([data.requestor_id, data.claimed_by, data.created_by, data.completed_by].filter(Boolean))]
   const { data: users } = userIds.length > 0
     ? await adminClient.from('users').select('id, display_name').in('id', userIds)
     : { data: [] as { id: string; display_name: string }[] }
@@ -32,6 +32,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   return ok({
     ...data,
+    requestor_user: data.requestor_id ? { id: data.requestor_id, display_name: usersMap[data.requestor_id] ?? null } : null,
     claimed_user: data.claimed_by ? { id: data.claimed_by, display_name: usersMap[data.claimed_by] ?? null } : null,
     created_by_user: data.created_by ? { id: data.created_by, display_name: usersMap[data.created_by] ?? null } : null,
     completed_by_user: data.completed_by ? { id: data.completed_by, display_name: usersMap[data.completed_by] ?? null } : null,

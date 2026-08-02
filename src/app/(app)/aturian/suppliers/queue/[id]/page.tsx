@@ -129,8 +129,20 @@ export default function AturianSupplierQueueDetailPage() {
             <h2 className="text-sm font-semibold text-slate-700">Company Information</h2>
           </div>
           <div className="px-5 py-4 grid grid-cols-3 gap-4 text-sm">
-            <Field label="Product Line" value={entry.product_line} />
-            <Field label="Specialty" value={entry.specialty} className="col-span-2" />
+            <Field label="Requestor" value={entry.requestor_user?.display_name} />
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
+            <h2 className="text-sm font-semibold text-slate-700">Mailing Address</h2>
+          </div>
+          <div className="px-5 py-4 grid grid-cols-3 gap-4 text-sm">
+            <Field label="Address Line 1" value={entry.mailing_address1} className="col-span-3" />
+            {entry.mailing_address2 && <Field label="Address Line 2" value={entry.mailing_address2} className="col-span-3" />}
+            <Field label="City" value={entry.mailing_city} />
+            <Field label="State" value={entry.mailing_state} />
+            <Field label="ZIP" value={entry.mailing_zip} />
           </div>
         </div>
 
@@ -153,9 +165,26 @@ export default function AturianSupplierQueueDetailPage() {
           <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
             <h2 className="text-sm font-semibold text-slate-700">Contact Emails</h2>
           </div>
-          <div className="px-5 py-4 grid grid-cols-2 gap-4 text-sm">
+          <div className="px-5 py-4 grid grid-cols-3 gap-4 text-sm">
             <Field label="Orders Email" value={entry.orders_email} />
             <Field label="AP Email" value={entry.ap_email} />
+            <Field label="Art Email" value={entry.art_email} />
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
+            <h2 className="text-sm font-semibold text-slate-700">Sales Rep &amp; Terms</h2>
+          </div>
+          <div className="px-5 py-4 grid grid-cols-1 gap-4 text-sm">
+            <Field label="Sales Rep Name and Email" value={entry.sales_rep} />
+            <Field label="Paperwork Needed" value={entry.paperwork_notes} />
+            {entry.paperwork_file_name && (
+              <div>
+                <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-0.5">Attached Paperwork</div>
+                <PaperworkFileLink path={entry.paperwork_file_path} name={entry.paperwork_file_name} />
+              </div>
+            )}
           </div>
         </div>
       </div>
@@ -168,6 +197,35 @@ function Field({ label, value, className = '' }: { label: string; value?: string
     <div className={className}>
       <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-0.5">{label}</div>
       <div className="text-slate-700">{value || '—'}</div>
+    </div>
+  )
+}
+
+function PaperworkFileLink({ path, name }: { path: string | null | undefined; name: string }) {
+  const [loading, setLoading] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  async function open() {
+    if (!path) return
+    setError(null)
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/files/signed-url?bucket=aturian-supplier-files&path=${encodeURIComponent(path)}`)
+      const data = await res.json()
+      if (!res.ok) { setError(data.error ?? 'Could not load file'); return }
+      window.open(data.signedUrl, '_blank', 'noopener,noreferrer')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <div>
+      <button type="button" onClick={open} disabled={loading}
+        className="text-sm font-medium text-purple-700 hover:text-purple-800 underline disabled:opacity-60">
+        {loading ? 'Loading…' : name}
+      </button>
+      {error && <p className="mt-0.5 text-xs text-red-600 font-medium">{error}</p>}
     </div>
   )
 }

@@ -11,6 +11,11 @@ export function formatPhone(raw: string | null | undefined): string | null {
   return `(${ten.slice(0, 3)}) ${ten.slice(3, 6)}-${ten.slice(6)}`
 }
 
+/** True if the raw input normalizes to a valid 10-digit US phone number. */
+export function isValidPhone(raw: string | null | undefined): boolean {
+  return formatPhone(raw) !== null
+}
+
 /**
  * Format phone input progressively as the user types.
  * Strips non-digits, limits to 10 digits, and builds the mask incrementally.

@@ -1008,8 +1008,11 @@ export interface AturianSupplierQueueEntry {
   company_name: string
   phone: string | null
   website: string | null
-  product_line: string | null
-  specialty: string | null
+  mailing_address1: string | null
+  mailing_address2: string | null
+  mailing_city: string | null
+  mailing_state: string | null
+  mailing_zip: string | null
   address1: string | null
   address2: string | null
   city: string | null
@@ -1017,6 +1020,12 @@ export interface AturianSupplierQueueEntry {
   zip: string | null
   orders_email: string | null
   ap_email: string | null
+  requestor_id: string | null
+  art_email: string | null
+  sales_rep: string | null
+  paperwork_notes: string | null
+  paperwork_file_path: string | null
+  paperwork_file_name: string | null
   status: AturianQueueStatus
   task_id: string | null
   claimed_by: string | null
@@ -1029,6 +1038,7 @@ export interface AturianSupplierQueueEntry {
 }
 
 export interface AturianSupplierQueueDetail extends AturianSupplierQueueEntry {
+  requestor_user: { id: string; display_name: string } | null
   claimed_user: { id: string; display_name: string } | null
   created_by_user: { id: string; display_name: string } | null
   completed_by_user: { id: string; display_name: string } | null

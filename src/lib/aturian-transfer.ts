@@ -161,8 +161,11 @@ type SupplierQueueTransferSource = {
   company_name: string
   phone: string | null
   website: string | null
-  product_line: string | null
-  specialty: string | null
+  mailing_address1: string | null
+  mailing_address2: string | null
+  mailing_city: string | null
+  mailing_state: string | null
+  mailing_zip: string | null
   address1: string | null
   address2: string | null
   city: string | null
@@ -170,6 +173,9 @@ type SupplierQueueTransferSource = {
   zip: string | null
   orders_email: string | null
   ap_email: string | null
+  art_email: string | null
+  sales_rep: string | null
+  paperwork_notes: string | null
 }
 
 export function buildSupplierQueuePayload(entry: SupplierQueueTransferSource): AturianTransferPayload {
@@ -184,8 +190,11 @@ export function buildSupplierQueuePayload(entry: SupplierQueueTransferSource): A
       name: { label: 'Supplier Name', value: entry.company_name },
       phone: { label: 'Phone', value: entry.phone },
       website: { label: 'Website', value: entry.website },
-      product_line: { label: 'Product Line', value: entry.product_line },
-      specialty: { label: 'Specialty', value: entry.specialty },
+      mailing_address1: { label: 'Mailing Address 1', value: entry.mailing_address1 },
+      mailing_address2: { label: 'Mailing Address 2', value: entry.mailing_address2 },
+      mailing_city: { label: 'Mailing City', value: entry.mailing_city },
+      mailing_state: { label: 'Mailing State', value: entry.mailing_state },
+      mailing_zip: { label: 'Mailing ZIP', value: entry.mailing_zip },
       billing_address1: { label: 'Billing Address 1', value: entry.address1 },
       billing_address2: { label: 'Billing Address 2', value: entry.address2 },
       billing_city: { label: 'Billing City', value: entry.city },
@@ -193,6 +202,9 @@ export function buildSupplierQueuePayload(entry: SupplierQueueTransferSource): A
       billing_zip: { label: 'Billing ZIP', value: entry.zip },
       orders_email: { label: 'Orders Email', value: entry.orders_email },
       ap_email: { label: 'AP Email', value: entry.ap_email },
+      art_email: { label: 'Art Email', value: entry.art_email },
+      sales_rep: { label: 'Sales Rep Name and Email', value: entry.sales_rep },
+      paperwork_notes: { label: 'Paperwork Needed', value: entry.paperwork_notes },
     },
   }
 }

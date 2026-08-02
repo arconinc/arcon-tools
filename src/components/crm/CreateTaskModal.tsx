@@ -10,6 +10,7 @@ import { ALL_CATEGORIES, getTaskCategoryLabel } from '@/lib/task-constants'
 import { TaskFlowStepper } from '@/components/crm/task/TaskFlowStepper'
 import EmployeeAvatar from '@/components/employees/EmployeeAvatar'
 import { TASK_STATUS_LABELS, TASK_STATUS_COLORS, getTaskNextActions } from '@/lib/task-workflow'
+import { CalendarGlyph, TagGlyph, ReassignGlyph, SendGlyph, CheckCircleGlyph, TrashGlyph, ExternalLinkGlyph, ChatBubbleGlyph, PaperclipGlyph, PlusGlyph } from '@/components/crm/task/TaskIcons'
 import type { CrmTask, CrmTaskStatus } from '@/types'
 
 type DropdownUser = { id: string; display_name: string; email: string }
@@ -105,20 +106,12 @@ const PRIORITIES = [
   { value: 'high', label: 'High', pill: 'text-red-700 bg-red-50 border-red-200 hover:bg-red-100' },
 ]
 
-function PriorityIcon({ value }: { value: string }) {
-  if (value === 'high') return (
-    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 15l7-7 7 7" />
-    </svg>
-  )
-  if (value === 'low') return (
-    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M19 9l-7 7-7-7" />
-    </svg>
-  )
+// A single flag mark for all priority levels — the pill's color (not the
+// glyph) carries low/medium/high, matching the reference design.
+function PriorityIcon() {
   return (
     <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M20 12H4" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 21V4m0 0h11l-2 4 2 4H5" />
     </svg>
   )
 }
@@ -246,8 +239,7 @@ export function TaskFormModal({
   const dropdownRef = useRef<HTMLDivElement>(null)
   const initialFormRef = useRef<TaskForm>(task ? formFromTask(task) : emptyForm(defaultTeamId))
   const [editingField, setEditingField] = useState<'title' | 'assigned_to' | 'category' | 'description' | null>(null)
-  const [attachmentsExpanded, setAttachmentsExpanded] = useState(false)
-  const [notesExpanded, setNotesExpanded] = useState(mode === 'edit')
+  const [sidePanelTab, setSidePanelTab] = useState<'comments' | 'attachments'>('comments')
   const dueDateRef = useRef<HTMLInputElement>(null)
   const canReassignToCreator = mode === 'edit' &&
     !!task?.created_by &&
@@ -265,8 +257,7 @@ export function TaskFormModal({
     setExistingAttachments([])
     setError(null)
     setEditingField(mode === 'create' ? 'title' : null)
-    setAttachmentsExpanded(false)
-    setNotesExpanded(mode === 'edit')
+    setSidePanelTab(mode === 'edit' ? 'comments' : 'attachments')
     if (mode === 'edit' && task?.id) {
       fetch(`/api/marketing/tasks/${task.id}/attachments`)
         .then((r) => r.json())
@@ -500,7 +491,7 @@ export function TaskFormModal({
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/40 px-4 py-6" onClick={handleClose}>
-      <div className="w-full max-w-4xl h-[90vh] flex flex-col rounded-2xl bg-white shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
+      <div className="w-full max-w-7xl h-[90vh] flex flex-col rounded-2xl bg-white shadow-2xl overflow-hidden" onClick={e => e.stopPropagation()}>
 
         {/* Header */}
         <div className="flex-shrink-0 border-b border-slate-100 bg-white px-8 py-4">
@@ -541,10 +532,7 @@ export function TaskFormModal({
                   className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
                   aria-label="Open full task view"
                 >
-                  <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18 13v6a2 2 0 01-2 2H5a2 2 0 01-2-2V8a2 2 0 012-2h6" />
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 3h6v6M10 14L21 3" />
-                  </svg>
+                  <ExternalLinkGlyph />
                 </Link>
               )}
               <button
@@ -603,7 +591,7 @@ export function TaskFormModal({
                 onClick={() => setOpenDropdown(openDropdown === 'priority' ? null : 'priority')}
                 className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold transition-colors ${currentPriority.pill}`}
               >
-                <PriorityIcon value={form.priority} />
+                <PriorityIcon />
                 {currentPriority.label}
                 <svg className="h-3 w-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                   <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -618,7 +606,7 @@ export function TaskFormModal({
                       onClick={() => { setForm((prev) => ({ ...prev, priority: p.value })); setOpenDropdown(null) }}
                       className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold transition-colors ${p.value === form.priority ? p.pill : 'text-slate-600 hover:bg-slate-50'}`}
                     >
-                      <PriorityIcon value={p.value} />
+                      <PriorityIcon />
                       {p.label}
                     </button>
                   ))}
@@ -626,34 +614,122 @@ export function TaskFormModal({
               )}
             </div>
 
-            {mode === 'edit' && task?.created_user && (
-              <>
-                <span className="text-xs text-slate-300">·</span>
-                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500">
-                  <EmployeeAvatar displayName={task.created_user.display_name} avatarUrl={task.created_user.avatar_url} profileImageUrl={task.created_user.profile_image_url} size="xs" />
-                  <span className="text-slate-700 font-semibold">{task.created_user.display_name}</span>
-                  {(task.assigned_user || task.team) && (
-                    <>
-                      →
-                      {task.assigned_user ? (
-                        <>
-                          <EmployeeAvatar displayName={task.assigned_user.display_name} avatarUrl={task.assigned_user.avatar_url} profileImageUrl={task.assigned_user.profile_image_url} size="xs" />
-                          <span className="text-slate-700 font-semibold">{task.assigned_user.display_name}</span>
-                        </>
-                      ) : (
-                        <span className="text-slate-700 font-semibold">{task.team?.name}</span>
-                      )}
-                    </>
-                  )}
-                </span>
+            <button
+              type="button"
+              onClick={() => (dueDateRef.current as HTMLInputElement & { showPicker?: () => void })?.showPicker?.() ?? dueDateRef.current?.click()}
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-purple-700 transition-colors"
+            >
+              <CalendarGlyph />
+              {form.due_date
+                ? new Date(form.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
+                : 'No date'}
+            </button>
+            <input
+              ref={dueDateRef}
+              type="date"
+              value={form.due_date}
+              onChange={(e) => setForm((p) => ({ ...p, due_date: e.target.value }))}
+              className="sr-only"
+              tabIndex={-1}
+              aria-hidden="true"
+            />
+
+            {editingField === 'category' ? (
+              <select
+                value={form.category}
+                autoFocus
+                onChange={(e) => { setForm((p) => ({ ...p, category: e.target.value })); setEditingField(null) }}
+                onBlur={() => setEditingField(null)}
+                className="text-xs border border-purple-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
+              >
+                <option value="">- None -</option>
+                {ALL_CATEGORIES.map((c) => (
+                  <option key={c} value={c}>{getTaskCategoryLabel(c)}</option>
+                ))}
+              </select>
+            ) : (
+              <button
+                type="button"
+                onClick={() => setEditingField('category')}
+                className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-purple-700 transition-colors"
+              >
+                <TagGlyph />
+                {form.category ? getTaskCategoryLabel(form.category) : 'Not set'}
+              </button>
+            )}
+
+            {mode === 'create' && (
+              editingField === 'assigned_to' ? (
+                <TeamAssigneeSelect
+                  teamId={form.team_id || null}
+                  assignedTo={form.assigned_to || null}
+                  teams={teams}
+                  users={crmUsers}
+                  onChange={(assignment) => {
+                    setForm((p) => ({ ...p, team_id: assignment.teamId ?? '', assigned_to: assignment.assignedTo ?? '' }))
+                    setEditingField(null)
+                  }}
+                  className="text-xs border border-purple-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
+                />
+              ) : (
                 <button
                   type="button"
                   onClick={() => setEditingField('assigned_to')}
-                  className="text-xs font-semibold text-purple-700 hover:text-purple-900 ml-auto px-2 py-0.5 rounded transition-colors"
+                  className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-purple-700 transition-colors"
                 >
-                  Reassign
+                  <ReassignGlyph />
+                  {form.assigned_to
+                    ? (crmUsers.find((u) => u.id === form.assigned_to)?.display_name ?? 'Unknown')
+                    : form.team_id
+                    ? (teams.find((t) => t.id === form.team_id)?.name ?? 'Unknown team')
+                    : 'Unassigned'}
                 </button>
-              </>
+              )
+            )}
+
+            {mode === 'edit' && task?.created_user && (
+              editingField === 'assigned_to' ? (
+                <TeamAssigneeSelect
+                  teamId={form.team_id || null}
+                  assignedTo={form.assigned_to || null}
+                  teams={teams}
+                  users={crmUsers}
+                  onChange={(assignment) => {
+                    setForm((p) => ({ ...p, team_id: assignment.teamId ?? '', assigned_to: assignment.assignedTo ?? '' }))
+                    setEditingField(null)
+                  }}
+                  className="text-xs border border-purple-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white ml-auto"
+                />
+              ) : (
+                <>
+                  <span className="text-xs text-slate-300">·</span>
+                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500">
+                    <EmployeeAvatar displayName={task.created_user.display_name} avatarUrl={task.created_user.avatar_url} profileImageUrl={task.created_user.profile_image_url} size="xs" />
+                    <span className="text-slate-700 font-semibold">{task.created_user.display_name}</span>
+                    {(task.assigned_user || task.team) && (
+                      <>
+                        →
+                        {task.assigned_user ? (
+                          <>
+                            <EmployeeAvatar displayName={task.assigned_user.display_name} avatarUrl={task.assigned_user.avatar_url} profileImageUrl={task.assigned_user.profile_image_url} size="xs" />
+                            <span className="text-slate-700 font-semibold">{task.assigned_user.display_name}</span>
+                          </>
+                        ) : (
+                          <span className="text-slate-700 font-semibold">{task.team?.name}</span>
+                        )}
+                      </>
+                    )}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => setEditingField('assigned_to')}
+                    className="inline-flex items-center gap-1 text-xs font-semibold text-purple-700 hover:text-purple-900 ml-auto px-2 py-0.5 rounded transition-colors"
+                  >
+                    <ReassignGlyph />
+                    Reassign
+                  </button>
+                </>
+              )
             )}
           </div>
         </div>
@@ -671,317 +747,198 @@ export function TaskFormModal({
         {/* Form — flex column so description can grow */}
         <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 relative">
 
-          {/* Compact metadata fields */}
-          <div className="flex-shrink-0 px-6 pt-4">
-            {error && (
-              <div className="mb-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
-            )}
-
-            {/* Assigned To (Team or Individual) + Due Date */}
-            <div className="grid grid-cols-2 border-b border-slate-100">
-              <div className="group flex items-center gap-2 py-2 pr-3 border-r border-slate-100">
-                <div className="flex-shrink-0 w-20 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Assigned To</div>
-                <div className="flex-1 min-w-0">
-                  {editingField === 'assigned_to' ? (
-                    <TeamAssigneeSelect
-                      teamId={form.team_id || null}
-                      assignedTo={form.assigned_to || null}
-                      teams={teams}
-                      users={crmUsers}
-                      onChange={(assignment) => {
-                        setForm((p) => ({ ...p, team_id: assignment.teamId ?? '', assigned_to: assignment.assignedTo ?? '' }))
-                        setEditingField(null)
-                      }}
-                    />
-                  ) : (
-                    <span className="text-sm text-slate-700 leading-tight">
-                      {form.assigned_to
-                        ? (crmUsers.find((u) => u.id === form.assigned_to)?.display_name ?? 'Unknown')
-                        : form.team_id
-                        ? (teams.find((t) => t.id === form.team_id)?.name ?? 'Unknown team')
-                        : <span className="text-slate-400 italic">Unassigned</span>
-                      }
-                    </span>
-                  )}
-                </div>
-                {editingField !== 'assigned_to' && (
-                  <button
-                    type="button"
-                    onClick={() => setEditingField('assigned_to')}
-                    className="flex-shrink-0 p-1 text-slate-300 hover:text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity rounded"
-                    aria-label="Edit assignee"
-                  >
-                    <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                    </svg>
-                  </button>
-                )}
-              </div>
-              <div className="flex items-center gap-2 py-2 pl-3">
-                <div className="flex-shrink-0 w-20 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Due Date</div>
-                <div className="flex items-center gap-1.5 flex-1 min-w-0">
-                  <span className="text-sm text-slate-700 leading-tight">
-                    {form.due_date
-                      ? new Date(form.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })
-                      : <span className="text-slate-400 italic">No date</span>
-                    }
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => (dueDateRef.current as HTMLInputElement & { showPicker?: () => void })?.showPicker?.() ?? dueDateRef.current?.click()}
-                    className="flex-shrink-0 p-1 text-slate-400 hover:text-purple-600 transition-colors rounded"
-                    aria-label="Pick date"
-                  >
-                    <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <rect x="3" y="4" width="18" height="18" rx="2" ry="2" strokeWidth={2} />
-                      <line x1="16" y1="2" x2="16" y2="6" strokeWidth={2} />
-                      <line x1="8" y1="2" x2="8" y2="6" strokeWidth={2} />
-                      <line x1="3" y1="10" x2="21" y2="10" strokeWidth={2} />
-                    </svg>
-                  </button>
-                  <input
-                    ref={dueDateRef}
-                    type="date"
-                    value={form.due_date}
-                    onChange={(e) => setForm((p) => ({ ...p, due_date: e.target.value }))}
-                    className="sr-only"
-                    tabIndex={-1}
-                    aria-hidden="true"
-                  />
-                </div>
-              </div>
-            </div>
-
-            {/* Category */}
-            <div className="group flex items-center gap-2 py-2">
-              <div className="flex-shrink-0 w-20 text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Category</div>
-              <div className="flex-1 min-w-0">
-                {editingField === 'category' ? (
-                  <select
-                    value={form.category}
-                    autoFocus
-                    onChange={(e) => { setForm((p) => ({ ...p, category: e.target.value })); setEditingField(null) }}
-                    onBlur={() => setEditingField(null)}
-                    className="w-full px-2 py-1 text-sm border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
-                  >
-                    <option value="">- None -</option>
-                    {ALL_CATEGORIES.map((c) => (
-                      <option key={c} value={c}>{getTaskCategoryLabel(c)}</option>
-                    ))}
-                  </select>
-                ) : (
-                  <span className="text-sm text-slate-700 leading-tight">
-                    {form.category ? getTaskCategoryLabel(form.category) : <span className="text-slate-400 italic">Not set</span>}
-                  </span>
-                )}
-              </div>
-              {editingField !== 'category' && (
-                <button
-                  type="button"
-                  onClick={() => setEditingField('category')}
-                  className="flex-shrink-0 p-1 text-slate-300 hover:text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity rounded"
-                  aria-label="Edit category"
-                >
-                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
-                </button>
-              )}
-            </div>
-          </div>
-
-          {/* Description */}
-          <div className="flex-1 flex flex-col min-h-0 px-6 pt-3 pb-1">
-            <div className="flex-shrink-0 flex items-center justify-between mb-1">
-              <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Description</span>
-              {editingField !== 'description' && (
-                <button
-                  type="button"
-                  onClick={() => setEditingField('description')}
-                  className="p-0.5 text-slate-300 hover:text-purple-600 transition-colors rounded"
-                  aria-label="Edit description"
-                >
-                  <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" />
-                  </svg>
-                </button>
-              )}
-            </div>
-
-            {editingField === 'description' ? (
-              <div
-                className="flex-1 flex flex-col min-h-0"
-                onBlur={(e) => {
-                  if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
-                    setEditingField(null)
-                  }
-                }}
-              >
-                <TaskDescriptionEditor
-                  initialHtml={form.description}
-                  onChange={(html) => setForm((p) => ({ ...p, description: html }))}
-                />
-              </div>
-            ) : (
-              <div
-                className="flex-1 min-h-0 overflow-y-auto cursor-text rounded-lg border border-slate-200 hover:border-slate-300 bg-white px-3 py-2 transition-colors"
-                onClick={() => setEditingField('description')}
-              >
-                {form.description ? (
-                  isHtmlContent(form.description) ? (
-                    <div
-                      className="prose prose-sm prose-slate max-w-none"
-                      dangerouslySetInnerHTML={{ __html: form.description }}
-                    />
-                  ) : (
-                    <p className="text-sm text-slate-700 whitespace-pre-wrap">{form.description}</p>
-                  )
-                ) : (
-                  <p className="text-sm text-slate-400 italic">Add a description…</p>
-                )}
-              </div>
-            )}
-          </div>
-
-          {/* Collapsible Comments (edit mode only) */}
-          {mode === 'edit' && task?.id && (
-            <div className="flex-shrink-0 border-t border-slate-100">
-              <button
-                type="button"
-                onClick={() => setNotesExpanded((p) => !p)}
-                className="w-full flex items-center gap-2 px-6 py-2 text-left hover:bg-slate-50 transition-colors"
-              >
-                <svg className={`h-3 w-3 text-slate-400 transition-transform flex-shrink-0 ${notesExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-                </svg>
-                <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Comments</span>
-                {notes.length > 0 && (
-                  <span className="ml-0.5 px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-full leading-none">
-                    {notes.length}
-                  </span>
-                )}
-              </button>
-              {notesExpanded && (
-                <div className="px-6 pb-3 space-y-3">
-                  <div className="flex gap-2 items-start">
-                    <textarea
-                      rows={3}
-                      value={noteText}
-                      onChange={(e) => setNoteText(e.target.value)}
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) submitNote()
-                      }}
-                      placeholder="Add a comment…"
-                      className="flex-1 px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none"
-                    />
-                    <div className="flex flex-col gap-1.5">
-                      <button
-                        type="button"
-                        onClick={() => submitNote(false)}
-                        disabled={submittingNote || !noteText.trim()}
-                        className="px-3 py-2 bg-purple-700 text-white text-xs font-semibold rounded-lg hover:bg-purple-800 disabled:opacity-50 transition-colors whitespace-nowrap"
-                      >
-                        {submittingNote ? 'Saving…' : 'Save Comment'}
-                      </button>
-                      {canReassignToCreator && (
-                        <button
-                          type="button"
-                          onClick={() => submitNote(true)}
-                          disabled={submittingNote || !noteText.trim()}
-                          title={`Comment and reassign to ${assignerName}`}
-                          className="px-3 py-2 border border-amber-300 bg-amber-50 text-amber-800 text-xs font-semibold rounded-lg hover:bg-amber-100 disabled:opacity-50 transition-colors whitespace-nowrap"
-                        >
-                          Comment & Reassign
-                        </button>
-                      )}
-                    </div>
-                  </div>
-                  {notes.length === 0 ? (
-                    <p className="text-xs text-slate-400">No comments yet.</p>
-                  ) : (
-                    <div className="max-h-[50vh] overflow-y-auto space-y-2.5 pr-1">
-                      {[...notes].reverse().map((n) => (
-                        <div key={n.id} className="bg-slate-50 rounded-lg px-3 py-2">
-                          <div className="flex items-center gap-1.5 mb-0.5">
-                            <span className="text-xs font-semibold text-slate-700">{n.user.display_name}</span>
-                            <span className="text-xs text-slate-400">{relativeTime(n.created_at)}</span>
-                          </div>
-                          <p className="text-xs text-slate-600 whitespace-pre-wrap">{n.comment}</p>
-                        </div>
-                      ))}
-                      <div ref={notesEndRef} />
-                    </div>
-                  )}
-                </div>
-              )}
-            </div>
+          {error && (
+            <div className="flex-shrink-0 mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
           )}
 
-          {/* Collapsible Attachments */}
-          <div className="flex-shrink-0 border-t border-slate-100">
-            <button
-              type="button"
-              onClick={() => setAttachmentsExpanded((p) => !p)}
-              className="w-full flex items-center gap-2 px-6 py-2 text-left hover:bg-slate-50 transition-colors"
-            >
-              <svg className={`h-3 w-3 text-slate-400 transition-transform flex-shrink-0 ${attachmentsExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-              </svg>
-              <span className="text-[10px] font-semibold text-slate-500 uppercase tracking-wide">Attachments</span>
-              {(existingAttachments.length + pendingFiles.length) > 0 && (
-                <span className="ml-0.5 px-1.5 py-0.5 bg-slate-100 text-slate-600 text-[10px] font-bold rounded-full leading-none">
-                  {existingAttachments.length + pendingFiles.length}
-                </span>
-              )}
-            </button>
-            {attachmentsExpanded && (
-              <div className="px-6 pb-3 space-y-2">
-                {existingAttachments.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {existingAttachments.map((att) => (
-                      <span key={att.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded-full">
-                        <a href={att.url} target="_blank" rel="noopener noreferrer" className="hover:underline truncate max-w-[160px]">
-                          {att.file_name ?? 'file'}
-                        </a>
-                        <button
-                          type="button"
-                          onClick={() => deleteExistingAttachment(att.id)}
-                          className="text-slate-400 hover:text-red-500 leading-none"
-                        >
-                          ×
-                        </button>
-                      </span>
-                    ))}
-                  </div>
-                )}
-                <input
-                  type="file"
-                  multiple
-                  onChange={(e) => {
-                    const files = Array.from(e.target.files ?? [])
-                    setPendingFiles((prev) => [...prev, ...files])
-                    e.target.value = ''
+          <div className="flex-1 flex min-h-0">
+
+            {/* Description — 2/3 */}
+            <div className="w-2/3 flex flex-col min-h-0 px-6 pt-3 pb-3 border-r border-slate-100">
+              <div className="flex-shrink-0 mb-1">
+                <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Description</span>
+              </div>
+
+              {editingField === 'description' ? (
+                <div
+                  className="flex-1 flex flex-col min-h-0"
+                  onBlur={(e) => {
+                    if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
+                      setEditingField(null)
+                    }
                   }}
-                  className="block w-full text-sm text-slate-500 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-semibold file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
-                />
-                {pendingFiles.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {pendingFiles.map((file, index) => (
-                      <span key={`${file.name}-${index}`} className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-50 text-purple-700 text-xs rounded-full">
-                        {file.name}
+                >
+                  <TaskDescriptionEditor
+                    initialHtml={form.description}
+                    onChange={(html) => setForm((p) => ({ ...p, description: html }))}
+                  />
+                </div>
+              ) : (
+                <div
+                  className="flex-1 min-h-0 overflow-y-auto cursor-text rounded-lg hover:bg-slate-50 bg-white px-3 py-2 transition-colors"
+                  onClick={() => setEditingField('description')}
+                >
+                  {form.description ? (
+                    isHtmlContent(form.description) ? (
+                      <div
+                        className="prose prose-sm prose-slate max-w-none"
+                        dangerouslySetInnerHTML={{ __html: form.description }}
+                      />
+                    ) : (
+                      <p className="text-sm text-slate-700 whitespace-pre-wrap">{form.description}</p>
+                    )
+                  ) : (
+                    <p className="text-sm text-slate-400 italic">Add a description…</p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Comments / Attachments — 1/3, tabbed */}
+            <div className="w-1/3 flex flex-col min-h-0">
+              <div className="flex-shrink-0 flex items-center gap-1 px-4 pt-3">
+                {mode === 'edit' && task?.id && (
+                  <button
+                    type="button"
+                    onClick={() => setSidePanelTab('comments')}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-t-lg border-b-2 transition-colors ${
+                      sidePanelTab === 'comments' ? 'text-purple-700 border-purple-700' : 'text-slate-400 border-transparent hover:text-slate-600'
+                    }`}
+                  >
+                    <ChatBubbleGlyph className="h-4 w-4" />
+                    Comments
+                    {notes.length > 0 && (
+                      <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-[10px] font-bold rounded-full leading-none">
+                        {notes.length}
+                      </span>
+                    )}
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setSidePanelTab('attachments')}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-t-lg border-b-2 transition-colors ${
+                    sidePanelTab === 'attachments' ? 'text-purple-700 border-purple-700' : 'text-slate-400 border-transparent hover:text-slate-600'
+                  }`}
+                >
+                  <PaperclipGlyph className="h-4 w-4" />
+                  Attachments
+                  {(existingAttachments.length + pendingFiles.length) > 0 && (
+                    <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-[10px] font-bold rounded-full leading-none">
+                      {existingAttachments.length + pendingFiles.length}
+                    </span>
+                  )}
+                </button>
+              </div>
+              <div className="border-b border-slate-100" />
+
+              <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
+                {sidePanelTab === 'comments' && mode === 'edit' && task?.id && (
+                  <>
+                    <div className="flex items-start gap-2">
+                      <EmployeeAvatar displayName={appUser?.display_name ?? ''} avatarUrl={appUser?.avatar_url} size="sm" />
+                      <div className="relative flex-1">
+                        <input
+                          type="text"
+                          value={noteText}
+                          onChange={(e) => setNoteText(e.target.value)}
+                          onKeyDown={(e) => { if (e.key === 'Enter') submitNote() }}
+                          placeholder="Add a comment…"
+                          className="w-full pl-3 pr-9 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
+                        />
                         <button
                           type="button"
-                          onClick={() => setPendingFiles((prev) => prev.filter((_, i) => i !== index))}
-                          className="text-slate-400 hover:text-red-500 leading-none"
+                          onClick={() => submitNote(false)}
+                          disabled={submittingNote || !noteText.trim()}
+                          aria-label="Save comment"
+                          className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-slate-300 hover:text-purple-600 disabled:opacity-40 transition-colors"
                         >
-                          ×
+                          <SendGlyph className="h-3.5 w-3.5" />
                         </button>
-                      </span>
-                    ))}
-                  </div>
+                      </div>
+                    </div>
+
+                    {canReassignToCreator && (
+                      <button
+                        type="button"
+                        onClick={() => submitNote(true)}
+                        disabled={submittingNote || !noteText.trim()}
+                        title={`Comment and reassign to ${assignerName}`}
+                        className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 border border-purple-200 bg-purple-50 text-purple-700 text-xs font-semibold rounded-lg hover:bg-purple-100 disabled:opacity-50 transition-colors"
+                      >
+                        <ReassignGlyph />
+                        Comment & Reassign to {assignerName}
+                      </button>
+                    )}
+
+                    {notes.length > 0 && (
+                      <div className="mt-3 space-y-2.5 pr-1">
+                        {[...notes].reverse().map((n) => (
+                          <div key={n.id} className="bg-slate-50 rounded-lg px-3 py-2">
+                            <div className="flex items-center gap-1.5 mb-0.5">
+                              <span className="text-xs font-semibold text-slate-700">{n.user.display_name}</span>
+                              <span className="text-xs text-slate-400">{relativeTime(n.created_at)}</span>
+                            </div>
+                            <p className="text-xs text-slate-600 whitespace-pre-wrap">{n.comment}</p>
+                          </div>
+                        ))}
+                        <div ref={notesEndRef} />
+                      </div>
+                    )}
+                  </>
+                )}
+
+                {sidePanelTab === 'attachments' && (
+                  <>
+                    <label className="flex items-center justify-center gap-1.5 w-full py-4 border border-dashed border-slate-300 rounded-lg text-sm font-semibold text-slate-500 hover:border-purple-300 hover:text-purple-700 hover:bg-purple-50/50 cursor-pointer transition-colors">
+                      <PlusGlyph />
+                      Attach files
+                      <input
+                        type="file"
+                        multiple
+                        onChange={(e) => {
+                          const files = Array.from(e.target.files ?? [])
+                          setPendingFiles((prev) => [...prev, ...files])
+                          e.target.value = ''
+                        }}
+                        className="sr-only"
+                      />
+                    </label>
+
+                    {(existingAttachments.length > 0 || pendingFiles.length > 0) && (
+                      <div className="mt-2 flex flex-wrap gap-1.5">
+                        {existingAttachments.map((att) => (
+                          <span key={att.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded-full">
+                            <a href={att.url} target="_blank" rel="noopener noreferrer" className="hover:underline truncate max-w-[160px]">
+                              {att.file_name ?? 'file'}
+                            </a>
+                            <button
+                              type="button"
+                              onClick={() => deleteExistingAttachment(att.id)}
+                              className="text-slate-400 hover:text-red-500 leading-none"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                        {pendingFiles.map((file, index) => (
+                          <span key={`${file.name}-${index}`} className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-50 text-purple-700 text-xs rounded-full">
+                            {file.name}
+                            <button
+                              type="button"
+                              onClick={() => setPendingFiles((prev) => prev.filter((_, i) => i !== index))}
+                              className="text-slate-400 hover:text-red-500 leading-none"
+                            >
+                              ×
+                            </button>
+                          </span>
+                        ))}
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
-            )}
+            </div>
           </div>
 
           {/* Footer */}
@@ -991,9 +948,10 @@ export function TaskFormModal({
                 <button
                   type="button"
                   onClick={() => setShowDeleteConfirm(true)}
-                  className="px-4 py-2 text-sm font-semibold text-red-600 border border-red-200 rounded-xl hover:bg-red-50 transition-colors"
+                  className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-red-600 border border-red-200 rounded-xl hover:bg-red-50 transition-colors"
                 >
-                  Delete
+                  <TrashGlyph />
+                  Delete Task
                 </button>
               )}
             </div>
@@ -1010,6 +968,11 @@ export function TaskFormModal({
                       : action.toStatus === 'completed' ? 'green'
                       : action.toStatus === 'need_changes' ? 'red'
                       : 'yellow'
+                  }
+                  icon={
+                    action.toStatus === 'waiting_on_approval' ? <SendGlyph className="h-3.5 w-3.5" />
+                      : action.toStatus === 'completed' ? <CheckCircleGlyph className="h-3.5 w-3.5" />
+                      : undefined
                   }
                   disabled={saving}
                 />

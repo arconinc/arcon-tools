@@ -57,6 +57,13 @@ export function useFormValidation<T extends Record<string, unknown>>() {
   return { errors, validate, clearError, resetErrors }
 }
 
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+/** True if the value looks like a valid email address. */
+export function isValidEmail(value: string): boolean {
+  return EMAIL_RE.test(value.trim())
+}
+
 // ─── Class helpers ────────────────────────────────────────────────────────────
 
 /** Base class string shared by inputs and selects */

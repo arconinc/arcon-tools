@@ -24,6 +24,9 @@ export const RESTRICTED_RESOURCES: Partial<Record<string, string>> = {
   // HR-only pages
   'page:/hr/tasks': 'access:hr_access',
   'page:/hr/pto/requests': 'access:hr_access',
+
+  // Aturian supplier queue paperwork (may contain W9s / tax IDs)
+  'file:bucket:aturian-supplier-files': 'access:accounting_access',
 }
 
 // Private Supabase Storage buckets — files are served via signed URL only.
@@ -31,4 +34,5 @@ export const RESTRICTED_RESOURCES: Partial<Record<string, string>> = {
 export const PRIVATE_BUCKETS = new Set([
   'financial-reports',
   'hr-documents',
+  'aturian-supplier-files',
 ])

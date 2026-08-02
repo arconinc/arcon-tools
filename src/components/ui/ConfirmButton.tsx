@@ -13,6 +13,8 @@ export interface ConfirmButtonProps {
   onConfirm: () => void
   /** Tailwind/style variant controlling color */
   variant?: 'green' | 'yellow' | 'red' | 'purple' | 'blue'
+  /** Optional icon rendered before the idle label */
+  icon?: React.ReactNode
   /** Size variant. Default 'md' */
   size?: 'sm' | 'md'
   /** Whether the button is disabled */
@@ -48,6 +50,7 @@ export function ConfirmButton({
   confirmLabel,
   onConfirm,
   variant = 'green',
+  icon,
   size = 'md',
   disabled = false,
   className = '',
@@ -97,7 +100,10 @@ export function ConfirmButton({
         className,
       ].join(' ')}
     >
-      <div>{pending ? resolvedConfirmLabel : idleLabel}</div>
+      <div className="flex items-center justify-center gap-1.5">
+        {!pending && icon}
+        {pending ? resolvedConfirmLabel : idleLabel}
+      </div>
       {!pending && subLabel && (
         <div className="text-[11px] font-normal mt-0.5 opacity-70">{subLabel}</div>
       )}

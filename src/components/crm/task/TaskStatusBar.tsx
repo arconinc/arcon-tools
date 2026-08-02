@@ -2,6 +2,7 @@
 
 import type { CrmTaskStatus } from '@/types'
 import { TASK_STATUS_LABELS, TASK_STATUS_COLORS, getTaskNextActions } from '@/lib/task-workflow'
+import { SendGlyph, CheckCircleGlyph } from '@/components/crm/task/TaskIcons'
 
 interface TaskStatusBarProps {
   currentStatus: CrmTaskStatus
@@ -23,6 +24,14 @@ const ACTION_BUTTON_CLASS: Record<CrmTaskStatus, string> = {
   waiting_on_client_approval: 'bg-amber-100 text-amber-700 hover:bg-amber-200',
 }
 
+// Icon per target status — Send for Approval gets the paper-plane, Mark
+// Complete / Approve & Complete get the check-circle. Other transitions
+// (Start Task, Request Changes, Resume Work) render without an icon.
+const ACTION_ICON: Partial<Record<CrmTaskStatus, React.ReactNode>> = {
+  waiting_on_approval: <SendGlyph className="h-3.5 w-3.5" />,
+  completed: <CheckCircleGlyph className="h-3.5 w-3.5" />,
+}
+
 // Guided workflow control: shows the current status as a read-only badge, then
 // only the actions that are legal from that status (see src/lib/task-workflow.ts) —
 // not a free-form dropdown.
@@ -38,16 +47,19 @@ export function TaskStatusBar({ currentStatus, onAction, disabled = false, descr
       </span>
 
       {actions.length > 0 && (
-        <div className="flex flex-wrap gap-2">
+        <div className="flex flex-col gap-2">
           {actions.map((action) => (
             <button
               key={action.toStatus}
               type="button"
               disabled={disabled}
               onClick={() => onAction(action.toStatus)}
-              className={`px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${ACTION_BUTTON_CLASS[action.toStatus]}`}
+              className={`w-full px-4 py-2 rounded-lg text-sm font-semibold disabled:opacity-50 disabled:cursor-not-allowed transition-colors ${ACTION_BUTTON_CLASS[action.toStatus]}`}
             >
-              <div>{action.label}</div>
+              <div className="flex items-center gap-1.5">
+                {ACTION_ICON[action.toStatus]}
+                {action.label}
+              </div>
               {describeNext?.(action.toStatus) && (
                 <div className="text-[11px] font-normal mt-0.5 opacity-70">
                   → {describeNext(action.toStatus)}
