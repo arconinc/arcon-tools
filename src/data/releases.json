@@ -1,5 +1,37 @@
 [
   {
+    "version": "1.1.0",
+    "date": "2026-08-02",
+    "title": "After launch updates 1",
+    "summary": "A number of updates made after the initial launch of the platform. Mostly around tasks and flow.",
+    "changes": [
+      {
+        "category": "feature",
+        "description": "Add headers to all pages."
+      },
+      {
+        "category": "feature",
+        "description": "Show multiple teams on the profile"
+      },
+      {
+        "category": "feature",
+        "description": "Add suppliers"
+      },
+      {
+        "category": "feature",
+        "description": "Redo task flow"
+      },
+      {
+        "category": "feature",
+        "description": "Use the concept of Teams"
+      },
+      {
+        "category": "feature",
+        "description": "Added new background"
+      }
+    ]
+  },
+  {
     "version": "1.0.0",
     "date": "2026-07-29",
     "title": "The Arc Launch",
