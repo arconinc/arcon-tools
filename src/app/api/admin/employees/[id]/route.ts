@@ -30,7 +30,7 @@ export async function GET(
       profile_image_url, avatar_url,
       linkedin_url, bio_json, bio_html, skills, interests,
       manager_id,
-      group_memberships!group_memberships_user_id_fkey(groups(id, name, color, is_active, source_type))
+      group_memberships!group_memberships_user_id_fkey(groups(id, name, color, is_active, group_capabilities(capability)))
     `)
     .eq('id', id)
     .single()

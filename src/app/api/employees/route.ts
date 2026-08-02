@@ -14,7 +14,7 @@ export async function GET(request: Request) {
   const adminClient = createAdminClient()
   let query = adminClient
     .from('users')
-    .select('id, email, display_name, job_title, office_location, employment_type, profile_image_url, avatar_url, start_date, phone, bio_html, group_memberships!group_memberships_user_id_fkey(groups(id, name, color, is_active, source_type))')
+    .select('id, email, display_name, job_title, office_location, employment_type, profile_image_url, avatar_url, start_date, phone, bio_html, group_memberships!group_memberships_user_id_fkey(groups(id, name, color, is_active, group_capabilities(capability)))')
     .is('deactivated_at', null)
     .order('display_name')
 

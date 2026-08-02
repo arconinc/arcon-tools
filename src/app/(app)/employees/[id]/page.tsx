@@ -67,7 +67,7 @@ export default async function EmployeeProfilePage({
       phone, linkedin_url, timezone,
       bio_html, bio_json, skills, interests,
       manager_id,
-      group_memberships!group_memberships_user_id_fkey(groups(id, name, color, is_active, source_type))
+      group_memberships!group_memberships_user_id_fkey(groups(id, name, color, is_active, group_capabilities(capability)))
     `)
     .eq('id', id)
     .single()
@@ -80,7 +80,7 @@ export default async function EmployeeProfilePage({
       ? adminClient.from('users').select('id, display_name, job_title, profile_image_url, avatar_url').eq('id', emp.manager_id).single()
       : Promise.resolve({ data: null }),
     adminClient.from('users')
-      .select('id, email, display_name, job_title, office_location, employment_type, profile_image_url, avatar_url, start_date, phone, bio_html, group_memberships!group_memberships_user_id_fkey(groups(id, name, color, is_active, source_type))')
+      .select('id, email, display_name, job_title, office_location, employment_type, profile_image_url, avatar_url, start_date, phone, bio_html, group_memberships!group_memberships_user_id_fkey(groups(id, name, color, is_active, group_capabilities(capability)))')
       .eq('manager_id', id)
       .order('display_name'),
   ])
