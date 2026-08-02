@@ -9,6 +9,7 @@ import { PermissionModal } from '@/components/documents/PermissionModal'
 import { FolderTreeNode } from '@/components/documents/FolderTreeNode'
 import { DocumentNameCell, DocumentActionsCell, DocIconCard } from '@/components/documents/DocumentRow'
 import { DataTable, type DataTableColumn } from '@/components/ui'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 declare global {
   interface Window {
@@ -27,6 +28,16 @@ const SECTION_MAP: Record<string, string> = {
   technology: 'Technology',
   sales: 'Sales',
   warehouse: 'Warehouse',
+}
+
+const SECTION_BG: Record<string, string> = {
+  hr: '/hr_bg.png',
+  marketing: '/marketing_bg.png',
+  accounting: '/finance_bg.png',
+  ecommerce: '/commerce_bg.png',
+  technology: '/technology_bg.png',
+  sales: '/crm_bg.png',
+  warehouse: '/warehouse_bg.png',
 }
 
 type DocSource = 'drive' | 'upload'
@@ -731,11 +742,7 @@ export default function SectionDocumentsPage() {
       )}
 
       <style>{`
-        .sp { padding: 2rem 1.5rem; }
-
-        .docs-header { display: flex; align-items: flex-start; justify-content: space-between; margin-bottom: 1.5rem; gap: 1rem; }
-        .docs-header h1 { font-size: 1.75rem; font-weight: 700; color: #111; margin: 0 0 0.25rem; }
-        .docs-header p { color: #6b7280; margin: 0; font-size: 0.9rem; }
+        .sp { padding: 2rem 1.5rem; width: 100%; box-sizing: border-box; }
 
         .docs-search { position: relative; margin-bottom: 1.25rem; max-width: 420px; }
         .docs-search input { width: 100%; box-sizing: border-box; padding: 0.6rem 0.875rem 0.6rem 2.25rem; border: 1.5px solid #e5e7eb; border-radius: 8px; font-size: 0.9rem; outline: none; }
@@ -872,17 +879,17 @@ export default function SectionDocumentsPage() {
         .picker-btn:hover { border-color: #7c3aed; color: #7c3aed; background: #faf5ff; }
       `}</style>
 
+      <PageHeader
+        title={`${section.name} Documents`}
+        subtitle={`${allFolders.length} folder${allFolders.length !== 1 ? 's' : ''}`}
+        bg={SECTION_BG[sectionSlug] ?? '/company_bg.png'}
+      />
+
       <div className="sp">
         <div style={{ fontSize: '0.8rem', color: '#9ca3af', marginBottom: '1rem' }}>
           <Link href="/documents" style={{ color: '#7c3aed', textDecoration: 'none', fontWeight: 500 }}>Documents</Link>
           <span style={{ margin: '0 0.375rem' }}>{'/'}</span>
           <span style={{ color: '#374151' }}>{section.name}</span>
-        </div>
-        <div className="docs-header">
-          <div>
-            <h1>{section.name} Documents</h1>
-            <p>{allFolders.length} folder{allFolders.length !== 1 ? 's' : ''}</p>
-          </div>
         </div>
 
         <div className="docs-search">

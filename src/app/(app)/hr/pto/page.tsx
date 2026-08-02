@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { PtoRequest, PTO_REASON_LABELS } from '@/types'
 import { DataTable, type DataTableColumn, FilterPillGroup, type FilterPillOption, ConfirmButton } from '@/components/ui'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 type PtoFilter = 'all' | PtoRequest['status']
 type PtoRequestWithReviewer = PtoRequest & { reviewer?: { display_name: string } | null }
@@ -220,24 +221,19 @@ export default function PtoRequestsPage() {
   ]
 
   return (
-    <div className="mx-auto max-w-[1440px] px-8 py-9">
+    <>
+      <PageHeader title="My PTO Requests" subtitle="View and manage your time off requests and approval status" bg="/hr_bg.png" />
 
-      {/* Header */}
-      <header className="mb-8 flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-        <div>
-          <h1 className="text-[1.75rem] font-extrabold tracking-tight text-slate-900" style={{ textWrap: 'balance' }}>
-            My PTO Requests
-          </h1>
-          <p className="mt-2 text-sm text-slate-500">View and manage your time off requests and approval status.</p>
-        </div>
+      <div className="w-full box-border px-8 py-9">
+      <div className="mb-8 flex justify-end">
         <Link
           href="/hr/pto/new"
-          className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-purple-800 bg-gradient-to-b from-purple-600 to-purple-700 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:from-purple-700 hover:to-purple-800 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:ring-offset-1 sm:self-start"
+          className="inline-flex shrink-0 items-center gap-2 rounded-lg border border-purple-800 bg-gradient-to-b from-purple-600 to-purple-700 px-5 py-2.5 text-sm font-bold text-white shadow-sm transition-colors hover:from-purple-700 hover:to-purple-800 focus:outline-none focus:ring-2 focus:ring-purple-300 focus:ring-offset-1"
         >
           <span aria-hidden="true" className="text-lg leading-none">+</span>
           Request Time Off
         </Link>
-      </header>
+      </div>
 
       {/* Stat cards */}
       <section className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="PTO request summary">
@@ -351,6 +347,7 @@ export default function PtoRequestsPage() {
           </p>
         )}
       </section>
-    </div>
+      </div>
+    </>
   )
 }

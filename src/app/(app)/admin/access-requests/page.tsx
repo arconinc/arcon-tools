@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import Image from 'next/image'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 interface AccessRequest {
   id: string
@@ -48,10 +49,7 @@ export default function AdminAccessRequestsPage() {
   return (
     <>
       <style>{`
-        .ar-page { padding: 32px 24px; max-width: 1200px; margin: 0 auto; }
-        .ar-header { margin-bottom: 24px; }
-        .ar-title { font-size: 22px; font-weight: 700; color: #111827; margin: 0 0 4px; }
-        .ar-sub { font-size: 14px; color: #6b7280; margin: 0; }
+        .ar-page { padding: 32px 24px; width: 100%; box-sizing: border-box; }
         .ar-tabs { display: flex; gap: 4px; margin-bottom: 20px; border-bottom: 1px solid #e5e7eb; }
         .ar-tab { padding: 8px 14px; font-size: 13px; font-weight: 500; cursor: pointer; border: none; background: none; color: #6b7280; border-bottom: 2px solid transparent; margin-bottom: -1px; }
         .ar-tab.active { color: #7c3aed; border-bottom-color: #7c3aed; }
@@ -73,11 +71,9 @@ export default function AdminAccessRequestsPage() {
         .ar-btn-approve:disabled, .ar-btn-deny:disabled { opacity: 0.5; cursor: not-allowed; }
         .ar-review-note { font-size: 12px; color: #6b7280; margin-top: 8px; }
       `}</style>
+      <PageHeader title="Access Requests" subtitle="Review and approve or deny employee access requests" bg="/admin_bg.png" />
+
       <div className="ar-page">
-        <div className="ar-header">
-          <h1 className="ar-title">Access Requests</h1>
-          <p className="ar-sub">Review and approve or deny employee access requests.</p>
-        </div>
         <div className="ar-tabs">
           {(['pending', 'approved', 'denied'] as const).map(t => (
             <button key={t} className={`ar-tab${tab === t ? ' active' : ''}`} onClick={() => setTab(t)}>

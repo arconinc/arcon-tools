@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react'
 import { useRouter, useSearchParams } from 'next/navigation'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 interface Role {
   id: string
@@ -62,21 +63,25 @@ export default function AccessRequestNewPage() {
     return (
       <>
         <style>{`
-          .ar-wrap { min-height: 60vh; display: flex; align-items: center; justify-content: center; padding: 48px 24px; }
+          .ar-page { width: 100%; padding: 2rem; box-sizing: border-box; }
+          .ar-wrap { min-height: 40vh; display: flex; align-items: center; justify-content: center; padding: 48px 24px; }
           .ar-card { max-width: 480px; width: 100%; text-align: center; }
           .ar-check { width: 56px; height: 56px; background: #dcfce7; border-radius: 50%; display: flex; align-items: center; justify-content: center; margin: 0 auto 20px; color: #16a34a; }
           .ar-title { font-size: 20px; font-weight: 600; color: #111827; margin: 0 0 8px; }
           .ar-body { font-size: 14px; color: #6b7280; margin: 0 0 24px; line-height: 1.6; }
           .ar-btn { display: inline-block; padding: 9px 20px; background: #7c3aed; color: #fff; border-radius: 6px; font-size: 14px; font-weight: 500; text-decoration: none; cursor: pointer; border: none; }
         `}</style>
-        <div className="ar-wrap">
-          <div className="ar-card">
-            <div className="ar-check">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+        <PageHeader title="Request Access" subtitle="Request an additional role or resource" />
+        <div className="ar-page">
+          <div className="ar-wrap">
+            <div className="ar-card">
+              <div className="ar-check">
+                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><polyline points="20 6 9 17 4 12" /></svg>
+              </div>
+              <h1 className="ar-title">Request Submitted</h1>
+              <p className="ar-body">Your access request has been sent to an administrator. You&apos;ll receive a notification once it&apos;s been reviewed.</p>
+              <button className="ar-btn" onClick={() => router.push('/dashboard')}>Back to Dashboard</button>
             </div>
-            <h1 className="ar-title">Request Submitted</h1>
-            <p className="ar-body">Your access request has been sent to an administrator. You&apos;ll receive a notification once it&apos;s been reviewed.</p>
-            <button className="ar-btn" onClick={() => router.push('/dashboard')}>Back to Dashboard</button>
           </div>
         </div>
       </>
@@ -86,9 +91,9 @@ export default function AccessRequestNewPage() {
   return (
     <>
       <style>{`
-        .ar-wrap { min-height: 60vh; display: flex; align-items: center; justify-content: center; padding: 48px 24px; }
+        .ar-page { width: 100%; padding: 2rem; box-sizing: border-box; }
+        .ar-wrap { min-height: 40vh; display: flex; align-items: center; justify-content: center; padding: 48px 24px; }
         .ar-card { max-width: 480px; width: 100%; }
-        .ar-title { font-size: 20px; font-weight: 600; color: #111827; margin: 0 0 4px; }
         .ar-sub { font-size: 14px; color: #6b7280; margin: 0 0 28px; }
         .ar-label { display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px; }
         .ar-select, .ar-textarea {
@@ -104,13 +109,14 @@ export default function AccessRequestNewPage() {
         .ar-btn-primary:disabled { opacity: 0.6; cursor: not-allowed; }
         .ar-btn-secondary { padding: 9px 20px; background: #f3f4f6; color: #374151; border-radius: 6px; font-size: 14px; font-weight: 500; border: none; cursor: pointer; }
       `}</style>
-      <div className="ar-wrap">
-        <div className="ar-card">
-          <h1 className="ar-title">Request Access</h1>
-          <p className="ar-sub">
-            {label ? `To access ${label}, you` : 'You'} need an additional role. Select the role below and optionally explain why you need it.
-          </p>
-          <form onSubmit={handleSubmit}>
+      <PageHeader title="Request Access" subtitle="Request an additional role or resource" />
+      <div className="ar-page">
+        <div className="ar-wrap">
+          <div className="ar-card">
+            <p className="ar-sub">
+              {label ? `To access ${label}, you` : 'You'} need an additional role. Select the role below and optionally explain why you need it.
+            </p>
+            <form onSubmit={handleSubmit}>
             <div className="ar-field">
               <label className="ar-label">Role</label>
               <select
@@ -144,7 +150,8 @@ export default function AccessRequestNewPage() {
                 Cancel
               </button>
             </div>
-          </form>
+            </form>
+          </div>
         </div>
       </div>
     </>

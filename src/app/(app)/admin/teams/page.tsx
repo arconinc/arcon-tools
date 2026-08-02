@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { DataTable, FilterPillGroup, Modal, type DataTableColumn, type FilterPillOption } from '@/components/ui'
 import type { AppUser, Group, GroupCapability, GroupMembership } from '@/types'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 type TeamStatusFilter = 'active' | 'inactive'
 
@@ -310,14 +311,14 @@ export default function AdminTeamsPage() {
   ]
 
   return (
-    <div className="mx-auto max-w-screen-xl">
-      <div className="mb-6 flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Teams</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Manage assignable teams and their membership. Anyone can assign tasks to a team; only admins can create or edit teams.
-          </p>
-        </div>
+    <>
+      <PageHeader title="Teams" subtitle="Manage assignable teams and their membership" bg="/admin_bg.png" />
+
+      <div className="w-full box-border px-8 py-8">
+        <p className="mt-1 mb-4 text-sm text-slate-500">
+        Anyone can assign tasks to a team; only admins can create or edit teams.
+      </p>
+      <div className="mb-6 flex items-center justify-end">
         <button
           type="button"
           onClick={openCreateModal}
@@ -476,5 +477,6 @@ export default function AdminTeamsPage() {
         </form>
       </Modal>
     </div>
+    </>
   )
 }

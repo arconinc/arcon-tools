@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState, type FormEvent } from 'react'
 import { DataTable, FilterPillGroup, Modal, type DataTableColumn, type FilterPillOption } from '@/components/ui'
 import { GROUP_CAPABILITY_KEYS, GROUP_CAPABILITY_LABELS } from '@/lib/groups/constants'
+import { PageHeader } from '@/components/layout/PageHeader'
 import type { AppUser, Group, GroupCapability, GroupCapabilityKey, GroupMembership } from '@/types'
 
 type GroupStatusFilter = 'active' | 'inactive'
@@ -341,14 +342,11 @@ export default function AdminGroupsPage() {
   ]
 
   return (
-    <div className="mx-auto max-w-screen-xl">
-      <div className="mb-6 flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Access Control</h1>
-          <p className="mt-1 text-sm text-slate-500">
-            Manage access controls and assignment-pool membership.
-          </p>
-        </div>
+    <>
+      <PageHeader title="Access Control" subtitle="Manage access controls and assignment-pool membership" bg="/admin_bg.png" />
+
+      <div className="w-full box-border px-8 py-8">
+        <div className="mb-6 flex items-center justify-end">
         <button
           type="button"
           onClick={openCreateModal}
@@ -547,5 +545,6 @@ export default function AdminGroupsPage() {
         </form>
       </Modal>
     </div>
+    </>
   )
 }

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { CrmForm, FormCategory } from '@/types'
 import { formatFileSize } from '@/lib/forms-utils'
 import { ConfirmButton } from '@/components/ui/ConfirmButton'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 const CATEGORIES: { value: FormCategory; label: string; icon: string }[] = [
   { value: 'vendor', label: 'Vendor Forms', icon: '🏢' },
@@ -158,9 +159,7 @@ export default function FormsAdminPage() {
   return (
     <>
       <style>{`
-        .fa-page { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem; }
-        .fa-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.75rem; }
-        .fa-header h1 { font-size: 1.6rem; font-weight: 700; color: #111; margin: 0; }
+        .fa-page { width: 100%; box-sizing: border-box; padding: 2rem 1.5rem; }
 
         .fa-category { background: #fff; border: 1px solid #e5e7eb; border-radius: 12px; margin-bottom: 1.25rem; overflow: hidden; }
         .fa-category-header { display: flex; align-items: center; gap: 0.5rem; padding: 0.9rem 1.25rem; background: #fafafa; border-bottom: 1px solid #e5e7eb; }
@@ -206,11 +205,9 @@ export default function FormsAdminPage() {
         .fa-error { background: #fee2e2; color: #991b1b; border: 1px solid #fecaca; border-radius: 6px; padding: 0.75rem; font-size: 0.875rem; margin-bottom: 1rem; }
       `}</style>
 
-      <div className="fa-page">
-        <div className="fa-header">
-          <h1>Forms Library</h1>
-        </div>
+      <PageHeader title="Forms" subtitle="Browse and manage vendor, customer, and general forms" bg="/admin_bg.png" />
 
+      <div className="fa-page">
         {error && (
           <div className="fa-error">{error}</div>
         )}

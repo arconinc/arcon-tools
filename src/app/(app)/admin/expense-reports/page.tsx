@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react'
 import Link from 'next/link'
 import type { ExpenseReport } from '@/types'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 function formatMonth(ym: string) {
   const [year, month] = ym.split('-')
@@ -62,7 +63,7 @@ export default function AdminExpenseReportsPage() {
   )
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '32px 16px' }}>
+    <>
       <style>{`
         .er-table { width: 100%; border-collapse: collapse; }
         .er-table th { text-align: left; padding: 10px 14px; background: #f8f7ff; color: #6d28d9; font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; border-bottom: 2px solid #ede9fe; }
@@ -78,11 +79,9 @@ export default function AdminExpenseReportsPage() {
         .stat-card:hover { filter: brightness(.96); box-shadow: 0 2px 10px rgba(0,0,0,.08); }
       `}</style>
 
-      <div style={{ marginBottom: 28 }}>
-        <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: '#1e1b4b' }}>Expense Report Approvals</h1>
-        <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: 14 }}>Review and action employee expense report submissions.</p>
-      </div>
+      <PageHeader title="Expense Report Approvals" subtitle="Review and action employee expense report submissions" bg="/finance_bg.png" />
 
+      <div style={{ width: '100%', padding: '32px 16px', boxSizing: 'border-box' }}>
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(180px, 1fr))', gap: 14, marginBottom: 28 }}>
         {STAT_CARDS.map(({ key, subtitle }) => {
           const cfg = STATUS_CONFIG[key]
@@ -155,5 +154,6 @@ export default function AdminExpenseReportsPage() {
         </div>
       )}
     </div>
+    </>
   )
 }

@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
 import type { AppUser, GroupSourceType } from '@/types'
 import { DataTable, FilterPillGroup, Modal, type DataTableColumn, type FilterPillOption } from '@/components/ui'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -649,33 +650,28 @@ export default function AdminUsersPage() {
   ]
 
   return (
-    <div className="max-w-screen-xl mx-auto">
-      <div className="mb-6 flex items-start justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Employees</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Manage user roles and profile data. Pre-load users before they log in, or edit existing users.
-          </p>
-        </div>
-        <div className="flex items-center gap-2">
-          <button
-            onClick={syncFromGoogle}
-            disabled={syncing}
-            title="Pull current profile photos from Google Workspace for all users"
-            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-colors flex items-center gap-1.5"
-          >
-            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
-            </svg>
-            {syncing ? 'Syncing…' : 'Sync from Google'}
-          </button>
-          <button
-            onClick={() => { setShowAdd((v) => !v); setAddError(null) }}
-            className="px-3 py-1.5 text-xs font-medium rounded-lg border border-purple-200 text-purple-600 hover:bg-purple-50 transition-colors"
-          >
-            {showAdd ? 'Cancel' : '+ Add User'}
-          </button>
-        </div>
+    <>
+      <PageHeader title="Manage Users" subtitle="Manage user roles and profile data across the company" bg="/admin_bg.png" />
+
+      <div className="w-full box-border px-8 py-8">
+        <div className="mb-6 flex items-center justify-end gap-2">
+        <button
+          onClick={syncFromGoogle}
+          disabled={syncing}
+          title="Pull current profile photos from Google Workspace for all users"
+          className="px-3 py-1.5 text-xs font-medium rounded-lg border border-slate-200 text-slate-600 hover:bg-slate-50 disabled:opacity-50 transition-colors flex items-center gap-1.5"
+        >
+          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+            <path d="M21.44 11.05l-9.19 9.19a6 6 0 01-8.49-8.49l9.19-9.19a4 4 0 015.66 5.66l-9.2 9.19a2 2 0 01-2.83-2.83l8.49-8.48" />
+          </svg>
+          {syncing ? 'Syncing…' : 'Sync from Google'}
+        </button>
+        <button
+          onClick={() => { setShowAdd((v) => !v); setAddError(null) }}
+          className="px-3 py-1.5 text-xs font-medium rounded-lg border border-purple-200 text-purple-600 hover:bg-purple-50 transition-colors"
+        >
+          {showAdd ? 'Cancel' : '+ Add User'}
+        </button>
       </div>
 
       {syncResult && (
@@ -831,5 +827,6 @@ export default function AdminUsersPage() {
         )}
       </Modal>
     </div>
+    </>
   )
 }

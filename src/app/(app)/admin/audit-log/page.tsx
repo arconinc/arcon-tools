@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react'
 import { AuditLog } from '@/types'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 export default function AuditLogPage() {
   const [records, setRecords] = useState<AuditLog[]>([])
@@ -27,13 +28,15 @@ export default function AuditLogPage() {
   useEffect(() => { loadLogs() }, [loadLogs])
 
   return (
-    <div className="max-w-5xl mx-auto">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Audit Log</h1>
-        <p className="text-sm text-slate-500 mt-1">All actions performed via this dashboard. {total > 0 && `${total} total entries.`}</p>
-      </div>
+    <>
+      <PageHeader
+        title="Audit Log"
+        subtitle={`All actions performed via this dashboard${total > 0 ? ` — ${total} total entries` : ''}`}
+        bg="/admin_bg.png"
+      />
 
-      {error && (
+      <div className="w-full box-border px-8 py-8">
+        {error && (
         <div className="p-4 bg-red-50 border border-red-200 rounded-2xl text-sm text-red-700 mb-4">{error}</div>
       )}
 
@@ -115,6 +118,7 @@ export default function AuditLogPage() {
         )}
       </div>
     </div>
+    </>
   )
 }
 

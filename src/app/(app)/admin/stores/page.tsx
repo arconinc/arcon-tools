@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { Store } from '@/types'
 import { ConfirmButton } from '@/components/ui/ConfirmButton'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 export default function AdminStoresPage() {
   const [stores, setStores] = useState<Store[]>([])
@@ -74,12 +75,11 @@ export default function AdminStoresPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Stores</h1>
-          <p className="text-sm text-slate-500 mt-1">Manage the PromoBullit stores available in this dashboard.</p>
-        </div>
+    <>
+      <PageHeader title="Stores" subtitle="Manage the PromoBullit stores available in this dashboard" bg="/admin_bg.png" />
+
+      <div className="w-full box-border px-8 py-8">
+        <div className="flex items-center justify-end mb-6">
         <button
           onClick={openAddForm}
           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-xl transition-colors flex items-center gap-2"
@@ -182,6 +182,7 @@ export default function AdminStoresPage() {
         </div>
       )}
     </div>
+    </>
   )
 }
 

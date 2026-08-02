@@ -7,6 +7,7 @@ import { DataTable, type DataTableColumn } from '@/components/ui/DataTable'
 import { FilterPillGroup, type FilterPillOption } from '@/components/ui/FilterPill'
 import { MultiSelect, type MultiSelectOption } from '@/components/ui/MultiSelect'
 import { SavedFiltersMenu } from '@/components/ui/SavedFiltersMenu'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 const PAGE_SIZE = 50
 const PAGE_KEY = 'marketing/opportunities'
@@ -321,14 +322,11 @@ export default function OpportunitiesPage() {
   const tagSelectOptions: MultiSelectOption[] = allTags.map((t) => ({ value: t.id, label: t.name, color: t.color }))
 
   return (
-    <div className="w-full px-6 py-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Opportunities</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Track deals and pipeline progress</p>
-        </div>
-        <div className="flex items-center gap-3">
+    <>
+      <PageHeader title="Opportunities" subtitle="Track deals and pipeline progress" bg="/crm_bg.png" />
+
+      <div className="w-full px-6 py-8">
+        <div className="flex items-center justify-end mb-6">
           <button
             onClick={() => router.push('/sales/opportunities/new')}
             className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl transition-colors"
@@ -339,94 +337,94 @@ export default function OpportunitiesPage() {
             New Opportunity
           </button>
         </div>
-      </div>
 
-      {/* Pipeline summary */}
-      <div className="grid grid-cols-2 gap-4 mb-6">
-        <div className="bg-white border border-slate-200 rounded-2xl px-5 py-4">
-          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Open Pipeline</div>
-          <div className="text-2xl font-bold text-slate-900">{fmt$(openValue)}</div>
-          <div className="text-xs text-slate-400 mt-0.5">{openCount} open opportunit{openCount !== 1 ? 'ies' : 'y'}</div>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-2xl px-5 py-4">
-          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Won (This View)</div>
-          <div className="text-2xl font-bold text-green-700">
-            {fmt$(opps.filter((o) => o.status === 'won').reduce((s, o) => s + (o.value ?? 0), 0))}
+        {/* Pipeline summary */}
+        <div className="grid grid-cols-2 gap-4 mb-6">
+          <div className="bg-white border border-slate-200 rounded-2xl px-5 py-4">
+            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Open Pipeline</div>
+            <div className="text-2xl font-bold text-slate-900">{fmt$(openValue)}</div>
+            <div className="text-xs text-slate-400 mt-0.5">{openCount} open opportunit{openCount !== 1 ? 'ies' : 'y'}</div>
           </div>
-          <div className="text-xs text-slate-400 mt-0.5">{opps.filter((o) => o.status === 'won').length} won</div>
+          <div className="bg-white border border-slate-200 rounded-2xl px-5 py-4">
+            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Won (This View)</div>
+            <div className="text-2xl font-bold text-green-700">
+              {fmt$(opps.filter((o) => o.status === 'won').reduce((s, o) => s + (o.value ?? 0), 0))}
+            </div>
+            <div className="text-xs text-slate-400 mt-0.5">{opps.filter((o) => o.status === 'won').length} won</div>
+          </div>
         </div>
-      </div>
 
-      {/* Filters */}
-      <div className="flex gap-3 mb-5 flex-wrap items-center">
-        <SavedFiltersMenu
-          pageKey={PAGE_KEY}
-          currentConfig={getCurrentFilterConfig()}
-          onLoad={handleLoadFilter}
-          activeFilterId={activeFilterId}
-          onActiveFilterIdChange={setActiveFilterId}
-          defaultActiveFilterId={activeFilterId}
-        />
-        <div className="relative flex-1 min-w-[200px] max-w-sm">
-          <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <circle cx="11" cy="11" r="8" strokeWidth={2} />
-            <path strokeLinecap="round" strokeWidth={2} d="M21 21l-4.35-4.35" />
-          </svg>
-          <input
-            type="search"
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search name or customer…"
-            className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
+        {/* Filters */}
+        <div className="flex gap-3 mb-5 flex-wrap items-center">
+          <SavedFiltersMenu
+            pageKey={PAGE_KEY}
+            currentConfig={getCurrentFilterConfig()}
+            onLoad={handleLoadFilter}
+            activeFilterId={activeFilterId}
+            onActiveFilterIdChange={setActiveFilterId}
+            defaultActiveFilterId={activeFilterId}
           />
-        </div>
-        <FilterPillGroup
-          options={STATUS_OPTIONS}
-          value={statusFilter}
-          onChange={setStatusFilter}
-          label="Status filter"
-        />
-        <MultiSelect
-          options={stageOptions}
-          value={stageFilter}
-          onChange={setStageFilter}
-          placeholder="All Stages"
-          label="Filter by stage"
-        />
-        <MultiSelect
-          options={ownerSelectOptions}
-          value={ownerFilter}
-          onChange={setOwnerFilter}
-          placeholder="All Owners"
-          label="Filter by owner"
-        />
-        {allTags.length > 0 && (
+          <div className="relative flex-1 min-w-[200px] max-w-sm">
+            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <circle cx="11" cy="11" r="8" strokeWidth={2} />
+              <path strokeLinecap="round" strokeWidth={2} d="M21 21l-4.35-4.35" />
+            </svg>
+            <input
+              type="search"
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              placeholder="Search name or customer…"
+              className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
+            />
+          </div>
+          <FilterPillGroup
+            options={STATUS_OPTIONS}
+            value={statusFilter}
+            onChange={setStatusFilter}
+            label="Status filter"
+          />
           <MultiSelect
-            options={tagSelectOptions}
-            value={tagFilter}
-            onChange={setTagFilter}
-            placeholder="All Tags"
-            label="Filter by tag"
+            options={stageOptions}
+            value={stageFilter}
+            onChange={setStageFilter}
+            placeholder="All Stages"
+            label="Filter by stage"
           />
-        )}
-      </div>
+          <MultiSelect
+            options={ownerSelectOptions}
+            value={ownerFilter}
+            onChange={setOwnerFilter}
+            placeholder="All Owners"
+            label="Filter by owner"
+          />
+          {allTags.length > 0 && (
+            <MultiSelect
+              options={tagSelectOptions}
+              value={tagFilter}
+              onChange={setTagFilter}
+              placeholder="All Tags"
+              label="Filter by tag"
+            />
+          )}
+        </div>
 
-      <DataTable
-        rows={opps}
-        columns={columns}
-        loading={loading}
-        emptyMessage={activeFilters ? 'No opportunities match your filters.' : 'No opportunities yet. Create one to get started.'}
-        getRowKey={(o) => o.id}
-        onRowClick={(o) => router.push(`/sales/opportunities/${o.id}`)}
-        pagination={{
-          page,
-          total,
-          pageSize: PAGE_SIZE,
-          itemName: 'opportunit',
-          onPageChange: setPage,
-        }}
-        minWidth="900px"
-      />
-    </div>
+        <DataTable
+          rows={opps}
+          columns={columns}
+          loading={loading}
+          emptyMessage={activeFilters ? 'No opportunities match your filters.' : 'No opportunities yet. Create one to get started.'}
+          getRowKey={(o) => o.id}
+          onRowClick={(o) => router.push(`/sales/opportunities/${o.id}`)}
+          pagination={{
+            page,
+            total,
+            pageSize: PAGE_SIZE,
+            itemName: 'opportunit',
+            onPageChange: setPage,
+          }}
+          minWidth="900px"
+        />
+      </div>
+    </>
   )
 }

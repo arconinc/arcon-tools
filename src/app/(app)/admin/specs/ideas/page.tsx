@@ -5,6 +5,7 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { SpecIdea } from '@/types'
 import { DataTable, FilterPillGroup, type DataTableColumn, type FilterPillOption } from '@/components/ui'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 type StatusFilter = 'active' | 'archived'
 
@@ -207,74 +208,74 @@ export default function AdminSpecIdeasPage() {
   ]
 
   return (
-    <div className="w-full px-6 py-8">
-      <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Spec Ideas</h1>
-          <p className="mt-0.5 text-sm text-slate-500">Manage the product catalog for spec sample creation.</p>
-        </div>
-        <button
-          onClick={handleCreate}
-          disabled={creating}
-          className="inline-flex items-center justify-center gap-2 rounded-xl bg-purple-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-800 disabled:cursor-not-allowed disabled:opacity-60"
-        >
-          <span aria-hidden="true">+</span>
-          {creating ? 'Creating...' : 'New Idea'}
-        </button>
-      </div>
+    <>
+      <PageHeader title="Spec Ideas" subtitle="Manage the product catalog for spec sample creation" bg="/marketing_bg.png" />
 
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <FilterPillGroup
-          options={STATUS_OPTIONS}
-          value={statusFilter}
-          onChange={setStatusFilter}
-          label="Filter by status"
-        />
-        <div className="flex flex-wrap items-center gap-2">
-          <select
-            value={vendorFilter}
-            onChange={e => setVendorFilter(e.target.value)}
-            aria-label="Filter by supplier"
-            className="h-[34px] rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300"
+      <div className="w-full px-6 py-8">
+        <div className="mb-6 flex justify-end">
+          <button
+            onClick={handleCreate}
+            disabled={creating}
+            className="inline-flex items-center justify-center gap-2 rounded-xl bg-purple-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-purple-800 disabled:cursor-not-allowed disabled:opacity-60"
           >
-            <option value="">All Suppliers</option>
-            {vendors.map(v => <option key={v} value={v}>{v}</option>)}
-          </select>
-          <div className="relative">
-            <SearchIcon />
-            <input
-              type="search"
-              placeholder="Search ideas..."
-              value={search}
-              onChange={e => setSearch(e.target.value)}
-              className="h-[34px] min-w-[220px] rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-300"
-            />
-          </div>
-          {hasFilters && (
-            <button
-              type="button"
-              onClick={() => {
-                setSearch('')
-                setVendorFilter('')
-                setStatusFilter('active')
-              }}
-              className="text-xs font-semibold text-purple-700 hover:underline focus:outline-none focus:ring-2 focus:ring-purple-300"
-            >
-              Clear filters
-            </button>
-          )}
+            <span aria-hidden="true">+</span>
+            {creating ? 'Creating...' : 'New Idea'}
+          </button>
         </div>
-      </div>
 
-      <DataTable
-        rows={filtered}
-        columns={columns}
-        loading={loading}
-        emptyMessage={hasFilters ? 'No spec ideas match your filters.' : 'No active spec ideas yet. Create one to get started.'}
-        getRowKey={(idea) => idea.id}
-        onRowClick={(idea) => router.push(`/admin/specs/ideas/${idea.id}`)}
-        minWidth="980px"
-      />
-    </div>
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <FilterPillGroup
+            options={STATUS_OPTIONS}
+            value={statusFilter}
+            onChange={setStatusFilter}
+            label="Filter by status"
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            <select
+              value={vendorFilter}
+              onChange={e => setVendorFilter(e.target.value)}
+              aria-label="Filter by supplier"
+              className="h-[34px] rounded-lg border border-slate-200 bg-white px-3 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300"
+            >
+              <option value="">All Suppliers</option>
+              {vendors.map(v => <option key={v} value={v}>{v}</option>)}
+            </select>
+            <div className="relative">
+              <SearchIcon />
+              <input
+                type="search"
+                placeholder="Search ideas..."
+                value={search}
+                onChange={e => setSearch(e.target.value)}
+                className="h-[34px] min-w-[220px] rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-300"
+              />
+            </div>
+            {hasFilters && (
+              <button
+                type="button"
+                onClick={() => {
+                  setSearch('')
+                  setVendorFilter('')
+                  setStatusFilter('active')
+                }}
+                className="text-xs font-semibold text-purple-700 hover:underline focus:outline-none focus:ring-2 focus:ring-purple-300"
+              >
+                Clear filters
+              </button>
+            )}
+          </div>
+        </div>
+
+        <DataTable
+          rows={filtered}
+          columns={columns}
+          loading={loading}
+          emptyMessage={hasFilters ? 'No spec ideas match your filters.' : 'No active spec ideas yet. Create one to get started.'}
+          getRowKey={(idea) => idea.id}
+          onRowClick={(idea) => router.push(`/admin/specs/ideas/${idea.id}`)}
+          minWidth="980px"
+        />
+      </div>
+    </>
   )
 }

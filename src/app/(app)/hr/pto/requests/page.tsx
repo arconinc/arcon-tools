@@ -3,6 +3,7 @@
 import { useMemo, useState, useEffect } from 'react'
 import { PtoRequest, PTO_REASON_LABELS } from '@/types'
 import { DataTable, type DataTableColumn, FilterPillGroup, type FilterPillOption } from '@/components/ui'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 type Filter = 'all' | PtoRequest['status']
 type RequestWithUser = PtoRequest & { users?: { display_name: string; email: string; avatar_url: string | null } }
@@ -222,18 +223,9 @@ export default function HrPtoRequestsPage() {
 
   return (
     <>
-      <div className="mx-auto max-w-[1440px] px-8 py-9">
+      <PageHeader title="Review PTO Requests" subtitle="Approve or deny employee time off requests" bg="/hr_bg.png" />
 
-        {/* Header */}
-        <header className="mb-8">
-          <h1 className="text-[1.75rem] font-extrabold tracking-tight text-slate-900" style={{ textWrap: 'balance' }}>
-            Review PTO Requests
-          </h1>
-          <p className="mt-2 text-sm text-slate-500">
-            Review employee time off requests, approve clean submissions, and leave clear denial notes when needed.
-          </p>
-        </header>
-
+      <div className="w-full box-border px-8 py-9">
         {/* Stat cards */}
         <section className="mb-8 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4" aria-label="PTO review summary">
           {[

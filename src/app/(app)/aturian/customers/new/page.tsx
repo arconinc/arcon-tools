@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { PlacesAddressAutocomplete } from '@/components/crm/PlacesAddressAutocomplete'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { formatPhoneInput } from '@/lib/phone'
 import { useFormValidation, inputCls, selectCls, FieldError } from '@/lib/form-validation'
 import { useAppUser } from '@/components/layout/AppShell'
@@ -173,17 +174,11 @@ export default function AturianAddCustomerPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-6">
-      <Link href="/aturian/customers/queue" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-5">
-        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
-        </svg>
-        Customer Queue
-      </Link>
-      <h1 className="text-xl font-bold text-slate-900 mb-1">Add Customer — Aturian</h1>
-      <p className="text-sm text-slate-500 mb-4">Submits a request for Amy or Jill to create this customer in Aturian.</p>
+    <>
+      <PageHeader title="Add Customer" subtitle="Submit a request for Amy or Jill to create this customer in Aturian" bg="/aturian_bg.png" />
 
-      <form onSubmit={handleSubmit} className="space-y-4">
+      <div className="w-full px-6 py-6">
+      <form onSubmit={handleSubmit} className="max-w-4xl mx-auto space-y-4">
         {createError && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{createError}</div>}
 
         {/* Company Info */}
@@ -412,6 +407,7 @@ export default function AturianAddCustomerPage() {
           </Link>
         </div>
       </form>
-    </div>
+      </div>
+    </>
   )
 }

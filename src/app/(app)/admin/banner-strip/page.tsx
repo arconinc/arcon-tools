@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { TickerConfig, TickerManualItem, BannerStripItem } from '@/types'
 import { ConfirmButton } from '@/components/ui/ConfirmButton'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 const PRESET_LABELS = ['Announce', 'HR', 'Sales', 'IT', 'Finance', 'Operations', 'Reminder', 'Event']
 
@@ -176,7 +177,7 @@ export default function BannerStripAdminPage() {
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto px-8 py-10">
+      <div className="w-full box-border px-8 py-10">
         <div className="animate-pulse space-y-4">
           {[1, 2, 3].map((n) => <div key={n} className="h-24 bg-slate-100 rounded-2xl" />)}
         </div>
@@ -185,27 +186,22 @@ export default function BannerStripAdminPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-8 py-8 space-y-6">
+    <>
+      <PageHeader title="Banner Strip" subtitle="Configure the scrolling ticker below the hero carousel" bg="/admin_bg.png" />
+
+    <div className="w-full box-border px-8 py-8 space-y-6">
 
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Banner Strip</h1>
-          <p className="text-sm text-slate-500 mt-1">
-            Configure the scrolling ticker below the hero carousel. Changes save automatically.
-          </p>
-        </div>
-        <div className="flex items-center gap-3 text-sm">
-          {saving && <span className="text-slate-400">Saving…</span>}
-          {saved && <span className="text-green-600 font-medium">Saved ✓</span>}
-          <button
-            onClick={loadPreview}
-            disabled={previewLoading}
-            className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50"
-          >
-            {previewLoading ? 'Loading…' : 'Preview Strip'}
-          </button>
-        </div>
+      <div className="flex items-center justify-end gap-3 text-sm">
+        {saving && <span className="text-slate-400">Saving…</span>}
+        {saved && <span className="text-green-600 font-medium">Saved ✓</span>}
+        <button
+          onClick={loadPreview}
+          disabled={previewLoading}
+          className="px-4 py-2 border border-slate-300 text-slate-700 font-medium rounded-xl hover:bg-slate-50 transition-colors disabled:opacity-50"
+        >
+          {previewLoading ? 'Loading…' : 'Preview Strip'}
+        </button>
       </div>
 
       {error && (
@@ -369,6 +365,7 @@ export default function BannerStripAdminPage() {
         </div>
       </section>
     </div>
+    </>
   )
 }
 

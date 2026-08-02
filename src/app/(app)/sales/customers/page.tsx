@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { DataTable, type DataTableColumn, FilterPillGroup, type FilterPillOption, MultiSelect, type MultiSelectOption } from '@/components/ui'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 const PAGE_SIZE = 50
 
@@ -203,73 +204,72 @@ export default function CustomersPage() {
   ]
 
   return (
-    <div className="w-full px-6 py-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Customers</h1>
-          <p className="text-sm text-slate-500 mt-0.5">All customer organizations</p>
-        </div>
-        <button
-          onClick={() => router.push('/sales/customers/new')}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-          </svg>
-          New Customer
-        </button>
-      </div>
+    <>
+      <PageHeader title="Customers" subtitle="All customer organizations" bg="/crm_bg.png" />
 
-      {/* Filters */}
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <FilterPillGroup
-          options={STATUS_OPTIONS}
-          value={status}
-          onChange={setStatus}
-          label="Filter by status"
-        />
-        <div className="flex flex-wrap items-center gap-2">
-          {allTags.length > 0 && (
-            <MultiSelect
-              options={allTags.map((t): MultiSelectOption => ({ value: t.id, label: t.name, color: t.color }))}
-              value={tagFilter}
-              onChange={setTagFilter}
-              placeholder="All Tags"
-              label="Filter by tag"
-            />
-          )}
-          <div className="relative">
-            <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="11" cy="11" r="8" strokeWidth={2} />
-              <path strokeLinecap="round" strokeWidth={2} d="M21 21l-4.35-4.35" />
+      <div className="w-full px-6 py-8">
+        <div className="flex items-center justify-end mb-6">
+          <button
+            onClick={() => router.push('/sales/customers/new')}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
             </svg>
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search customers…"
-              className="h-[34px] min-w-[220px] rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-300"
-            />
+            New Customer
+          </button>
+        </div>
+
+        {/* Filters */}
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <FilterPillGroup
+            options={STATUS_OPTIONS}
+            value={status}
+            onChange={setStatus}
+            label="Filter by status"
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            {allTags.length > 0 && (
+              <MultiSelect
+                options={allTags.map((t): MultiSelectOption => ({ value: t.id, label: t.name, color: t.color }))}
+                value={tagFilter}
+                onChange={setTagFilter}
+                placeholder="All Tags"
+                label="Filter by tag"
+              />
+            )}
+            <div className="relative">
+              <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="11" cy="11" r="8" strokeWidth={2} />
+                <path strokeLinecap="round" strokeWidth={2} d="M21 21l-4.35-4.35" />
+              </svg>
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search customers…"
+                className="h-[34px] min-w-[220px] rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-300"
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      <DataTable
-        rows={customers}
-        columns={customerColumns}
-        loading={loading}
-        emptyMessage={search || status || tagFilter ? 'No customers match your filters.' : 'No customers yet. Create one to get started.'}
-        getRowKey={(customer) => customer.id}
-        onRowClick={(customer) => router.push(`/sales/customers/${customer.id}`)}
-        pagination={{
-          page,
-          total,
-          pageSize: PAGE_SIZE,
-          itemName: 'customer',
-          onPageChange: (nextPage) => setPage(Math.min(totalPages, Math.max(1, nextPage))),
-        }}
-      />
-    </div>
+        <DataTable
+          rows={customers}
+          columns={customerColumns}
+          loading={loading}
+          emptyMessage={search || status || tagFilter ? 'No customers match your filters.' : 'No customers yet. Create one to get started.'}
+          getRowKey={(customer) => customer.id}
+          onRowClick={(customer) => router.push(`/sales/customers/${customer.id}`)}
+          pagination={{
+            page,
+            total,
+            pageSize: PAGE_SIZE,
+            itemName: 'customer',
+            onPageChange: (nextPage) => setPage(Math.min(totalPages, Math.max(1, nextPage))),
+          }}
+        />
+      </div>
+    </>
   )
 }

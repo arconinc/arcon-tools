@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react'
 import { BannerSlide } from '@/types'
 import { ConfirmButton } from '@/components/ui/ConfirmButton'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 // ── Constants ──────────────────────────────────────────────────────────────────
 
@@ -128,7 +129,7 @@ export default function BannerAdminPage() {
 
   if (loading) {
     return (
-      <div className="max-w-4xl mx-auto px-8 py-10">
+      <div className="w-full box-border px-8 py-10">
         <div className="animate-pulse space-y-4">
           {[1, 2, 3].map((n) => <div key={n} className="h-32 bg-slate-100 rounded-2xl" />)}
         </div>
@@ -163,16 +164,12 @@ export default function BannerAdminPage() {
         .grad-thumb { width: 32px; height: 24px; border-radius: 4px; flex-shrink: 0; }
       `}</style>
 
-      <div className="max-w-4xl mx-auto">
+      <PageHeader title="Banner" subtitle="Manage the hero carousel slides shown on the dashboard" bg="/admin_bg.png" />
+
+      <div className="w-full box-border">
         {/* Header */}
-        <div className="flex items-center justify-between mb-6 px-8 pt-8">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Edit Banner</h1>
-            <p className="text-sm text-slate-500 mt-1">
-              Manage hero carousel slides. Changes auto-save as draft and won&apos;t go live until you publish.
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
+        <div className="px-8 pt-8">
+          <div className="flex items-center justify-end gap-3 mb-6">
             {saving && <span className="text-xs text-slate-400">Saving…</span>}
             {isDirty && !saving && (
               <span className="text-xs font-medium text-amber-600 bg-amber-50 border border-amber-200 rounded-full px-2.5 py-1">

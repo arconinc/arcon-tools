@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState, useCallback } from 'react'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 interface HrLink {
   id: string
@@ -152,21 +153,20 @@ export default function AdminHrLinksPage() {
   }
 
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto', padding: '2rem 1rem' }}>
-      <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1.5rem' }}>
-        <div>
-          <h1 style={{ fontSize: '1.5rem', fontWeight: 700, margin: 0 }}>Employee Links</h1>
-          <p style={{ color: '#6b7280', fontSize: '0.875rem', marginTop: '0.25rem' }}>Manage HR resource links visible to all employees.</p>
-        </div>
+    <>
+      <PageHeader title="Employee Links" subtitle="Manage HR resource links visible to all employees" bg="/admin_bg.png" />
+
+      <div style={{ width: '100%', boxSizing: 'border-box', padding: '2rem 1rem' }}>
         {!showAdd && !editingId && (
+        <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '1.5rem' }}>
           <button
             onClick={startAdd}
             style={{ padding: '0.5rem 1.25rem', background: '#7c3aed', color: '#fff', border: 'none', borderRadius: '0.375rem', fontWeight: 600, fontSize: '0.875rem', cursor: 'pointer' }}
           >
             + Add Link
           </button>
-        )}
-      </div>
+        </div>
+      )}
 
       {showAdd && <LinkForm form={form} formError={formError} saving={saving} editingId={editingId} onChange={handleFormChange} onSave={save} onCancel={cancel} />}
 
@@ -218,5 +218,6 @@ export default function AdminHrLinksPage() {
         ))}
       </div>
     </div>
+    </>
   )
 }

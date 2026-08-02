@@ -2,6 +2,7 @@
 
 import { useRef, useState } from 'react'
 import * as XLSX from 'xlsx'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -166,14 +167,13 @@ export default function CrmImportPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Marketing Import</h1>
-        <p className="text-sm text-slate-500 mt-0.5">
-          Import organizations from an Insightly Excel export (.xlsx) into Customers and Suppliers.
-          Re-importing is safe — existing records update in place, nothing is deleted.
-        </p>
-      </div>
+    <>
+      <PageHeader title="Marketing Import" subtitle="Import organizations from an Insightly Excel export into Customers and Suppliers" bg="/admin_bg.png" />
+
+      <div className="w-full box-border px-6 py-8">
+        <p className="text-sm text-slate-500 mb-6">
+        Re-importing is safe — existing records update in place, nothing is deleted.
+      </p>
 
       {/* Upload card */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5 mb-5">
@@ -534,6 +534,7 @@ export default function CrmImportPage() {
         </div>
       </div>
     </div>
+    </>
   )
 }
 

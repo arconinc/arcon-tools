@@ -7,6 +7,7 @@ import { ArticleTypeBadge } from '@/components/news/ArticleTypeBadge'
 import { formatPublishDate, ARTICLE_TYPES, ARTICLE_TYPE_BADGE } from '@/lib/news-utils'
 import type { NewsArticleWithAuthor, ArticleStatus, ArticleType } from '@/types'
 import { ConfirmButton } from '@/components/ui/ConfirmButton'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 const STATUS_TABS: { label: string; value: ArticleStatus | 'all' }[] = [
   { label: 'All', value: 'all' },
@@ -109,13 +110,11 @@ export default function NewsAdminPage() {
   }
 
   return (
-    <div className="p-6 max-w-6xl">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-xl font-semibold text-slate-900">News & Announcements</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Manage articles published to the intranet feed</p>
-        </div>
+    <>
+      <PageHeader title="News" subtitle="Manage articles published to the intranet feed" bg="/admin_bg.png" />
+
+      <div className="w-full box-border p-6">
+        <div className="flex items-center justify-end mb-6">
         <button
           onClick={() => router.push('/admin/news/new')}
           className="px-4 py-2 bg-purple-600 hover:bg-purple-700 text-white text-sm font-medium rounded-xl transition-colors flex items-center gap-2"
@@ -309,7 +308,7 @@ export default function NewsAdminPage() {
         </div>
       )}
 
-
     </div>
+    </>
   )
 }

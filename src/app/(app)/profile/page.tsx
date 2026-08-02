@@ -3,6 +3,7 @@
 import { useState, useEffect, useRef } from 'react'
 import Link from 'next/link'
 import { useAppUser } from '@/components/layout/AppShell'
+import { PageHeader } from '@/components/layout/PageHeader'
 import { TiptapEditor } from '@/components/news/TiptapEditor'
 import TagInput from '@/components/employees/TagInput'
 import EmployeeAvatar from '@/components/employees/EmployeeAvatar'
@@ -129,9 +130,8 @@ export default function MyProfilePage() {
   return (
     <>
       <style>{`
-        .my-prof { max-width: 1200px; margin: 0 auto; padding: 2rem; }
+        .my-prof { width: 100%; padding: 2rem; box-sizing: border-box; }
         .my-prof-header { display: flex; align-items: center; justify-content: space-between; margin-bottom: 1.75rem; gap: 1rem; flex-wrap: wrap; }
-        .my-prof-title { font-size: 1.25rem; font-weight: 700; color: #1e293b; }
         .my-prof-view-link { font-size: 0.875rem; color: #7c3aed; text-decoration: none; }
         .my-prof-view-link:hover { text-decoration: underline; }
         .my-prof-save-btn { display: inline-flex; align-items: center; gap: 0.5rem; padding: 0.625rem 1.5rem; background: #7c3aed; color: white; border: none; border-radius: 0.5rem; font-size: 0.9375rem; font-weight: 600; cursor: pointer; }
@@ -156,16 +156,15 @@ export default function MyProfilePage() {
         .my-prof-alert-success { background: #f0fdf4; color: #15803d; border: 1px solid #bbf7d0; }
       `}</style>
 
+      <PageHeader title="My Profile" subtitle="Manage your personal and contact information" />
+
       <div className="my-prof">
         <div className="my-prof-header">
-          <div>
-            <div className="my-prof-title">My Profile</div>
-            {employeeId && (
-              <Link href={`/employees/${employeeId}`} className="my-prof-view-link">
-                View public profile ↗
-              </Link>
-            )}
-          </div>
+          {employeeId ? (
+            <Link href={`/employees/${employeeId}`} className="my-prof-view-link">
+              View public profile ↗
+            </Link>
+          ) : <span />}
           <button className="my-prof-save-btn" onClick={handleSave} disabled={saving}>
             {saving ? 'Saving…' : 'Save'}
           </button>

@@ -4,6 +4,7 @@ import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 import Link from 'next/link'
 import type { ExpenseReport } from '@/types'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 function formatMonth(ym: string) {
   const [year, month] = ym.split('-')
@@ -191,7 +192,7 @@ export default function ExpenseReportsPage() {
   }
 
   return (
-    <div style={{ maxWidth: 1200, margin: '0 auto', padding: '32px 16px' }}>
+    <>
       <style>{`
         .er-card { background: #fff; border: 1px solid #e9d5ff; border-radius: 14px; overflow: hidden; }
         .er-table { width: 100%; border-collapse: collapse; }
@@ -234,13 +235,10 @@ export default function ExpenseReportsPage() {
         }
       `}</style>
 
-      <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', marginBottom: 24, flexWrap: 'wrap', gap: 12 }}>
-        <div>
-          <h1 style={{ margin: 0, fontSize: 26, fontWeight: 700, color: '#1e1b4b' }}>Expense Reports</h1>
-          <p style={{ margin: '4px 0 0', color: '#6b7280', fontSize: 14 }}>
-            Track and submit your monthly expense reports.
-          </p>
-        </div>
+      <PageHeader title="Expense Reports" subtitle="Track and submit your monthly expense reports" bg="/finance_bg.png" />
+
+      <div style={{ width: '100%', padding: '32px 16px', boxSizing: 'border-box' }}>
+      <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: 24 }}>
         <button className="btn-primary" onClick={() => { setSelectedMonth(currentYearMonth()); setShowMonthPicker(true) }}>
           + New Expense Report
         </button>
@@ -419,5 +417,6 @@ export default function ExpenseReportsPage() {
         </div>
       )}
     </div>
+    </>
   )
 }

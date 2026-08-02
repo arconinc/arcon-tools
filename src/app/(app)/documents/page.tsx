@@ -3,6 +3,7 @@
 import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import type { DocSectionWithTree, DocFolderNode, DriveDocument } from '@/types'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 function countFolders(folders: DocFolderNode[]): number {
   let n = 0
@@ -83,10 +84,7 @@ export default function DocumentsPage() {
   return (
     <>
       <style>{`
-        .docs-overview { max-width: 1200px; margin: 0 auto; padding: 2rem 1.5rem; }
-        .docs-overview-header { margin-bottom: 2rem; }
-        .docs-overview-header h1 { font-size: 1.75rem; font-weight: 700; color: #111; margin: 0 0 0.25rem; }
-        .docs-overview-header p { color: #6b7280; margin: 0; font-size: 0.9rem; }
+        .docs-overview { width: 100%; padding: 2rem 1.5rem; box-sizing: border-box; }
 
         .sections-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 1rem; }
 
@@ -120,12 +118,9 @@ export default function DocumentsPage() {
         .search-result-path { font-size: 0.75rem; color: #7c3aed; margin-top: 0.3rem; }
       `}</style>
 
-      <div className="docs-overview">
-        <div className="docs-overview-header">
-          <h1>Documents</h1>
-          <p>Company resources and reference documents</p>
-        </div>
+      <PageHeader title="Documents" subtitle="Company resources and reference documents" />
 
+      <div className="docs-overview">
         <div className="docs-search">
           <svg fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-4.35-4.35M17 10.5a6.5 6.5 0 11-13 0 6.5 6.5 0 0113 0z" /></svg>
           <input

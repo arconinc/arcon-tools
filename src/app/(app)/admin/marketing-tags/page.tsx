@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { ConfirmButton } from '@/components/ui/ConfirmButton'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 type Tag = { id: string; name: string; color: string; created_at: string; usage_count?: number }
 
@@ -113,13 +114,11 @@ export default function CrmTagsPage() {
   }
 
   return (
-    <div className="max-w-4xl mx-auto px-6 py-8">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-slate-900">Marketing Tags</h1>
-        <p className="text-sm text-slate-500 mt-0.5">Manage tags shared across opportunities, customers, suppliers, and contacts</p>
-      </div>
+    <>
+      <PageHeader title="Marketing Tags" subtitle="Manage tags shared across opportunities, customers, suppliers, and contacts" bg="/admin_bg.png" />
 
-      {/* Create new tag */}
+      <div className="w-full box-border px-6 py-8">
+        {/* Create new tag */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5 mb-6">
         <h2 className="text-sm font-semibold text-slate-700 mb-4">Create New Tag</h2>
         <form onSubmit={createTag} className="flex items-end gap-3 flex-wrap">
@@ -264,5 +263,6 @@ export default function CrmTagsPage() {
         )}
       </div>
     </div>
+    </>
   )
 }

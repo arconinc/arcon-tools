@@ -3,6 +3,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import { DataTable, type DataTableColumn, FilterPillGroup, type FilterPillOption, MultiSelect, type MultiSelectOption } from '@/components/ui'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 const PAGE_SIZE = 50
 
@@ -170,71 +171,71 @@ export default function VendorsPage() {
   ]
 
   return (
-    <div className="w-full px-6 py-8">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Suppliers</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Supplier organizations and partners</p>
-        </div>
-        <button
-          onClick={() => router.push('/sales/suppliers/new')}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-          </svg>
-          New Supplier
-        </button>
-      </div>
+    <>
+      <PageHeader title="Suppliers" subtitle="Supplier organizations and partners" bg="/crm_bg.png" />
 
-      <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-        <FilterPillGroup
-          options={PREMIER_OPTIONS}
-          value={premierFilter}
-          onChange={setPremierFilter}
-          label="Filter by tier"
-        />
-        <div className="flex flex-wrap items-center gap-2">
-          {allTags.length > 0 && (
-            <MultiSelect
-              options={allTags.map((t): MultiSelectOption => ({ value: t.id, label: t.name, color: t.color }))}
-              value={tagFilter}
-              onChange={setTagFilter}
-              placeholder="All Tags"
-              label="Filter by tag"
-            />
-          )}
-          <div className="relative">
-            <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
-              <circle cx="11" cy="11" r="8" strokeWidth={2} />
-              <path strokeLinecap="round" strokeWidth={2} d="M21 21l-4.35-4.35" />
+      <div className="w-full px-6 py-8">
+        <div className="flex items-center justify-end mb-6">
+          <button
+            onClick={() => router.push('/sales/suppliers/new')}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
             </svg>
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search suppliers…"
-              className="h-[34px] min-w-[220px] rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-300"
-            />
+            New Supplier
+          </button>
+        </div>
+
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <FilterPillGroup
+            options={PREMIER_OPTIONS}
+            value={premierFilter}
+            onChange={setPremierFilter}
+            label="Filter by tier"
+          />
+          <div className="flex flex-wrap items-center gap-2">
+            {allTags.length > 0 && (
+              <MultiSelect
+                options={allTags.map((t): MultiSelectOption => ({ value: t.id, label: t.name, color: t.color }))}
+                value={tagFilter}
+                onChange={setTagFilter}
+                placeholder="All Tags"
+                label="Filter by tag"
+              />
+            )}
+            <div className="relative">
+              <svg className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden="true">
+                <circle cx="11" cy="11" r="8" strokeWidth={2} />
+                <path strokeLinecap="round" strokeWidth={2} d="M21 21l-4.35-4.35" />
+              </svg>
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search suppliers…"
+                className="h-[34px] min-w-[220px] rounded-lg border border-slate-200 bg-white pl-9 pr-3 text-sm text-slate-900 placeholder:text-slate-400 focus:border-purple-400 focus:outline-none focus:ring-2 focus:ring-purple-300"
+              />
+            </div>
           </div>
         </div>
-      </div>
 
-      <DataTable
-        rows={vendors}
-        columns={vendorColumns}
-        loading={loading}
-        emptyMessage={search || tagFilter || premierFilter ? 'No vendors match your filters.' : 'No vendors yet. Create one to get started.'}
-        getRowKey={(vendor) => vendor.id}
-        onRowClick={(vendor) => router.push(`/sales/suppliers/${vendor.id}`)}
-        pagination={{
-          page,
-          total,
-          pageSize: PAGE_SIZE,
-          itemName: 'vendor',
-          onPageChange: (nextPage) => setPage(Math.min(totalPages, Math.max(1, nextPage))),
-        }}
-      />
-    </div>
+        <DataTable
+          rows={vendors}
+          columns={vendorColumns}
+          loading={loading}
+          emptyMessage={search || tagFilter || premierFilter ? 'No vendors match your filters.' : 'No vendors yet. Create one to get started.'}
+          getRowKey={(vendor) => vendor.id}
+          onRowClick={(vendor) => router.push(`/sales/suppliers/${vendor.id}`)}
+          pagination={{
+            page,
+            total,
+            pageSize: PAGE_SIZE,
+            itemName: 'vendor',
+            onPageChange: (nextPage) => setPage(Math.min(totalPages, Math.max(1, nextPage))),
+          }}
+        />
+      </div>
+    </>
   )
 }

@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec']
 
@@ -127,13 +128,11 @@ export default function CrmGoalsPage() {
   const yearOptions = [currentYear - 1, currentYear, currentYear + 1]
 
   return (
-    <div className="px-6 py-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Sales Goals</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Set monthly revenue targets per salesperson</p>
-        </div>
+    <>
+      <PageHeader title="Sales Goals" subtitle="Set monthly revenue targets per salesperson" bg="/admin_bg.png" />
+
+      <div className="px-6 py-8">
+        <div className="flex items-center justify-end mb-6">
         <select
           value={year}
           onChange={(e) => setYear(Number(e.target.value))}
@@ -260,5 +259,6 @@ export default function CrmGoalsPage() {
         </div>
       )}
     </div>
+    </>
   )
 }

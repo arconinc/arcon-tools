@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import type { AturianSupplierQueueEntry, AturianQueueStatus } from '@/types'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 type QueueRow = AturianSupplierQueueEntry & {
   claimed_user: { id: string; display_name: string } | null
@@ -35,12 +36,11 @@ export default function AturianSupplierQueuePage() {
   }, [filter])
 
   return (
-    <div className="px-6 py-5">
-      <div className="flex items-center justify-between mb-4">
-        <div>
-          <h1 className="text-xl font-bold text-slate-900">Aturian Supplier Queue</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Requests waiting to be added to Aturian.</p>
-        </div>
+    <>
+      <PageHeader title="Supplier Queue" subtitle="Requests waiting to be added to Aturian" bg="/aturian_bg.png" />
+
+      <div className="w-full px-6 py-5">
+      <div className="flex justify-end mb-4">
         <Link href="/aturian/suppliers/new" className="px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl transition-colors">
           + Add Supplier
         </Link>
@@ -94,6 +94,7 @@ export default function AturianSupplierQueuePage() {
           </tbody>
         </table>
       </div>
-    </div>
+      </div>
+    </>
   )
 }

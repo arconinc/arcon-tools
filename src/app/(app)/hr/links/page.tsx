@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useState } from 'react'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 interface HrLink {
   id: string
@@ -23,14 +24,10 @@ export default function EmployeeLinksPage() {
   }, [])
 
   return (
-    <div style={{ maxWidth: 800, margin: '0 auto', padding: '2rem 1rem' }}>
-      <h1 style={{ fontSize: '1.75rem', fontWeight: 700, marginBottom: '0.25rem', color: '#1a1a2e' }}>
-        Employee Links
-      </h1>
-      <p style={{ color: '#6b7280', marginBottom: '2rem', fontSize: '0.95rem' }}>
-        Quick access to payroll, benefits, and other employee resources.
-      </p>
+    <>
+      <PageHeader title="Employee Links" subtitle="Quick access to payroll, benefits, and other employee resources" bg="/hr_bg.png" />
 
+      <div style={{ width: '100%', boxSizing: 'border-box', padding: '2rem 1rem' }}>
       {loading && <p style={{ color: '#6b7280' }}>Loading…</p>}
       {error && <p style={{ color: '#dc2626' }}>{error}</p>}
 
@@ -38,7 +35,7 @@ export default function EmployeeLinksPage() {
         <p style={{ color: '#6b7280' }}>No links have been added yet.</p>
       )}
 
-      <div style={{ display: 'grid', gap: '1rem' }}>
+      <div style={{ display: 'grid', gap: '1rem', maxWidth: 800, margin: '0 auto' }}>
         {links.map(link => (
           <a
             key={link.id}
@@ -84,6 +81,7 @@ export default function EmployeeLinksPage() {
           </a>
         ))}
       </div>
-    </div>
+      </div>
+    </>
   )
 }

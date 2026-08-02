@@ -1,8 +1,8 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import Link from 'next/link'
 import { BirthdayEvent } from '@/types'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 type BirthdayEventWithColor = BirthdayEvent & { color: string }
 
@@ -64,11 +64,7 @@ export default function BirthdaysPage() {
   return (
     <>
       <style>{`
-        .bday-page { padding: 28px 32px; max-width: 1200px; margin: 0 auto; }
-        .bday-page-header { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
-        .bday-back { font-size: 12px; color: #6b1e98; font-weight: 600; text-decoration: none; display: inline-flex; align-items: center; gap: 4px; }
-        .bday-back:hover { text-decoration: underline; }
-        .bday-page-title { font-size: 20px; font-weight: 800; color: #111; }
+        .bday-page { padding: 28px 32px; width: 100%; box-sizing: border-box; }
         .bday-section-label { font-size: 11px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; color: #999; margin: 22px 0 8px; }
         .bday-section-label:first-child { margin-top: 0; }
         .bday-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; overflow: hidden; }
@@ -96,13 +92,9 @@ export default function BirthdaysPage() {
         .bday-empty { font-size: 13px; color: #bbb; padding: 32px; text-align: center; background: #fff; border: 1px solid #e5e7eb; border-radius: 10px; }
       `}</style>
 
-      <div className="bday-page">
-        <div className="bday-page-header">
-          <Link href="/dashboard" className="bday-back">← Dashboard</Link>
-          <div style={{ width: 1, height: 16, background: '#e5e7eb' }} />
-          <div className="bday-page-title">Birthdays &amp; Anniversaries</div>
-        </div>
+      <PageHeader title="Birthdays & Anniversaries" subtitle="Upcoming birthdays and work anniversaries" />
 
+      <div className="bday-page">
         {loading ? (
           <div className="bday-empty">Loading…</div>
         ) : events.length === 0 ? (

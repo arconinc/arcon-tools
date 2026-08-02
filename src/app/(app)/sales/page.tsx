@@ -7,6 +7,7 @@ import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer,
 } from 'recharts'
 import { taskStatusBadge } from '@/lib/badges'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -173,7 +174,7 @@ export default function SalesDashboardPage() {
 
   if (loading) {
     return (
-      <div className="max-w-6xl mx-auto px-6 py-8">
+      <div className="w-full px-6 py-8">
         <div className="animate-pulse space-y-5">
           <div className="h-8 bg-slate-100 rounded w-48" />
           <div className="grid grid-cols-3 gap-4">
@@ -189,7 +190,7 @@ export default function SalesDashboardPage() {
 
   if (error || !data) {
     return (
-      <div className="max-w-6xl mx-auto px-6 py-8">
+      <div className="w-full px-6 py-8">
         <div className="p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">
           {error ?? 'Could not load dashboard'}
         </div>
@@ -200,214 +201,213 @@ export default function SalesDashboardPage() {
   const monthLabel = `${MONTH_NAMES[data.current_month - 1]} ${data.current_year}`
 
   return (
-    <div className="max-w-6xl mx-auto px-6 py-8">
-      {/* Header */}
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Sales Dashboard</h1>
-          <p className="text-sm text-slate-500 mt-0.5">Your pipeline, goals, and team activity</p>
-        </div>
-        <button
-          onClick={() => router.push('/sales/opportunities/new')}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-          </svg>
-          New Opportunity
-        </button>
-      </div>
+    <>
+      <PageHeader title="Sales Dashboard" subtitle="Your pipeline, goals, and team activity" bg="/crm_bg.png" />
 
-      {/* Stat cards */}
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="bg-white border border-slate-200 rounded-2xl px-5 py-4">
-          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">My Open Pipeline</div>
-          <div className="text-3xl font-bold text-slate-900">{fmt$(data.my_pipeline_total)}</div>
-          <div className="text-xs text-slate-400 mt-1">{data.my_pipeline.length} open opportunit{data.my_pipeline.length !== 1 ? 'ies' : 'y'}</div>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-2xl px-5 py-4">
-          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Closing Soon</div>
-          <div className="text-3xl font-bold text-amber-600">{data.closing_soon_count}</div>
-          <div className="text-xs text-slate-400 mt-1">due within 30 days</div>
-        </div>
-        <div className="bg-white border border-slate-200 rounded-2xl px-5 py-4">
-          <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Tasks Overdue</div>
-          <div className="text-3xl font-bold text-red-600">{data.my_tasks_overdue_count}</div>
-          <div className="text-xs text-slate-400 mt-1">due today or past due</div>
-        </div>
-      </div>
-
-      {/* Pipeline chart */}
-      <PipelineChart />
-
-      <div className="grid grid-cols-2 gap-5 mb-5">
-
-        {/* My Pipeline */}
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-          <SectionHeader title="My Pipeline" action="View all →" href="/sales/opportunities" />
-          {data.my_pipeline.length === 0 ? (
-            <EmptyState text="No open opportunities assigned to you." />
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {data.my_pipeline.slice(0, 8).map((o) => (
-                <div
-                  key={o.id}
-                  onClick={() => router.push(`/sales/opportunities/${o.id}`)}
-                  className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 cursor-pointer transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-slate-800 truncate">{o.name}</div>
-                    <div className="text-xs text-slate-400 truncate">{o.customer_name ?? 'No customer'}</div>
-                  </div>
-                  <div className="text-right flex-shrink-0">
-                    <div className="text-sm font-bold text-slate-700">{fmt$(o.value)}</div>
-                    {o.forecast_close_date && (
-                      <div className="text-xs text-slate-400">{fmtDate(o.forecast_close_date)}</div>
-                    )}
-                  </div>
-                </div>
-              ))}
-              {data.my_pipeline.length > 8 && (
-                <div className="px-5 py-3 text-xs text-slate-400">
-                  +{data.my_pipeline.length - 8} more — <Link href="/sales/opportunities" className="text-purple-700 hover:underline">view all</Link>
-                </div>
-              )}
-            </div>
-          )}
+      <div className="w-full px-6 py-8">
+        <div className="flex items-center justify-end mb-6">
+          <button
+            onClick={() => router.push('/sales/opportunities/new')}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
+            </svg>
+            New Opportunity
+          </button>
         </div>
 
-        {/* Closing Soon */}
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-          <SectionHeader title="Closing Soon (30 days)" action="View all →" href="/sales/opportunities" />
-          {data.closing_soon.length === 0 ? (
-            <EmptyState text="No opportunities closing in the next 30 days." />
-          ) : (
-            <div className="divide-y divide-slate-100">
-              {data.closing_soon.slice(0, 8).map((o) => (
-                <div
-                  key={o.id}
-                  onClick={() => router.push(`/sales/opportunities/${o.id}`)}
-                  className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 cursor-pointer transition-colors"
-                >
-                  <div className="flex-1 min-w-0">
-                    <div className="text-sm font-medium text-slate-800 truncate">{o.name}</div>
-                    <div className="text-xs text-slate-400 truncate">
-                      {o.customer_name ?? '—'} · {o.assigned_user_name ?? 'Unassigned'}
+        {/* Stat cards */}
+        <div className="grid grid-cols-3 gap-4 mb-6">
+          <div className="bg-white border border-slate-200 rounded-2xl px-5 py-4">
+            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">My Open Pipeline</div>
+            <div className="text-3xl font-bold text-slate-900">{fmt$(data.my_pipeline_total)}</div>
+            <div className="text-xs text-slate-400 mt-1">{data.my_pipeline.length} open opportunit{data.my_pipeline.length !== 1 ? 'ies' : 'y'}</div>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-2xl px-5 py-4">
+            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Closing Soon</div>
+            <div className="text-3xl font-bold text-amber-600">{data.closing_soon_count}</div>
+            <div className="text-xs text-slate-400 mt-1">due within 30 days</div>
+          </div>
+          <div className="bg-white border border-slate-200 rounded-2xl px-5 py-4">
+            <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-1">Tasks Overdue</div>
+            <div className="text-3xl font-bold text-red-600">{data.my_tasks_overdue_count}</div>
+            <div className="text-xs text-slate-400 mt-1">due today or past due</div>
+          </div>
+        </div>
+
+        {/* Pipeline chart */}
+        <PipelineChart />
+
+        <div className="grid grid-cols-2 gap-5 mb-5">
+
+          {/* My Pipeline */}
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <SectionHeader title="My Pipeline" action="View all →" href="/sales/opportunities" />
+            {data.my_pipeline.length === 0 ? (
+              <EmptyState text="No open opportunities assigned to you." />
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {data.my_pipeline.slice(0, 8).map((o) => (
+                  <div
+                    key={o.id}
+                    onClick={() => router.push(`/sales/opportunities/${o.id}`)}
+                    className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 cursor-pointer transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-slate-800 truncate">{o.name}</div>
+                      <div className="text-xs text-slate-400 truncate">{o.customer_name ?? 'No customer'}</div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-sm font-bold text-slate-700">{fmt$(o.value)}</div>
+                      {o.forecast_close_date && (
+                        <div className="text-xs text-slate-400">{fmtDate(o.forecast_close_date)}</div>
+                      )}
                     </div>
                   </div>
-                  <div className="text-right flex-shrink-0">
-                    <div className="text-sm font-bold text-slate-700">{fmt$(o.value)}</div>
-                    <div className="text-xs font-semibold text-amber-600">{fmtDate(o.forecast_close_date)}</div>
+                ))}
+                {data.my_pipeline.length > 8 && (
+                  <div className="px-5 py-3 text-xs text-slate-400">
+                    +{data.my_pipeline.length - 8} more — <Link href="/sales/opportunities" className="text-purple-700 hover:underline">view all</Link>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                )}
+              </div>
+            )}
+          </div>
+
+          {/* Closing Soon */}
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <SectionHeader title="Closing Soon (30 days)" action="View all →" href="/sales/opportunities" />
+            {data.closing_soon.length === 0 ? (
+              <EmptyState text="No opportunities closing in the next 30 days." />
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {data.closing_soon.slice(0, 8).map((o) => (
+                  <div
+                    key={o.id}
+                    onClick={() => router.push(`/sales/opportunities/${o.id}`)}
+                    className="flex items-center gap-3 px-5 py-3 hover:bg-slate-50 cursor-pointer transition-colors"
+                  >
+                    <div className="flex-1 min-w-0">
+                      <div className="text-sm font-medium text-slate-800 truncate">{o.name}</div>
+                      <div className="text-xs text-slate-400 truncate">
+                        {o.customer_name ?? '—'} · {o.assigned_user_name ?? 'Unassigned'}
+                      </div>
+                    </div>
+                    <div className="text-right flex-shrink-0">
+                      <div className="text-sm font-bold text-slate-700">{fmt$(o.value)}</div>
+                      <div className="text-xs font-semibold text-amber-600">{fmtDate(o.forecast_close_date)}</div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+
         </div>
 
-      </div>
+        <div className="grid grid-cols-2 gap-5 mb-5">
 
-      <div className="grid grid-cols-2 gap-5 mb-5">
-
-        {/* Monthly Goal Progress */}
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-          <SectionHeader title={`Goal Progress — ${monthLabel}`} action="Manage goals →" href="/admin/marketing-goals" />
-          {data.goal_progress.length === 0 ? (
-            <EmptyState text="No goals set for this month." />
-          ) : (
-            <div className="p-4 space-y-3">
-              {data.goal_progress.map((g) => (
-                <div key={g.user_id}>
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="text-sm font-medium text-slate-700">{g.display_name}</span>
-                    <span className="text-xs text-slate-400">
-                      {fmt$(g.won_amount)}
-                      {g.goal_amount > 0 && <> / {fmt$(g.goal_amount)}</>}
-                      {' · '}
-                      <span className={g.pct >= 100 ? 'text-green-600 font-semibold' : 'text-slate-500'}>
-                        {g.pct}%
+          {/* Monthly Goal Progress */}
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <SectionHeader title={`Goal Progress — ${monthLabel}`} action="Manage goals →" href="/admin/marketing-goals" />
+            {data.goal_progress.length === 0 ? (
+              <EmptyState text="No goals set for this month." />
+            ) : (
+              <div className="p-4 space-y-3">
+                {data.goal_progress.map((g) => (
+                  <div key={g.user_id}>
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium text-slate-700">{g.display_name}</span>
+                      <span className="text-xs text-slate-400">
+                        {fmt$(g.won_amount)}
+                        {g.goal_amount > 0 && <> / {fmt$(g.goal_amount)}</>}
+                        {' · '}
+                        <span className={g.pct >= 100 ? 'text-green-600 font-semibold' : 'text-slate-500'}>
+                          {g.pct}%
+                        </span>
                       </span>
-                    </span>
+                    </div>
+                    <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${
+                          g.pct >= 100 ? 'bg-green-500' :
+                          g.pct >= 75 ? 'bg-blue-500' :
+                          g.pct >= 50 ? 'bg-purple-500' :
+                          g.pct >= 25 ? 'bg-amber-400' : 'bg-slate-300'
+                        }`}
+                        style={{ width: `${Math.min(100, g.pct)}%` }}
+                      />
+                    </div>
                   </div>
-                  <div className="h-2 bg-slate-100 rounded-full overflow-hidden">
-                    <div
-                      className={`h-full rounded-full transition-all ${
-                        g.pct >= 100 ? 'bg-green-500' :
-                        g.pct >= 75 ? 'bg-blue-500' :
-                        g.pct >= 50 ? 'bg-purple-500' :
-                        g.pct >= 25 ? 'bg-amber-400' : 'bg-slate-300'
-                      }`}
-                      style={{ width: `${Math.min(100, g.pct)}%` }}
-                    />
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Team Leaderboard */}
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <SectionHeader title="Team Leaderboard (Open Pipeline)" action="All opportunities →" href="/sales/opportunities" />
+            {data.leaderboard.length === 0 ? (
+              <EmptyState text="No open opportunities assigned yet." />
+            ) : (
+              <div className="divide-y divide-slate-100">
+                {data.leaderboard.slice(0, 8).map((entry, idx) => (
+                  <div key={entry.user_id} className="flex items-center gap-3 px-5 py-3">
+                    <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
+                      idx === 0 ? 'bg-amber-100 text-amber-700' :
+                      idx === 1 ? 'bg-slate-200 text-slate-600' :
+                      idx === 2 ? 'bg-orange-100 text-orange-600' :
+                      'bg-slate-100 text-slate-500'
+                    }`}>
+                      {idx + 1}
+                    </div>
+                    <div className="flex-1 text-sm font-medium text-slate-800">{entry.display_name}</div>
+                    <div className="text-sm font-bold text-slate-700">{fmt$(entry.open_value)}</div>
                   </div>
-                </div>
-              ))}
-            </div>
-          )}
+                ))}
+              </div>
+            )}
+          </div>
+
         </div>
 
-        {/* Team Leaderboard */}
+        {/* My Tasks Due/Overdue */}
         <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-          <SectionHeader title="Team Leaderboard (Open Pipeline)" action="All opportunities →" href="/sales/opportunities" />
-          {data.leaderboard.length === 0 ? (
-            <EmptyState text="No open opportunities assigned yet." />
+          <SectionHeader title="My Tasks — Due Today &amp; Overdue" action="All tasks →" href="/sales/tasks" />
+          {data.my_tasks.length === 0 ? (
+            <EmptyState text="You're all caught up! No tasks due today or overdue." />
           ) : (
             <div className="divide-y divide-slate-100">
-              {data.leaderboard.slice(0, 8).map((entry, idx) => (
-                <div key={entry.user_id} className="flex items-center gap-3 px-5 py-3">
-                  <div className={`w-6 h-6 rounded-full flex items-center justify-center text-xs font-bold flex-shrink-0 ${
-                    idx === 0 ? 'bg-amber-100 text-amber-700' :
-                    idx === 1 ? 'bg-slate-200 text-slate-600' :
-                    idx === 2 ? 'bg-orange-100 text-orange-600' :
-                    'bg-slate-100 text-slate-500'
-                  }`}>
-                    {idx + 1}
+              {data.my_tasks.map((t) => (
+                <div
+                  key={t.id}
+                  onClick={() => router.push(`/tasks/${t.id}`)}
+                  className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50 cursor-pointer transition-colors"
+                >
+                  <div className="flex-1 min-w-0">
+                    <div className="text-sm font-medium text-slate-800 truncate">{t.title}</div>
+                    {t.linked_name && <div className="text-xs text-slate-400 truncate">{t.linked_name}</div>}
                   </div>
-                  <div className="flex-1 text-sm font-medium text-slate-800">{entry.display_name}</div>
-                  <div className="text-sm font-bold text-slate-700">{fmt$(entry.open_value)}</div>
+                  <div className="flex items-center gap-2 flex-shrink-0">
+                    {t.category && (
+                      <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded font-medium hidden md:inline">
+                        {t.category}
+                      </span>
+                    )}
+                    <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${taskStatusBadge(t.status) ?? 'bg-slate-100 text-slate-600'}`}>
+                      {TASK_STATUS_LABEL[t.status] ?? t.status}
+                    </span>
+                    <span className="text-xs text-red-500 font-medium whitespace-nowrap">
+                      {t.due_date ? fmtDate(t.due_date) : '—'}
+                    </span>
+                  </div>
                 </div>
               ))}
             </div>
           )}
         </div>
-
       </div>
-
-      {/* My Tasks Due/Overdue */}
-      <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-        <SectionHeader title="My Tasks — Due Today &amp; Overdue" action="All tasks →" href="/sales/tasks" />
-        {data.my_tasks.length === 0 ? (
-          <EmptyState text="You're all caught up! No tasks due today or overdue." />
-        ) : (
-          <div className="divide-y divide-slate-100">
-            {data.my_tasks.map((t) => (
-              <div
-                key={t.id}
-                onClick={() => router.push(`/tasks/${t.id}`)}
-                className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50 cursor-pointer transition-colors"
-              >
-                <div className="flex-1 min-w-0">
-                  <div className="text-sm font-medium text-slate-800 truncate">{t.title}</div>
-                  {t.linked_name && <div className="text-xs text-slate-400 truncate">{t.linked_name}</div>}
-                </div>
-                <div className="flex items-center gap-2 flex-shrink-0">
-                  {t.category && (
-                    <span className="text-xs bg-slate-100 text-slate-500 px-2 py-0.5 rounded font-medium hidden md:inline">
-                      {t.category}
-                    </span>
-                  )}
-                  <span className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${taskStatusBadge(t.status) ?? 'bg-slate-100 text-slate-600'}`}>
-                    {TASK_STATUS_LABEL[t.status] ?? t.status}
-                  </span>
-                  <span className="text-xs text-red-500 font-medium whitespace-nowrap">
-                    {t.due_date ? fmtDate(t.due_date) : '—'}
-                  </span>
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
+    </>
   )
 }

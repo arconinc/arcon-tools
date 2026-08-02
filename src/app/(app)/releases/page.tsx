@@ -3,6 +3,7 @@ import Link from 'next/link'
 import { createClient } from '@/lib/supabase/server'
 import releasesData from '@/data/releases.json'
 import type { Release, ReleaseChangeCategory } from '@/types'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 const releases = releasesData as Release[]
 
@@ -29,12 +30,7 @@ export default async function ReleasesPage() {
   return (
     <>
       <style>{`
-        .releases-page { max-width: 1200px; margin: 0 auto; padding: 32px 24px 64px; }
-        .releases-header { margin-bottom: 32px; }
-        .releases-back { display: inline-flex; align-items: center; gap: 6px; color: #6b7280; font-size: 14px; text-decoration: none; margin-bottom: 20px; }
-        .releases-back:hover { color: #6b1e98; }
-        .releases-title { font-size: 28px; font-weight: 700; color: #111827; margin: 0 0 6px; }
-        .releases-subtitle { color: #6b7280; font-size: 15px; margin: 0; }
+        .releases-page { width: 100%; box-sizing: border-box; padding: 32px 24px 64px; }
         .release-card { background: #fff; border: 1px solid #e5e7eb; border-radius: 16px; padding: 28px; margin-bottom: 16px; text-decoration: none; display: block; transition: box-shadow 0.15s, border-color 0.15s; }
         .release-card:hover { box-shadow: 0 4px 16px rgba(0,0,0,0.08); border-color: #d1d5db; }
         .release-card-header { display: flex; align-items: center; gap: 12px; margin-bottom: 12px; flex-wrap: wrap; }
@@ -50,18 +46,9 @@ export default async function ReleasesPage() {
         .count-chip-breaking_change { background: #fee2e2; color: #dc2626; }
         .releases-empty { text-align: center; color: #9ca3af; padding: 48px 0; }
       `}</style>
-      <div className="releases-page">
-        <div className="releases-header">
-          <Link href="/dashboard" className="releases-back">
-            <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-              <path strokeLinecap="round" strokeLinejoin="round" d="M15 19l-7-7 7-7" />
-            </svg>
-            Dashboard
-          </Link>
-          <h1 className="releases-title">Release Notes</h1>
-          <p className="releases-subtitle">A history of what&apos;s been built and shipped in The Arc.</p>
-        </div>
+      <PageHeader title="Release Notes" subtitle="A history of what's been built and shipped in The Arc" bg="/admin_bg.png" />
 
+      <div className="releases-page">
         {releases.length === 0 ? (
           <div className="releases-empty">No releases yet.</div>
         ) : (

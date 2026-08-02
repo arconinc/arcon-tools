@@ -7,6 +7,7 @@ import { Store } from '@/types'
 import { useAppUser } from '@/components/layout/AppShell'
 import { CredentialPrompt } from '@/components/stores/CredentialPrompt'
 import { FilterPillGroup, type FilterPillOption } from '@/components/ui/FilterPill'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 // ── constants ─────────────────────────────────────────────────────────────────
 
@@ -724,19 +725,17 @@ export default function StoresDashboardPage() {
   return (
     <>
       <style>{`
-        .stores-page { padding: 22px 28px 28px; }
+        .stores-page { width: 100%; box-sizing: border-box; padding: 22px 28px 28px; }
         .stat-card { background: white; border: 1px solid #e2e8f0; border-radius: 16px; padding: 16px 20px; text-align: left; }
         .stat-val { font-size: 26px; font-weight: 700; color: #1e293b; line-height: 1; }
         .stat-lbl { font-size: 11px; color: #94a3b8; margin-top: 4px; font-weight: 500; }
       `}</style>
 
+      <PageHeader title="Stores" subtitle="Manage Promobuillit e-commerce stores and sync orders" bg="/commerce_bg.png" />
+
       <div className="stores-page">
-        {/* Header */}
-        <div className="flex items-center justify-between mb-5">
-          <div>
-            <h1 className="text-2xl font-bold text-slate-900">Stores</h1>
-            <p className="text-sm text-slate-500 mt-0.5">{stores.length} stores</p>
-          </div>
+        {/* Actions */}
+        <div className="flex items-center justify-end mb-5">
           <div className="flex items-center gap-2 flex-wrap">
             <select
               value={showAll ? 'all' : 'active'}

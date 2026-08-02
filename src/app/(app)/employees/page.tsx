@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import { EmployeeSummary, OfficeLocation } from '@/types'
 import EmployeeCard from '@/components/employees/EmployeeCard'
 import { MultiSelect, type MultiSelectOption } from '@/components/ui/MultiSelect'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 const OFFICE_LOCATIONS: OfficeLocation[] = ['Remote', 'Minnesota', 'Arizona', 'Colorado']
 
@@ -47,11 +48,8 @@ export default function EmployeeDirectoryPage() {
   return (
     <>
       <style>{`
-        .dir-page { padding: 2rem; max-width: 1200px; margin: 0 auto; width: 100%; box-sizing: border-box; }
+        .dir-page { padding: 2rem; width: 100%; box-sizing: border-box; }
         .dir-grid > * { min-width: 0; width: 100%; box-sizing: border-box; }
-        .dir-header { margin-bottom: 1.5rem; }
-        .dir-title { font-size: 1.5rem; font-weight: 700; color: #1e293b; }
-        .dir-count { font-size: 0.875rem; color: #64748b; margin-top: 0.25rem; }
         .dir-filters { display: flex; flex-wrap: wrap; gap: 0.75rem; align-items: center; margin-bottom: 1.5rem; }
         .dir-search { flex: 1; min-width: 220px; max-width: 360px; position: relative; }
         .dir-search input { width: 100%; padding: 0.5rem 0.75rem 0.5rem 2.25rem; border: 1px solid #e2e8f0; border-radius: 0.5rem; font-size: 0.875rem; outline: none; }
@@ -69,12 +67,12 @@ export default function EmployeeDirectoryPage() {
         @keyframes pulse { 0%, 100% { opacity: 1 } 50% { opacity: 0.5 } }
       `}</style>
 
-      <div className="dir-page">
-        <div className="dir-header">
-          <h1 className="dir-title">Employee Directory</h1>
-          <p className="dir-count">{employees.length} {employees.length === 1 ? 'employee' : 'employees'}</p>
-        </div>
+      <PageHeader
+        title="Employee Directory"
+        subtitle={`${employees.length} ${employees.length === 1 ? 'employee' : 'employees'}`}
+      />
 
+      <div className="dir-page">
         <div className="dir-filters">
           <div className="dir-search">
             <svg width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" viewBox="0 0 24 24">

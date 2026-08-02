@@ -4,6 +4,7 @@ import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import { DataTable, type DataTableColumn, MultiSelect, type MultiSelectOption } from '@/components/ui'
 import { FilterPillGroup, type FilterPillOption } from '@/components/ui/FilterPill'
+import { PageHeader } from '@/components/layout/PageHeader'
 
 const PAGE_SIZE = 50
 
@@ -157,71 +158,71 @@ export default function ContactsPage() {
     : 'No contacts yet. Create one to get started.'
 
   return (
-    <div className="w-full px-6 py-8">
-      <div className="flex items-center justify-between mb-6">
-        <div>
-          <h1 className="text-2xl font-bold text-slate-900">Contacts</h1>
-          <p className="text-sm text-slate-500 mt-0.5">People across all organizations</p>
-        </div>
-        <button
-          onClick={() => router.push('/sales/contacts/new')}
-          className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl transition-colors"
-        >
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
-          </svg>
-          New Contact
-        </button>
-      </div>
+    <>
+      <PageHeader title="Contacts" subtitle="People across all organizations" bg="/crm_bg.png" />
 
-      <div className="flex flex-col gap-4 mb-5">
-        <div className="flex gap-3 flex-wrap">
-          <div className="relative flex-1 max-w-sm">
-            <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <circle cx="11" cy="11" r="8" strokeWidth={2} />
-              <path strokeLinecap="round" strokeWidth={2} d="M21 21l-4.35-4.35" />
+      <div className="w-full px-6 py-8">
+        <div className="flex items-center justify-end mb-6">
+          <button
+            onClick={() => router.push('/sales/contacts/new')}
+            className="flex items-center gap-2 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl transition-colors"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 4v16m8-8H4" />
             </svg>
-            <input
-              type="search"
-              value={search}
-              onChange={(e) => setSearch(e.target.value)}
-              placeholder="Search by name or email…"
-              className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
-            />
-          </div>
-          {allTags.length > 0 && (
-            <MultiSelect
-              options={allTags.map((t): MultiSelectOption => ({ value: t.id, label: t.name, color: t.color }))}
-              value={tagFilter}
-              onChange={setTagFilter}
-              placeholder="All Tags"
-              label="Filter by tag"
-            />
-          )}
+            New Contact
+          </button>
         </div>
-        <FilterPillGroup
-          options={TYPE_OPTIONS}
-          value={type}
-          onChange={setType}
-          label="Filter by type"
+
+        <div className="flex flex-col gap-4 mb-5">
+          <div className="flex gap-3 flex-wrap">
+            <div className="relative flex-1 max-w-sm">
+              <svg className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <circle cx="11" cy="11" r="8" strokeWidth={2} />
+                <path strokeLinecap="round" strokeWidth={2} d="M21 21l-4.35-4.35" />
+              </svg>
+              <input
+                type="search"
+                value={search}
+                onChange={(e) => setSearch(e.target.value)}
+                placeholder="Search by name or email…"
+                className="w-full pl-9 pr-3 py-2 text-sm border border-slate-200 rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-purple-400"
+              />
+            </div>
+            {allTags.length > 0 && (
+              <MultiSelect
+                options={allTags.map((t): MultiSelectOption => ({ value: t.id, label: t.name, color: t.color }))}
+                value={tagFilter}
+                onChange={setTagFilter}
+                placeholder="All Tags"
+                label="Filter by tag"
+              />
+            )}
+          </div>
+          <FilterPillGroup
+            options={TYPE_OPTIONS}
+            value={type}
+            onChange={setType}
+            label="Filter by type"
+          />
+        </div>
+
+        <DataTable
+          rows={contacts}
+          columns={columns}
+          loading={loading}
+          emptyMessage={emptyMessage}
+          getRowKey={(c) => c.id}
+          onRowClick={(c) => router.push(`/sales/contacts/${c.id}`)}
+          pagination={{
+            page,
+            total,
+            pageSize: PAGE_SIZE,
+            itemName: 'contact',
+            onPageChange: setPage,
+          }}
         />
       </div>
-
-      <DataTable
-        rows={contacts}
-        columns={columns}
-        loading={loading}
-        emptyMessage={emptyMessage}
-        getRowKey={(c) => c.id}
-        onRowClick={(c) => router.push(`/sales/contacts/${c.id}`)}
-        pagination={{
-          page,
-          total,
-          pageSize: PAGE_SIZE,
-          itemName: 'contact',
-          onPageChange: setPage,
-        }}
-      />
-    </div>
+    </>
   )
 }
