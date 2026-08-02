@@ -907,6 +907,86 @@ export const aturianCustomerQueueNewEntry: NotificationDefinition<AturianQueueNe
   },
 }
 
+// ─── aturian_supplier_queue.new_entry ──────────────────────────────────────────
+
+export interface AturianSupplierQueueNewEntryPayload {
+  queue_id: string
+  company_name: string
+  requestor_name: string
+  phone: string | null
+  city: string | null
+  state: string | null
+}
+
+export const aturianSupplierQueueNewEntry: NotificationDefinition<AturianSupplierQueueNewEntryPayload> = {
+  type: 'aturian_supplier_queue.new_entry',
+  label: 'New Aturian supplier queue entry',
+  description: 'When a new Aturian supplier intake is submitted and needs to be added.',
+  defaultEmail: true,
+  render: (p) => ({
+    title: `New Aturian supplier request: ${p.company_name}`,
+    body: `Requested by ${p.requestor_name}`,
+    linkUrl: `/aturian/suppliers/queue/${p.queue_id}`,
+  }),
+  email: (p, recipient) => {
+    const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
+    const addr = [p.city, p.state].filter(Boolean).join(', ')
+    return {
+      subject: `New Aturian supplier request: ${p.company_name}`,
+      html: renderGenericEmail({
+        preheader: `${p.company_name} needs to be created in Aturian`,
+        heading: 'New Supplier — Aturian Queue',
+        greeting: `Hi ${firstName},`,
+        bodyLines: [
+          `<strong>${p.requestor_name}</strong> submitted a new supplier request for the Aturian queue.`,
+          `<strong style="font-size:16px;color:#1e293b">${p.company_name}</strong>`,
+          ...(p.phone ? [`<strong>Phone:</strong> ${p.phone}`] : []),
+          ...(addr ? [`<strong>Location:</strong> ${addr}`] : []),
+          `Mark it complete once it's been added, so the other person knows not to duplicate it.`,
+        ],
+        ctaText: 'View in Supplier Queue',
+        ctaUrl: `${appUrl()}/aturian/suppliers/queue/${p.queue_id}`,
+      }),
+    }
+  },
+}
+
+// ─── aturian_supplier_queue.completed ──────────────────────────────────────────
+
+export interface AturianSupplierQueueCompletedPayload {
+  queue_id: string
+  company_name: string
+  completed_by_name: string
+}
+
+export const aturianSupplierQueueCompleted: NotificationDefinition<AturianSupplierQueueCompletedPayload> = {
+  type: 'aturian_supplier_queue.completed',
+  label: 'Aturian supplier queue entry completed',
+  description: 'When a supplier has been added to Aturian and the queue entry is marked complete.',
+  defaultEmail: true,
+  render: (p) => ({
+    title: `${p.company_name} added to Aturian`,
+    body: `Completed by ${p.completed_by_name}`,
+    linkUrl: `/aturian/suppliers/queue/${p.queue_id}`,
+  }),
+  email: (p, recipient) => {
+    const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
+    return {
+      subject: `Done: ${p.company_name} added to Aturian`,
+      html: renderGenericEmail({
+        preheader: `${p.company_name} was added to Aturian`,
+        heading: 'Supplier Added — Aturian Queue',
+        greeting: `Hi ${firstName},`,
+        bodyLines: [
+          `<strong>${p.completed_by_name}</strong> added <strong>${p.company_name}</strong> to Aturian and marked the request complete.`,
+        ],
+        ctaText: 'View in Supplier Queue',
+        ctaUrl: `${appUrl()}/aturian/suppliers/queue/${p.queue_id}`,
+      }),
+    }
+  },
+}
+
 // ─── Registry ─────────────────────────────────────────────────────────────────
 //
 // To add a new notification type:
@@ -936,6 +1016,8 @@ export const NOTIFICATION_REGISTRY = {
   'contact_form.submitted': contactFormSubmitted,
   'supplier.added_to_aturian': supplierAddedToAturian,
   'aturian_customer_queue.new_entry': aturianCustomerQueueNewEntry,
+  'aturian_supplier_queue.new_entry': aturianSupplierQueueNewEntry,
+  'aturian_supplier_queue.completed': aturianSupplierQueueCompleted,
 } as const
 
 export type NotificationType = keyof typeof NOTIFICATION_REGISTRY

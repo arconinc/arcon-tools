@@ -156,6 +156,47 @@ export function buildSupplierAturianPayload(supplier: SupplierTransferSource): A
   }
 }
 
+type SupplierQueueTransferSource = {
+  id: string
+  company_name: string
+  phone: string | null
+  website: string | null
+  product_line: string | null
+  specialty: string | null
+  address1: string | null
+  address2: string | null
+  city: string | null
+  state: string | null
+  zip: string | null
+  orders_email: string | null
+  ap_email: string | null
+}
+
+export function buildSupplierQueuePayload(entry: SupplierQueueTransferSource): AturianTransferPayload {
+  return {
+    version: 1,
+    entityType: 'supplier',
+    recordId: entry.id,
+    recordName: entry.company_name,
+    recordUrl: currentUrl(),
+    exportedAt: new Date().toISOString(),
+    fields: {
+      name: { label: 'Supplier Name', value: entry.company_name },
+      phone: { label: 'Phone', value: entry.phone },
+      website: { label: 'Website', value: entry.website },
+      product_line: { label: 'Product Line', value: entry.product_line },
+      specialty: { label: 'Specialty', value: entry.specialty },
+      billing_address1: { label: 'Billing Address 1', value: entry.address1 },
+      billing_address2: { label: 'Billing Address 2', value: entry.address2 },
+      billing_city: { label: 'Billing City', value: entry.city },
+      billing_state: { label: 'Billing State', value: entry.state },
+      billing_zip: { label: 'Billing ZIP', value: entry.zip },
+      orders_email: { label: 'Orders Email', value: entry.orders_email },
+      ap_email: { label: 'AP Email', value: entry.ap_email },
+    },
+  }
+}
+
 export async function sendAturianTransferPayload(payload: AturianTransferPayload) {
   if (typeof window === 'undefined') return
 

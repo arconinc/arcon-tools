@@ -1,0 +1,173 @@
+'use client'
+
+import { useEffect, useState, useCallback } from 'react'
+import { useParams } from 'next/navigation'
+import Link from 'next/link'
+import { ConfirmButton } from '@/components/ui/ConfirmButton'
+import { buildSupplierQueuePayload, sendAturianTransferPayload } from '@/lib/aturian-transfer'
+import type { AturianSupplierQueueDetail } from '@/types'
+
+export default function AturianSupplierQueueDetailPage() {
+  const params = useParams<{ id: string }>()
+  const id = params.id
+
+  const [entry, setEntry] = useState<AturianSupplierQueueDetail | null>(null)
+  const [loading, setLoading] = useState(true)
+  const [actionError, setActionError] = useState<string | null>(null)
+  const [aturianAssistSent, setAturianAssistSent] = useState(false)
+
+  const load = useCallback(async () => {
+    setLoading(true)
+    try {
+      const res = await fetch(`/api/marketing/aturian-supplier-queue/${id}`)
+      const data = await res.json()
+      if (res.ok) setEntry(data)
+    } finally {
+      setLoading(false)
+    }
+  }, [id])
+
+  useEffect(() => { load() }, [load])
+
+  async function runAction(action: 'complete') {
+    setActionError(null)
+    const res = await fetch(`/api/marketing/aturian-supplier-queue/${id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ action }),
+    })
+    const data = await res.json()
+    if (!res.ok) {
+      setActionError(
+        res.status === 403
+          ? 'Only Jill, Amy, or an admin can complete requests.'
+          : (data.error ?? 'Action failed')
+      )
+      return
+    }
+    load()
+  }
+
+  function sendToAturianAssist() {
+    if (!entry) return
+    sendAturianTransferPayload(buildSupplierQueuePayload(entry))
+    setAturianAssistSent(true)
+    window.setTimeout(() => setAturianAssistSent(false), 3500)
+  }
+
+  if (loading) {
+    return (
+      <div className="px-6 py-5">
+        <div className="animate-pulse space-y-3">
+          <div className="h-5 bg-slate-100 rounded w-32" />
+          <div className="h-24 bg-slate-100 rounded-2xl" />
+        </div>
+      </div>
+    )
+  }
+
+  if (!entry) {
+    return (
+      <div className="px-6 py-5">
+        <Link href="/aturian/suppliers/queue" className="text-sm text-slate-500 hover:text-slate-700">← Supplier Queue</Link>
+        <div className="mt-4 p-4 bg-red-50 border border-red-200 rounded-xl text-sm text-red-700">Queue entry not found</div>
+      </div>
+    )
+  }
+
+  return (
+    <div className="px-6 py-5 max-w-3xl mx-auto">
+      <Link href="/aturian/suppliers/queue" className="inline-flex items-center gap-1.5 text-sm text-slate-500 hover:text-slate-700 mb-3">
+        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+        </svg>
+        Supplier Queue
+      </Link>
+
+      <div className="flex items-center justify-between mb-4">
+        <h1 className="text-xl font-bold text-slate-900">{entry.company_name}</h1>
+        <div className="flex items-center gap-2">
+          {(entry.status === 'new' || entry.status === 'claimed') && (
+            <>
+              <button
+                onClick={sendToAturianAssist}
+                className="px-4 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors"
+              >
+                Aturian Assist
+              </button>
+              <ConfirmButton idleLabel="Mark Complete" variant="green" onConfirm={() => runAction('complete')} />
+            </>
+          )}
+          {entry.status === 'complete' && (
+            <span className="text-sm text-green-700 font-medium">Completed by {entry.completed_by_user?.display_name ?? '—'}</span>
+          )}
+        </div>
+      </div>
+
+      {aturianAssistSent && (
+        <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-800">
+          Sent to Aturian Assist. Open Aturian, then use the Chrome extension to fill the current page.
+        </div>
+      )}
+      {actionError && (
+        <div className="mb-3 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm font-medium text-red-700">
+          {actionError}
+        </div>
+      )}
+
+      <div className="mb-4 p-3 rounded-xl border border-slate-200 bg-white flex items-center gap-3 text-sm">
+        <span className="font-semibold text-slate-500">Status:</span>
+        {entry.status === 'new' && <span className="text-slate-600">New — waiting for processing</span>}
+        {entry.status === 'claimed' && <span className="text-blue-700">Claimed by {entry.claimed_user?.display_name ?? '—'}</span>}
+        {entry.status === 'complete' && <span className="text-green-700">Complete</span>}
+        <span className="text-slate-400 ml-auto">Requested by {entry.created_by_user?.display_name ?? '—'} on {new Date(entry.created_at).toLocaleDateString()}</span>
+      </div>
+
+      <div className="space-y-4">
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
+            <h2 className="text-sm font-semibold text-slate-700">Company Information</h2>
+          </div>
+          <div className="px-5 py-4 grid grid-cols-3 gap-4 text-sm">
+            <Field label="Product Line" value={entry.product_line} />
+            <Field label="Specialty" value={entry.specialty} className="col-span-2" />
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
+            <h2 className="text-sm font-semibold text-slate-700">Billing Address</h2>
+          </div>
+          <div className="px-5 py-4 grid grid-cols-3 gap-4 text-sm">
+            <Field label="Address Line 1" value={entry.address1} className="col-span-3" />
+            {entry.address2 && <Field label="Address Line 2" value={entry.address2} className="col-span-3" />}
+            <Field label="City" value={entry.city} />
+            <Field label="State" value={entry.state} />
+            <Field label="ZIP" value={entry.zip} />
+            <Field label="Phone" value={entry.phone} />
+            <Field label="Website" value={entry.website} className="col-span-2" />
+          </div>
+        </div>
+
+        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+          <div className="px-5 py-3 bg-slate-50 border-b border-slate-100">
+            <h2 className="text-sm font-semibold text-slate-700">Contact Emails</h2>
+          </div>
+          <div className="px-5 py-4 grid grid-cols-2 gap-4 text-sm">
+            <Field label="Orders Email" value={entry.orders_email} />
+            <Field label="AP Email" value={entry.ap_email} />
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function Field({ label, value, className = '' }: { label: string; value?: string | null; className?: string }) {
+  return (
+    <div className={className}>
+      <div className="text-xs font-semibold text-slate-400 uppercase tracking-wide mb-0.5">{label}</div>
+      <div className="text-slate-700">{value || '—'}</div>
+    </div>
+  )
+}

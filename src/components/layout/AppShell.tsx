@@ -17,9 +17,12 @@ import UniversalSearch from './UniversalSearch'
 
 const CACHE_TTL = 5 * 60 * 1000 // 5 minutes
 
+type NavTeam = { id: string; key: string; name: string; color: string }
+
 const _fetchCache: {
   stores?: { data: Store[]; at: number }
   countdown?: { data: CalendarCountdownEvent[]; at: number }
+  teams?: { data: NavTeam[]; at: number }
 } = {}
 
 // ── Types ─────────────────────────────────────────────────────────────────────
@@ -88,7 +91,7 @@ export function useAppUser() {
 
 // ── Nav structure ─────────────────────────────────────────────────────────────
 
-function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Record<string, boolean> = {}): NavSection[] {
+function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Record<string, boolean> = {}, teams: NavTeam[] = []): NavSection[] {
   const filter = (items: NavItemDef[]) =>
     items.filter(item => {
       if (item.adminOnly && !isAdmin) return false
@@ -111,9 +114,22 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
           ],
       },
     {
-      label: 'Tasks',
+      label: 'Teams',
       items: [
         { href: '/my-tasks', label: 'My Tasks', icon: BoardIcon },
+        ...teams.map((team): NavItemDef => ({
+          href: `/teams/${team.key}`,
+          label: team.name,
+          icon: UsersIcon,
+        })),
+      ],
+    },
+    {
+      label: 'Art',
+      items: [
+        { href: '/teams/art', label: 'My Tasks', icon: BoardIcon },
+        { href: '/documents/art', label: 'Documents', icon: DocumentIcon },
+        { href: 'https://www.dropbox.com/home', label: 'Dropbox', icon: LinkIcon },
       ],
     },
     {
@@ -122,7 +138,8 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
         { href: 'https://arcon.erp.network/', label: 'Login', icon: LoginIcon },
         { href: '/aturian/customers/new', label: 'Add Customer', icon: CrmCustomersIcon },
         { href: '/aturian/customers/queue', label: 'Customer Queue', icon: ClipboardListIcon },
-        { href: '/sales/suppliers/new', label: 'Add Supplier', icon: BuildingIcon },
+        { href: '/aturian/suppliers/new', label: 'Add Supplier', icon: BuildingIcon },
+        { href: '/aturian/suppliers/queue', label: 'Supplier Queue', icon: ClipboardListIcon },
       ],
     },
       {
@@ -269,6 +286,26 @@ export default function AppShell({ children, user, isImpersonating, impersonated
     return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [profileOpen])
 
+  const [navTeams, setNavTeams] = useState<NavTeam[]>([])
+
+  useEffect(() => {
+    const cached = _fetchCache.teams
+    if (cached && Date.now() - cached.at < CACHE_TTL) {
+      setNavTeams(cached.data)
+      return
+    }
+    fetch('/api/teams')
+      .then(async (r) => {
+        if (!r.ok) return
+        const data = await r.json()
+        if (Array.isArray(data)) {
+          _fetchCache.teams = { data, at: Date.now() }
+          setNavTeams(data)
+        }
+      })
+      .catch(() => {})
+  }, [])
+
   useEffect(() => {
     const cached = _fetchCache.stores
     if (cached && Date.now() - cached.at < CACHE_TTL) {
@@ -391,7 +428,7 @@ export default function AppShell({ children, user, isImpersonating, impersonated
     .toUpperCase()
     .slice(0, 2)
 
-  const navSections = buildNavSections(user.is_admin, user.roles ?? [], evaluatedFlags)
+  const navSections = buildNavSections(user.is_admin, user.roles ?? [], evaluatedFlags, navTeams)
   const sidebarWidth = sidebarCollapsed ? 52 : 228
 
   return (

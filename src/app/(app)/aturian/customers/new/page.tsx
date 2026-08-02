@@ -104,7 +104,6 @@ export default function AturianAddCustomerPage() {
       state: [req('State is required')],
       zip: [req('ZIP is required')],
       phone: [req('Corporate Phone is required')],
-      website: [req('Website is required')],
       orderer_first_name: [req('Orderer First Name is required')],
       orderer_last_name: [req('Orderer Last Name is required')],
       orderer_email: [req('Orderer Email is required')],

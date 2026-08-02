@@ -1003,6 +1003,37 @@ export interface AturianCustomerQueueDetail extends AturianCustomerQueueEntry {
   files: CrmFile[]
 }
 
+export interface AturianSupplierQueueEntry {
+  id: string
+  company_name: string
+  phone: string | null
+  website: string | null
+  product_line: string | null
+  specialty: string | null
+  address1: string | null
+  address2: string | null
+  city: string | null
+  state: string | null
+  zip: string | null
+  orders_email: string | null
+  ap_email: string | null
+  status: AturianQueueStatus
+  task_id: string | null
+  claimed_by: string | null
+  claimed_at: string | null
+  completed_by: string | null
+  completed_at: string | null
+  created_by: string
+  created_at: string
+  updated_at: string
+}
+
+export interface AturianSupplierQueueDetail extends AturianSupplierQueueEntry {
+  claimed_user: { id: string; display_name: string } | null
+  created_by_user: { id: string; display_name: string } | null
+  completed_by_user: { id: string; display_name: string } | null
+}
+
 export interface CrmArtwork {
   id: string
   customer_id: string

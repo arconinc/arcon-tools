@@ -42,6 +42,15 @@ export async function resolveAturianAssignee(adminClient: ReturnType<typeof crea
   return data[0] as AturianAssignee
 }
 
+// Supplier queue is co-owned by both Jill and Amy — either can claim/complete, and both are notified.
+export async function resolveAturianSupplierQueueAssignees(adminClient: ReturnType<typeof createAdminClient>): Promise<AturianAssignee[]> {
+  const [jill, amy] = await Promise.all([
+    resolveAturianAssignee(adminClient, 'supplier'),
+    resolveAturianAssignee(adminClient, 'customer'),
+  ])
+  return [jill, amy].filter((a): a is AturianAssignee => !!a)
+}
+
 export async function resolveAturianQueueAssignee(adminClient: ReturnType<typeof createAdminClient>): Promise<AturianAssignee | null> {
   const { data, error } = await adminClient
     .from('users')

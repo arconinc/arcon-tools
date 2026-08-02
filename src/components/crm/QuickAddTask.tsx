@@ -33,7 +33,12 @@ export default function QuickAddTask({ defaultTeamId, onTaskCreated }: QuickAddT
     setError(null)
     try {
       const body: Record<string, unknown> = { title }
-      if (defaultTeamId) body.team_id = defaultTeamId
+      // team_id absent assigned_to leaves the server to default it to the creator —
+      // send it explicitly so a team-scoped quick-add stays assigned to the team.
+      if (defaultTeamId) {
+        body.team_id = defaultTeamId
+        body.assigned_to = null
+      }
       const res = await fetch('/api/marketing/tasks', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

@@ -278,7 +278,10 @@ export function TaskFormModal({
       .then((users) => {
         if (!active || !Array.isArray(users)) return
         setCrmUsers(users)
-        if (mode === 'create' && appUser?.email) {
+        // Only default to "assigned to me" when no team is already selected —
+        // opening the create form from a team-locked board should keep the
+        // team as the assignee, not silently reassign to the creator.
+        if (mode === 'create' && appUser?.email && !defaultTeamId) {
           const me = users.find((u: DropdownUser) => u.email === appUser.email)
           if (me) setForm((prev) => ({ ...prev, assigned_to: me.id }))
         }
