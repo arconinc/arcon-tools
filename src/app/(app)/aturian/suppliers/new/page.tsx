@@ -8,7 +8,8 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { formatPhoneInput, isValidPhone } from '@/lib/phone'
 import { useFormValidation, inputCls, selectCls, isValidEmail, FieldError } from '@/lib/form-validation'
 import { useAppUser } from '@/components/layout/AppShell'
-import { useCrmUsers } from '@/hooks/useCrmUsers'
+import { useApiResource } from '@/hooks/useApiResource'
+import type { CrmUserLite } from '@/hooks/useCrmUsers'
 import type { PlacesAddress } from '@/lib/google-places'
 
 type CreateForm = {
@@ -43,7 +44,7 @@ const EMPTY_FORM: CreateForm = {
 export default function AturianAddSupplierPage() {
   const router = useRouter()
   const { user } = useAppUser()
-  const { data: crmUsers } = useCrmUsers()
+  const { data: crmUsers } = useApiResource<CrmUserLite[]>('/api/marketing/access-groups/customer_supplier_creator/users')
 
   const [form, setForm] = useState<CreateForm>(() => ({ ...EMPTY_FORM, requestor_id: user?.id ?? '' }))
   const { errors, validate, clearError } = useFormValidation<CreateForm>()

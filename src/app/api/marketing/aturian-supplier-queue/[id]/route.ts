@@ -74,6 +74,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     try {
       const assignees = await resolveAturianSupplierQueueAssignees(adminClient)
+      const recipientIds = new Set(assignees.map((a) => a.id))
+      if (current.created_by) recipientIds.add(current.created_by)
       const actor = await fetchActor(appUser.id)
       await dispatchNotification({
         definition: aturianSupplierQueueCompleted,
@@ -82,7 +84,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
           company_name: data.company_name,
           completed_by_name: actor.display_name,
         },
-        recipientSpec: { userIds: assignees.map((a) => a.id) },
+        recipientSpec: { userIds: [...recipientIds] },
         suppressUserIds: [appUser.id],
       })
     } catch (err) {

@@ -8,7 +8,7 @@ import { PageHeader } from '@/components/layout/PageHeader'
 import { formatPhoneInput } from '@/lib/phone'
 import { useFormValidation, inputCls, selectCls, FieldError } from '@/lib/form-validation'
 import { useAppUser } from '@/components/layout/AppShell'
-import { useCrmUsers } from '@/hooks'
+import { useApiResource, type CrmUserLite } from '@/hooks'
 import type { PlacesAddress } from '@/lib/google-places'
 import type { AturianCommissionedClient } from '@/types'
 
@@ -49,7 +49,7 @@ const EMPTY_FORM: CreateForm = {
 export default function AturianAddCustomerPage() {
   const router = useRouter()
   const { user: appUser } = useAppUser()
-  const { data: crmUsersData } = useCrmUsers()
+  const { data: crmUsersData } = useApiResource<CrmUserLite[]>('/api/marketing/access-groups/customer_supplier_creator/users')
   const crmUsers = crmUsersData ?? []
 
   const [form, setForm] = useState<CreateForm>(EMPTY_FORM)

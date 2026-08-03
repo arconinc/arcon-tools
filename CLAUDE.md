@@ -64,7 +64,8 @@ src/
     access.ts         # hasFileAccess(), requiredRoleFor(), shared doc access helpers
     search/sources.ts # SearchSource registry + runUniversalSearch()
     task-constants.ts # CrmTaskDepartment, enums, DEPARTMENT_ROUTES, ROUTE_TO_DEPARTMENT
-    crm/require-user.ts  # Auth helper for CRM route handlers
+    crm/require-user.ts  # requireUser() — auth + admin lookup + impersonation, for CRM route handlers
+    api/respond.ts    # ok/created/unauthorized/forbidden/notFound/badRequest/serverError response helpers
   types/index.ts      # All shared TypeScript types
 ```
 
@@ -86,6 +87,8 @@ if (!dbUser?.is_admin) return NextResponse.json({ error: 'Forbidden' }, { status
 ```
 
 `user.id` from Supabase auth **is** the `google_id` — query `users` by `google_id`, not `id`.
+
+For CRM/marketing routes, prefer `requireUser()` from `src/lib/crm/require-user.ts` over the manual pattern above — it does the auth + `is_admin` lookup + impersonation resolution in one call and returns `{ id, is_admin } | null` (or `null` if unauthenticated), where `id` is the `users.id` row (not `google_id`). Pair with `respond.ts` helpers (`unauthorized()`, `forbidden()`, `ok(data)`, etc.) instead of hand-rolled `NextResponse.json`.
 
 ### Admin Layout Pattern
 `layout.tsx` under `app/admin/` does server-side `is_admin` check and redirects to `/dashboard` if false.
@@ -109,7 +112,7 @@ const flags = useFeatureFlags()      // Record<string, boolean>
 Flags are rows in `feature_flags` table. A missing row = disabled.
 
 ### Notifications System
-Add new type: define `<Type>Payload` + `NotificationDefinition` in `registry.ts`, add to `NOTIFICATION_REGISTRY`. Dispatch via `dispatchNotification()`. No DB seed needed — registry key is source of truth.
+Add new type: define `<Type>Payload` + `NotificationDefinition` in `registry.ts`, add to `NOTIFICATION_REGISTRY`. Dispatch via `dispatchNotification({ definition, payload, recipientSpec, suppressUserIds? })` (`src/lib/notifications/dispatch.ts`). `recipientSpec` (`src/lib/notifications/recipients.ts`) targets `userId` / `userIds` / `teamId` / `department` / `admins: true`. `suppressUserIds` excludes the actor from their own notification. `fetchActor(userId)` resolves `{ id, display_name }` for use in payloads. No DB seed needed — registry key is source of truth. Wrap dispatch calls in try/catch + `Sentry.captureException(err)` so a notification failure never blocks the main mutation.
 
 ### RBAC / Roles
 `permissions.ts` maps resource → required role. `access.ts` provides helpers. Admins bypass all role checks. Private bucket files must be served via `GET /api/files/signed-url` — never direct links.
@@ -148,6 +151,7 @@ Two-table: `spec_ideas` (catalog) + `spec_samples` (per-customer records). Stora
 | `spec_ideas` / `spec_samples` | Spec sample catalog + send records |
 | `notifications` / `notification_preferences` | In-app notifications + per-user email prefs |
 | `roles` / `user_roles` / `access_requests` | RBAC |
+| `groups` / `group_memberships` | Named access-control groups (`key`, `is_active`) with member users; queried via `/api/marketing/access-groups/[groupKey]/users` |
 | `feature_flags` | Feature flag registry |
 | `expense_reports` / `expense_report_config` | Expense workflow |
 | `banner_config` | Hero carousel (two rows: `draft` + `published`) |
@@ -183,6 +187,7 @@ No unit test suite. Playwright available (`playwright.config.ts`). **Done when:*
 - Do not disable security features "temporarily."
 - Do not use `--force` / `--no-verify` without explicit user instruction.
 - Do not fabricate DB columns, routes, or components — verify they exist first.
+- Sentry (`@sentry/nextjs`) is wired project-wide — wrap non-critical side effects (notification dispatch, background sync) in try/catch and call `Sentry.captureException(err)` rather than letting them throw and fail the request.
 
 ## Maintenance Notes
 

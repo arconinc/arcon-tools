@@ -103,6 +103,9 @@ export async function PUT(req: NextRequest, { params }: Params) {
     ...(jill ? [jill.id] : []),
   ]))
 
+  // Amy & Jill always get notified, even when one of them is the reviewer.
+  const actorIsAmyOrJill = dbUser.id === amy?.id || dbUser.id === jill?.id
+
   await dispatchNotification({
     definition: ptoReviewed,
     payload: {
@@ -114,7 +117,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
       end_date: existing.end_date,
     },
     recipientSpec: { userIds: recipientIds },
-    suppressUserIds: [dbUser.id],
+    suppressUserIds: actorIsAmyOrJill ? [] : [dbUser.id],
   })
 
   return NextResponse.json({ request: updated })

@@ -761,8 +761,8 @@ export const ptoReviewed: NotificationDefinition<PtoReviewedPayload> = {
         greeting: `Hi ${firstName},`,
         bodyLines: [
           approved
-            ? `Your PTO request for <strong>${p.start_date} – ${p.end_date}</strong> has been approved by <strong>${p.reviewer_name}</strong>.`
-            : `Your PTO request for <strong>${p.start_date} – ${p.end_date}</strong> was reviewed by <strong>${p.reviewer_name}</strong> and was not approved at this time.`,
+            ? `The PTO request for <strong>${p.start_date} – ${p.end_date}</strong> has been approved by <strong>${p.reviewer_name}</strong>.`
+            : `Then PTO request for <strong>${p.start_date} – ${p.end_date}</strong> was reviewed by <strong>${p.reviewer_name}</strong> and was not approved at this time.`,
           ...(p.reviewer_comment ? [`Note: <em>${p.reviewer_comment}</em>`] : []),
           ...(!approved ? [`You may edit and resubmit your request from the PTO Requests page.`] : []),
         ],
@@ -907,6 +907,42 @@ export const aturianCustomerQueueNewEntry: NotificationDefinition<AturianQueueNe
   },
 }
 
+// ─── aturian_customer_queue.completed ──────────────────────────────────────────
+
+export interface AturianCustomerQueueCompletedPayload {
+  queue_id: string
+  company_name: string
+  completed_by_name: string
+}
+
+export const aturianCustomerQueueCompleted: NotificationDefinition<AturianCustomerQueueCompletedPayload> = {
+  type: 'aturian_customer_queue.completed',
+  label: 'Aturian customer queue entry completed',
+  description: 'When a customer request you submitted is added to Aturian and marked complete.',
+  defaultEmail: true,
+  render: (p) => ({
+    title: `${p.company_name} added to Aturian`,
+    body: `Completed by ${p.completed_by_name}`,
+    linkUrl: `/aturian/customers/queue/${p.queue_id}`,
+  }),
+  email: (p, recipient) => {
+    const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
+    return {
+      subject: `Done: ${p.company_name} added to Aturian`,
+      html: renderGenericEmail({
+        preheader: `${p.company_name} was added to Aturian`,
+        heading: 'Customer Added — Aturian Queue',
+        greeting: `Hi ${firstName},`,
+        bodyLines: [
+          `<strong>${p.completed_by_name}</strong> added <strong>${p.company_name}</strong> to Aturian and marked your request complete.`,
+        ],
+        ctaText: 'View in Customer Queue',
+        ctaUrl: `${appUrl()}/aturian/customers/queue/${p.queue_id}`,
+      }),
+    }
+  },
+}
+
 // ─── aturian_supplier_queue.new_entry ──────────────────────────────────────────
 
 export interface AturianSupplierQueueNewEntryPayload {
@@ -1016,6 +1052,7 @@ export const NOTIFICATION_REGISTRY = {
   'contact_form.submitted': contactFormSubmitted,
   'supplier.added_to_aturian': supplierAddedToAturian,
   'aturian_customer_queue.new_entry': aturianCustomerQueueNewEntry,
+  'aturian_customer_queue.completed': aturianCustomerQueueCompleted,
   'aturian_supplier_queue.new_entry': aturianSupplierQueueNewEntry,
   'aturian_supplier_queue.completed': aturianSupplierQueueCompleted,
 } as const

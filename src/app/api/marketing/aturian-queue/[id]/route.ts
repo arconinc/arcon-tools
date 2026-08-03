@@ -1,8 +1,11 @@
 import { NextRequest } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 import { unauthorized, forbidden, notFound, badRequest, serverError, ok } from '@/lib/api/respond'
 import { resolveAturianQueueAssignee } from '@/lib/crm/aturian-assignees'
+import { dispatchNotification, fetchActor } from '@/lib/notifications/dispatch'
+import { aturianCustomerQueueCompleted } from '@/lib/notifications/registry'
 
 async function canActOnQueue(adminClient: ReturnType<typeof createAdminClient>, userId: string, isAdmin: boolean) {
   if (isAdmin) return true
@@ -72,6 +75,26 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     if (current.task_id) {
       await adminClient.from('crm_tasks').update({ status: 'completed', progress: 100 }).eq('id', current.task_id)
     }
+
+    if (current.created_by) {
+      try {
+        const actor = await fetchActor(appUser.id)
+        await dispatchNotification({
+          definition: aturianCustomerQueueCompleted,
+          payload: {
+            queue_id: data.id,
+            company_name: data.company_name,
+            completed_by_name: actor.display_name,
+          },
+          recipientSpec: { userId: current.created_by },
+          suppressUserIds: [appUser.id],
+        })
+      } catch (err) {
+        console.error('[aturian-queue/[id]/PATCH] notification failed:', err)
+        Sentry.captureException(err)
+      }
+    }
+
     return ok(data)
   }
 
