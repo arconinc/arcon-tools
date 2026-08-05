@@ -4,6 +4,7 @@ import { useState, useEffect, useMemo } from 'react'
 import Link from 'next/link'
 import type { DocSectionWithTree, DocFolderNode, DriveDocument } from '@/types'
 import { PageHeader } from '@/components/layout/PageHeader'
+import { sectionSlug } from '@/lib/documents/section-slugs'
 
 function countFolders(folders: DocFolderNode[]): number {
   let n = 0
@@ -48,16 +49,6 @@ function searchFolders(
   }
 }
 
-const SECTION_SLUGS: Record<string, string> = {
-  'HR': 'hr',
-  'Marketing': 'marketing',
-  'Accounting': 'accounting',
-  'E-Commerce': 'ecommerce',
-  'Technology': 'technology',
-  'Sales': 'sales',
-  'Warehouse': 'warehouse',
-}
-
 export default function DocumentsPage() {
   const [sections, setSections] = useState<DocSectionWithTree[]>([])
   const [loading, setLoading] = useState(true)
@@ -75,7 +66,7 @@ export default function DocumentsPage() {
     if (!query) return null
     const out: SearchResult[] = []
     for (const section of sections) {
-      const slug = SECTION_SLUGS[section.name] ?? section.name.toLowerCase().replace(/[\s-]+/g, '')
+      const slug = sectionSlug(section.name)
       searchFolders(section.folders, query, slug, section.name, [], out)
     }
     return out
@@ -161,7 +152,7 @@ export default function DocumentsPage() {
         ) : (
           <div className="sections-grid">
             {sections.map(section => {
-              const slug = SECTION_SLUGS[section.name] ?? section.name.toLowerCase().replace(/[\s-]+/g, '')
+              const slug = sectionSlug(section.name)
               const folderCount = countFolders(section.folders)
               const docCount = countDocs(section.folders)
               return (

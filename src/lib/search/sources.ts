@@ -1,9 +1,13 @@
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getDocAccessContext, filterAccessibleDocuments } from '@/lib/documents/access'
+import { sectionSlug } from '@/lib/documents/section-slugs'
+import { stripHtml } from '@/lib/news-utils'
+import { DEPARTMENT_DISPLAY_NAMES } from '@/lib/task-constants'
+import type { CrmTaskDepartment } from '@/types'
 
 type Admin = ReturnType<typeof createAdminClient>
 
-export type SearchResultType = 'customer' | 'contact' | 'vendor' | 'document'
+export type SearchResultType = 'customer' | 'contact' | 'vendor' | 'document' | 'task'
 
 export interface SearchResult {
   type: SearchResultType
@@ -152,18 +156,77 @@ export const SEARCH_SOURCES: SearchSource[] = [
       const p = ilikePattern(term)
       const { data } = await admin
         .from('documents')
-        .select('id, title, description, owner_id, required_role, doc_folders(name)')
+        .select('id, title, description, owner_id, required_role, folder_id, doc_folders(name, doc_sections(name))')
         .or(`title.ilike.${p},description.ilike.${p}`)
         .limit(20) // over-fetch; access filter trims below
       const visible = await filterAccessibleDocuments(admin, data ?? [], ctx)
-      return visible.map(d => ({
-        type: 'document' as const,
-        id: d.id,
-        title: d.title,
+      return visible.map(d => {
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        subtitle: (d as any).doc_folders?.name ?? null,
-        url: '/documents',
-        score: Math.max(scoreMatch(d.title, term), scoreMatch(d.description, term) ? 25 : 0),
+        const folder = (d as any).doc_folders
+        const sectionName = folder?.doc_sections?.name as string | undefined
+        return {
+          type: 'document' as const,
+          id: d.id,
+          title: d.title,
+          subtitle: folder?.name ?? null,
+          url: sectionName ? `/documents/${sectionSlug(sectionName)}?folder=${d.folder_id}&doc=${d.id}` : '/documents',
+          score: Math.max(scoreMatch(d.title, term), scoreMatch(d.description, term) ? 25 : 0),
+        }
+      })
+    },
+  },
+  {
+    type: 'task',
+    typeWeight: 1,
+    async run(admin, term) {
+      const p = ilikePattern(term)
+      const [tasksRes, commentsRes] = await Promise.all([
+        admin
+          .from('crm_tasks')
+          .select('id, title, description, department')
+          .or(`title.ilike.${p},description.ilike.${p}`)
+          .neq('status', 'completed')
+          .limit(LIMIT),
+        admin
+          .from('crm_task_comments')
+          .select('task_id, comment')
+          .ilike('comment', p)
+          .limit(LIMIT),
+      ])
+
+      const results = new Map<string, { title: string; subtitle: string | null; score: number }>()
+      for (const t of tasksRes.data ?? []) {
+        const department = t.department as CrmTaskDepartment | null
+        results.set(t.id, {
+          title: t.title,
+          subtitle: department ? DEPARTMENT_DISPLAY_NAMES[department] : null,
+          score: Math.max(scoreMatch(t.title, term), scoreMatch(t.description, term) ? 25 : 0),
+        })
+      }
+
+      const comments = commentsRes.data ?? []
+      const missingTaskIds = [...new Set(comments.map(c => c.task_id).filter((id): id is string => Boolean(id) && !results.has(id)))]
+      if (missingTaskIds.length > 0) {
+        const { data: extraTasks } = await admin.from('crm_tasks').select('id, title, department').in('id', missingTaskIds).neq('status', 'completed')
+        for (const t of extraTasks ?? []) {
+          const department = t.department as CrmTaskDepartment | null
+          results.set(t.id, { title: t.title, subtitle: department ? DEPARTMENT_DISPLAY_NAMES[department] : null, score: 0 })
+        }
+      }
+      for (const c of comments) {
+        const existing = c.task_id ? results.get(c.task_id) : undefined
+        if (!existing) continue
+        const snippet = stripHtml(c.comment).trim()
+        if (snippet && existing.score < 25) results.set(c.task_id!, { ...existing, subtitle: snippet.slice(0, 80), score: 25 })
+      }
+
+      return [...results.entries()].map(([id, r]) => ({
+        type: 'task' as const,
+        id,
+        title: r.title,
+        subtitle: r.subtitle,
+        url: `/tasks/${id}`,
+        score: r.score,
       }))
     },
   },

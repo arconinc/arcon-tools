@@ -9,6 +9,7 @@ const TYPE_LABEL: Record<SearchResultType, string> = {
   contact: 'Contact',
   vendor: 'Supplier',
   document: 'Document',
+  task: 'Task',
 }
 
 function TypeIcon({ type }: { type: SearchResultType }) {
@@ -29,6 +30,10 @@ function TypeIcon({ type }: { type: SearchResultType }) {
     case 'document':
       return (
         <svg {...common}><path strokeLinecap="round" strokeLinejoin="round" d="M14 3H6a2 2 0 00-2 2v14a2 2 0 002 2h12a2 2 0 002-2V9zM14 3v6h6M8 13h8M8 17h8" /></svg>
+      )
+    case 'task':
+      return (
+        <svg {...common}><rect x="3" y="5" width="18" height="16" rx="2" /><path strokeLinecap="round" d="M8 3v4M16 3v4M8 12l2.5 2.5L16 9" /></svg>
       )
   }
 }
