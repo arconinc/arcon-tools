@@ -4,6 +4,7 @@ import { requireUser } from '@/lib/crm/require-user'
 import { unauthorized, forbidden, badRequest, notFound, serverError, ok } from '@/lib/api/respond'
 import { stripReadOnly } from '@/lib/api/sanitize'
 import { setEntityTags } from '@/lib/crm/tags'
+import { withAssigneeNames } from '@/lib/crm/task-enrich'
 import { OPPORTUNITY_OWNERS_GROUP_KEY } from '@/lib/groups/constants'
 
 // Fields that trigger a stage history row on change
@@ -96,7 +97,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     ...opp,
     customer: customerRes.data ?? null,
     assigned_user: assignedUserRes.data ?? null,
-    tasks: tasksRes.data ?? [],
+    tasks: await withAssigneeNames(adminClient, tasksRes.data ?? []),
     stage_history: enrichedHistory,
     files: filesRes.data ?? [],
     tags,

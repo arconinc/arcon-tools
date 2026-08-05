@@ -163,6 +163,17 @@ function linkedEntityLabel(entity: TaskLinkedEntity) {
   return entity.name ? `${type}: ${entity.name}` : type
 }
 
+const LINKED_ENTITY_ROUTES: Record<TaskLinkedEntity['type'], string> = {
+  customer: '/sales/customers',
+  vendor: '/sales/suppliers',
+  contact: '/sales/contacts',
+  opportunity: '/sales/opportunities',
+}
+
+function linkedEntityHref(entity: TaskLinkedEntity) {
+  return `${LINKED_ENTITY_ROUTES[entity.type]}/${entity.id}`
+}
+
 function linkedEntityFromTask(task: TaskFormTask): TaskLinkedEntity | undefined {
   if (task.opportunity) return { type: 'opportunity', id: task.opportunity.id, name: task.opportunity.name }
   if (task.customer) return { type: 'customer', id: task.customer.id, name: task.customer.name }
@@ -480,7 +491,14 @@ export function TaskFormModal({
                 </h2>
               )}
               {displayLinkedEntity && (
-                <p className="mt-0.5 text-xs font-medium text-slate-500">{linkedEntityLabel(displayLinkedEntity)}</p>
+                <Link
+                  href={linkedEntityHref(displayLinkedEntity)}
+                  onClick={(e) => e.stopPropagation()}
+                  className="mt-1 inline-flex items-center gap-1 px-2 py-0.5 rounded-full bg-purple-50 text-purple-700 text-xs font-semibold hover:bg-purple-100 transition-colors"
+                >
+                  {linkedEntityLabel(displayLinkedEntity)}
+                  <ExternalLinkGlyph className="h-3 w-3" />
+                </Link>
               )}
             </div>
 

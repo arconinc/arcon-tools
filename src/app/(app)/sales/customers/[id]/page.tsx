@@ -23,6 +23,8 @@ import { CrmForm } from '@/types'
 import { getCustomerFormsByState, getGeneralForms, US_STATES } from '@/lib/forms-utils'
 import { buildCompanySummary } from '@/lib/customer/helpers'
 import { useCustomer, useCrmUsers, useArtwork, useCustomerEdit, type CustomerDetail, type BrandDataLocal } from '@/hooks'
+import { taskStatusBadge } from '@/lib/badges'
+import { formatDate } from '@/lib/format'
 import type { PlacesAddress, PlacesDetails } from '@/lib/google-places'
 
 type DropdownUser = { id: string; display_name: string; email: string }
@@ -615,7 +617,7 @@ export default function CustomerDetailPage() {
             }`}
           >
             {tab}
-            {tab === 'related' && customer.contacts.length + customer.opportunities.length + customer.files.length > 0 && (
+            {tab === 'related' && customer.contacts.length + customer.opportunities.length + customer.files.length + customer.tasks.length > 0 && (
               <span className="ml-1.5 text-xs opacity-70">
                 {customer.contacts.length + customer.opportunities.length + customer.files.length}
               </span>
@@ -1089,7 +1091,7 @@ export default function CustomerDetailPage() {
 
       {/* ── Related Tab ── */}
       {activeTab === 'related' && (
-        <div className="grid grid-cols-2 gap-4">
+        <div className="grid gap-4 md:grid-cols-3 items-start">
           {/* Contacts */}
           <CustomerContactsList
             contacts={customer.contacts}
@@ -1110,6 +1112,39 @@ export default function CustomerDetailPage() {
           />
 
           <CustomerFilesList files={customer.files} />
+
+          {/* Tasks */}
+          <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
+            <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50">
+              <h2 className="text-sm font-semibold text-slate-700">Open Tasks ({customer.tasks.length})</h2>
+              <button onClick={() => setCreateTaskOpen(true)} className="text-xs font-semibold text-purple-700 hover:text-purple-900">+ Add Task</button>
+            </div>
+            {customer.tasks.length === 0
+              ? <div className="px-5 py-5 text-sm text-slate-400 text-center">No open tasks linked to this customer.</div>
+              : <div className="divide-y divide-slate-100">
+                  {customer.tasks.map((t) => (
+                    <div key={t.id} onClick={() => router.push(`/tasks/${t.id}`)}
+                      className="flex items-center gap-2 flex-wrap px-5 py-3 hover:bg-slate-50 cursor-pointer transition-colors">
+                      <div className="flex-1 min-w-0">
+                        <div className="text-sm font-medium text-slate-800 truncate">{t.title}</div>
+                        {t.category && <div className="text-xs text-slate-400">{t.category}</div>}
+                      </div>
+                      <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium whitespace-nowrap">
+                        {t.assigned_to_name ?? 'Unassigned'}
+                      </span>
+                      <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap ${taskStatusBadge(t.status)}`}>
+                        {t.status.replace(/_/g, ' ')}
+                      </span>
+                      {t.due_date && (
+                        <span className={`text-xs whitespace-nowrap ${new Date(t.due_date) < new Date() ? 'text-red-500 font-medium' : 'text-slate-400'}`}>
+                          {formatDate(t.due_date)}
+                        </span>
+                      )}
+                    </div>
+                  ))}
+                </div>
+            }
+          </div>
 
           {/* Stores */}
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
@@ -1266,7 +1301,27 @@ export default function CustomerDetailPage() {
         open={createTaskOpen}
         onClose={() => setCreateTaskOpen(false)}
         linkedEntity={{ type: 'customer', id: customer.id, name: customer.name }}
-        onCreated={() => setTaskCreatedToastOpen(true)}
+        onCreated={(task) => {
+          setCustomer((current) => current
+            ? {
+                ...current,
+                tasks: [
+                  ...current.tasks,
+                  {
+                    id: task.id,
+                    title: task.title,
+                    status: task.status,
+                    priority: task.priority,
+                    due_date: task.due_date,
+                    category: task.category,
+                    assigned_to: task.assigned_to,
+                    assigned_to_name: task.assigned_user?.display_name ?? null,
+                  },
+                ],
+              }
+            : current)
+          setTaskCreatedToastOpen(true)
+        }}
       />
       <TaskCreatedToast
         show={taskCreatedToastOpen}

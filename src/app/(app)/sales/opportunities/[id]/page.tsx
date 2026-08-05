@@ -46,6 +46,7 @@ type OppDetail = {
   tasks: {
     id: string; title: string; status: string; priority: string
     due_date: string | null; category: string | null
+    assigned_to: string | null; assigned_to_name: string | null
   }[]
   stage_history: {
     id: string
@@ -661,7 +662,7 @@ export default function OpportunityDetailPage() {
 
       {/* ── Related Tab ── */}
       {activeTab === 'related' && (
-        <div className="space-y-5">
+        <div className="grid gap-4 md:grid-cols-3 items-start">
           {/* Stage History */}
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 bg-slate-50">
@@ -670,6 +671,7 @@ export default function OpportunityDetailPage() {
             {opp.stage_history.length === 0 ? (
               <div className="px-5 py-6 text-sm text-slate-400 text-center">No stage changes recorded yet.</div>
             ) : (
+              <div className="overflow-x-auto">
               <table className="w-full text-xs">
                 <thead className="bg-slate-50 border-b border-slate-100">
                   <tr>
@@ -702,6 +704,7 @@ export default function OpportunityDetailPage() {
                   ))}
                 </tbody>
               </table>
+              </div>
             )}
           </div>
 
@@ -720,11 +723,14 @@ export default function OpportunityDetailPage() {
               <div className="divide-y divide-slate-100">
                 {opp.tasks.map((t) => (
                   <div key={t.id} onClick={() => router.push(`/tasks/${t.id}`)}
-                    className="flex items-center gap-4 px-5 py-3 hover:bg-slate-50 cursor-pointer transition-colors">
+                    className="flex items-center gap-2 flex-wrap px-5 py-3 hover:bg-slate-50 cursor-pointer transition-colors">
                     <div className="flex-1 min-w-0">
                       <div className="text-sm font-medium text-slate-800 truncate">{t.title}</div>
                       {t.category && <div className="text-xs text-slate-400">{t.category}</div>}
                     </div>
+                    <span className="inline-flex items-center px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 text-xs font-medium whitespace-nowrap">
+                      {t.assigned_to_name ?? 'Unassigned'}
+                    </span>
                     <span className={`inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold whitespace-nowrap ${taskStatusBadge(t.status)}`}>
                       {t.status.replace(/_/g, ' ')}
                     </span>
@@ -820,6 +826,8 @@ export default function OpportunityDetailPage() {
                     priority: task.priority,
                     due_date: task.due_date,
                     category: task.category,
+                    assigned_to: task.assigned_to,
+                    assigned_to_name: task.assigned_user?.display_name ?? null,
                   },
                 ],
               }

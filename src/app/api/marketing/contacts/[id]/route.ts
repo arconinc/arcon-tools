@@ -4,6 +4,7 @@ import { requireUser } from '@/lib/crm/require-user'
 import { unauthorized, forbidden, notFound, serverError, ok } from '@/lib/api/respond'
 import { stripReadOnly } from '@/lib/api/sanitize'
 import { setEntityTags } from '@/lib/crm/tags'
+import { withAssigneeNames } from '@/lib/crm/task-enrich'
 
 // GET /api/marketing/contacts/[id]
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -21,7 +22,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   if (error || !contact) return notFound('Contact not found')
 
-  const [customerRes, vendorRes, filesRes, entityTagsRes] = await Promise.all([
+  const [customerRes, vendorRes, filesRes, tasksRes, entityTagsRes] = await Promise.all([
     contact.customer_id
       ? adminClient.from('crm_customers').select('id, name, website').eq('id', contact.customer_id).single()
       : Promise.resolve({ data: null }),
@@ -29,6 +30,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
       ? adminClient.from('crm_vendors').select('id, name, website').eq('id', contact.vendor_id).single()
       : Promise.resolve({ data: null }),
     adminClient.from('crm_files').select('id, label, url, created_at').eq('contact_id', id).order('created_at', { ascending: false }),
+    adminClient
+      .from('crm_tasks')
+      .select('id, title, status, priority, due_date, category, assigned_to')
+      .eq('contact_id', id)
+      .neq('status', 'completed')
+      .order('due_date', { ascending: true })
+      .limit(10),
     adminClient
       .from('crm_entity_tags')
       .select('crm_tags(id, name, color)')
@@ -43,6 +51,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     customer: customerRes.data ?? null,
     vendor: vendorRes.data ?? null,
     files: filesRes.data ?? [],
+    tasks: await withAssigneeNames(adminClient, tasksRes.data ?? []),
     tags,
   })
 }
@@ -55,7 +64,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params
   const body = await req.json()
   const { tag_ids, ...rest } = body
-  const updates = stripReadOnly(rest, ['tags', 'customer', 'vendor', 'files', 'customer_name', 'vendor_name'])
+  const updates = stripReadOnly(rest, ['tags', 'customer', 'vendor', 'files', 'tasks', 'customer_name', 'vendor_name'])
 
   const adminClient = createAdminClient()
 

@@ -4,6 +4,7 @@ import { requireUser } from '@/lib/crm/require-user'
 import { unauthorized, forbidden, notFound, serverError, ok } from '@/lib/api/respond'
 import { stripReadOnly } from '@/lib/api/sanitize'
 import { setEntityTags } from '@/lib/crm/tags'
+import { withAssigneeNames } from '@/lib/crm/task-enrich'
 
 // GET /api/marketing/vendors/[id]
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -21,9 +22,16 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   if (error || !vendor) return notFound('Vendor not found')
 
-  const [contactsRes, filesRes, createdByUserRes, entityTagsRes] = await Promise.all([
+  const [contactsRes, filesRes, tasksRes, createdByUserRes, entityTagsRes] = await Promise.all([
     adminClient.from('crm_contacts').select('id, first_name, last_name, title, email, phone, type_of_contact, created_at').eq('vendor_id', id).order('last_name'),
     adminClient.from('crm_files').select('id, label, url, created_at').eq('vendor_id', id).order('created_at', { ascending: false }),
+    adminClient
+      .from('crm_tasks')
+      .select('id, title, status, priority, due_date, category, assigned_to')
+      .eq('vendor_id', id)
+      .neq('status', 'completed')
+      .order('due_date', { ascending: true })
+      .limit(10),
     adminClient.from('users').select('id, display_name, email').eq('id', vendor.created_by).single(),
     adminClient
       .from('crm_entity_tags')
@@ -44,6 +52,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     ...vendor,
     contacts: contactsRes.data ?? [],
     files: filesRes.data ?? [],
+    tasks: await withAssigneeNames(adminClient, tasksRes.data ?? []),
     created_by_user: createdByUserRes.data ?? null,
     tags,
     brand_data,
@@ -58,7 +67,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   const { id } = await params
   const body = await req.json()
   const { tag_ids, ...rest } = body
-  const updates = stripReadOnly(rest, ['tags', 'contacts', 'files', 'created_by_user', 'brand_data'])
+  const updates = stripReadOnly(rest, ['tags', 'contacts', 'files', 'tasks', 'created_by_user', 'brand_data'])
 
   const adminClient = createAdminClient()
 

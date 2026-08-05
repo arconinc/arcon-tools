@@ -66,6 +66,7 @@ export type CustomerDetail = {
   contacts: { id: string; first_name: string; last_name: string; title: string | null; email: string | null; phone: string | null; department: string | null }[]
   opportunities: { id: string; name: string; value: number | null; status: string; pipeline_stage: string | null; forecast_close_date: string | null }[]
   files: { id: string; label: string; url: string; created_at: string }[]
+  tasks: { id: string; title: string; status: string; priority: string; due_date: string | null; category: string | null; assigned_to: string | null; assigned_to_name: string | null }[]
   assigned_user: { id: string; display_name: string; email: string } | null
   created_by_user: { id: string; display_name: string; email: string } | null
 }
