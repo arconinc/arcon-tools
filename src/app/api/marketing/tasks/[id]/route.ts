@@ -301,8 +301,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       'assigned_to' in safeUpdates && data.assigned_to !== current.assigned_to
     const teamChanged =
       'team_id' in safeUpdates && data.team_id !== current.team_id
+    const statusChanged = 'status' in safeUpdates && data.status !== current.status
 
-    if (newAssigneeChanged && data.assigned_to && data.assigned_to !== appUser.id) {
+    // When a status transition (waiting_on_approval / need_changes / completed) is what
+    // moved assigned_to, that transition has its own dedicated notification below — don't
+    // also fire the generic "assigned you a task" one for the same action, or the recipient
+    // gets two emails for one click. Direct reassignment (no status change) is unaffected.
+    if (newAssigneeChanged && !statusChanged && data.assigned_to && data.assigned_to !== appUser.id) {
       const actor = await fetchActor(appUser.id)
       await dispatchNotification({
         definition: taskAssigned,
@@ -349,7 +354,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
 
     // Notify the assignee when someone else updates the task (and it wasn't just a
     // reassignment or status transition — those have their own dedicated notifications below).
-    const statusChanged = 'status' in safeUpdates && data.status !== current.status
     const hasFieldChanges = historyInserts.length > 0
     const assigneeIsNotEditor = data.assigned_to && data.assigned_to !== appUser.id
     const wasReassignedAway = newAssigneeChanged && data.assigned_to !== current.assigned_to

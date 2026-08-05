@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from 'react'
 
 interface CrmDetailActionsProps {
   onCreateTask: () => void
-  extraAction?: { label: string; href: string }
+  extraAction?: { label: string; onClick: () => void }
 }
 
 export function CrmDetailActions({ onCreateTask, extraAction }: CrmDetailActionsProps) {
@@ -44,13 +44,16 @@ export function CrmDetailActions({ onCreateTask, extraAction }: CrmDetailActions
             Create Task
           </button>
           {extraAction && (
-            <a
-              href={extraAction.href}
-              onClick={() => setTimeout(() => setOpen(false), 0)}
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false)
+                extraAction.onClick()
+              }}
               className="block w-full rounded-lg px-3 py-2 text-left text-sm font-medium text-slate-700 hover:bg-purple-50 hover:text-purple-700"
             >
               {extraAction.label}
-            </a>
+            </button>
           )}
         </div>
       )}
