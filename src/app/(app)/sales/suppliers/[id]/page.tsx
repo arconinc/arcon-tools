@@ -169,6 +169,52 @@ function CopyButton({ value }: { value: string }) {
   )
 }
 
+function VendorRelationsSignupLinkModal({ url, onClose }: { url: string; onClose: () => void }) {
+  const [copied, setCopied] = useState(false)
+  const handleCopy = () => {
+    navigator.clipboard.writeText(url)
+    setCopied(true)
+    setTimeout(() => setCopied(false), 1500)
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
+      <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
+        <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
+          <h2 className="text-base font-semibold text-slate-800">Vendor Relations Signup Link</h2>
+          <button onClick={onClose} className="text-slate-400 hover:text-slate-600">
+            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+        <div className="px-6 py-5 space-y-3">
+          <p className="text-sm text-slate-600">Copy this link and paste it into your email to the vendor.</p>
+          <div className="flex items-center gap-2">
+            <input
+              type="text"
+              readOnly
+              value={url}
+              onFocus={(e) => e.target.select()}
+              className="flex-1 border border-slate-200 rounded-lg px-3 py-2 text-sm bg-slate-50 text-slate-700"
+            />
+            <button
+              type="button"
+              onClick={handleCopy}
+              className="px-3 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-lg hover:bg-slate-50 transition-colors whitespace-nowrap"
+            >
+              {copied ? 'Copied!' : 'Copy'}
+            </button>
+          </div>
+        </div>
+        <div className="px-6 py-4 border-t border-slate-100 flex justify-end">
+          <button onClick={onClose} className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">Close</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
 function Field({ label, value, password, multiline, link, email }: { label: string; value: string | null | undefined; password?: boolean; multiline?: boolean; link?: boolean; email?: boolean }) {
   const display = value
     ? link
@@ -238,6 +284,7 @@ export default function VendorDetailPage() {
   const [editing, setEditing] = useState(false)
   const [editForm, setEditForm] = useState<Partial<VendorDetail>>({})
   const [createTaskOpen, setCreateTaskOpen] = useState(false)
+  const [signupLinkOpen, setSignupLinkOpen] = useState(false)
   const [taskCreatedToastOpen, setTaskCreatedToastOpen] = useState(false)
   const [aturianAssistSent, setAturianAssistSent] = useState(false)
   const [saving, setSaving] = useState(false)
@@ -814,12 +861,8 @@ export default function VendorDetailPage() {
   const ef = editForm as Partial<VendorDetail>
 
   const firstContact = [...vendor.contacts].sort((a, b) => a.created_at.localeCompare(b.created_at))[0]
-  const vendorRelationsMailto = firstContact?.email && typeof window !== 'undefined'
-    ? (() => {
-        const signupUrl = `${window.location.origin}/order/vendor-relations/${vendor.id}`
-        const body = `Hi,\n\nPlease use the link below to sign up for a Vendor Relations demo time slot:\n${signupUrl}\n\nThanks,\nArcon`
-        return `mailto:${firstContact.email}?subject=${encodeURIComponent('Vendor Demonstration Signup')}&body=${encodeURIComponent(body)}`
-      })()
+  const vendorRelationsSignupUrl = firstContact?.email && typeof window !== 'undefined'
+    ? `${window.location.origin}/order/vendor-relations/${vendor.id}`
     : undefined
 
   const sendSupplierToAturianAssist = async () => {
@@ -873,10 +916,13 @@ export default function VendorDetailPage() {
           </button>
           <CrmDetailActions
             onCreateTask={() => setCreateTaskOpen(true)}
-            extraAction={vendorRelationsMailto ? { label: 'Email Vendor Relations Signup', href: vendorRelationsMailto } : undefined}
+            extraAction={vendorRelationsSignupUrl ? { label: 'Email Vendor Relations Signup', onClick: () => setSignupLinkOpen(true) } : undefined}
           />
         </div>
       </div>
+      {signupLinkOpen && vendorRelationsSignupUrl && (
+        <VendorRelationsSignupLinkModal url={vendorRelationsSignupUrl} onClose={() => setSignupLinkOpen(false)} />
+      )}
       {aturianAssistSent && (
         <div className="mb-3 rounded-lg border border-green-200 bg-green-50 px-3 py-2 text-sm font-medium text-green-800">
           Sent to Aturian Assist. Open Aturian, then use the Chrome extension to fill the current page.
