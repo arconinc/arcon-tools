@@ -312,7 +312,7 @@ export default function VendorDetailPage() {
   const [deletingFileId, setDeletingFileId] = useState<string | null>(null)
 
   useEffect(() => {
-    fetch('/api/admin/forms').then(r => r.json()).then(d => setTaxForms(d.forms ?? [])).catch(() => {})
+    fetch('/api/forms').then(r => r.json()).then(d => setTaxForms(d.forms ?? [])).catch(() => {})
   }, [])
 
   useEffect(() => {
