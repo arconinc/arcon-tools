@@ -739,6 +739,20 @@ export default function AppShell({ children, user, isImpersonating, impersonated
                   <HelpIcon className="w-4 h-4" />
                 </Link>
 
+                {/* Aturian */}
+                <a
+                  href="https://arcon.erp.network/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  title="Aturian"
+                  aria-label="Aturian"
+                  style={{ width: 34, height: 34, borderRadius: 6, background: '#f5f5f5', border: '1px solid #e5e7eb', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', textDecoration: 'none', flexShrink: 0 }}
+                  onMouseEnter={e => { e.currentTarget.style.background = '#faf5ff'; e.currentTarget.style.borderColor = '#e9d5ff' }}
+                  onMouseLeave={e => { e.currentTarget.style.background = '#f5f5f5'; e.currentTarget.style.borderColor = '#e5e7eb' }}
+                >
+                  <Image src="/aturian_btn.png" alt="Aturian" width={18} height={18} style={{ objectFit: 'contain' }} />
+                </a>
+
                 {/* Gmail */}
                 <a
                   href="https://mail.google.com"

@@ -630,6 +630,9 @@ export default function VendorDetailPage() {
           Suppliers
         </Link>
         <h1 className="text-xl font-bold text-slate-900 mb-4">New Supplier</h1>
+        <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
+          <strong>Please Note:</strong> This form is not used to request approval for a new customer in Aturian. It is only for adding customers that have already been approved. If you need approval for a new customer in Aturian, please go to <Link href="/aturian/customers/new" className="font-semibold underline hover:text-amber-900">ATURIAN ERP &gt; Add Customer</Link>.
+        </div>
         <form onSubmit={handleCreate} className="space-y-3">
           {createError && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{createError}</div>}
 

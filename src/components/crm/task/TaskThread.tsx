@@ -16,6 +16,13 @@ import { PaperclipGlyph, SendGlyph, ReassignGlyph, DocumentGlyph, ImageGlyph } f
 import type { Comment, HistoryEntry, TaskAttachment } from '@/hooks/useTask'
 import type { CrmTaskStatus } from '@/types'
 
+type ParticipantRef = {
+  id: string
+  display_name: string
+  avatar_url?: string | null
+  profile_image_url?: string | null
+}
+
 function isImageMime(mime: string | null) {
   return mime?.startsWith('image/') ?? false
 }
@@ -380,22 +387,34 @@ function GroupReplyComposer({
   taskId,
   parentCommentId,
   onRefresh,
+  currentUserId,
   currentUserName,
   currentUserAvatarUrl,
   currentUserProfileImageUrl,
+  assignedTo,
+  participants,
 }: {
   taskId: string
   parentCommentId: string
   onRefresh: () => void | Promise<void>
+  currentUserId: string
   currentUserName: string
   currentUserAvatarUrl?: string | null
   currentUserProfileImageUrl?: string | null
+  assignedTo: string | null
+  participants: ParticipantRef[]
 }) {
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [submitting, setSubmitting] = useState(false)
   const [uploadingImage, setUploadingImage] = useState(false)
+  const [reassignTo, setReassignTo] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
   const imageInputRef = useRef<HTMLInputElement>(null)
+
+  // Only the current holder of the task can hand it off, and only to someone
+  // else already in this conversation.
+  const reassignTargets = participants.filter((p) => p.id !== currentUserId)
+  const canReassign = assignedTo === currentUserId && reassignTargets.length > 0
 
   const editor = useEditor({
     immediatelyRender: false,
@@ -424,7 +443,7 @@ function GroupReplyComposer({
     }
   }
 
-  async function submit() {
+  async function submit(reassignToId?: string) {
     const html = editor?.getHTML() ?? ''
     const isEmpty = !editor || editor.isEmpty
     if (isEmpty && pendingFiles.length === 0) return
@@ -433,7 +452,7 @@ function GroupReplyComposer({
       const res = await fetch(`/api/marketing/tasks/${taskId}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ comment: isEmpty ? '' : html, parent_comment_id: parentCommentId }),
+        body: JSON.stringify({ comment: isEmpty ? '' : html, parent_comment_id: parentCommentId, reassign_to: reassignToId || undefined }),
       })
       if (!res.ok) return
       const created = await res.json()
@@ -456,6 +475,7 @@ function GroupReplyComposer({
       }
       editor?.commands.clearContent()
       setPendingFiles([])
+      setReassignTo('')
       await onRefresh()
     } finally {
       setSubmitting(false)
@@ -550,15 +570,53 @@ function GroupReplyComposer({
             <PaperclipGlyph className="w-3.5 h-3.5" />
           </button>
 
-          <button
-            type="button"
-            onClick={submit}
-            disabled={submitting || (editor.isEmpty && pendingFiles.length === 0)}
-            className="ml-auto inline-flex items-center gap-1.5 px-3 py-1 bg-purple-700 hover:bg-purple-800 text-white text-xs font-semibold rounded-lg disabled:opacity-50 transition-colors"
-          >
-            <SendGlyph className="h-3 w-3" />
-            {submitting ? 'Sending…' : 'Reply'}
-          </button>
+          <div className="ml-auto flex items-center gap-1.5">
+            {canReassign && reassignTargets.length === 1 && (
+              <button
+                type="button"
+                onClick={() => submit(reassignTargets[0].id)}
+                disabled={submitting || (editor.isEmpty && pendingFiles.length === 0)}
+                title={`Send and reassign to ${reassignTargets[0].display_name}`}
+                className="inline-flex items-center gap-1.5 px-3 py-1 border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 text-xs font-semibold rounded-lg disabled:opacity-50 transition-colors"
+              >
+                <ReassignGlyph />
+                Reply & Reassign to {reassignTargets[0].display_name}
+              </button>
+            )}
+            {canReassign && reassignTargets.length > 1 && (
+              <select
+                value={reassignTo}
+                onChange={(e) => setReassignTo(e.target.value)}
+                className="text-xs border border-amber-300 bg-amber-50 text-amber-800 rounded-lg px-1.5 py-1 focus:outline-none"
+              >
+                <option value="">Reassign to…</option>
+                {reassignTargets.map((p) => (
+                  <option key={p.id} value={p.id}>{p.display_name}</option>
+                ))}
+              </select>
+            )}
+            {canReassign && reassignTargets.length > 1 && reassignTo && (
+              <button
+                type="button"
+                onClick={() => submit(reassignTo)}
+                disabled={submitting || (editor.isEmpty && pendingFiles.length === 0)}
+                title={`Send and reassign to ${reassignTargets.find((p) => p.id === reassignTo)?.display_name ?? ''}`}
+                className="inline-flex items-center gap-1.5 px-3 py-1 border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 text-xs font-semibold rounded-lg disabled:opacity-50 transition-colors"
+              >
+                <ReassignGlyph />
+                Reply & Reassign
+              </button>
+            )}
+            <button
+              type="button"
+              onClick={() => submit()}
+              disabled={submitting || (editor.isEmpty && pendingFiles.length === 0)}
+              className="inline-flex items-center gap-1.5 px-3 py-1 bg-purple-700 hover:bg-purple-800 text-white text-xs font-semibold rounded-lg disabled:opacity-50 transition-colors"
+            >
+              <SendGlyph className="h-3 w-3" />
+              {submitting ? 'Sending…' : 'Reply'}
+            </button>
+          </div>
         </div>
       </div>
     </div>
@@ -579,6 +637,8 @@ function CommentGroup({
   currentUserName,
   currentUserAvatarUrl,
   currentUserProfileImageUrl,
+  assignedTo,
+  participants,
 }: {
   comment: Comment
   replies: Comment[]
@@ -589,6 +649,8 @@ function CommentGroup({
   currentUserName: string
   currentUserAvatarUrl?: string | null
   currentUserProfileImageUrl?: string | null
+  assignedTo: string | null
+  participants: ParticipantRef[]
 }) {
   return (
     <div>
@@ -605,9 +667,12 @@ function CommentGroup({
           taskId={taskId}
           parentCommentId={comment.id}
           onRefresh={onRefresh}
+          currentUserId={currentUserId}
           currentUserName={currentUserName}
           currentUserAvatarUrl={currentUserAvatarUrl}
           currentUserProfileImageUrl={currentUserProfileImageUrl}
+          assignedTo={assignedTo}
+          participants={participants}
         />
       </div>
     </div>
@@ -676,6 +741,25 @@ export function TaskThread({
   const canReassignToCreator = !!createdBy && assignedTo === currentUserId && createdBy !== currentUserId
   const assignerName = createdByName || 'the person who assigned it'
 
+  // Everyone who has posted in this thread, plus whoever opened it — the
+  // reassignment target list for in-thread replies.
+  const participantsById = new Map<string, ParticipantRef>()
+  if (createdBy) {
+    participantsById.set(createdBy, {
+      id: createdBy, display_name: createdByName,
+      avatar_url: createdByAvatarUrl, profile_image_url: createdByProfileImageUrl,
+    })
+  }
+  for (const c of comments) {
+    if (!participantsById.has(c.user_id)) {
+      participantsById.set(c.user_id, {
+        id: c.user_id, display_name: c.user.display_name,
+        avatar_url: c.user.avatar_url, profile_image_url: c.user.profile_image_url,
+      })
+    }
+  }
+  const participants = [...participantsById.values()]
+
   // Replies can target any message, but the thread only renders one level of
   // nesting — a reply to a reply is grouped under its top-level ancestor so
   // the layout stays a flat, readable indent rather than a deep tree.
@@ -717,7 +801,7 @@ export function TaskThread({
       const res = await fetch(`/api/marketing/tasks/${taskId}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ comment: text.trim(), reassignToCreator }),
+        body: JSON.stringify({ comment: text.trim(), reassign_to: reassignToCreator ? createdBy : undefined }),
       })
       if (!res.ok) return
       const created = await res.json()
@@ -781,6 +865,8 @@ export function TaskThread({
               currentUserName={currentUserName}
               currentUserAvatarUrl={currentUserAvatarUrl}
               currentUserProfileImageUrl={currentUserProfileImageUrl}
+              assignedTo={assignedTo}
+              participants={participants}
             />
           )
         }
