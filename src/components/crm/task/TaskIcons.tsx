@@ -82,10 +82,29 @@ export function PaperclipGlyph({ className = 'h-3.5 w-3.5' }: { className?: stri
   )
 }
 
+export function ImageGlyph({ className = 'h-3.5 w-3.5' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <rect x="3" y="4" width="18" height="16" rx="2" strokeWidth={2} />
+      <circle cx="8.5" cy="9.5" r="1.5" strokeWidth={2} />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 16l-5.5-5.5a2 2 0 00-2.828 0L4 19" />
+    </svg>
+  )
+}
+
 export function PlusGlyph({ className = 'h-3.5 w-3.5' }: { className?: string }) {
   return (
     <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+    </svg>
+  )
+}
+
+export function DocumentGlyph({ className = 'h-6 w-6' }: { className?: string }) {
+  return (
+    <svg className={className} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14 2H6a2 2 0 00-2 2v16a2 2 0 002 2h12a2 2 0 002-2V8z" />
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M14 2v6h6" />
     </svg>
   )
 }

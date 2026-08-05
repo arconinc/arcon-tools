@@ -5,20 +5,18 @@ import { useRouter, useParams } from 'next/navigation'
 import Link from 'next/link'
 import EntitySearchPicker from '@/components/crm/EntitySearchPicker'
 import { TeamAssigneeSelect } from '@/components/crm/TeamAssigneeSelect'
-import { TaskDescriptionEditor } from '@/components/crm/TaskDescriptionEditor'
-import { ALL_CATEGORIES, getTaskCategoryLabel } from '@/lib/task-constants'
 import { useAppUser } from '@/components/layout/AppShell'
-import { formatDate, formatDateTime, formatBytes } from '@/lib/format'
+import { formatDate } from '@/lib/format'
 import { useTask } from '@/hooks/useTask'
 import type { TaskPriority } from '@/hooks/useTask'
-import { TaskStatusBar } from '@/components/crm/task/TaskStatusBar'
 import { TaskFlowStepper, flowStepLabel } from '@/components/crm/task/TaskFlowStepper'
-import EmployeeAvatar from '@/components/employees/EmployeeAvatar'
-import { TaskNotesPreview } from '@/components/crm/task/TaskNotesPreview'
-import { CommentsTab } from '@/components/crm/task/CommentsTab'
+import { TaskThread } from '@/components/crm/task/TaskThread'
+import { AssignToControl } from '@/components/crm/task/AssignToControl'
+import { TaskParticipants } from '@/components/crm/task/TaskParticipants'
+import { computeTaskParticipants } from '@/lib/task-participants'
 import { ConfirmButton } from '@/components/ui/ConfirmButton'
-import { CalendarGlyph, TagGlyph, ReassignGlyph, TrashGlyph } from '@/components/crm/task/TaskIcons'
-import { TASK_STATUS_LABELS, TASK_STATUS_COLORS, computeTransitionPatch, getTaskNextActions } from '@/lib/task-workflow'
+import { CalendarGlyph, TrashGlyph } from '@/components/crm/task/TaskIcons'
+import { TASK_STATUS_LABELS, TASK_STATUS_COLORS, computeTransitionPatch } from '@/lib/task-workflow'
 import type { CrmTaskStatus } from '@/types'
 
 // ── Local Types ───────────────────────────────────────────────────────────────
@@ -36,14 +34,6 @@ const PRIORITY_BADGE: Record<TaskPriority, string> = {
 }
 
 // ── Local Helpers ─────────────────────────────────────────────────────────────
-
-function isHtmlContent(str: string) {
-  return str.trim().startsWith('<')
-}
-
-function isImageMime(mime: string | null) {
-  return mime?.startsWith('image/') ?? false
-}
 
 function PencilIcon() {
 
@@ -65,15 +55,13 @@ export default function TaskDetailPage() {
 
   const { task, setTask, loading, error, refetch, load } = useTask(id)
 
-  const [activeTab, setActiveTab] = useState<'details' | 'comments' | 'attachments' | 'activity' | 'related'>('details')
-  const [editingField, setEditingField] = useState<'title' | 'priority' | 'category' | 'due_date' | 'assigned_to' | 'description' | null>(null)
-  const descriptionDraftRef = useRef<string | null>(null)
+  const [activeTab, setActiveTab] = useState<'thread' | 'details' | 'related'>('thread')
+  const [editingField, setEditingField] = useState<'title' | 'priority' | 'due_date' | 'assigned_to' | null>(null)
   const dueDateRef = useRef<HTMLInputElement>(null)
   const [editingLinked, setEditingLinked] = useState(false)
   const [linkedForm, setLinkedForm] = useState<Record<string, unknown>>({})
   const [saving, setSaving] = useState(false)
   const [uploadingAttachment, setUploadingAttachment] = useState(false)
-  const attachmentInputRef = useRef<HTMLInputElement>(null)
   const [deleting, setDeleting] = useState(false)
 
   const [crmUsers, setCrmUsers] = useState<DropdownUser[]>([])
@@ -288,6 +276,16 @@ export default function TaskDetailPage() {
     ? { type: 'contact', label: 'Contact', href: `/sales/contacts/${task.contact.id}`, name: `${task.contact.first_name} ${task.contact.last_name}`, color: 'bg-teal-100 text-teal-700' }
     : null
 
+  // Every attachment across the opening description and all replies, newest
+  // first — for the sidebar's quick-find list (the thread itself keeps each
+  // attachment inline with the message it belongs to).
+  const allAttachments = [
+    ...task.attachments.map((a) => ({ id: a.id, url: a.url, label: a.file_name ?? 'file', created_at: a.created_at })),
+    ...task.comments.flatMap((c) => c.attachments.map((a) => ({ id: a.id, url: a.url, label: a.label, created_at: a.created_at }))),
+  ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())
+
+  const participants = computeTaskParticipants(task)
+
 
   return (
     <div className="max-w-6xl mx-auto px-6 py-8">
@@ -304,81 +302,54 @@ export default function TaskDetailPage() {
       {/* Header card */}
       <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden mb-5">
         <div className="px-8 py-4">
-          <div className="flex items-start justify-between gap-5">
+          <div className="flex items-center justify-between gap-5 flex-wrap">
             <div className="min-w-0">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-purple-700 mb-1">
-                {[`Task #${task.id.slice(0, 4).toUpperCase()}`, task.department].filter(Boolean).join(' · ')}
-              </div>
-              <h1 className="text-lg font-bold text-slate-900 leading-tight">{task.title}</h1>
+              <h1 className="text-xl font-bold text-slate-900 leading-tight">{task.title}</h1>
             </div>
-            {(appUser?.is_admin || task.created_by === appUser?.id || task.task_owner === appUser?.id) && (
-              <ConfirmButton
-                idleLabel="Delete Task"
-                confirmLabel="Yes, delete task?"
-                onConfirm={deleteTask}
-                variant="red"
-                size="sm"
-                icon={<TrashGlyph />}
-                disabled={deleting}
-              />
-            )}
+
+            {/* Status + priority badges, due date, delete */}
+            <div className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
+              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${statusColorCls}`}>
+                {statusLabel}
+              </span>
+              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${PRIORITY_BADGE[task.priority]}`}>
+                {task.priority}
+              </span>
+              <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${isOverdue ? 'text-red-600 font-semibold' : 'text-slate-500'}`}>
+                <CalendarGlyph />
+                {task.due_date ? `${isOverdue ? '⚠️ ' : ''}${formatDate(task.due_date)}` : 'No date'}
+              </span>
+              {(appUser?.is_admin || task.created_by === appUser?.id || task.task_owner === appUser?.id) && (
+                <ConfirmButton
+                  idleLabel="Delete Task"
+                  confirmLabel="Yes, delete task?"
+                  onConfirm={deleteTask}
+                  variant="red"
+                  size="sm"
+                  icon={<TrashGlyph />}
+                  disabled={deleting}
+                />
+              )}
+            </div>
           </div>
 
-          {/* Status + priority badges, due date, category, requestor→owner */}
-          <div className="flex items-center gap-2 mt-2 flex-wrap">
-            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${statusColorCls}`}>
-              {statusLabel}
-            </span>
-            <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold capitalize ${PRIORITY_BADGE[task.priority]}`}>
-              {task.priority}
-            </span>
-            <span className={`inline-flex items-center gap-1.5 text-xs font-medium ${isOverdue ? 'text-red-600 font-semibold' : 'text-slate-500'}`}>
-              <CalendarGlyph />
-              {task.due_date ? `${isOverdue ? '⚠️ ' : ''}${formatDate(task.due_date)}` : 'No date'}
-            </span>
-            <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500">
-              <TagGlyph />
-              {task.category ? getTaskCategoryLabel(task.category) : 'Not set'}
-            </span>
-            {task.created_user && (
-              <>
-                <span className="text-xs text-slate-300">·</span>
-                <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500">
-                  <EmployeeAvatar displayName={task.created_user.display_name} avatarUrl={task.created_user.avatar_url} profileImageUrl={task.created_user.profile_image_url} size="xs" />
-                  <span className="text-slate-700 font-semibold">{task.created_user.display_name}</span>
-                  {(task.assigned_user || task.team) && (
-                    <>
-                      →
-                      {task.assigned_user ? (
-                        <>
-                          <EmployeeAvatar displayName={task.assigned_user.display_name} avatarUrl={task.assigned_user.avatar_url} profileImageUrl={task.assigned_user.profile_image_url} size="xs" />
-                          <span className="text-slate-700 font-semibold">{task.assigned_user.display_name}</span>
-                        </>
-                      ) : (
-                        <span className="text-slate-700 font-semibold">{task.team?.name}</span>
-                      )}
-                    </>
-                  )}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => setEditingField('assigned_to')}
-                  className="inline-flex items-center gap-1 text-xs font-semibold text-purple-700 hover:text-purple-900 ml-auto px-2 py-0.5 rounded transition-colors"
-                >
-                  <ReassignGlyph />
-                  Reassign
-                </button>
-              </>
-            )}
+          {/* Prominent assign control + everyone involved in the task */}
+          <div className="flex items-center justify-between gap-3 mt-3 flex-wrap">
+            <AssignToControl
+              teamId={task.team_id}
+              assignedTo={task.assigned_to}
+              displayLabel={task.assigned_user?.display_name ?? task.team?.name ?? 'Unassigned'}
+              teams={teams}
+              users={crmUsers}
+              editing={editingField === 'assigned_to'}
+              onStartEdit={() => setEditingField('assigned_to')}
+              onChange={(assignment) => {
+                saveFieldValues({ team_id: assignment.teamId ?? null, assigned_to: assignment.assignedTo ?? null })
+                setEditingField(null)
+              }}
+            />
+            <TaskParticipants participants={participants} />
           </div>
-          {task.delegator_users.length > 0 && (
-            <div className="mt-2 text-xs text-slate-400">
-              Delegated by{' '}
-              <span className="font-medium text-slate-600">
-                {task.delegator_users.map((u) => u.display_name).join(' → ')}
-              </span>
-            </div>
-          )}
         </div>
 
         <TaskFlowStepper
@@ -392,12 +363,8 @@ export default function TaskDetailPage() {
 
       {/* Tabs */}
       <div className="flex border-b border-slate-200 mb-5">
-        {(['details', 'comments', 'attachments', 'activity', 'related'] as const).map((tab) => {
-          const count =
-            tab === 'comments' ? task.comments.length
-              : tab === 'attachments' ? task.attachments.length
-              : tab === 'activity' ? task.history.length
-              : 0
+        {(['thread', 'details', 'related'] as const).map((tab) => {
+          const count = tab === 'thread' ? task.comments.length : 0
           return (
             <button
               key={tab}
@@ -486,38 +453,6 @@ export default function TaskDetailPage() {
                 )}
               </div>
 
-              {/* Category */}
-              <div className="group flex items-center gap-3 px-6 py-3">
-                <div className="w-36 flex-shrink-0 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Category</div>
-                <div className="flex-1 min-w-0">
-                  {editingField === 'category' ? (
-                    <select
-                      defaultValue={task.category ?? ''}
-                      autoFocus
-                      onChange={(e) => { saveFieldValue('category', e.target.value || null); setEditingField(null) }}
-                      onBlur={() => setEditingField(null)}
-                      className="w-full px-2 py-1 text-sm border border-purple-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
-                    >
-                      <option value="">- None -</option>
-                      {ALL_CATEGORIES.map((c) => (
-                        <option key={c} value={c}>{getTaskCategoryLabel(c)}</option>
-                      ))}
-                    </select>
-                  ) : (
-                    <span className="text-sm text-slate-800">
-                      {task.category ? getTaskCategoryLabel(task.category) : <span className="italic text-slate-400">Not set</span>}
-                    </span>
-                  )}
-                </div>
-                {editingField !== 'category' && (
-                  <button type="button" onClick={() => setEditingField('category')}
-                    className="flex-shrink-0 p-1 text-slate-300 hover:text-purple-600 opacity-0 group-hover:opacity-100 transition-opacity rounded"
-                    aria-label="Edit category">
-                    <PencilIcon />
-                  </button>
-                )}
-              </div>
-
               {/* Due Date */}
               <div className="flex items-center gap-3 px-6 py-3">
                 <div className="w-36 flex-shrink-0 text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Due Date</div>
@@ -590,59 +525,6 @@ export default function TaskDetailPage() {
                 </span>
               </div>
 
-              {/* Description */}
-              <div className="px-6 pt-4 pb-5">
-                <div className="flex items-center justify-between mb-2">
-                  <span className="text-[11px] font-semibold text-slate-400 uppercase tracking-wide">Description</span>
-                  {editingField !== 'description' && (
-                    <button
-                      type="button"
-                      onClick={() => { descriptionDraftRef.current = task.description ?? ''; setEditingField('description') }}
-                      className="p-1 text-slate-300 hover:text-purple-600 transition-colors rounded"
-                      aria-label="Edit description"
-                    >
-                      <PencilIcon />
-                    </button>
-                  )}
-                </div>
-
-                {editingField === 'description' ? (
-                  <div
-                    className="flex flex-col"
-                    style={{ minHeight: 220 }}
-                    onBlur={(e) => {
-                      if (!e.currentTarget.contains(e.relatedTarget as Node | null)) {
-                        const html = descriptionDraftRef.current
-                        if (html !== null && html !== task.description) {
-                          saveFieldValue('description', html || null)
-                        }
-                        setEditingField(null)
-                      }
-                    }}
-                  >
-                    <TaskDescriptionEditor
-                      initialHtml={task.description ?? ''}
-                      onChange={(html) => { descriptionDraftRef.current = html }}
-                    />
-                  </div>
-                ) : (
-                  <div
-                    className="cursor-text min-h-[60px] rounded-lg border border-transparent hover:border-slate-200 hover:bg-slate-50/50 px-3 py-2 transition-colors"
-                    onClick={() => { descriptionDraftRef.current = task.description ?? ''; setEditingField('description') }}
-                  >
-                    {task.description ? (
-                      isHtmlContent(task.description) ? (
-                        <div className="prose prose-sm prose-slate max-w-none" dangerouslySetInnerHTML={{ __html: task.description }} />
-                      ) : (
-                        <p className="text-sm text-slate-700 whitespace-pre-wrap">{task.description}</p>
-                      )
-                    ) : (
-                      <p className="text-sm text-slate-400 italic">Add a description…</p>
-                    )}
-                  </div>
-                )}
-              </div>
-
               {/* Linked record (read-only; edit in Related tab) */}
               {linkedObj && (
                 <div className="px-6 py-3">
@@ -680,22 +562,6 @@ export default function TaskDetailPage() {
 
         {/* Sidebar */}
         <div className="space-y-5">
-          {/* Quick Actions */}
-          {getTaskNextActions(task.status as CrmTaskStatus).length > 0 && (
-            <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-              <div className="px-5 py-4 border-b border-slate-100 bg-slate-50">
-                <h2 className="text-sm font-semibold text-slate-700">Quick Actions</h2>
-              </div>
-              <div className="p-4">
-                <TaskStatusBar
-                  currentStatus={task.status as CrmTaskStatus}
-                  onAction={quickUpdateStatus}
-                  describeNext={describeNextOwner}
-                />
-              </div>
-            </div>
-          )}
-
           {/* Task Information */}
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
             <div className="px-5 py-4 border-b border-slate-100 bg-slate-50">
@@ -737,33 +603,27 @@ export default function TaskDetailPage() {
             </div>
           </div>
 
-          <TaskNotesPreview
-            comments={task.comments}
-            onViewAll={() => setActiveTab('comments')}
-          />
-
-          {/* Attachments preview */}
+          {/* Files preview — every attachment across the description and all
+              replies, newest first, so files stay findable without hunting
+              through the thread. */}
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
             <div className="flex items-center justify-between px-5 py-4 border-b border-slate-100 bg-slate-50">
               <h2 className="text-sm font-semibold text-slate-700">
-                Attachments
-                {task.attachments.length > 0 && <span className="ml-1.5 text-xs font-normal text-slate-400">({task.attachments.length})</span>}
+                Files
+                {allAttachments.length > 0 && <span className="ml-1.5 text-xs font-normal text-slate-400">({allAttachments.length})</span>}
               </h2>
-              {task.attachments.length > 0 && (
-                <button onClick={() => setActiveTab('attachments')} className="text-xs font-semibold text-purple-700 hover:underline">View all</button>
-              )}
             </div>
-            {task.attachments.length === 0 ? (
-              <div className="px-5 py-4 text-sm text-slate-400">No attachments yet.</div>
+            {allAttachments.length === 0 ? (
+              <div className="px-5 py-4 text-sm text-slate-400">No files yet.</div>
             ) : (
               <div className="p-3 space-y-1.5">
-                {task.attachments.slice(0, 4).map((att) => (
+                {allAttachments.slice(0, 6).map((att) => (
                   <a key={att.id} href={att.url} target="_blank" rel="noopener noreferrer"
                     className="flex items-center gap-2 px-2 py-1.5 rounded-lg text-xs text-slate-700 hover:bg-slate-50 transition-colors">
                     <svg className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
                     </svg>
-                    <span className="truncate">{att.file_name ?? 'file'}</span>
+                    <span className="truncate">{att.label}</span>
                   </a>
                 ))}
               </div>
@@ -773,106 +633,32 @@ export default function TaskDetailPage() {
         </div>
       )}
 
-      {/* ── Attachments Tab ── */}
-      {activeTab === 'attachments' && (
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-          <div className="flex items-center justify-between px-6 py-4 border-b border-slate-100 bg-slate-50">
-            <h2 className="text-sm font-semibold text-slate-700">
-              Attachments
-              {task.attachments.length > 0 && <span className="ml-1.5 text-xs font-normal text-slate-400">({task.attachments.length})</span>}
-            </h2>
-            <div>
-              <input
-                ref={attachmentInputRef}
-                type="file"
-                className="hidden"
-                onChange={async (e) => {
-                  const file = e.target.files?.[0]
-                  if (file) await uploadTaskAttachment(file)
-                  e.target.value = ''
-                }}
-              />
-              <button
-                onClick={() => attachmentInputRef.current?.click()}
-                disabled={uploadingAttachment}
-                className="px-3 py-1.5 text-xs font-semibold border border-slate-300 text-slate-600 rounded-lg hover:bg-white transition-colors disabled:opacity-60"
-              >
-                {uploadingAttachment ? 'Uploading…' : '+ Attach files'}
-              </button>
-            </div>
-          </div>
-          {task.attachments.length === 0 ? (
-            <div className="px-6 py-4 text-sm text-slate-400">No attachments yet.</div>
-          ) : (
-            <div className="p-4 flex flex-wrap gap-2">
-              {task.attachments.map((att) => (
-                <div key={att.id} className="group relative">
-                  {isImageMime(att.mime_type) ? (
-                    <a href={att.url} target="_blank" rel="noopener noreferrer"
-                      className="block w-20 h-20 rounded-lg overflow-hidden border border-slate-200 hover:border-purple-300 transition-colors">
-                      {/* eslint-disable-next-line @next/next/no-img-element */}
-                      <img src={att.url} alt={att.file_name ?? 'attachment'} className="w-full h-full object-cover" />
-                    </a>
-                  ) : (
-                    <a href={att.url} target="_blank" rel="noopener noreferrer"
-                      className="flex items-center gap-2 px-3 py-2 bg-slate-50 border border-slate-200 rounded-lg text-xs text-purple-700 hover:bg-purple-50 hover:border-purple-300 transition-colors">
-                      <svg className="w-3.5 h-3.5 text-slate-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                      </svg>
-                      <span className="truncate max-w-[160px]">{att.file_name ?? 'file'}</span>
-                      {att.file_size && <span className="text-slate-400 flex-shrink-0">{formatBytes(att.file_size)}</span>}
-                    </a>
-                  )}
-                  {(att.uploaded_by === appUser?.id || appUser?.is_admin) && (
-                    <button
-                      onClick={() => deleteTaskAttachment(att.id)}
-                      className="absolute -top-1.5 -right-1.5 hidden group-hover:flex w-5 h-5 bg-red-500 text-white rounded-full items-center justify-center text-xs leading-none"
-                    >
-                      ×
-                    </button>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* ── Activity Tab ── */}
-      {activeTab === 'activity' && (
-        <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-100 bg-slate-50">
-            <h2 className="text-sm font-semibold text-slate-700">Activity</h2>
-          </div>
-          {task.history.length === 0 ? (
-            <div className="px-6 py-4 text-sm text-slate-400">No activity yet.</div>
-          ) : (
-            <div className="p-4 space-y-0">
-              {task.history.map((h, idx) => (
-                <div key={h.id} className={`flex gap-4 ${idx < task.history.length - 1 ? 'pb-4' : ''}`}>
-                  <div className="flex flex-col items-center">
-                    <div className="w-2 h-2 rounded-full bg-purple-400 mt-1.5 flex-shrink-0" />
-                    {idx < task.history.length - 1 && <div className="w-px flex-1 bg-slate-100 my-1" />}
-                  </div>
-                  <div className="flex-1 min-w-0 pb-1">
-                    <div className="text-xs text-slate-500">
-                      <span className="font-medium text-slate-700">{h.user.display_name}</span>
-                      {' changed '}
-                      <span className="font-medium text-slate-700">{h.field_changed.replace(/_/g, ' ')}</span>
-                      {h.old_value != null && (
-                        <> from <span className="font-mono bg-slate-100 px-1 rounded">{h.old_value}</span></>
-                      )}
-                      {h.new_value != null && (
-                        <> to <span className="font-mono bg-purple-50 text-purple-700 px-1 rounded">{h.new_value}</span></>
-                      )}
-                    </div>
-                    <div className="text-xs text-slate-400 mt-0.5">{formatDateTime(h.changed_at)}</div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
+      {/* ── Thread Tab ── */}
+      {activeTab === 'thread' && appUser && (
+        <TaskThread
+          taskId={task.id}
+          createdAt={task.created_at}
+          createdByName={task.created_user?.display_name ?? 'Unknown'}
+          createdByEmail={task.created_user?.email}
+          createdByAvatarUrl={task.created_user?.avatar_url}
+          createdByProfileImageUrl={task.created_user?.profile_image_url}
+          description={task.description}
+          descriptionAttachments={task.attachments}
+          comments={task.comments}
+          history={task.history}
+          currentUserId={appUser.id}
+          currentUserName={appUser.display_name}
+          currentUserAvatarUrl={appUser.avatar_url}
+          isAdmin={appUser.is_admin}
+          assignedTo={task.assigned_to}
+          createdBy={task.created_by}
+          canEditDescription
+          uploadingDescriptionFile={uploadingAttachment}
+          onRefresh={refetch}
+          onSaveDescription={(html) => saveFieldValue('description', html || null)}
+          onUploadDescriptionFile={uploadTaskAttachment}
+          onDeleteDescriptionAttachment={deleteTaskAttachment}
+        />
       )}
 
       {/* ── Related Tab ── */}
@@ -970,20 +756,6 @@ export default function TaskDetailPage() {
             )}
           </div>
         </div>
-      )}
-
-      {/* ── Comments Tab ── */}
-      {activeTab === 'comments' && appUser && (
-        <CommentsTab
-          taskId={task.id}
-          comments={task.comments}
-          currentUserId={appUser.id}
-          assignedTo={task.assigned_to}
-          createdBy={task.created_by}
-          createdByName={task.created_user?.display_name}
-          isAdmin={appUser.is_admin}
-          onRefresh={refetch}
-        />
       )}
     </div>
   )

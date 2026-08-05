@@ -3,6 +3,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 import { dispatchNotification, fetchActor } from '@/lib/notifications/dispatch'
 import { taskCommentAdded } from '@/lib/notifications/registry'
+import { stripHtml } from '@/lib/news-utils'
 
 // GET /api/marketing/tasks/[id]/comments
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -22,13 +23,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
 
   const rows = comments ?? []
   const userIds = [...new Set(rows.map((c: any) => c.user_id).filter(Boolean))]
-  let usersMap: Record<string, { display_name: string }> = {}
+  const usersMap: Record<string, { display_name: string; email: string; avatar_url: string | null; profile_image_url: string | null }> = {}
   if (userIds.length > 0) {
     const { data: users } = await adminClient
       .from('users')
-      .select('id, display_name')
+      .select('id, display_name, email, avatar_url, profile_image_url')
       .in('id', userIds)
-    for (const u of users ?? []) usersMap[u.id] = { display_name: u.display_name }
+    for (const u of users ?? []) usersMap[u.id] = { display_name: u.display_name, email: u.email, avatar_url: u.avatar_url, profile_image_url: u.profile_image_url }
   }
 
   const enriched = rows.map((c: any) => ({
@@ -47,9 +48,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { id: taskId } = await params
   const body = await req.json()
-  const { comment, reassignToCreator } = body
+  const { comment, reassignToCreator, parent_comment_id } = body
 
-  if (!comment?.trim()) return NextResponse.json({ error: 'Comment text is required' }, { status: 400 })
+  // Text is optional here — the conversation thread also posts "attach only"
+  // replies (files with no message), which upload to this comment row right
+  // after creation. Empty string is a valid comment body.
+  if (typeof comment !== 'string') return NextResponse.json({ error: 'Comment text is required' }, { status: 400 })
 
   const adminClient = createAdminClient()
   const { data: task, error: taskError } = await adminClient
@@ -65,12 +69,29 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
     return NextResponse.json({ error: 'This task cannot be reassigned back to its assigner.' }, { status: 400 })
   }
 
+  // A reply can target any existing message, but the thread only renders one
+  // level of nesting — so a reply-to-a-reply is folded onto its top-level
+  // ancestor here, keeping the stored tree shallow and the UI simple.
+  let resolvedParentId: string | null = null
+  if (typeof parent_comment_id === 'string' && parent_comment_id) {
+    const { data: parent } = await adminClient
+      .from('crm_task_comments')
+      .select('id, task_id, parent_comment_id')
+      .eq('id', parent_comment_id)
+      .single()
+    if (!parent || parent.task_id !== taskId) {
+      return NextResponse.json({ error: 'Invalid parent comment' }, { status: 400 })
+    }
+    resolvedParentId = parent.parent_comment_id ?? parent.id
+  }
+
   const { data, error } = await adminClient
     .from('crm_task_comments')
     .insert({
       task_id: taskId,
       user_id: appUser.id,
       comment: comment.trim(),
+      parent_comment_id: resolvedParentId,
     })
     .select()
     .single()
@@ -131,7 +152,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           task_title: task.title,
           actor_id: appUser.id,
           actor_name: actor.display_name,
-          comment_preview: comment.trim().slice(0, 120),
+          comment_preview: stripHtml(comment).trim() ? stripHtml(comment).trim().slice(0, 120) : 'Added an attachment',
           comments: (commentRows ?? []).map((c: any) => ({
             author_name: commentUsersMap[c.user_id] ?? 'Unknown',
             comment: c.comment,

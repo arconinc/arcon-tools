@@ -28,7 +28,7 @@ test.describe('Task Detail Page', () => {
     await page.waitForLoadState('networkidle')
 
     // Verify task detail page loaded
-    await expect(page.locator('h1, h2')).first().toBeTruthy()
+    await expect(page.locator('h1, h2').first()).toBeVisible()
 
     // Find status dropdown/button and change it
     const statusSelect = page.locator('select[name*="status"], button:has-text("Status")')
@@ -59,7 +59,7 @@ test.describe('Task Detail Page', () => {
     }
   })
 
-  test('should add a comment to task', async ({ page }) => {
+  test('should post a reply in the conversation thread', async ({ page }) => {
     await page.goto('/my-tasks')
     await page.waitForLoadState('networkidle')
 
@@ -78,24 +78,53 @@ test.describe('Task Detail Page', () => {
     await taskLink.click()
     await page.waitForLoadState('networkidle')
 
-    // Find comment input
-    const commentInput = page.locator('textarea[placeholder*="comment"], input[placeholder*="comment"], textarea[name*="comment"]')
-    if (await commentInput.count() > 0) {
-      await commentInput.first().click()
-      await commentInput.first().fill('Test comment from automation')
+    // The Thread tab is the default view — find the "New Message" composer
+    // (top-level messages; per-comment "Add Reply" rows are a separate,
+    // always-visible input scoped to each existing message).
+    const replyInput = page.locator('textarea[placeholder*="message"]')
+    if (await replyInput.count() > 0) {
+      const uniqueText = `Test reply from automation ${Date.now()}`
+      await replyInput.first().click()
+      await replyInput.first().fill(uniqueText)
 
-      // Find post/send button
-      const sendBtn = page.locator('button:has-text("Send"), button:has-text("Post"), button:has-text("Comment")')
+      const sendBtn = page.locator('button:has-text("Send")').first()
       if (await sendBtn.count() > 0) {
         await sendBtn.click()
         await page.waitForLoadState('networkidle')
 
-        // Verify comment appeared
-        const comment = page.locator('text=Test comment from automation')
-        if (await comment.count() > 0) {
-          await expect(comment).toBeTruthy()
-        }
+        // Verify the reply appeared inline in the thread
+        await expect(page.locator(`text=${uniqueText}`)).toBeVisible()
       }
     }
+  })
+
+  test('conversation thread shows the description as the opening message and no separate description panel', async ({ page }) => {
+    await page.goto('/my-tasks')
+    await page.waitForLoadState('networkidle')
+
+    let taskLink = page.locator('a[href*="/tasks/"]').first()
+    if (await taskLink.count() === 0) {
+      await page.goto('/sales/tasks')
+      await page.waitForLoadState('networkidle')
+      taskLink = page.locator('a[href*="/tasks/"]').first()
+    }
+
+    if (await taskLink.count() === 0) {
+      test.skip()
+    }
+
+    await taskLink.click()
+    await page.waitForLoadState('networkidle')
+
+    // Thread tab is the default landing tab and carries the opening message
+    await expect(page.locator('text=Task description').first()).toBeVisible()
+
+    // "Assign to" is explicitly labeled (not just an icon/name with no label)
+    await expect(page.locator('text=Assign to').first()).toBeVisible()
+
+    // The old standalone "Attachments" and "Activity" tabs no longer exist —
+    // everything lives in the Thread tab now.
+    await expect(page.getByRole('button', { name: 'attachments', exact: true })).toHaveCount(0)
+    await expect(page.getByRole('button', { name: 'activity', exact: true })).toHaveCount(0)
   })
 })

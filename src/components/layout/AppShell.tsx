@@ -93,6 +93,25 @@ export function useAppUser() {
 
 // ── Nav structure ─────────────────────────────────────────────────────────────
 
+// Team keys mapped to the existing department section they belong under.
+// dream_team, the_arc, and art are handled separately (see below).
+const TEAM_KEY_TO_SECTION: Record<string, string> = {
+  sales: 'CRM',
+  marketing: 'Marketing',
+  hr: 'HR',
+  ecommerce: 'Commerce',
+  warehouse: 'Warehouse',
+  az_warehouse: 'Warehouse',
+  it: 'Technology',
+  accounting: 'Finance',
+}
+
+// Warehouse has two teams sharing one section — disambiguate their Tasks labels.
+const TEAM_KEY_TO_TASKS_LABEL: Record<string, string> = {
+  warehouse: 'MN Tasks',
+  az_warehouse: 'AZ Tasks',
+}
+
 function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Record<string, boolean> = {}, teams: NavTeam[] = []): NavSection[] {
   const filter = (items: NavItemDef[]) =>
     items.filter(item => {
@@ -100,6 +119,7 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
       if (item.featureFlag && !featureFlags[item.featureFlag]) return false
       return isAdmin || !item.requiredRole || roles.includes(item.requiredRole)
     })
+  const artTeam = teams.find(t => t.key === 'art')
   const sections: NavSection[] = [
     {
       label: 'Home',
@@ -133,14 +153,25 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
       ],
     },
     {
-      // Canonical entry point for every team's task board — one dynamic list
-      // (GET /api/teams) instead of a hardcoded section per department.
+      // dream_team and the_arc have no department section of their own, so
+      // they stay here. Every other active team's task board link now lives
+      // under its matching department section (see TEAM_KEY_TO_SECTION).
       label: 'Teams',
-      items: teams.map((team): NavItemDef => ({
-        href: `/teams/${team.key}`,
-        label: team.name,
-        icon: UsersIcon,
-      })),
+      items: teams
+        .filter(team => team.key === 'dream_team' || team.key === 'the_arc')
+        .map((team): NavItemDef => ({
+          href: `/teams/${team.key}`,
+          label: team.name,
+          icon: UsersIcon,
+        })),
+    },
+    {
+      label: 'Art',
+      items: [
+        { href: 'https://www.dropbox.com/home', label: 'Dropbox', icon: BuildingIcon },
+        { href: '/documents/art', label: 'Documents', icon: DocumentIcon, adminMatch: true },
+        ...(artTeam ? [{ href: `/teams/${artTeam.key}`, label: 'Tasks', icon: TaskCheckIcon } as NavItemDef] : []),
+      ],
     },
     {
       label: 'CRM',
@@ -169,7 +200,7 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
       label: 'Commerce',
       items: [
         { href: '/stores', label: 'Stores', icon: StoreIcon, adminMatch: true },
-        { href: '/documents/ecommerce', label: 'E-Commerce Documents', icon: DocumentIcon, adminMatch: true },
+        { href: '/documents/ecommerce', label: 'Documents', icon: DocumentIcon, adminMatch: true },
       ],
     },
     {
@@ -178,7 +209,7 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
         { href: '/hr/pto', label: 'PTO Requests', icon: CalendarIcon, adminMatch: true },
         { href: '/hr/pto/requests', label: 'Review PTO', icon: TaskCheckIcon, adminMatch: true, requiredRole: 'access:hr_access' },
         { href: '/hr/links', label: 'Employee Links', icon: LinkIcon, adminMatch: true },
-        { href: '/documents/hr', label: 'HR Documents', icon: DocumentIcon, adminMatch: true },
+        { href: '/documents/hr', label: 'Documents', icon: DocumentIcon, adminMatch: true },
       ],
     },
     {
@@ -186,12 +217,10 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
       items: [
         { href: '/expense-reports', label: 'Expense Reports', icon: ClipboardListIcon, adminMatch: true, featureFlag: 'expense-reports' },
         { href: '/admin/expense-reports', label: 'Expense Report Approvals', icon: ClipboardListIcon, adminMatch: true, adminOnly: true, featureFlag: 'expense-reports' },
-        { href: '/documents/accounting', label: 'Accounting Documents', icon: DocumentIcon, adminMatch: true },
+        { href: '/documents/accounting', label: 'Documents', icon: DocumentIcon, adminMatch: true },
       ],
     },
     {
-      // Warehouse/Technology never had tools beyond Tasks + Documents; Tasks
-      // now lives under Teams, so these are minimal Documents-only sections.
       label: 'Warehouse',
       items: [
         { href: '/documents/warehouse', label: 'Documents', icon: DocumentIcon, adminMatch: true },
@@ -204,6 +233,19 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
       ],
     },
   ]
+
+  // Wire each remaining team's task board link into its department section.
+  for (const team of teams) {
+    if (team.key === 'dream_team' || team.key === 'the_arc' || team.key === 'art') continue
+    const sectionLabel = TEAM_KEY_TO_SECTION[team.key]
+    const section = sections.find(s => s.label === sectionLabel)
+    if (!section) continue
+    section.items.push({
+      href: `/teams/${team.key}`,
+      label: TEAM_KEY_TO_TASKS_LABEL[team.key] ?? 'Tasks',
+      icon: TaskCheckIcon,
+    })
+  }
 
   if (isAdmin) {
     sections.push({

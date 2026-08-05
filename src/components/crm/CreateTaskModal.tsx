@@ -3,58 +3,28 @@
 import Link from 'next/link'
 import { useEffect, useRef, useState, type FormEvent } from 'react'
 import { useAppUser } from '@/components/layout/AppShell'
-import { TeamAssigneeSelect } from '@/components/crm/TeamAssigneeSelect'
 import { TaskDescriptionEditor } from '@/components/crm/TaskDescriptionEditor'
-import { ConfirmButton } from '@/components/ui/ConfirmButton'
-import { ALL_CATEGORIES, getTaskCategoryLabel } from '@/lib/task-constants'
+import { TaskThread } from '@/components/crm/task/TaskThread'
+import { AssignToControl } from '@/components/crm/task/AssignToControl'
+import { TaskParticipants } from '@/components/crm/task/TaskParticipants'
+import { computeTaskParticipants } from '@/lib/task-participants'
 import { TaskFlowStepper } from '@/components/crm/task/TaskFlowStepper'
-import EmployeeAvatar from '@/components/employees/EmployeeAvatar'
-import { TASK_STATUS_LABELS, TASK_STATUS_COLORS, getTaskNextActions } from '@/lib/task-workflow'
-import { CalendarGlyph, TagGlyph, ReassignGlyph, SendGlyph, CheckCircleGlyph, TrashGlyph, ExternalLinkGlyph, ChatBubbleGlyph, PaperclipGlyph, PlusGlyph } from '@/components/crm/task/TaskIcons'
+import { TASK_STATUS_LABELS, TASK_STATUS_COLORS } from '@/lib/task-workflow'
+import { CalendarGlyph, TrashGlyph, ExternalLinkGlyph, PlusGlyph } from '@/components/crm/task/TaskIcons'
+import type { Comment, HistoryEntry, TaskAttachment } from '@/hooks/useTask'
 import type { CrmTask, CrmTaskStatus } from '@/types'
 
 type DropdownUser = { id: string; display_name: string; email: string }
 type Team = { id: string; key: string; name: string; color: string }
 
-type TaskNote = {
-  id: string
-  user_id: string
-  comment: string
-  created_at: string
-  user: { display_name: string }
-}
-
-type TaskAttachment = {
-  id: string
-  file_name: string | null
-  url: string
-  mime_type: string | null
-  file_size: number | null
-  uploaded_by: string
-}
-
 function isHtmlContent(str: string) {
   return str.trim().startsWith('<')
-}
-
-function relativeTime(iso: string): string {
-  const diff = Date.now() - new Date(iso).getTime()
-  const min = Math.floor(diff / 60000)
-  if (min < 1) return 'just now'
-  if (min < 60) return `${min}m ago`
-  const hr = Math.floor(min / 60)
-  if (hr < 24) return `${hr}h ago`
-  const days = Math.floor(hr / 24)
-  if (days === 1) return 'yesterday'
-  if (days < 7) return `${days}d ago`
-  return new Date(iso).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
 }
 
 type TaskForm = {
   title: string
   assigned_to: string
   team_id: string
-  category: string
   priority: string
   due_date: string
   status: string
@@ -85,10 +55,12 @@ export type TaskFormTask = CrmTask & {
   contact?: { id: string; first_name: string; last_name: string } | null
   last_worked_by?: string | null
   assigned_user?: { id: string; display_name: string; email: string; avatar_url?: string | null; profile_image_url?: string | null } | null
-  created_user?: { id: string; display_name: string; avatar_url?: string | null; profile_image_url?: string | null } | null
+  created_user?: { id: string; display_name: string; email?: string; avatar_url?: string | null; profile_image_url?: string | null } | null
   last_worked_user?: { id: string; display_name: string; avatar_url?: string | null; profile_image_url?: string | null } | null
   team?: { id: string; name: string; color: string } | null
-  comments?: TaskNote[]
+  comments?: Comment[]
+  history?: HistoryEntry[]
+  attachments?: TaskAttachment[]
 }
 
 const STATUSES = [
@@ -165,7 +137,6 @@ function emptyForm(defaultTeamId?: string): TaskForm {
     title: '',
     assigned_to: '',
     team_id: defaultTeamId ?? '',
-    category: '',
     priority: 'medium',
     due_date: '',
     status: 'not_started',
@@ -179,7 +150,6 @@ function formFromTask(task: TaskFormTask): TaskForm {
     title: task.title ?? '',
     assigned_to: task.assigned_to ?? '',
     team_id: task.team_id ?? '',
-    category: task.category ?? '',
     priority: task.priority ?? 'medium',
     due_date: task.due_date?.slice(0, 10) ?? '',
     status: task.status ?? 'not_started',
@@ -225,27 +195,17 @@ export function TaskFormModal({
   const [teams, setTeams] = useState<Team[]>([])
   const [form, setForm] = useState<TaskForm>(() => task ? formFromTask(task) : emptyForm(defaultTeamId))
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
-  const [existingAttachments, setExistingAttachments] = useState<TaskAttachment[]>([])
   const [saving, setSaving] = useState(false)
+  const [uploadingDescriptionFile, setUploadingDescriptionFile] = useState(false)
   const [error, setError] = useState<string | null>(null)
-  const [notes, setNotes] = useState<TaskNote[]>(() => task?.comments ?? [])
-  const [noteText, setNoteText] = useState('')
-  const [submittingNote, setSubmittingNote] = useState(false)
-  const notesEndRef = useRef<HTMLDivElement>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [openDropdown, setOpenDropdown] = useState<'priority' | 'status' | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
   const initialFormRef = useRef<TaskForm>(task ? formFromTask(task) : emptyForm(defaultTeamId))
-  const [editingField, setEditingField] = useState<'title' | 'assigned_to' | 'category' | 'description' | null>(null)
-  const [sidePanelTab, setSidePanelTab] = useState<'comments' | 'attachments'>('comments')
+  const [editingField, setEditingField] = useState<'title' | 'assigned_to' | 'description' | null>(null)
   const dueDateRef = useRef<HTMLInputElement>(null)
-  const canReassignToCreator = mode === 'edit' &&
-    !!task?.created_by &&
-    task.assigned_to === appUser?.id &&
-    task.created_by !== appUser?.id
-  const assignerName = task?.created_user?.display_name ?? 'the person who assigned it'
 
   useEffect(() => {
     if (!open) return
@@ -254,16 +214,8 @@ export function TaskFormModal({
     initialFormRef.current = initial
     setForm(initial)
     setPendingFiles([])
-    setExistingAttachments([])
     setError(null)
     setEditingField(mode === 'create' ? 'title' : null)
-    setSidePanelTab(mode === 'edit' ? 'comments' : 'attachments')
-    if (mode === 'edit' && task?.id) {
-      fetch(`/api/marketing/tasks/${task.id}/attachments`)
-        .then((r) => r.json())
-        .then((data) => { if (active && Array.isArray(data)) setExistingAttachments(data) })
-        .catch(() => {})
-    }
     fetch('/api/marketing/users')
       .then((r) => r.json())
       .then((users) => {
@@ -298,42 +250,52 @@ export function TaskFormModal({
 
   if (!open) return null
 
-  async function refreshNotes(taskId: string) {
-    const res = await fetch(`/api/marketing/tasks/${taskId}/comments`)
-    if (!res.ok) return
-    const data = await res.json()
-    if (Array.isArray(data)) setNotes(data)
-    else if (Array.isArray(data.comments)) setNotes(data.comments)
-    setTimeout(() => notesEndRef.current?.scrollIntoView({ behavior: 'smooth' }), 50)
+  // Re-fetches the full task detail (comments, history, attachments) and
+  // hands it up to the parent — the thread's own actions (reply, attach,
+  // reassign) don't go through the batch "Save Task" submit, so each one
+  // refreshes the shared task state directly.
+  async function refreshTask() {
+    if (!task?.id) return
+    const saved = await fetchSavedTask(task.id, task)
+    onSaved(saved as TaskFormTask)
   }
 
-  async function submitNote(reassignToCreator = false) {
-    if (!noteText.trim() || !task?.id) return
-    setSubmittingNote(true)
+  async function saveDescription(html: string) {
+    if (!task?.id) return
+    await fetch(`/api/marketing/tasks/${task.id}`, {
+      method: 'PATCH',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ description: html || null }),
+    })
+    await refreshTask()
+  }
+
+  async function uploadDescriptionAttachment(file: File) {
+    if (!task?.id) return
+    setUploadingDescriptionFile(true)
     try {
-      const res = await fetch(`/api/marketing/tasks/${task.id}/comments`, {
+      const fd = new FormData()
+      fd.append('file', file)
+      const uploadRes = await fetch('/api/marketing/upload', { method: 'POST', body: fd })
+      if (!uploadRes.ok) { alert('Upload failed'); return }
+      const uploaded = await uploadRes.json()
+      await fetch(`/api/marketing/tasks/${task.id}/attachments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ comment: noteText.trim(), reassignToCreator }),
+        body: JSON.stringify({
+          url: uploaded.url, file_name: uploaded.file_name, file_size: uploaded.file_size, mime_type: uploaded.mime_type,
+        }),
       })
-      if (res.ok) {
-        setNoteText('')
-        await refreshNotes(task.id)
-        if (reassignToCreator) {
-          const saved = await fetchSavedTask(task.id, task)
-          onSaved(saved as TaskFormTask)
-          setForm(formFromTask(saved as TaskFormTask))
-        }
-      }
+      await refreshTask()
     } finally {
-      setSubmittingNote(false)
+      setUploadingDescriptionFile(false)
     }
   }
 
-  async function deleteExistingAttachment(attachmentId: string) {
+  async function deleteDescriptionAttachment(attachmentId: string) {
     if (!task?.id) return
     await fetch(`/api/marketing/tasks/${task.id}/attachments?attachment_id=${attachmentId}`, { method: 'DELETE' })
-    setExistingAttachments((prev) => prev.filter((a) => a.id !== attachmentId))
+    await refreshTask()
   }
 
   // The action is just the target status — reassignment (who it goes to next)
@@ -443,11 +405,13 @@ export function TaskFormModal({
         title: form.title.trim(),
         assigned_to: form.assigned_to || null,
         team_id: form.team_id || null,
-        category: form.category || null,
         priority: form.priority || 'medium',
         due_date: form.due_date || null,
         status: form.status || 'not_started',
-        description: form.description || null,
+        // In edit mode the description lives in the thread now and saves
+        // immediately on blur (see saveDescription) — including the
+        // form-staged copy here would overwrite it with a stale snapshot.
+        ...(mode === 'create' ? { description: form.description || null } : {}),
         progress: form.progress ? Number(form.progress) : 0,
         ...linkedPayload,
       }
@@ -474,7 +438,7 @@ export function TaskFormModal({
     }
   }
 
-  const isDirty = pendingFiles.length > 0 || noteText.trim() !== '' || JSON.stringify(form) !== JSON.stringify(initialFormRef.current)
+  const isDirty = pendingFiles.length > 0 || JSON.stringify(form) !== JSON.stringify(initialFormRef.current)
 
   function handleClose() {
     if (showDeleteConfirm) { setShowDeleteConfirm(false); return }
@@ -482,7 +446,6 @@ export function TaskFormModal({
   }
 
   const displayLinkedEntity = linkedEntity ?? (task ? linkedEntityFromTask(task) : undefined)
-  const title = mode === 'edit' ? 'Edit Task' : 'New Task'
   const actionLabel = mode === 'edit' ? 'Save Task' : 'Create Task'
   const savingLabel = mode === 'edit' ? 'Saving...' : 'Creating...'
 
@@ -495,13 +458,8 @@ export function TaskFormModal({
 
         {/* Header */}
         <div className="flex-shrink-0 border-b border-slate-100 bg-white px-8 py-4">
-          <div className="flex items-start justify-between gap-5">
+          <div className="flex items-center justify-between gap-5 flex-wrap">
             <div className="min-w-0">
-              <div className="text-[11px] font-bold uppercase tracking-wider text-purple-700 mb-1">
-                {mode === 'edit' && task?.id
-                  ? [`Task #${task.id.slice(0, 4).toUpperCase()}`, task.department].filter(Boolean).join(' · ')
-                  : title}
-              </div>
               {editingField === 'title' ? (
                 <input
                   type="text"
@@ -511,11 +469,11 @@ export function TaskFormModal({
                   onChange={(e) => setForm((p) => ({ ...p, title: e.target.value }))}
                   onBlur={() => setEditingField(null)}
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); setEditingField(null) } }}
-                  className="w-full text-lg font-bold text-slate-900 border border-purple-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                  className="w-full text-xl font-bold text-slate-900 border border-purple-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-400"
                 />
               ) : (
                 <h2
-                  className="text-lg font-bold text-slate-900 leading-tight cursor-text"
+                  className="text-xl font-bold text-slate-900 leading-tight cursor-text"
                   onClick={() => setEditingField('title')}
                 >
                   {form.title || <span className="text-slate-400 italic">Untitled task</span>}
@@ -525,31 +483,9 @@ export function TaskFormModal({
                 <p className="mt-0.5 text-xs font-medium text-slate-500">{linkedEntityLabel(displayLinkedEntity)}</p>
               )}
             </div>
-            <div className="flex items-center gap-2 flex-shrink-0">
-              {mode === 'edit' && task?.id && (
-                <Link
-                  href={`/tasks/${task.id}`}
-                  className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
-                  aria-label="Open full task view"
-                >
-                  <ExternalLinkGlyph />
-                </Link>
-              )}
-              <button
-                type="button"
-                onClick={handleClose}
-                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-                aria-label="Close"
-              >
-                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18 18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-          </div>
 
-          {/* Status + priority badges, requestor→owner, Reassign */}
-          <div ref={dropdownRef} className="flex items-center gap-2 mt-2 flex-wrap">
+            {/* Status + priority badges, due date, external link, close */}
+            <div ref={dropdownRef} className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
             {mode === 'create' ? (
               <div className="relative">
                 <button
@@ -634,103 +570,52 @@ export function TaskFormModal({
               aria-hidden="true"
             />
 
-            {editingField === 'category' ? (
-              <select
-                value={form.category}
-                autoFocus
-                onChange={(e) => { setForm((p) => ({ ...p, category: e.target.value })); setEditingField(null) }}
-                onBlur={() => setEditingField(null)}
-                className="text-xs border border-purple-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
-              >
-                <option value="">- None -</option>
-                {ALL_CATEGORIES.map((c) => (
-                  <option key={c} value={c}>{getTaskCategoryLabel(c)}</option>
-                ))}
-              </select>
-            ) : (
+              {mode === 'edit' && task?.id && (
+                <Link
+                  href={`/tasks/${task.id}`}
+                  className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600 transition-colors"
+                  aria-label="Open full task view"
+                >
+                  <ExternalLinkGlyph />
+                </Link>
+              )}
               <button
                 type="button"
-                onClick={() => setEditingField('category')}
-                className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-purple-700 transition-colors"
+                onClick={handleClose}
+                className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                aria-label="Close"
               >
-                <TagGlyph />
-                {form.category ? getTaskCategoryLabel(form.category) : 'Not set'}
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18 18 6M6 6l12 12" />
+                </svg>
               </button>
-            )}
+            </div>
+          </div>
 
-            {mode === 'create' && (
-              editingField === 'assigned_to' ? (
-                <TeamAssigneeSelect
-                  teamId={form.team_id || null}
-                  assignedTo={form.assigned_to || null}
-                  teams={teams}
-                  users={crmUsers}
-                  onChange={(assignment) => {
-                    setForm((p) => ({ ...p, team_id: assignment.teamId ?? '', assigned_to: assignment.assignedTo ?? '' }))
-                    setEditingField(null)
-                  }}
-                  className="text-xs border border-purple-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white"
-                />
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => setEditingField('assigned_to')}
-                  className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-purple-700 transition-colors"
-                >
-                  <ReassignGlyph />
-                  {form.assigned_to
-                    ? (crmUsers.find((u) => u.id === form.assigned_to)?.display_name ?? 'Unknown')
-                    : form.team_id
-                    ? (teams.find((t) => t.id === form.team_id)?.name ?? 'Unknown team')
-                    : 'Unassigned'}
-                </button>
-              )
-            )}
-
-            {mode === 'edit' && task?.created_user && (
-              editingField === 'assigned_to' ? (
-                <TeamAssigneeSelect
-                  teamId={form.team_id || null}
-                  assignedTo={form.assigned_to || null}
-                  teams={teams}
-                  users={crmUsers}
-                  onChange={(assignment) => {
-                    setForm((p) => ({ ...p, team_id: assignment.teamId ?? '', assigned_to: assignment.assignedTo ?? '' }))
-                    setEditingField(null)
-                  }}
-                  className="text-xs border border-purple-300 rounded-lg px-2 py-1 focus:outline-none focus:ring-2 focus:ring-purple-400 bg-white ml-auto"
-                />
-              ) : (
-                <>
-                  <span className="text-xs text-slate-300">·</span>
-                  <span className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500">
-                    <EmployeeAvatar displayName={task.created_user.display_name} avatarUrl={task.created_user.avatar_url} profileImageUrl={task.created_user.profile_image_url} size="xs" />
-                    <span className="text-slate-700 font-semibold">{task.created_user.display_name}</span>
-                    {(task.assigned_user || task.team) && (
-                      <>
-                        →
-                        {task.assigned_user ? (
-                          <>
-                            <EmployeeAvatar displayName={task.assigned_user.display_name} avatarUrl={task.assigned_user.avatar_url} profileImageUrl={task.assigned_user.profile_image_url} size="xs" />
-                            <span className="text-slate-700 font-semibold">{task.assigned_user.display_name}</span>
-                          </>
-                        ) : (
-                          <span className="text-slate-700 font-semibold">{task.team?.name}</span>
-                        )}
-                      </>
-                    )}
-                  </span>
-                  <button
-                    type="button"
-                    onClick={() => setEditingField('assigned_to')}
-                    className="inline-flex items-center gap-1 text-xs font-semibold text-purple-700 hover:text-purple-900 ml-auto px-2 py-0.5 rounded transition-colors"
-                  >
-                    <ReassignGlyph />
-                    Reassign
-                  </button>
-                </>
-              )
-            )}
+          {/* Prominent assign control + (edit mode) everyone involved */}
+          <div className="flex items-center justify-between gap-3 mt-3 flex-wrap">
+            <AssignToControl
+              teamId={form.team_id || null}
+              assignedTo={form.assigned_to || null}
+              displayLabel={
+                mode === 'edit'
+                  ? (task?.assigned_user?.display_name ?? task?.team?.name ?? 'Unassigned')
+                  : (form.assigned_to
+                      ? (crmUsers.find((u) => u.id === form.assigned_to)?.display_name ?? 'Unknown')
+                      : form.team_id
+                      ? (teams.find((t) => t.id === form.team_id)?.name ?? 'Unknown team')
+                      : 'Unassigned')
+              }
+              teams={teams}
+              users={crmUsers}
+              editing={editingField === 'assigned_to'}
+              onStartEdit={() => setEditingField('assigned_to')}
+              onChange={(assignment) => {
+                setForm((p) => ({ ...p, team_id: assignment.teamId ?? '', assigned_to: assignment.assignedTo ?? '' }))
+                setEditingField(null)
+              }}
+            />
+            {mode === 'edit' && task && <TaskParticipants participants={computeTaskParticipants(task)} />}
           </div>
         </div>
 
@@ -741,6 +626,7 @@ export function TaskFormModal({
             requestorName={task.created_user?.display_name}
             onAction={handleStatusAction}
             disabled={saving}
+            describeNext={describeNextOwner}
           />
         )}
 
@@ -751,10 +637,8 @@ export function TaskFormModal({
             <div className="flex-shrink-0 mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
           )}
 
-          <div className="flex-1 flex min-h-0">
-
-            {/* Description — 2/3 */}
-            <div className="w-2/3 flex flex-col min-h-0 px-6 pt-3 pb-3 border-r border-slate-100">
+          {mode === 'create' ? (
+            <div className="flex-1 flex flex-col min-h-0 px-6 pt-3 pb-3">
               <div className="flex-shrink-0 mb-1">
                 <span className="text-[10px] font-semibold text-slate-400 uppercase tracking-wide">Description</span>
               </div>
@@ -792,154 +676,70 @@ export function TaskFormModal({
                   )}
                 </div>
               )}
-            </div>
 
-            {/* Comments / Attachments — 1/3, tabbed */}
-            <div className="w-1/3 flex flex-col min-h-0">
-              <div className="flex-shrink-0 flex items-center gap-1 px-4 pt-3">
-                {mode === 'edit' && task?.id && (
-                  <button
-                    type="button"
-                    onClick={() => setSidePanelTab('comments')}
-                    className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-t-lg border-b-2 transition-colors ${
-                      sidePanelTab === 'comments' ? 'text-purple-700 border-purple-700' : 'text-slate-400 border-transparent hover:text-slate-600'
-                    }`}
-                  >
-                    <ChatBubbleGlyph className="h-4 w-4" />
-                    Comments
-                    {notes.length > 0 && (
-                      <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-[10px] font-bold rounded-full leading-none">
-                        {notes.length}
-                      </span>
-                    )}
-                  </button>
-                )}
-                <button
-                  type="button"
-                  onClick={() => setSidePanelTab('attachments')}
-                  className={`inline-flex items-center gap-1.5 px-3 py-1.5 text-sm font-semibold rounded-t-lg border-b-2 transition-colors ${
-                    sidePanelTab === 'attachments' ? 'text-purple-700 border-purple-700' : 'text-slate-400 border-transparent hover:text-slate-600'
-                  }`}
-                >
-                  <PaperclipGlyph className="h-4 w-4" />
-                  Attachments
-                  {(existingAttachments.length + pendingFiles.length) > 0 && (
-                    <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-[10px] font-bold rounded-full leading-none">
-                      {existingAttachments.length + pendingFiles.length}
-                    </span>
-                  )}
-                </button>
-              </div>
-              <div className="border-b border-slate-100" />
-
-              <div className="flex-1 min-h-0 overflow-y-auto px-4 py-4">
-                {sidePanelTab === 'comments' && mode === 'edit' && task?.id && (
-                  <>
-                    <div className="flex items-start gap-2">
-                      <EmployeeAvatar displayName={appUser?.display_name ?? ''} avatarUrl={appUser?.avatar_url} size="sm" />
-                      <div className="relative flex-1">
-                        <input
-                          type="text"
-                          value={noteText}
-                          onChange={(e) => setNoteText(e.target.value)}
-                          onKeyDown={(e) => { if (e.key === 'Enter') submitNote() }}
-                          placeholder="Add a comment…"
-                          className="w-full pl-3 pr-9 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400"
-                        />
+              <div className="flex-shrink-0 mt-3">
+                <label className="flex items-center justify-center gap-1.5 w-full py-3 border border-dashed border-slate-300 rounded-lg text-sm font-semibold text-slate-500 hover:border-purple-300 hover:text-purple-700 hover:bg-purple-50/50 cursor-pointer transition-colors">
+                  <PlusGlyph />
+                  Attach files
+                  <input
+                    type="file"
+                    multiple
+                    onChange={(e) => {
+                      const files = Array.from(e.target.files ?? [])
+                      setPendingFiles((prev) => [...prev, ...files])
+                      e.target.value = ''
+                    }}
+                    className="sr-only"
+                  />
+                </label>
+                {pendingFiles.length > 0 && (
+                  <div className="mt-2 flex flex-wrap gap-1.5">
+                    {pendingFiles.map((file, index) => (
+                      <span key={`${file.name}-${index}`} className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-50 text-purple-700 text-xs rounded-full">
+                        {file.name}
                         <button
                           type="button"
-                          onClick={() => submitNote(false)}
-                          disabled={submittingNote || !noteText.trim()}
-                          aria-label="Save comment"
-                          className="absolute right-1.5 top-1/2 -translate-y-1/2 p-1 text-slate-300 hover:text-purple-600 disabled:opacity-40 transition-colors"
+                          onClick={() => setPendingFiles((prev) => prev.filter((_, i) => i !== index))}
+                          className="text-slate-400 hover:text-red-500 leading-none"
                         >
-                          <SendGlyph className="h-3.5 w-3.5" />
+                          ×
                         </button>
-                      </div>
-                    </div>
-
-                    {canReassignToCreator && (
-                      <button
-                        type="button"
-                        onClick={() => submitNote(true)}
-                        disabled={submittingNote || !noteText.trim()}
-                        title={`Comment and reassign to ${assignerName}`}
-                        className="mt-2 inline-flex items-center gap-1.5 px-3 py-1.5 border border-purple-200 bg-purple-50 text-purple-700 text-xs font-semibold rounded-lg hover:bg-purple-100 disabled:opacity-50 transition-colors"
-                      >
-                        <ReassignGlyph />
-                        Comment & Reassign to {assignerName}
-                      </button>
-                    )}
-
-                    {notes.length > 0 && (
-                      <div className="mt-3 space-y-2.5 pr-1">
-                        {[...notes].reverse().map((n) => (
-                          <div key={n.id} className="bg-slate-50 rounded-lg px-3 py-2">
-                            <div className="flex items-center gap-1.5 mb-0.5">
-                              <span className="text-xs font-semibold text-slate-700">{n.user.display_name}</span>
-                              <span className="text-xs text-slate-400">{relativeTime(n.created_at)}</span>
-                            </div>
-                            <p className="text-xs text-slate-600 whitespace-pre-wrap">{n.comment}</p>
-                          </div>
-                        ))}
-                        <div ref={notesEndRef} />
-                      </div>
-                    )}
-                  </>
-                )}
-
-                {sidePanelTab === 'attachments' && (
-                  <>
-                    <label className="flex items-center justify-center gap-1.5 w-full py-4 border border-dashed border-slate-300 rounded-lg text-sm font-semibold text-slate-500 hover:border-purple-300 hover:text-purple-700 hover:bg-purple-50/50 cursor-pointer transition-colors">
-                      <PlusGlyph />
-                      Attach files
-                      <input
-                        type="file"
-                        multiple
-                        onChange={(e) => {
-                          const files = Array.from(e.target.files ?? [])
-                          setPendingFiles((prev) => [...prev, ...files])
-                          e.target.value = ''
-                        }}
-                        className="sr-only"
-                      />
-                    </label>
-
-                    {(existingAttachments.length > 0 || pendingFiles.length > 0) && (
-                      <div className="mt-2 flex flex-wrap gap-1.5">
-                        {existingAttachments.map((att) => (
-                          <span key={att.id} className="inline-flex items-center gap-1 px-2 py-0.5 bg-slate-100 text-slate-700 text-xs rounded-full">
-                            <a href={att.url} target="_blank" rel="noopener noreferrer" className="hover:underline truncate max-w-[160px]">
-                              {att.file_name ?? 'file'}
-                            </a>
-                            <button
-                              type="button"
-                              onClick={() => deleteExistingAttachment(att.id)}
-                              className="text-slate-400 hover:text-red-500 leading-none"
-                            >
-                              ×
-                            </button>
-                          </span>
-                        ))}
-                        {pendingFiles.map((file, index) => (
-                          <span key={`${file.name}-${index}`} className="inline-flex items-center gap-1 px-2 py-0.5 bg-purple-50 text-purple-700 text-xs rounded-full">
-                            {file.name}
-                            <button
-                              type="button"
-                              onClick={() => setPendingFiles((prev) => prev.filter((_, i) => i !== index))}
-                              className="text-slate-400 hover:text-red-500 leading-none"
-                            >
-                              ×
-                            </button>
-                          </span>
-                        ))}
-                      </div>
-                    )}
-                  </>
+                      </span>
+                    ))}
+                  </div>
                 )}
               </div>
             </div>
-          </div>
+          ) : (
+            task?.id && (
+              <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
+                <TaskThread
+                  taskId={task.id}
+                  createdAt={task.created_at}
+                  createdByName={task.created_user?.display_name ?? 'Unknown'}
+                  createdByEmail={task.created_user?.email}
+                  createdByAvatarUrl={task.created_user?.avatar_url}
+                  createdByProfileImageUrl={task.created_user?.profile_image_url}
+                  description={task.description}
+                  descriptionAttachments={task.attachments ?? []}
+                  comments={task.comments ?? []}
+                  history={task.history ?? []}
+                  currentUserId={appUser?.id ?? ''}
+                  currentUserName={appUser?.display_name ?? ''}
+                  currentUserAvatarUrl={appUser?.avatar_url}
+                  isAdmin={appUser?.is_admin ?? false}
+                  assignedTo={task.assigned_to}
+                  createdBy={task.created_by}
+                  canEditDescription
+                  uploadingDescriptionFile={uploadingDescriptionFile}
+                  onRefresh={refreshTask}
+                  onSaveDescription={saveDescription}
+                  onUploadDescriptionFile={uploadDescriptionAttachment}
+                  onDeleteDescriptionAttachment={deleteDescriptionAttachment}
+                />
+              </div>
+            )
+          )}
 
           {/* Footer */}
           <div className="mt-auto flex-shrink-0 flex items-center justify-between gap-3 px-6 py-3 border-t border-slate-100">
@@ -956,27 +756,6 @@ export function TaskFormModal({
               )}
             </div>
             <div className="flex gap-3">
-              {mode === 'edit' && task?.id && getTaskNextActions(task.status as CrmTaskStatus).map((action) => (
-                <ConfirmButton
-                  key={action.toStatus}
-                  idleLabel={action.label}
-                  subLabel={describeNextOwner(action.toStatus) ? `→ ${describeNextOwner(action.toStatus)}` : undefined}
-                  confirmLabel={`Confirm: ${action.label}?`}
-                  onConfirm={() => handleStatusAction(action.toStatus)}
-                  variant={
-                    action.toStatus === 'in_progress' ? 'blue'
-                      : action.toStatus === 'completed' ? 'green'
-                      : action.toStatus === 'need_changes' ? 'red'
-                      : 'yellow'
-                  }
-                  icon={
-                    action.toStatus === 'waiting_on_approval' ? <SendGlyph className="h-3.5 w-3.5" />
-                      : action.toStatus === 'completed' ? <CheckCircleGlyph className="h-3.5 w-3.5" />
-                      : undefined
-                  }
-                  disabled={saving}
-                />
-              ))}
               <button
                 type="button"
                 onClick={handleClose}

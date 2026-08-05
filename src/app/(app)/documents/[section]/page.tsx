@@ -28,6 +28,7 @@ const SECTION_MAP: Record<string, string> = {
   technology: 'Technology',
   sales: 'Sales',
   warehouse: 'Warehouse',
+  art: 'Art',
 }
 
 const SECTION_BG: Record<string, string> = {

@@ -29,17 +29,18 @@ export type Attachment = {
 export type Comment = {
   id: string; task_id: string; user_id: string; comment: string
   created_at: string; updated_at: string
+  parent_comment_id: string | null
   attachments: Attachment[]
-  user: { display_name: string }
+  user: { display_name: string; email?: string; avatar_url?: string | null; profile_image_url?: string | null }
 }
+
+type PersonRef = { id: string; display_name: string; email?: string; avatar_url?: string | null; profile_image_url?: string | null }
 
 export type HistoryEntry = {
   id: string; task_id: string; user_id: string; field_changed: string
   old_value: string | null; new_value: string | null; changed_at: string
-  user: { id: string; display_name: string }
+  user: PersonRef
 }
-
-type PersonRef = { id: string; display_name: string; email?: string; avatar_url?: string | null; profile_image_url?: string | null }
 
 export type TaskDetail = {
   id: string; title: string; assigned_to: string | null; task_owner: string | null
@@ -59,7 +60,7 @@ export type TaskDetail = {
   created_user: PersonRef | null
   last_worked_user: PersonRef | null
   team: { id: string; name: string; color: string } | null
-  delegator_users: { id: string; display_name: string }[]
+  delegator_users: PersonRef[]
   attachments: TaskAttachment[]
   linked_spec: { id: string; item_name: string; status: string } | null
 }

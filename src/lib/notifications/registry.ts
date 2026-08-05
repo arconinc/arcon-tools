@@ -594,6 +594,10 @@ function escapeHtml(value: string): string {
     .replace(/'/g, '&#39;')
 }
 
+function isHtmlComment(str: string): boolean {
+  return str.trim().startsWith('<')
+}
+
 function formatCommentDate(iso: string): string {
   return new Date(iso).toLocaleString('en-US', {
     month: 'short',
@@ -621,7 +625,7 @@ export const taskCommentAdded: NotificationDefinition<TaskCommentAddedPayload> =
           ${p.comments.map((comment) => `
             <span style="display:block;padding:10px 0;border-top:1px solid #e2e8f0">
               <span style="display:block;margin:0 0 4px;font-size:13px;color:#64748b"><strong>${escapeHtml(comment.author_name)}</strong> &middot; ${escapeHtml(formatCommentDate(comment.created_at))}</span>
-              <span style="display:block;margin:0;font-size:14px;color:#334155;line-height:1.55;white-space:pre-wrap">${escapeHtml(comment.comment)}</span>
+              <span style="display:block;margin:0;font-size:14px;color:#334155;line-height:1.55;white-space:pre-wrap">${isHtmlComment(comment.comment) ? comment.comment : escapeHtml(comment.comment)}</span>
             </span>
           `).join('')}
         </span>`

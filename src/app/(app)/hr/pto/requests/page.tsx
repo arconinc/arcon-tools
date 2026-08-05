@@ -65,7 +65,6 @@ export default function HrPtoRequestsPage() {
   const [loading, setLoading] = useState(true)
   const [filter, setFilter] = useState<Filter>('pending')
   const [query, setQuery] = useState('')
-  const [year, setYear] = useState(String(new Date().getFullYear()))
   const [modal, setModal] = useState<{ id: string; action: 'approve' | 'deny'; title: string } | null>(null)
   const [comment, setComment] = useState('')
   const [submitting, setSubmitting] = useState(false)
@@ -78,11 +77,6 @@ export default function HrPtoRequestsPage() {
       .catch(() => {})
       .finally(() => setLoading(false))
   }, [])
-
-  const years = useMemo(() => {
-    const requestYears = requests.flatMap(r => [r.start_date.slice(0, 4), r.end_date.slice(0, 4)])
-    return Array.from(new Set([String(new Date().getFullYear()), ...requestYears])).sort((a, b) => Number(b) - Number(a))
-  }, [requests])
 
   const counts = useMemo(() => ({
     all:      requests.length,
@@ -97,10 +91,9 @@ export default function HrPtoRequestsPage() {
       const user = r.users
       const haystack = [user?.display_name ?? '', user?.email ?? '', PTO_REASON_LABELS[r.reason], r.notes ?? '', r.status, r.reviewer_comment ?? ''].join(' ').toLowerCase()
       return (filter === 'all' || r.status === filter)
-        && (r.start_date.startsWith(year) || r.end_date.startsWith(year))
         && (!normalized || haystack.includes(normalized))
     })
-  }, [filter, query, requests, year])
+  }, [filter, query, requests])
 
   const filterOptions: FilterPillOption<Filter>[] = useMemo(() => [
     { value: 'pending',  label: 'Pending',  icon: <Icon type="clock" />,   color: 'amber',  count: counts.pending },
@@ -258,14 +251,6 @@ export default function HrPtoRequestsPage() {
               label="Filter by status"
             />
             <div className="flex flex-wrap items-center gap-2">
-              <select
-                value={year}
-                onChange={e => setYear(e.target.value)}
-                aria-label="Filter by year"
-                className="rounded-lg border border-slate-200 bg-white px-3 py-1.5 text-sm text-slate-700 focus:outline-none focus:ring-2 focus:ring-purple-300"
-              >
-                {years.map(y => <option key={y} value={y}>{y}</option>)}
-              </select>
               <div className="relative">
                 <Icon type="search" className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
                 <input
@@ -291,7 +276,7 @@ export default function HrPtoRequestsPage() {
 
           {!loading && requests.length > 0 && (
             <p className="mt-2 text-right text-xs text-slate-400">
-              Showing {filtered.length} of {requests.length} requests · {year}
+              Showing {filtered.length} of {requests.length} requests
             </p>
           )}
         </section>

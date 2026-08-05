@@ -138,13 +138,13 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   // Enrich comments with user info
   const commentRows = commentsRes.data ?? []
   const commentUserIds = [...new Set(commentRows.map((c: any) => c.user_id).filter(Boolean))]
-  let commentUsersMap: Record<string, { display_name: string }> = {}
+  const commentUsersMap: Record<string, { display_name: string; email: string; avatar_url: string | null; profile_image_url: string | null }> = {}
   if (commentUserIds.length > 0) {
     const { data: cUsers } = await adminClient
       .from('users')
-      .select('id, display_name')
+      .select('id, display_name, email, avatar_url, profile_image_url')
       .in('id', commentUserIds)
-    for (const u of cUsers ?? []) commentUsersMap[u.id] = { display_name: u.display_name }
+    for (const u of cUsers ?? []) commentUsersMap[u.id] = { display_name: u.display_name, email: u.email, avatar_url: u.avatar_url, profile_image_url: u.profile_image_url }
   }
 
   const enrichedComments = commentRows.map((c: any) => ({
@@ -153,16 +153,17 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     user: commentUsersMap[c.user_id] ?? { display_name: 'Unknown' },
   }))
 
-  // Enrich history with user names
+  // Enrich history with user names (and avatar so history actors can be
+  // shown in the task-level "involved" avatar stack, not just initials)
   const historyRows = historyRes.data ?? []
   const histUserIds = [...new Set(historyRows.map((h: any) => h.user_id).filter(Boolean))]
-  let histUsersMap: Record<string, string> = {}
+  const histUsersMap: Record<string, { display_name: string; avatar_url: string | null; profile_image_url: string | null }> = {}
   if (histUserIds.length > 0) {
     const { data: hUsers } = await adminClient
       .from('users')
-      .select('id, display_name')
+      .select('id, display_name, avatar_url, profile_image_url')
       .in('id', histUserIds)
-    for (const u of hUsers ?? []) histUsersMap[u.id] = u.display_name
+    for (const u of hUsers ?? []) histUsersMap[u.id] = { display_name: u.display_name, avatar_url: u.avatar_url, profile_image_url: u.profile_image_url }
   }
 
   // Also collect user IDs from assigned_to field changes
@@ -181,11 +182,32 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     for (const u of aUsers ?? []) assignedUsersMap[u.id] = u.display_name
   }
 
+  // Same resolution for team_id field changes, so a team reassignment reads
+  // as "Sales Team" rather than a raw group UUID in the activity thread.
+  const teamIdsFromHistory = [...new Set(
+    historyRows
+      .filter((h: any) => h.field_changed === 'team_id')
+      .flatMap((h: any) => [h.old_value, h.new_value])
+      .filter(Boolean)
+  )]
+  const historyTeamsMap: Record<string, string> = {}
+  if (teamIdsFromHistory.length > 0) {
+    const { data: hTeams } = await adminClient
+      .from('groups')
+      .select('id, name')
+      .in('id', teamIdsFromHistory)
+    for (const t of hTeams ?? []) historyTeamsMap[t.id] = t.name
+  }
+
   const enrichedHistory = historyRows.map((h: any) => ({
     ...h,
-    user: { id: h.user_id, display_name: histUsersMap[h.user_id] ?? 'Unknown' },
-    old_value: h.field_changed === 'assigned_to' && h.old_value ? (assignedUsersMap[h.old_value] ?? h.old_value) : h.old_value,
-    new_value: h.field_changed === 'assigned_to' && h.new_value ? (assignedUsersMap[h.new_value] ?? h.new_value) : h.new_value,
+    user: { id: h.user_id, display_name: histUsersMap[h.user_id]?.display_name ?? 'Unknown', avatar_url: histUsersMap[h.user_id]?.avatar_url ?? null, profile_image_url: histUsersMap[h.user_id]?.profile_image_url ?? null },
+    old_value: h.field_changed === 'assigned_to' && h.old_value ? (assignedUsersMap[h.old_value] ?? h.old_value)
+      : h.field_changed === 'team_id' && h.old_value ? (historyTeamsMap[h.old_value] ?? h.old_value)
+      : h.old_value,
+    new_value: h.field_changed === 'assigned_to' && h.new_value ? (assignedUsersMap[h.new_value] ?? h.new_value)
+      : h.field_changed === 'team_id' && h.new_value ? (historyTeamsMap[h.new_value] ?? h.new_value)
+      : h.new_value,
   }))
 
   const contact = contRes.data
