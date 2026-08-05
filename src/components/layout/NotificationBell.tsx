@@ -31,6 +31,34 @@ function requestNotifPermission() {
   }
 }
 
+function playChime() {
+  try {
+    const ctx = new (window.AudioContext || (window as unknown as { webkitAudioContext: typeof AudioContext }).webkitAudioContext)()
+    // Two-note doorbell/iMessage-style chime: bright note then a softer fifth below.
+    const notes: Array<{ freq: number; start: number; duration: number; gain: number }> = [
+      { freq: 1318.5, start: 0, duration: 0.4, gain: 0.18 },   // E6
+      { freq: 987.77, start: 0.14, duration: 0.5, gain: 0.15 }, // B5
+    ]
+    for (const note of notes) {
+      const osc = ctx.createOscillator()
+      const gain = ctx.createGain()
+      osc.connect(gain)
+      gain.connect(ctx.destination)
+      osc.type = 'sine'
+      osc.frequency.value = note.freq
+      const t0 = ctx.currentTime + note.start
+      gain.gain.setValueAtTime(0, t0)
+      gain.gain.linearRampToValueAtTime(note.gain, t0 + 0.02)
+      gain.gain.exponentialRampToValueAtTime(0.001, t0 + note.duration)
+      osc.start(t0)
+      osc.stop(t0 + note.duration)
+    }
+    setTimeout(() => ctx.close(), 900)
+  } catch {
+    // Audio unsupported or blocked — skip silently
+  }
+}
+
 function fireSystemNotif(n: NotificationRow) {
   if (typeof Notification === 'undefined' || Notification.permission !== 'granted') return
   try {
@@ -38,6 +66,7 @@ function fireSystemNotif(n: NotificationRow) {
     if (n.link_url) {
       notif.onclick = () => { window.focus(); window.location.href = n.link_url! }
     }
+    playChime()
   } catch {
     // Safari may throw even with permission
   }

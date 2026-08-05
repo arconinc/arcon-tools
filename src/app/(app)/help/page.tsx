@@ -84,6 +84,25 @@ const tutorials = [
       'Type your name to confirm and submit — watch notifications for approval.',
     ],
   },
+  {
+    title: 'Enable desktop notifications (Mac)',
+    steps: [
+      'In Chrome, when prompted, click Allow for notifications on thearc.arconinc.com (or click the lock icon in the address bar → Notifications → Allow).',
+      'Open macOS System Settings → Notifications.',
+      'Select Google Chrome in the app list.',
+      'Turn Allow Notifications on, and set the alert style to Banners or Alerts (not None).',
+      'Make sure Focus / Do Not Disturb is off, or add Chrome to its allowed list.',
+    ],
+  },
+  {
+    title: 'Enable desktop notifications (Windows)',
+    steps: [
+      'In Chrome, when prompted, click Allow for notifications on thearc.arconinc.com (or click the lock icon in the address bar → Notifications → Allow).',
+      'Open Windows Settings → System → Notifications.',
+      'Confirm Notifications is turned on, then find Google Chrome in the app list below and turn it on.',
+      'Make sure Focus assist is off, or add Chrome as a priority app.',
+    ],
+  },
 ]
 
 function HelpIcon({ type }: { type: 'search' | 'task' | 'bell' | 'doc' | 'profile' | 'request' }) {
