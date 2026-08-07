@@ -59,5 +59,5 @@ export async function POST(req: NextRequest, { params }: Params) {
   const { error: updateErr } = await adminClient.from('spec_ideas').update(updatePayload).eq('id', id)
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
 
-  return NextResponse.json({ url: publicUrl }, { status: 201 })
+  return NextResponse.json(primary ? { image_url: publicUrl } : { added_url: publicUrl }, { status: 201 })
 }

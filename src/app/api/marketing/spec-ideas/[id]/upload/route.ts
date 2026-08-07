@@ -15,7 +15,7 @@ export async function POST(req: NextRequest, { params }: Params) {
   const { id } = await params
   const formData = await req.formData()
   const file = formData.get('file') as File | null
-  const isPrimary = formData.get('primary') === 'true'
+  const isPrimary = formData.get('primary') === '1'
 
   if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
   if (!file.type.startsWith('image/')) return NextResponse.json({ error: 'File must be an image' }, { status: 400 })
@@ -56,5 +56,5 @@ export async function POST(req: NextRequest, { params }: Params) {
   const { error: updateErr } = await adminClient.from('spec_ideas').update(updatePayload).eq('id', id)
   if (updateErr) return NextResponse.json({ error: updateErr.message }, { status: 500 })
 
-  return NextResponse.json({ url: publicUrl }, { status: 201 })
+  return NextResponse.json(isPrimary ? { image_url: publicUrl } : { added_url: publicUrl }, { status: 201 })
 }

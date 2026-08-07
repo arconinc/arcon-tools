@@ -5,6 +5,8 @@ import { useParams, useRouter } from 'next/navigation'
 import Link from 'next/link'
 import { SpecSampleStatus } from '@/types'
 import { ConfirmButton } from '@/components/ui/ConfirmButton'
+import { ArtworkUploadModal } from '@/components/crm/customer/ArtworkUploadModal'
+import type { ArtworkItem } from '@/hooks/useArtwork'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -34,6 +36,8 @@ type SpecDetail = {
   artwork_task: { id: string; title: string; status: string; due_date: string | null } | null
   spec_idea: { id: string; item_name: string; vendor: string; image_url: string | null; ordering_instructions_html: string | null } | null
   proof_url: string | null
+  logo_artwork_id: string | null
+  logo: { id: string; name: string; url: string; thumbnail_url: string | null } | null
 }
 
 // ─── Status config ────────────────────────────────────────────────────────────
@@ -113,6 +117,11 @@ export default function SpecDetailPage() {
   const [fetchingImage, setFetchingImage] = useState(false)
   const [uploadingProof, setUploadingProof] = useState(false)
   const [imageError, setImageError] = useState<string | null>(null)
+  const [showLogoPicker, setShowLogoPicker] = useState(false)
+  const [logoOptions, setLogoOptions] = useState<{ id: string; name: string; url: string; thumbnail_url: string | null }[]>([])
+  const [logoOptionsLoaded, setLogoOptionsLoaded] = useState(false)
+  const [savingLogo, setSavingLogo] = useState(false)
+  const [showLogoUploadModal, setShowLogoUploadModal] = useState(false)
 
   useEffect(() => {
     fetch(`/api/marketing/specs/${id}`)
@@ -175,6 +184,30 @@ export default function SpecDetailPage() {
       setImageError(data.error ?? 'Upload failed')
     }
     setUploadingProof(false)
+  }
+
+  async function openLogoPicker() {
+    setShowLogoPicker(v => !v)
+    if (!logoOptionsLoaded && spec?.customer) {
+      const res = await fetch(`/api/marketing/artwork?customer_id=${spec.customer.id}`)
+      const data = await res.json()
+      setLogoOptions(Array.isArray(data) ? data : [])
+      setLogoOptionsLoaded(true)
+    }
+  }
+
+  async function selectLogo(item: { id: string; name: string; url: string; thumbnail_url: string | null } | null) {
+    setSavingLogo(true)
+    const res = await fetch(`/api/marketing/specs/${id}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ logo_artwork_id: item?.id ?? null }),
+    })
+    if (res.ok) {
+      setSpec(prev => prev ? { ...prev, logo_artwork_id: item?.id ?? null, logo: item } : null)
+      setShowLogoPicker(false)
+    }
+    setSavingLogo(false)
   }
 
   async function handleDelete() {
@@ -533,6 +566,95 @@ export default function SpecDetailPage() {
               <div style={{ color: '#94a3b8', fontSize: 13 }}>No team assigned</div>
             )}
           </div>
+
+          {/* Logo */}
+          {spec.customer && (
+            <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 14, overflow: 'hidden' }}>
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px 16px', borderBottom: '1px solid #f1f5f9', background: '#fafafa' }}>
+                <div style={{ fontSize: 12, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em', color: '#94a3b8' }}>Logo</div>
+                <button onClick={openLogoPicker} style={{ background: 'none', border: 'none', color: '#7c3aed', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>
+                  {spec.logo ? 'Change' : '+ Add'}
+                </button>
+              </div>
+              <div style={{ padding: '12px 16px' }}>
+                {spec.logo ? (
+                  <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+                    <a href={spec.logo.url} target="_blank" rel="noopener noreferrer" style={{ flexShrink: 0 }}>
+                      {spec.logo.thumbnail_url ? (
+                        <img src={spec.logo.thumbnail_url} alt={spec.logo.name} style={{ width: 44, height: 44, borderRadius: 8, objectFit: 'contain', background: '#f8fafc', border: '1px solid #e2e8f0' }} />
+                      ) : (
+                        <div style={{ width: 44, height: 44, borderRadius: 8, background: '#f8fafc', border: '1px solid #e2e8f0', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                          <svg width="18" height="18" fill="none" viewBox="0 0 24 24" stroke="#94a3b8" strokeWidth={1.5}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path strokeLinecap="round" d="M21 15l-5-5L5 21"/></svg>
+                        </div>
+                      )}
+                    </a>
+                    <div style={{ flex: 1, minWidth: 0 }}>
+                      <div style={{ fontSize: 13, fontWeight: 600, color: '#1e293b', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{spec.logo.name}</div>
+                      <button onClick={() => selectLogo(null)} disabled={savingLogo} style={{ background: 'none', border: 'none', color: '#dc2626', fontSize: 11, cursor: 'pointer', padding: 0 }}>Remove</button>
+                    </div>
+                  </div>
+                ) : (
+                  <div style={{ color: '#94a3b8', fontSize: 13 }}>No logo selected</div>
+                )}
+
+                {showLogoPicker && (
+                  <div style={{ marginTop: 12, paddingTop: 12, borderTop: '1px solid #f1f5f9' }}>
+                    {!logoOptionsLoaded ? (
+                      <div style={{ color: '#94a3b8', fontSize: 12 }}>Loading customer artwork…</div>
+                    ) : logoOptions.length === 0 ? (
+                      <div style={{ color: '#94a3b8', fontSize: 12, marginBottom: 8 }}>No artwork on file for this customer.</div>
+                    ) : (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(56px, 1fr))', gap: 6, marginBottom: 8 }}>
+                        {logoOptions.map(o => (
+                          <button
+                            key={o.id}
+                            type="button"
+                            onClick={() => selectLogo(o)}
+                            disabled={savingLogo}
+                            title={o.name}
+                            style={{
+                              position: 'relative', aspectRatio: '1', borderRadius: 6, overflow: 'hidden', padding: 0, cursor: 'pointer',
+                              border: spec.logo_artwork_id === o.id ? '2px solid #7c3aed' : '1px solid #e2e8f0',
+                              background: '#f8fafc',
+                            }}
+                          >
+                            {o.thumbnail_url ? (
+                              <img src={o.thumbnail_url} alt={o.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                            ) : (
+                              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <svg width="16" height="16" fill="none" viewBox="0 0 24 24" stroke="#94a3b8" strokeWidth={1.5}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path strokeLinecap="round" d="M21 15l-5-5L5 21"/></svg>
+                              </div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowLogoUploadModal(true)}
+                      style={{ width: '100%', background: 'white', border: '1px dashed #cbd5e1', borderRadius: 7, padding: '6px', fontSize: 12, color: '#64748b', cursor: 'pointer' }}
+                    >
+                      + Upload New Logo
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          )}
+
+          {spec.customer && (
+            <ArtworkUploadModal
+              open={showLogoUploadModal}
+              customerId={spec.customer.id}
+              onClose={() => setShowLogoUploadModal(false)}
+              onAdded={(item: ArtworkItem) => {
+                const opt = { id: item.id, name: item.name, url: item.url, thumbnail_url: item.thumbnail_url }
+                setLogoOptions(prev => [opt, ...prev])
+                setShowLogoUploadModal(false)
+                selectLogo(opt)
+              }}
+            />
+          )}
 
           {/* Linked CRM tasks */}
           {(spec.linked_task || spec.artwork_task) && (

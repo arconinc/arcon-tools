@@ -5,6 +5,8 @@ import { useRouter, useSearchParams } from 'next/navigation'
 import Link from 'next/link'
 import { SpecIdea } from '@/types'
 import { IdeaCard } from '@/components/specs/IdeaCard'
+import { ArtworkUploadModal } from '@/components/crm/customer/ArtworkUploadModal'
+import type { ArtworkItem } from '@/hooks/useArtwork'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -126,6 +128,8 @@ export default function NewSpecWizard() {
   const [artworkTaskCategory, setArtworkTaskCategory] = useState('Art Order')
   const [artworkTaskDescription, setArtworkTaskDescription] = useState('')
   const [showArtworkTaskForm, setShowArtworkTaskForm] = useState(false)
+  const [selectedLogoId, setSelectedLogoId] = useState<string | null>(null)
+  const [showLogoUploadModal, setShowLogoUploadModal] = useState(false)
 
   // Step 4
   const [followUpDate, setFollowUpDate] = useState(futureDate(14))
@@ -202,10 +206,12 @@ export default function NewSpecWizard() {
       setArtworkLoaded(false)
       setCreateArtworkTask(false)
       setShowArtworkTaskForm(false)
+      setSelectedLogoId(null)
       return
     }
     setArtworkLoading(true)
     setArtworkLoaded(false)
+    setSelectedLogoId(null)
     fetch(`/api/marketing/artwork?customer_id=${selectedCustomer.id}`)
       .then(r => r.json())
       .then((d: any) => {
@@ -340,6 +346,7 @@ export default function NewSpecWizard() {
       order_date: itemDetails[idx]?.order_date ?? item.order_date ?? todayStr(),
       date_sent: itemDetails[idx]?.date_sent ?? item.date_sent ?? null,
       notes: itemDetails[idx]?.notes ?? item.notes ?? null,
+      logo_artwork_id: selectedLogoId || null,
       status: 'not_contacted',
       follow_up_date: followUpDate || null,
       follow_up_notes: followUpNotes || null,
@@ -549,6 +556,54 @@ export default function NewSpecWizard() {
                   </div>
                 )}
 
+                {artworkLoaded && (
+                  <div style={{ marginBottom: 20 }}>
+                    <label className="wiz-label">Logo for this spec (optional)</label>
+                    {customerArtwork.length > 0 && (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(70px, 1fr))', gap: 8, marginBottom: 10 }}>
+                        {customerArtwork.map(a => (
+                          <button
+                            key={a.id}
+                            type="button"
+                            onClick={() => setSelectedLogoId(prev => prev === a.id ? null : a.id)}
+                            title={a.name}
+                            style={{
+                              position: 'relative', aspectRatio: '1', borderRadius: 8, overflow: 'hidden',
+                              border: selectedLogoId === a.id ? '2px solid #7c3aed' : '1px solid #e2e8f0',
+                              background: '#f8fafc', padding: 0, cursor: 'pointer',
+                            }}
+                          >
+                            {a.thumbnail_url ? (
+                              <img src={a.thumbnail_url} alt={a.name} style={{ width: '100%', height: '100%', objectFit: 'contain' }} />
+                            ) : (
+                              <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <svg width="20" height="20" fill="none" viewBox="0 0 24 24" stroke="#94a3b8" strokeWidth={1.5}><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><path strokeLinecap="round" d="M21 15l-5-5L5 21"/></svg>
+                              </div>
+                            )}
+                            {selectedLogoId === a.id && (
+                              <div style={{ position: 'absolute', top: 3, right: 3, background: '#7c3aed', borderRadius: '50%', width: 16, height: 16, display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                                <svg width="10" height="10" fill="none" viewBox="0 0 24 24" stroke="white" strokeWidth={3}><path strokeLinecap="round" strokeLinejoin="round" d="M5 13l4 4L19 7"/></svg>
+                              </div>
+                            )}
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                    <button
+                      type="button"
+                      onClick={() => setShowLogoUploadModal(true)}
+                      style={{ background: 'white', border: '1px dashed #cbd5e1', borderRadius: 7, padding: '7px 12px', fontSize: 12, color: '#64748b', cursor: 'pointer' }}
+                    >
+                      + Upload New Logo
+                    </button>
+                    {selectedLogoId && (
+                      <div style={{ fontSize: 12, color: '#7c3aed', marginTop: 6, fontWeight: 600 }}>
+                        ✓ {customerArtwork.find(a => a.id === selectedLogoId)?.name ?? 'Logo'} selected
+                      </div>
+                    )}
+                  </div>
+                )}
+
                 {artworkLoaded && (showArtworkTaskForm || customerArtwork.length === 0) && (
                   <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 12, padding: '18px 20px', marginBottom: 20 }}>
                     <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16 }}>
@@ -601,6 +656,19 @@ export default function NewSpecWizard() {
                     Next: Choose Items →
                   </button>
                 </div>
+
+                {selectedCustomer && (
+                  <ArtworkUploadModal
+                    open={showLogoUploadModal}
+                    customerId={selectedCustomer.id}
+                    onClose={() => setShowLogoUploadModal(false)}
+                    onAdded={(item: ArtworkItem) => {
+                      setCustomerArtwork(prev => [{ id: item.id, name: item.name, thumbnail_url: item.thumbnail_url, url: item.url }, ...prev])
+                      setSelectedLogoId(item.id)
+                      setShowLogoUploadModal(false)
+                    }}
+                  />
+                )}
               </>
             ) : (
               <>
@@ -1046,6 +1114,22 @@ export default function NewSpecWizard() {
               ))}
             </div>
 
+            {/* Logo */}
+            {selectedLogoId && (
+              <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px', marginBottom: 16, display: 'flex', alignItems: 'center', gap: 12 }}>
+                {customerArtwork.find(a => a.id === selectedLogoId)?.thumbnail_url ? (
+                  <img src={customerArtwork.find(a => a.id === selectedLogoId)!.thumbnail_url!} alt="" style={{ width: 40, height: 40, borderRadius: 6, objectFit: 'contain', background: '#f8fafc', border: '1px solid #e2e8f0', flexShrink: 0 }} />
+                ) : (
+                  <div style={{ width: 40, height: 40, borderRadius: 6, background: '#f1f5f9', flexShrink: 0 }} />
+                )}
+                <div style={{ flex: 1 }}>
+                  <div style={{ fontSize: 12, color: '#64748b', fontWeight: 700, textTransform: 'uppercase', letterSpacing: '.04em' }}>Logo</div>
+                  <div style={{ fontSize: 14, fontWeight: 600, color: '#1e293b' }}>{customerArtwork.find(a => a.id === selectedLogoId)?.name ?? 'Selected logo'}</div>
+                </div>
+                <button onClick={() => setStep(1)} style={{ background: 'none', border: 'none', color: '#7c3aed', fontSize: 12, fontWeight: 600, cursor: 'pointer' }}>Edit</button>
+              </div>
+            )}
+
             {/* Follow-up */}
             {createTask && followUpDate && (
               <div style={{ background: 'white', border: '1px solid #e2e8f0', borderRadius: 12, padding: '16px 20px', marginBottom: 24 }}>
@@ -1107,6 +1191,7 @@ export default function NewSpecWizard() {
                   setShowArtworkTaskForm(false)
                   setCustomerArtwork([])
                   setArtworkLoaded(false)
+                  setSelectedLogoId(null)
                 }}
                 style={{ background: 'white', color: '#374151', border: '1px solid #e2e8f0', borderRadius: 9, padding: '11px 22px', fontWeight: 600, fontSize: 14, cursor: 'pointer' }}
               >

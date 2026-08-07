@@ -1248,6 +1248,7 @@ export interface SpecSample {
   artwork_task_id: string | null
   spec_idea_id: string | null
   proof_url: string | null
+  logo_artwork_id: string | null
   created_at: string
   updated_at: string
 }
