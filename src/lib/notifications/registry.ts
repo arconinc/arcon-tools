@@ -733,6 +733,7 @@ export const ptoSubmitted: NotificationDefinition<PtoSubmittedPayload> = {
 
 export interface PtoReviewedPayload {
   request_id: string
+  requester_name: string
   status: 'approved' | 'denied'
   reviewer_name: string
   reviewer_comment: string | null
@@ -765,8 +766,8 @@ export const ptoReviewed: NotificationDefinition<PtoReviewedPayload> = {
         greeting: `Hi ${firstName},`,
         bodyLines: [
           approved
-            ? `The PTO request for <strong>${p.start_date} – ${p.end_date}</strong> has been approved by <strong>${p.reviewer_name}</strong>.`
-            : `Then PTO request for <strong>${p.start_date} – ${p.end_date}</strong> was reviewed by <strong>${p.reviewer_name}</strong> and was not approved at this time.`,
+            ? `The PTO request from <strong>${p.requester_name}</strong> for <strong>${p.start_date} – ${p.end_date}</strong> has been approved by <strong>${p.reviewer_name}</strong>.`
+            : `The PTO request from <strong>${p.requester_name}</strong> for <strong>${p.start_date} – ${p.end_date}</strong> was reviewed by <strong>${p.reviewer_name}</strong> and was not approved at this time.`,
           ...(p.reviewer_comment ? [`Note: <em>${p.reviewer_comment}</em>`] : []),
           ...(!approved ? [`You may edit and resubmit your request from the PTO Requests page.`] : []),
         ],

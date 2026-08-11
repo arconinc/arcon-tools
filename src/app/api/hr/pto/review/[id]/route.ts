@@ -40,7 +40,10 @@ export async function PUT(req: NextRequest, { params }: Params) {
 
   const { data: existing } = await adminClient
     .from('pto_requests')
-    .select('id, user_id, task_id, start_date, end_date, status')
+    .select(`
+      id, user_id, task_id, start_date, end_date, status,
+      users(id, display_name)
+    `)
     .eq('id', id)
     .single()
 
@@ -110,6 +113,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     definition: ptoReviewed,
     payload: {
       request_id: id,
+      requester_name: existing.users.display_name,
       status: newStatus,
       reviewer_name: dbUser.display_name,
       reviewer_comment: reviewer_comment?.trim() ?? null,
