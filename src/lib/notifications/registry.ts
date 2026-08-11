@@ -44,7 +44,7 @@ export const taskAssigned: NotificationDefinition<TaskAssignedPayload> = {
   type: 'task_assigned',
   label: 'Task assigned to me',
   description: 'When someone assigns you a task, or a task is posted to your department.',
-  defaultEmail: false,
+  defaultEmail: true,
   render: (p) => ({
     title:
       p.fanout_kind === 'team'
