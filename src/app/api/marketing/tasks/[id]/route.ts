@@ -6,7 +6,7 @@ import { ALL_CATEGORIES } from '@/lib/task-constants'
 import { validateTeamId } from '@/lib/team-assignment'
 import { dispatchNotification, fetchActor } from '@/lib/notifications/dispatch'
 import { taskAssigned, taskCompleted, taskUpdated, taskWaitingOnApproval, taskNeedsChanges } from '@/lib/notifications/registry'
-import { isTransitionAllowed, computeTransitionPatch } from '@/lib/task-workflow'
+import { computeTransitionPatch } from '@/lib/task-workflow'
 import type { CrmTaskStatus } from '@/types'
 
 const TRACKED_FIELDS = ['status', 'assigned_to', 'last_worked_by', 'team_id', 'department', 'priority', 'category', 'due_date', 'progress'] as const
@@ -256,19 +256,13 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Invalid team' }, { status: 400 })
   }
 
-  // Guided status workflow: validate the transition and compute the reassignment
-  // it triggers (see src/lib/task-workflow.ts for the rules). This is the single
-  // enforcement point — clients only ever send the target status, never assigned_to
-  // alongside it; the server decides who the task goes to next.
+  // Status moves are unrestricted (any stage to any stage) — compute the
+  // reassignment a transition triggers (see src/lib/task-workflow.ts). Clients
+  // only ever send the target status, never assigned_to alongside it; the
+  // server decides who the task goes to next.
   if ('status' in safeUpdates && safeUpdates.status !== current.status) {
     const fromStatus = current.status as CrmTaskStatus
     const toStatus = safeUpdates.status as CrmTaskStatus
-    if (!isTransitionAllowed(fromStatus, toStatus)) {
-      return NextResponse.json(
-        { error: `Cannot move a task from "${fromStatus}" to "${toStatus}"` },
-        { status: 400 }
-      )
-    }
     const reassignment = computeTransitionPatch(
       { assigned_to: current.assigned_to, created_by: current.created_by, last_worked_by: current.last_worked_by },
       fromStatus,

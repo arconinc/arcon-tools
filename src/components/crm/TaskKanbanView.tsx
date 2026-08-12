@@ -56,6 +56,11 @@ export const KANBAN_COLUMNS: { id: KanbanStatus; label: string; color: string; b
   { id: 'completed',                  label: 'Completed',            color: '#16a34a', bg: '#f0fdf4', dotColor: '#22c55e' },
 ]
 
+// Statuses that exist but shouldn't get their own column on the board —
+// still fully visible/filterable in the table view.
+const KANBAN_HIDDEN_STATUSES = new Set<KanbanStatus>(['waiting_on_client_approval'])
+const VISIBLE_KANBAN_COLUMNS = KANBAN_COLUMNS.filter((col) => !KANBAN_HIDDEN_STATUSES.has(col.id))
+
 const PRIORITY_ORDER: Record<KanbanPriority, number> = { high: 0, medium: 1, low: 2 }
 
 const LINKED_TYPE_COLOR: Record<string, string> = {
@@ -695,7 +700,7 @@ export function TaskKanbanView({
     return [...ordered, ...extras]
   }
 
-  const columns = KANBAN_COLUMNS
+  const columns = VISIBLE_KANBAN_COLUMNS
     .filter((col) => !(hideCompleted && col.id === 'completed'))
     .map((col) => ({ ...col, tasks: getColumnTasks(col.id) }))
 
@@ -834,7 +839,7 @@ export function TaskKanbanView({
         position: 'relative',
       }}>
         {loading ? (
-          KANBAN_COLUMNS.map((col) => (
+          VISIBLE_KANBAN_COLUMNS.map((col) => (
             <div key={col.id} style={{ width: 272, minWidth: 272, flexShrink: 0, background: '#f8fafc', borderRadius: 12, border: '1px solid #e5e7eb', padding: '12px' }}>
               <div style={{ height: 16, width: '60%', background: '#e5e7eb', borderRadius: 4, marginBottom: 14 }} />
               {[1, 2].map((i) => (

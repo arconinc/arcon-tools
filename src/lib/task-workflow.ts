@@ -1,24 +1,10 @@
 import type { CrmTaskStatus } from '@/types'
 
-// Single source of truth for the guided task-status workflow: legal transitions,
-// the reassignment that happens on each transition, and the UI labels/emphasis
-// for the "next action" buttons. Shared by the PATCH route and every task UI
-// surface (detail page, modal, kanban/table row actions) so there is exactly
-// one place that knows the rules.
-
-export const ALLOWED_STATUS_TRANSITIONS: Record<CrmTaskStatus, CrmTaskStatus[]> = {
-  not_started: ['in_progress', 'waiting_on_approval', 'completed'],
-  in_progress: ['waiting_on_approval', 'completed'],
-  waiting_on_approval: ['need_changes', 'completed'],
-  need_changes: ['in_progress', 'waiting_on_approval'],
-  completed: [],
-  // Legacy status, not part of the guided workflow — left alone (no transitions in or out).
-  waiting_on_client_approval: [],
-}
-
-export function isTransitionAllowed(from: CrmTaskStatus, to: CrmTaskStatus): boolean {
-  return ALLOWED_STATUS_TRANSITIONS[from]?.includes(to) ?? false
-}
+// Single source of truth for the task-status reassignment logic and the
+// UI labels/emphasis for the "next action" buttons. Shared by the PATCH route
+// and every task UI surface (detail page, modal, kanban/table row actions) so
+// there is exactly one place that knows the rules. Status moves themselves are
+// unrestricted — a task can go from any stage to any stage.
 
 export interface TaskAssignmentFields {
   assigned_to: string | null
