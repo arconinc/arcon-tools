@@ -113,7 +113,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     definition: ptoReviewed,
     payload: {
       request_id: id,
-      requester_name: existing.users.display_name,
+      requester_name: Array.isArray(existing.users) ? existing.users[0]?.display_name : (existing.users as { id: string; display_name: string } | null)?.display_name,
       status: newStatus,
       reviewer_name: dbUser.display_name,
       reviewer_comment: reviewer_comment?.trim() ?? null,
