@@ -42,7 +42,7 @@ export async function PUT(req: NextRequest, { params }: Params) {
     .from('pto_requests')
     .select(`
       id, user_id, task_id, start_date, end_date, status,
-      users(id, display_name)
+      users!user_id(id, display_name)
     `)
     .eq('id', id)
     .single()
