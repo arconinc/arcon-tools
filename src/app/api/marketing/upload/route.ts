@@ -2,7 +2,8 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 
-const MAX_SIZE_BYTES = 10 * 1024 * 1024 // 10MB
+
+const MAX_SIZE_BYTES = 50 * 1024 * 1024 // 50MB
 const BUCKET = 'crm-attachments'
 
 export async function POST(request: Request) {
