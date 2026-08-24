@@ -13,6 +13,7 @@ import { TASK_STATUS_LABELS, TASK_STATUS_COLORS } from '@/lib/task-workflow'
 import { CalendarGlyph, TrashGlyph, ExternalLinkGlyph, PlusGlyph } from '@/components/crm/task/TaskIcons'
 import type { Comment, HistoryEntry, TaskAttachment } from '@/hooks/useTask'
 import type { CrmTask, CrmTaskStatus } from '@/types'
+import { uploadAttachmentWithToast } from '@/lib/crm/upload-attachment'
 
 type DropdownUser = { id: string; display_name: string; email: string }
 type Team = { id: string; key: string; name: string; color: string }
@@ -285,11 +286,8 @@ export function TaskFormModal({
     if (!task?.id) return
     setUploadingDescriptionFile(true)
     try {
-      const fd = new FormData()
-      fd.append('file', file)
-      const uploadRes = await fetch('/api/marketing/upload', { method: 'POST', body: fd })
-      if (!uploadRes.ok) { alert('Upload failed'); return }
-      const uploaded = await uploadRes.json()
+      const uploaded = await uploadAttachmentWithToast(file)
+      if (!uploaded) { alert('Upload failed'); return }
       await fetch(`/api/marketing/tasks/${task.id}/attachments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -372,11 +370,8 @@ export function TaskFormModal({
   async function uploadAttachments(taskId: string) {
     if (pendingFiles.length === 0) return
     await Promise.all(pendingFiles.map(async (file) => {
-      const fd = new FormData()
-      fd.append('file', file)
-      const uploadRes = await fetch('/api/marketing/upload', { method: 'POST', body: fd })
-      if (!uploadRes.ok) return
-      const uploaded = await uploadRes.json()
+      const uploaded = await uploadAttachmentWithToast(file)
+      if (!uploaded) return
       await fetch(`/api/marketing/tasks/${taskId}/attachments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

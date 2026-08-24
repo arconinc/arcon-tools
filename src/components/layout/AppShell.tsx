@@ -11,6 +11,7 @@ import { setGAUser, trackPageView } from '@/lib/analytics'
 import * as Sentry from '@sentry/nextjs'
 import { NotificationBell } from './NotificationBell'
 import UniversalSearch from './UniversalSearch'
+import { Toaster } from '@/components/ui/Toast'
 
 // ── Module-level fetch cache ──────────────────────────────────────────────────
 // Survives React remounts within the same page session; cleared on full refresh.
@@ -855,6 +856,7 @@ export default function AppShell({ children, user, isImpersonating, impersonated
 
         </div>
       </StoreContext.Provider>
+      <Toaster />
     </UserContext.Provider>
   )
 }

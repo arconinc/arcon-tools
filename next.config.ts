@@ -6,12 +6,6 @@ const nextConfig: NextConfig = {
   // Bundling them via webpack breaks those checks, so we tell Next.js to leave them external.
   serverExternalPackages: ['potrace', 'jimp'],
 
-  experimental: {
-    serverActions: {
-      bodySizeLimit: '51mb',
-    },
-  },
-
   // Note: do NOT use output: 'standalone' when deploying to Vercel.
   // Vercel manages its own output format — standalone mode is only
   // for self-hosted / Docker deployments and breaks Vercel routing.

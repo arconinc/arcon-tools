@@ -19,6 +19,7 @@ import { buildSupplierAturianPayload, sendAturianTransferPayload } from '@/lib/a
 import { taskStatusBadge } from '@/lib/badges'
 import { formatDate } from '@/lib/format'
 import type { PlacesAddress, PlacesDetails } from '@/lib/google-places'
+import { uploadAttachment } from '@/lib/crm/upload-attachment'
 
 type TagOption = { id: string; name: string; color: string }
 
@@ -469,16 +470,13 @@ export default function VendorDetailPage() {
     setAttachUploading(true)
     setAttachError(null)
     try {
-      const fd = new FormData()
-      fd.append('file', attachFile)
-      const uploadRes = await fetch('/api/marketing/upload', { method: 'POST', body: fd })
-      const uploadData = await uploadRes.json()
-      if (!uploadRes.ok) { setAttachError(uploadData.error ?? 'Upload failed'); return }
+      const uploaded = await uploadAttachment(attachFile).catch((e: Error) => { setAttachError(e.message ?? 'Upload failed'); return null })
+      if (!uploaded) return
 
       const saveRes = await fetch(`/api/marketing/vendors/${vendor.id}/files`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label: attachLabel.trim(), url: uploadData.url }),
+        body: JSON.stringify({ label: attachLabel.trim(), url: uploaded.url }),
       })
       const saveData = await saveRes.json()
       if (!saveRes.ok) { setAttachError(saveData.error ?? 'Save failed'); return }

@@ -18,6 +18,7 @@ import { ConfirmButton } from '@/components/ui/ConfirmButton'
 import { CalendarGlyph, TrashGlyph } from '@/components/crm/task/TaskIcons'
 import { TASK_STATUS_LABELS, TASK_STATUS_COLORS, computeTransitionPatch } from '@/lib/task-workflow'
 import type { CrmTaskStatus } from '@/types'
+import { uploadAttachmentWithToast } from '@/lib/crm/upload-attachment'
 
 // ── Local Types ───────────────────────────────────────────────────────────────
 
@@ -192,11 +193,8 @@ export default function TaskDetailPage() {
     if (!task) return
     setUploadingAttachment(true)
     try {
-      const fd = new FormData()
-      fd.append('file', file)
-      const uploadRes = await fetch('/api/marketing/upload', { method: 'POST', body: fd })
-      if (!uploadRes.ok) { alert('Upload failed'); return }
-      const uploaded = await uploadRes.json()
+      const uploaded = await uploadAttachmentWithToast(file)
+      if (!uploaded) return
       await fetch(`/api/marketing/tasks/${task.id}/attachments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },

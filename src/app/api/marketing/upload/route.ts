@@ -2,7 +2,6 @@ import { NextResponse } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 
-
 const MAX_SIZE_BYTES = 50 * 1024 * 1024 // 50MB
 const BUCKET = 'crm-attachments'
 
@@ -10,20 +9,18 @@ export async function POST(request: Request) {
   const appUser = await requireUser()
   if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
-  const formData = await request.formData()
-  const file = formData.get('file') as File | null
-  if (!file) return NextResponse.json({ error: 'No file provided' }, { status: 400 })
+  const body = await request.json()
+  const { fileName, fileSize, mimeType } = body as { fileName: string; fileSize: number; mimeType: string }
 
-  if (file.size > MAX_SIZE_BYTES) {
-    return NextResponse.json({ error: 'File must be 10MB or smaller' }, { status: 400 })
+  if (!fileName || typeof fileSize !== 'number') {
+    return NextResponse.json({ error: 'fileName and fileSize required' }, { status: 400 })
+  }
+  if (fileSize > MAX_SIZE_BYTES) {
+    return NextResponse.json({ error: 'File must be 50MB or smaller' }, { status: 400 })
   }
 
-  const ext = file.name.split('.').pop() ?? 'bin'
-  const safeName = file.name.replace(/[^a-zA-Z0-9._-]/g, '_')
+  const safeName = fileName.replace(/[^a-zA-Z0-9._-]/g, '_')
   const path = `${appUser.id}/${Date.now()}-${Math.random().toString(36).slice(2)}-${safeName}`
-
-  const arrayBuffer = await file.arrayBuffer()
-  const buffer = Buffer.from(arrayBuffer)
 
   const adminClient = createAdminClient()
 
@@ -36,24 +33,25 @@ export async function POST(request: Request) {
     }
   }
 
-  const { error: uploadErr } = await adminClient.storage
+  const { data: signedData, error: signedErr } = await adminClient.storage
     .from(BUCKET)
-    .upload(path, buffer, {
-      contentType: file.type || 'application/octet-stream',
-      upsert: false,
-    })
+    .createSignedUploadUrl(path)
 
-  if (uploadErr) return NextResponse.json({ error: uploadErr.message }, { status: 500 })
+  if (signedErr || !signedData) {
+    return NextResponse.json({ error: signedErr?.message ?? 'Failed to create upload URL' }, { status: 500 })
+  }
 
   const { data: { publicUrl } } = adminClient.storage.from(BUCKET).getPublicUrl(path)
 
   return NextResponse.json(
     {
+      signedUrl: signedData.signedUrl,
+      path,
       url: publicUrl,
-      file_name: file.name,
-      file_size: file.size,
-      mime_type: file.type || null,
+      file_name: fileName,
+      file_size: fileSize,
+      mime_type: mimeType || null,
     },
-    { status: 201 }
+    { status: 200 }
   )
 }

@@ -15,6 +15,7 @@ import EmployeeAvatar from '@/components/employees/EmployeeAvatar'
 import { PaperclipGlyph, SendGlyph, ReassignGlyph, DocumentGlyph, ImageGlyph } from '@/components/crm/task/TaskIcons'
 import type { Comment, HistoryEntry, TaskAttachment } from '@/hooks/useTask'
 import type { CrmTaskStatus } from '@/types'
+import { uploadAttachmentWithToast } from '@/lib/crm/upload-attachment'
 
 type ParticipantRef = {
   id: string
@@ -431,16 +432,9 @@ function GroupReplyComposer({
 
   async function insertImage(file: File) {
     setUploadingImage(true)
-    try {
-      const fd = new FormData()
-      fd.append('file', file)
-      const res = await fetch('/api/marketing/upload', { method: 'POST', body: fd })
-      if (!res.ok) { alert('Image upload failed'); return }
-      const uploaded = await res.json()
-      editor?.chain().focus().setImage({ src: uploaded.url, alt: uploaded.file_name }).run()
-    } finally {
-      setUploadingImage(false)
-    }
+    const uploaded = await uploadAttachmentWithToast(file)
+    if (uploaded) editor?.chain().focus().setImage({ src: uploaded.url, alt: uploaded.file_name }).run()
+    setUploadingImage(false)
   }
 
   async function submit(reassignToId?: string) {
@@ -458,11 +452,8 @@ function GroupReplyComposer({
       const created = await res.json()
       if (pendingFiles.length > 0) {
         await Promise.all(pendingFiles.map(async (file) => {
-          const fd = new FormData()
-          fd.append('file', file)
-          const uploadRes = await fetch('/api/marketing/upload', { method: 'POST', body: fd })
-          if (!uploadRes.ok) return
-          const uploaded = await uploadRes.json()
+          const uploaded = await uploadAttachmentWithToast(file)
+          if (!uploaded) return
           await fetch(`/api/marketing/tasks/${taskId}/comments/${created.id}/attachments`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
@@ -807,11 +798,8 @@ export function TaskThread({
       const created = await res.json()
       if (pendingFiles.length > 0) {
         await Promise.all(pendingFiles.map(async (file) => {
-          const fd = new FormData()
-          fd.append('file', file)
-          const uploadRes = await fetch('/api/marketing/upload', { method: 'POST', body: fd })
-          if (!uploadRes.ok) return
-          const uploaded = await uploadRes.json()
+          const uploaded = await uploadAttachmentWithToast(file)
+          if (!uploaded) return
           await fetch(`/api/marketing/tasks/${taskId}/comments/${created.id}/attachments`, {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },

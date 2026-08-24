@@ -26,6 +26,7 @@ import { useCustomer, useCrmUsers, useArtwork, useCustomerEdit, type CustomerDet
 import { taskStatusBadge } from '@/lib/badges'
 import { formatDate } from '@/lib/format'
 import type { PlacesAddress, PlacesDetails } from '@/lib/google-places'
+import { uploadAttachment } from '@/lib/crm/upload-attachment'
 
 type DropdownUser = { id: string; display_name: string; email: string }
 
@@ -237,12 +238,9 @@ export default function CustomerDetailPage() {
     try {
       let taxCertificateUrl: string | null = null
       if (createForm.tax_exempt === 'yes' && taxCertificateFile) {
-        const uploadForm = new FormData()
-        uploadForm.append('file', taxCertificateFile)
-        const uploadRes = await fetch('/api/marketing/upload', { method: 'POST', body: uploadForm })
-        const uploadData = await uploadRes.json()
-        if (!uploadRes.ok) { setCreateError(uploadData.error ?? 'Tax certificate upload failed'); return }
-        taxCertificateUrl = uploadData.url
+        const uploaded = await uploadAttachment(taxCertificateFile).catch((e: Error) => { setCreateError(e.message ?? 'Tax certificate upload failed'); return null })
+        if (!uploaded) return
+        taxCertificateUrl = uploaded.url
       }
 
       const res = await fetch('/api/marketing/customers', {

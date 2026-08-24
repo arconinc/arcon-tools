@@ -11,6 +11,7 @@ import { useAppUser } from '@/components/layout/AppShell'
 import { useApiResource, type CrmUserLite } from '@/hooks'
 import type { PlacesAddress } from '@/lib/google-places'
 import type { AturianCommissionedClient } from '@/types'
+import { uploadAttachment } from '@/lib/crm/upload-attachment'
 
 const COMMISSIONED_CLIENT_OPTIONS: AturianCommissionedClient[] = [
   'Standard', 'Standard with Split', 'Credit Card Store', 'Non-Credit card store',
@@ -130,12 +131,9 @@ export default function AturianAddCustomerPage() {
     try {
       let taxCertificateUrl: string | null = null
       if (form.tax_exempt === 'yes' && taxCertificateFile) {
-        const uploadForm = new FormData()
-        uploadForm.append('file', taxCertificateFile)
-        const uploadRes = await fetch('/api/marketing/upload', { method: 'POST', body: uploadForm })
-        const uploadData = await uploadRes.json()
-        if (!uploadRes.ok) { setCreateError(uploadData.error ?? 'Tax certificate upload failed'); return }
-        taxCertificateUrl = uploadData.url
+        const uploaded = await uploadAttachment(taxCertificateFile).catch((e: Error) => { setCreateError(e.message ?? 'Tax certificate upload failed'); return null })
+        if (!uploaded) return
+        taxCertificateUrl = uploaded.url
       }
 
       const res = await fetch('/api/marketing/aturian-queue', {
