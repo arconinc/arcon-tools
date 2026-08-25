@@ -96,6 +96,7 @@ function TaskBoardInner({ defaultTeamKey, defaultAssignee = 'all' }: TaskBoardPr
     return 'all'
   })
   const [showDelegated, setShowDelegated] = useState(searchParams.get('delegated') === 'true')
+  const [hideDelegated, setHideDelegated] = useState(searchParams.get('hide_delegated') === 'true')
   const [hideCompleted, setHideCompleted] = useState(searchParams.get('hide_completed') !== 'false')
   const [sortBy, setSortBy] = useState<'priority' | 'due_date'>(
     searchParams.get('sort') === 'due_date' ? 'due_date' : 'priority'
@@ -221,11 +222,10 @@ function TaskBoardInner({ defaultTeamKey, defaultAssignee = 'all' }: TaskBoardPr
       (selectedUserIds as Set<string>).has(currentUser?.id ?? '')
 
     if (myTasksMode && isMeOnlySelected) {
-      // Default My Tasks view: mine + unclaimed tasks on my teams. Toggling
-      // "Tasks I've Delegated" adds tasks I created/own/delegated on top of
-      // that, rather than replacing it.
+      // Default My Tasks view: mine + unclaimed tasks on my teams + delegated by me.
+      // "Hide Delegated" suppresses the delegated union.
       params.set('my_teams', 'true')
-      if (showDelegated) params.set('delegated_by_me', 'true')
+      if (!hideDelegated) params.set('delegated_by_me', 'true')
     } else if (showDelegated) {
       params.set('delegated_by_me', 'true')
       // Also apply assigned_to filter when delegated is true
@@ -270,7 +270,7 @@ function TaskBoardInner({ defaultTeamKey, defaultAssignee = 'all' }: TaskBoardPr
       .catch(() => setTasks([]))
       .finally(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [usersKey, teamId, category, showDelegated, hideCompleted, initialized, view, page, refreshKey, columnFiltersKey, isTeamLocked, teamIdInitialized, myTasksMode, currentUser?.id])
+  }, [usersKey, teamId, category, showDelegated, hideDelegated, hideCompleted, initialized, view, page, refreshKey, columnFiltersKey, isTeamLocked, teamIdInitialized, myTasksMode, currentUser?.id])
 
   // ── Filter helpers ─────────────────────────────────────────────────────────
 
@@ -359,6 +359,11 @@ function TaskBoardInner({ defaultTeamKey, defaultAssignee = 'all' }: TaskBoardPr
     syncUrl({ hide_completed: h ? null : 'false' })
   }
 
+  function handleHideDelegated(h: boolean) {
+    setHideDelegated(h)
+    syncUrl({ hide_delegated: h ? 'true' : null })
+  }
+
   function handleSortChange(s: 'priority' | 'due_date') {
     setSortBy(s)
     syncUrl({ sort: s === 'priority' ? null : s })
@@ -402,6 +407,7 @@ function TaskBoardInner({ defaultTeamKey, defaultAssignee = 'all' }: TaskBoardPr
       category: category || null,
       assignees: selectedUserIds === 'all' ? 'all' : [...(selectedUserIds as Set<string>)],
       showDelegated,
+      hideDelegated,
       hideCompleted,
       sortBy,
       search: search || null,
@@ -415,6 +421,7 @@ function TaskBoardInner({ defaultTeamKey, defaultAssignee = 'all' }: TaskBoardPr
     const newCategory = (config.category as string | null) ?? ''
     const newAssignees = config.assignees
     const newShowDelegated = config.showDelegated === true
+    const newHideDelegated = config.hideDelegated === true
     const newHideCompleted = config.hideCompleted !== false
     const newSortBy = (config.sortBy as 'priority' | 'due_date') ?? 'priority'
     const newSearch = (config.search as string | null) ?? ''
@@ -432,6 +439,7 @@ function TaskBoardInner({ defaultTeamKey, defaultAssignee = 'all' }: TaskBoardPr
     setCategory(newCategory)
     setSelectedUserIds(newSelectedUserIds)
     setShowDelegated(newShowDelegated)
+    setHideDelegated(newHideDelegated)
     setHideCompleted(newHideCompleted)
     setSortBy(newSortBy)
     setSearch(newSearch)
@@ -446,6 +454,7 @@ function TaskBoardInner({ defaultTeamKey, defaultAssignee = 'all' }: TaskBoardPr
       category: newCategory || null,
       assignees: assigneesStr,
       delegated: newShowDelegated ? 'true' : null,
+      hide_delegated: newHideDelegated ? 'true' : null,
       hide_completed: newHideCompleted ? null : 'false',
       sort: newSortBy === 'priority' ? null : newSortBy,
       search: newSearch || null,
@@ -712,25 +721,27 @@ function TaskBoardInner({ defaultTeamKey, defaultAssignee = 'all' }: TaskBoardPr
             ))}
           </select>
 
-          {/* Delegated tasks toggle */}
-          <button
-            onClick={handleToggleDelegated}
-            className="tb-focusable"
-            style={{
-              display: 'flex', alignItems: 'center', gap: 6,
-              padding: '0 12px', height: 36,
-              border: `1.5px solid ${showDelegated ? '#9333ea' : '#e5e7eb'}`,
-              borderRadius: 8, fontSize: 12, fontWeight: 600,
-              background: showDelegated ? '#f3e8ff' : '#fff',
-              color: showDelegated ? '#6b1e98' : '#666',
-              cursor: 'pointer',
-            }}
-          >
-            <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-            </svg>
-              Show Delegated Tasks
-          </button>
+          {/* Delegated tasks toggle — only shown on non-myTasksMode boards */}
+          {!myTasksMode && (
+            <button
+              onClick={handleToggleDelegated}
+              className="tb-focusable"
+              style={{
+                display: 'flex', alignItems: 'center', gap: 6,
+                padding: '0 12px', height: 36,
+                border: `1.5px solid ${showDelegated ? '#9333ea' : '#e5e7eb'}`,
+                borderRadius: 8, fontSize: 12, fontWeight: 600,
+                background: showDelegated ? '#f3e8ff' : '#fff',
+                color: showDelegated ? '#6b1e98' : '#666',
+                cursor: 'pointer',
+              }}
+            >
+              <svg width="13" height="13" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+              </svg>
+                Show Delegated Tasks
+            </button>
+          )}
         </div>
 
         {/* Filter row 2: Assignee dropdown + search + sort + hide completed */}
@@ -816,6 +827,23 @@ function TaskBoardInner({ defaultTeamKey, defaultAssignee = 'all' }: TaskBoardPr
             </div>
             <span style={{ fontSize: 12, color: '#666', fontWeight: 500 }}>Hide completed</span>
           </button>
+
+          {/* Hide delegated — only on My Tasks, where delegated is shown by default */}
+          {myTasksMode && (
+            <button
+              type="button"
+              role="switch"
+              aria-checked={hideDelegated}
+              onClick={() => handleHideDelegated(!hideDelegated)}
+              className="tb-switch"
+              style={{ display: 'flex', alignItems: 'center', gap: 7, cursor: 'pointer', userSelect: 'none', border: 'none', background: 'transparent', padding: '8px 2px', minHeight: 36 }}
+            >
+              <div style={{ width: 36, height: 20, borderRadius: 10, background: hideDelegated ? '#6b1e98' : '#d1d5db', position: 'relative', transition: 'background 0.2s', flexShrink: 0 }}>
+                <div style={{ position: 'absolute', top: 2, left: hideDelegated ? 18 : 2, width: 16, height: 16, borderRadius: '50%', background: '#fff', transition: 'left 0.2s', boxShadow: '0 1px 3px rgba(0,0,0,0.2)' }} />
+              </div>
+              <span style={{ fontSize: 12, color: '#666', fontWeight: 500 }}>Hide delegated</span>
+            </button>
+          )}
         </div>
 
         {/* Quick-add */}
@@ -847,6 +875,7 @@ function TaskBoardInner({ defaultTeamKey, defaultAssignee = 'all' }: TaskBoardPr
                 created_by: currentUser?.id ?? null,
                 created_by_name: currentUser?.display_name ?? null,
                 delegators: [],
+                attachment_count: 0,
               }])
               setTotal((t) => t + 1)
             }}

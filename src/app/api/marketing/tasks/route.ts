@@ -215,7 +215,9 @@ export async function GET(req: NextRequest) {
   const contIds = [...new Set(rows.map((t: any) => t.contact_id).filter(Boolean))]
   const teamIds = [...new Set(rows.map((t: any) => t.team_id).filter(Boolean))]
 
-  const [usersRes, oppsRes, custsRes, vendsRes, contsRes, teamsRes] = await Promise.all([
+  const taskIds = rows.map((t: any) => t.id)
+
+  const [usersRes, oppsRes, custsRes, vendsRes, contsRes, teamsRes, attRes] = await Promise.all([
     userIds.length > 0
       ? adminClient.from('users').select('id, display_name').in('id', userIds)
       : Promise.resolve({ data: [] }),
@@ -234,6 +236,9 @@ export async function GET(req: NextRequest) {
     teamIds.length > 0
       ? adminClient.from('groups').select('id, name, color').in('id', teamIds)
       : Promise.resolve({ data: [] }),
+    taskIds.length > 0
+      ? adminClient.from('crm_task_attachments').select('task_id').in('task_id', taskIds)
+      : Promise.resolve({ data: [] }),
   ])
 
   const usersMap: Record<string, string> = {}
@@ -248,6 +253,10 @@ export async function GET(req: NextRequest) {
   for (const c of contsRes.data ?? []) contsMap[c.id] = `${c.first_name} ${c.last_name}`
   const teamsMap: Record<string, { name: string; color: string }> = {}
   for (const g of teamsRes.data ?? []) teamsMap[g.id] = { name: g.name, color: g.color }
+  const attCountMap: Record<string, number> = {}
+  for (const a of (attRes.data ?? []) as { task_id: string }[]) {
+    attCountMap[a.task_id] = (attCountMap[a.task_id] ?? 0) + 1
+  }
 
   const enriched = rows.map((t: any) => ({
     ...t,
@@ -273,6 +282,7 @@ export async function GET(req: NextRequest) {
       : t.contact_id
       ? 'contact'
       : null,
+    attachment_count: attCountMap[t.id] ?? 0,
   }))
 
   return ok({ tasks: enriched, total, page, limit })

@@ -41,6 +41,7 @@ export type KanbanTask = {
   created_by: string | null
   created_by_name: string | null
   delegators: string[]
+  attachment_count: number
 }
 
 type DragOverCard = { id: string; half: 'top' | 'bottom' }
@@ -422,6 +423,14 @@ function KanbanCard({
             </>
           )}
         </div>
+        {task.attachment_count > 0 && (
+          <span title={`${task.attachment_count} attachment${task.attachment_count === 1 ? '' : 's'}`} style={{ display: 'flex', alignItems: 'center', gap: 2, color: '#94a3b8', marginLeft: !task.assigned_to || !showAssignee ? 'auto' : undefined }}>
+            <svg width="11" height="11" fill="none" stroke="currentColor" viewBox="0 0 24 24" style={{ flexShrink: 0 }}>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+            </svg>
+            <span style={{ fontSize: 9, fontWeight: 600 }}>{task.attachment_count}</span>
+          </span>
+        )}
         {dateStr && (
           <span style={{
             fontSize: 10, fontWeight: 600,

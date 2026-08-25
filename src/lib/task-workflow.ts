@@ -16,28 +16,34 @@ export interface TaskAssignmentFields {
 // Returns only the keys that should change — spread onto the update payload.
 export function computeTransitionPatch(
   task: TaskAssignmentFields,
-  _fromStatus: CrmTaskStatus,
+  fromStatus: CrmTaskStatus,
   toStatus: CrmTaskStatus,
   actorId: string
 ): { assigned_to?: string | null; last_worked_by?: string | null } {
   const patch: { assigned_to?: string | null; last_worked_by?: string | null } = {}
 
   if (toStatus === 'in_progress') {
-    // Picking up the task — the actor becomes the current owner.
-    patch.assigned_to = actorId
+    if (fromStatus === 'waiting_on_approval') {
+      // Send back — return to whoever last worked it.
+      patch.assigned_to = task.last_worked_by ?? task.assigned_to ?? actorId
+    } else {
+      // Picking up the task — the actor becomes the current owner.
+      patch.assigned_to = actorId
+    }
   } else if (toStatus === 'waiting_on_approval') {
     // Whoever was working it is recorded as last_worked_by so a later
     // "Needs Changes" knows who to send it back to; ownership shifts to the requestor.
     patch.last_worked_by = task.assigned_to ?? actorId
     patch.assigned_to = task.created_by
-  } else if (toStatus === 'need_changes') {
-    // Send it back to whoever last worked it.
-    patch.assigned_to = task.last_worked_by ?? task.assigned_to ?? actorId
   } else if (toStatus === 'completed') {
-    // Completing always hands the task back to whoever created/assigned it, so
-    // they can verify the work before it's truly done — regardless of which
-    // status it's completed from.
-    patch.assigned_to = task.created_by
+    // When completing from the approval flow, keep the task with whoever did
+    // the work (last_worked_by) so it appears in their completed view.
+    // Otherwise hand back to the creator.
+    if (fromStatus === 'waiting_on_approval' && task.last_worked_by) {
+      patch.assigned_to = task.last_worked_by
+    } else {
+      patch.assigned_to = task.created_by
+    }
   }
 
   return patch
@@ -82,7 +88,7 @@ const TASK_NEXT_ACTIONS: Record<CrmTaskStatus, TaskNextAction[]> = {
     { toStatus: 'completed', label: 'Mark Complete', emphasis: 'secondary' },
   ],
   waiting_on_approval: [
-    { toStatus: 'need_changes', label: 'Request Changes', emphasis: 'primary' },
+    { toStatus: 'in_progress', label: 'Send Back', emphasis: 'primary' },
     { toStatus: 'completed', label: 'Approve & Complete', emphasis: 'secondary' },
   ],
   need_changes: [

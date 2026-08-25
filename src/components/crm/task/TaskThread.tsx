@@ -98,6 +98,19 @@ type AttachmentCardItem = {
   onDelete?: () => void
 }
 
+function downloadFile(url: string, filename: string) {
+  fetch(url)
+    .then((r) => r.blob())
+    .then((blob) => {
+      const a = document.createElement('a')
+      a.href = URL.createObjectURL(blob)
+      a.download = filename
+      a.click()
+      URL.revokeObjectURL(a.href)
+    })
+    .catch(() => { window.open(url, '_blank') })
+}
+
 function AttachmentCard({ url, label, mimeType, isDriveLink, onDelete }: AttachmentCardItem) {
   const [confirming, setConfirming] = useState(false)
   return (
@@ -120,6 +133,16 @@ function AttachmentCard({ url, label, mimeType, isDriveLink, onDelete }: Attachm
           <div className="text-[11px] font-medium text-slate-700 truncate">{label}</div>
         </div>
       </a>
+      {!isDriveLink && (
+        <button
+          type="button"
+          onClick={(e) => { e.preventDefault(); downloadFile(url, label) }}
+          title={`Download ${label}`}
+          className="absolute -top-1.5 -left-1.5 hidden group-hover:flex items-center justify-center w-5 h-5 rounded-full bg-slate-600 text-white text-xs leading-none hover:bg-purple-700 transition-colors"
+        >
+          ↓
+        </button>
+      )}
       {onDelete && (
         <button
           type="button"
@@ -653,19 +676,6 @@ function CommentGroup({
           ))}
         </div>
       )}
-      <div className="ml-10 mt-3 pl-4">
-        <GroupReplyComposer
-          taskId={taskId}
-          parentCommentId={comment.id}
-          onRefresh={onRefresh}
-          currentUserId={currentUserId}
-          currentUserName={currentUserName}
-          currentUserAvatarUrl={currentUserAvatarUrl}
-          currentUserProfileImageUrl={currentUserProfileImageUrl}
-          assignedTo={assignedTo}
-          participants={participants}
-        />
-      </div>
     </div>
   )
 }
@@ -696,6 +706,7 @@ export function TaskThread({
   canEditDescription,
   uploadingDescriptionFile,
   onRefresh,
+  onCompleteTask,
   onSaveDescription,
   onUploadDescriptionFile,
   onDeleteDescriptionAttachment,
@@ -720,6 +731,7 @@ export function TaskThread({
   canEditDescription: boolean
   uploadingDescriptionFile: boolean
   onRefresh: () => void | Promise<void>
+  onCompleteTask?: () => void
   onSaveDescription: (html: string) => void
   onUploadDescriptionFile: (file: File) => void
   onDeleteDescriptionAttachment: (attachmentId: string) => void
@@ -861,9 +873,9 @@ export function TaskThread({
         return <ThreadHistoryItem key={e.entry.id} entry={e.entry} />
       })}
 
-      {/* New top-level message composer */}
+      {/* Message composer */}
       <div className="bg-white border border-slate-200 rounded-2xl p-5">
-        <div className="text-sm font-semibold text-slate-700 mb-3">New Message</div>
+        <div className="text-sm font-semibold text-slate-700 mb-3">Message</div>
         <textarea
           rows={3}
           value={text}
@@ -884,15 +896,28 @@ export function TaskThread({
         )}
 
         <div className="flex items-center gap-2 flex-wrap">
-          <button
-            type="button"
-            onClick={() => submitReply(false)}
-            disabled={submitting || (!text.trim() && pendingFiles.length === 0)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-lg disabled:opacity-60 transition-colors"
-          >
-            <SendGlyph className="h-3.5 w-3.5" />
-            {submitting ? 'Sending…' : 'Send'}
-          </button>
+          {canReassignToCreator ? (
+            <button
+              type="button"
+              onClick={() => submitReply(true)}
+              disabled={submitting || (!text.trim() && pendingFiles.length === 0)}
+              title={`Send and reassign to ${assignerName}`}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-lg disabled:opacity-60 transition-colors"
+            >
+              <ReassignGlyph />
+              {submitting ? 'Sending…' : `Send & Reassign to ${assignerName}`}
+            </button>
+          ) : (
+            <button
+              type="button"
+              onClick={() => submitReply(false)}
+              disabled={submitting || (!text.trim() && pendingFiles.length === 0)}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-lg disabled:opacity-60 transition-colors"
+            >
+              <SendGlyph className="h-3.5 w-3.5" />
+              {submitting ? 'Sending…' : 'Send'}
+            </button>
+          )}
 
           <input
             ref={fileInputRef}
@@ -914,16 +939,17 @@ export function TaskThread({
             Attach files
           </button>
 
-          {canReassignToCreator && (
+          {onCompleteTask && (
             <button
               type="button"
-              onClick={() => submitReply(true)}
-              disabled={submitting || (!text.trim() && pendingFiles.length === 0)}
-              title={`Send and reassign to ${assignerName}`}
-              className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-amber-300 bg-amber-50 text-amber-800 hover:bg-amber-100 text-xs font-semibold rounded-lg disabled:opacity-50 transition-colors ml-auto"
+              onClick={onCompleteTask}
+              disabled={submitting}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 border border-green-300 bg-green-50 text-green-800 hover:bg-green-100 text-xs font-semibold rounded-lg disabled:opacity-50 transition-colors ml-auto"
             >
-              <ReassignGlyph />
-              Send & Reassign to {assignerName}
+              <svg className="h-3.5 w-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M5 13l4 4L19 7" />
+              </svg>
+              Complete Task
             </button>
           )}
         </div>

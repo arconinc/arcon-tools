@@ -70,7 +70,6 @@ const STATUSES = [
   { value: 'completed', label: 'Completed', pill: 'text-green-700 bg-green-50 border-green-200 hover:bg-green-100' },
   { value: 'waiting_on_approval', label: 'Waiting on Approval', pill: 'text-purple-700 bg-purple-50 border-purple-200 hover:bg-purple-100' },
   { value: 'waiting_on_client_approval', label: 'Waiting on Client', pill: 'text-orange-700 bg-orange-50 border-orange-200 hover:bg-orange-100' },
-  { value: 'need_changes', label: 'Need Changes', pill: 'text-rose-700 bg-rose-50 border-rose-200 hover:bg-rose-100' },
 ]
 
 const PRIORITIES = [
@@ -336,9 +335,9 @@ export function TaskFormModal({
   function describeNextOwner(toStatus: CrmTaskStatus): string | null {
     if (!task || !appUser) return null
     const targetId =
-      toStatus === 'in_progress' ? appUser.id
+      toStatus === 'in_progress' && task.status === 'waiting_on_approval' ? (task.last_worked_by ?? task.assigned_to ?? null)
+      : toStatus === 'in_progress' ? appUser.id
       : toStatus === 'waiting_on_approval' ? task.created_by
-      : toStatus === 'need_changes' ? (task.last_worked_by ?? task.assigned_to ?? null)
       : toStatus === 'completed' && task.status === 'not_started' ? appUser.id
       : null
     if (!targetId) return null
@@ -746,6 +745,7 @@ export function TaskFormModal({
                   canEditDescription
                   uploadingDescriptionFile={uploadingDescriptionFile}
                   onRefresh={refreshTask}
+                  onCompleteTask={task.status !== 'completed' ? () => handleStatusAction('completed') : undefined}
                   onSaveDescription={saveDescription}
                   onUploadDescriptionFile={uploadDescriptionAttachment}
                   onDeleteDescriptionAttachment={deleteDescriptionAttachment}

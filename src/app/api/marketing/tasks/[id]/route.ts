@@ -409,8 +409,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       })
     }
 
-    // Notify the reassigned worker when a task is sent back for changes
-    const statusChangedToNeedChanges = statusChanged && data.status === 'need_changes'
+    // Notify the reassigned worker when a task is sent back from approval
+    const statusChangedToNeedChanges = statusChanged && data.status === 'in_progress' && current.status === 'waiting_on_approval'
     if (statusChangedToNeedChanges && data.assigned_to && data.assigned_to !== appUser.id) {
       const actor = await fetchActor(appUser.id)
       await dispatchNotification({
@@ -446,22 +446,29 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     }
 
     // Waiting on Approval -> Complete: the requestor completed it themselves, so
-    // notify the person who actually did the work instead of the requestor.
+    // notify everyone who worked the task (last_worked_by + any delegators).
     const completedFromApproval = statusChangedToCompleted && current.status === 'waiting_on_approval'
-    if (completedFromApproval && current.last_worked_by && current.last_worked_by !== appUser.id) {
-      const actor = await fetchActor(appUser.id)
-      await dispatchNotification({
-        definition: taskCompleted,
-        payload: {
-          task_id: data.id,
-          task_title: data.title,
-          actor_id: appUser.id,
-          actor_name: actor.display_name,
-          department: data.department ?? null,
-        },
-        recipientSpec: { userId: current.last_worked_by },
-        suppressUserIds: [appUser.id],
-      })
+    if (completedFromApproval) {
+      const workerIds = [
+        current.last_worked_by,
+        ...((current.delegators as string[] | null) ?? []),
+      ].filter((id): id is string => !!id && id !== appUser.id)
+      const uniqueWorkerIds = [...new Set(workerIds)]
+      if (uniqueWorkerIds.length > 0) {
+        const actor = await fetchActor(appUser.id)
+        await dispatchNotification({
+          definition: taskCompleted,
+          payload: {
+            task_id: data.id,
+            task_title: data.title,
+            actor_id: appUser.id,
+            actor_name: actor.display_name,
+            department: data.department ?? null,
+          },
+          recipientSpec: { userIds: uniqueWorkerIds },
+          suppressUserIds: [appUser.id],
+        })
+      }
     }
   } catch (err) {
     console.error('[notifications] task PATCH dispatch failed:', err)
