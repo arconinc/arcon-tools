@@ -248,6 +248,19 @@ export function TaskFormModal({
     return () => { active = false }
   }, [open, mode, task?.id, appUser?.email, defaultTeamId])
 
+  // Sync form assignment when the task's assignment changes externally (e.g. thread reassign + refresh)
+  // so a subsequent Save Task doesn't overwrite the reassignment with stale form state.
+  useEffect(() => {
+    if (!open || mode !== 'edit') return
+    setForm((prev) => ({
+      ...prev,
+      assigned_to: task?.assigned_to ?? '',
+      team_id: task?.team_id ?? '',
+    }))
+  // ponytail: only track assignment/team — other fields are user-edited and must not reset
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open, mode, task?.assigned_to, task?.team_id])
+
   useEffect(() => {
     if (!openDropdown) return
     function handleClickOutside(e: MouseEvent) {
