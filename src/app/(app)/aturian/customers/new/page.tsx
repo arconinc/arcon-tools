@@ -7,7 +7,6 @@ import { PlacesAddressAutocomplete } from '@/components/crm/PlacesAddressAutocom
 import { PageHeader } from '@/components/layout/PageHeader'
 import { formatPhoneInput } from '@/lib/phone'
 import { useFormValidation, inputCls, selectCls, FieldError } from '@/lib/form-validation'
-import { useAppUser } from '@/components/layout/AppShell'
 import { useApiResource, type CrmUserLite } from '@/hooks'
 import type { PlacesAddress } from '@/lib/google-places'
 import type { AturianCommissionedClient } from '@/types'
@@ -49,8 +48,7 @@ const EMPTY_FORM: CreateForm = {
 
 export default function AturianAddCustomerPage() {
   const router = useRouter()
-  const { user: appUser } = useAppUser()
-  const { data: crmUsersData } = useApiResource<CrmUserLite[]>('/api/marketing/access-groups/customer_supplier_creator/users')
+const { data: crmUsersData } = useApiResource<CrmUserLite[]>('/api/marketing/access-groups/customer_supplier_creator/users')
   const crmUsers = crmUsersData ?? []
 
   const [form, setForm] = useState<CreateForm>(EMPTY_FORM)
@@ -62,11 +60,12 @@ export default function AturianAddCustomerPage() {
   const [createError, setCreateError] = useState<string | null>(null)
 
   useEffect(() => {
-    if (appUser?.id && !form.assigned_to) {
-      setForm((p) => ({ ...p, assigned_to: appUser.id }))
+    if (crmUsers.length > 0 && !form.assigned_to) {
+      const amy = crmUsers.find((u) => u.display_name?.toLowerCase().includes('wheatcraft'))
+      if (amy) setForm((p) => ({ ...p, assigned_to: amy.id }))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [appUser?.id])
+  }, [crmUsers])
 
   function applyAddress(address: PlacesAddress) {
     setForm((p) => ({
