@@ -4,7 +4,7 @@ import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 import { unauthorized, badRequest, serverError, created, ok } from '@/lib/api/respond'
 import { isUserCrmAttachmentUrl } from '@/lib/crm/attachments'
-import { resolveAturianQueueAssignee } from '@/lib/crm/aturian-assignees'
+import { resolveAturianSupplierQueueAssignees } from '@/lib/crm/aturian-assignees'
 import { dispatchNotification, fetchActor } from '@/lib/notifications/dispatch'
 import { aturianCustomerQueueNewEntry } from '@/lib/notifications/registry'
 import { getTeamIdByKey } from '@/lib/team-assignment'
@@ -72,13 +72,14 @@ export async function POST(req: NextRequest) {
   }
 
   const adminClient = createAdminClient()
-  const amy = await resolveAturianQueueAssignee(adminClient)
+  const assignees = await resolveAturianSupplierQueueAssignees(adminClient)
+  const primaryAssignee = assignees[0] ?? null
 
   const { data, error } = await adminClient
     .from('aturian_customer_queue')
     .insert({
       company_name: company_name.trim(),
-      assigned_to: amy?.id || null,
+      assigned_to: primaryAssignee?.id || null,
       is_online_client: !!is_online_client,
       online_uses_cc: is_online_client ? !!online_uses_cc : null,
       commissioned_client,
@@ -134,7 +135,7 @@ export async function POST(req: NextRequest) {
       title: `Add ${company_name.trim()} to Aturian`,
       department: 'Accounting',
       team_id: teamId,
-      assigned_to: amy?.id || null,
+      assigned_to: primaryAssignee?.id || null,
       description: descLines || null,
       status: 'not_started',
       priority: 'medium',
@@ -150,7 +151,7 @@ export async function POST(req: NextRequest) {
     data.task_id = task.id
   }
 
-  if (amy) {
+  if (assignees.length > 0) {
     try {
       const actor = await fetchActor(appUser.id)
       await dispatchNotification({
@@ -164,7 +165,7 @@ export async function POST(req: NextRequest) {
           city: data.city ?? null,
           state: data.state ?? null,
         },
-        recipientSpec: { userId: amy.id },
+        recipientSpec: { userIds: assignees.map((a) => a.id) },
         suppressUserIds: [appUser.id],
       })
     } catch (err) {
