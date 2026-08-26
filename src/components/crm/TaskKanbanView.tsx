@@ -59,7 +59,7 @@ export const KANBAN_COLUMNS: { id: KanbanStatus; label: string; color: string; b
 
 // Statuses that exist but shouldn't get their own column on the board —
 // still fully visible/filterable in the table view.
-const KANBAN_HIDDEN_STATUSES = new Set<KanbanStatus>(['waiting_on_client_approval'])
+const KANBAN_HIDDEN_STATUSES = new Set<KanbanStatus>(['waiting_on_client_approval', 'need_changes'])
 const VISIBLE_KANBAN_COLUMNS = KANBAN_COLUMNS.filter((col) => !KANBAN_HIDDEN_STATUSES.has(col.id))
 
 const PRIORITY_ORDER: Record<KanbanPriority, number> = { high: 0, medium: 1, low: 2 }
