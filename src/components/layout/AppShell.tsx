@@ -100,7 +100,7 @@ const TEAM_KEY_TO_SECTION: Record<string, string> = {
   sales: 'CRM',
   marketing: 'Marketing',
   hr: 'HR',
-  ecommerce: 'Commerce',
+  ecommerce: 'eCommerce',
   warehouse: 'Warehouse',
   az_warehouse: 'Warehouse',
   it: 'Technology',
@@ -198,7 +198,7 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
       ],
     },
     {
-      label: 'Commerce',
+      label: 'eCommerce',
       items: [
         { href: '/stores', label: 'Stores', icon: StoreIcon, adminMatch: true },
         { href: '/documents/ecommerce', label: 'Documents', icon: DocumentIcon, adminMatch: true },

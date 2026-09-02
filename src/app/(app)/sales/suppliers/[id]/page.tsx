@@ -629,7 +629,7 @@ export default function VendorDetailPage() {
         </Link>
         <h1 className="text-xl font-bold text-slate-900 mb-4">New Supplier</h1>
         <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800">
-          <strong>Please Note:</strong> This form is not used to request approval for a new customer in Aturian. It is only for adding customers that have already been approved. If you need approval for a new customer in Aturian, please go to <Link href="/aturian/customers/new" className="font-semibold underline hover:text-amber-900">ATURIAN ERP &gt; Add Customer</Link>.
+          <strong>Please Note:</strong> This form is not used to add a supplier to Aturian. To add a supplier to Aturian, please go to <Link href="/aturian/suppliers/new" className="font-semibold underline hover:text-amber-900">Aturian &gt; Add Supplier</Link>.
         </div>
         <form onSubmit={handleCreate} className="space-y-3">
           {createError && <div className="p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{createError}</div>}
@@ -781,40 +781,6 @@ export default function VendorDetailPage() {
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
             <div className="px-5 py-3 bg-slate-50 border-b border-slate-100"><h2 className="text-sm font-semibold text-slate-700">Tags</h2></div>
             <div className="px-5 py-4 space-y-3">
-              <div className="flex items-start gap-3 p-3.5 bg-purple-50 border border-purple-200 rounded-xl">
-                <svg className="w-4 h-4 text-purple-500 mt-0.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
-                <div className="flex-1 min-w-0">
-                  <p className="text-sm text-purple-800">
-                    If this supplier needs to be added to Aturian, click the button below. This will require additional fields to be filled out completely before saving.
-                  </p>
-                  <button
-                    type="button"
-                    onClick={async () => {
-                      let tag = allCrmTags.find((t) => t.name.trim().toLowerCase() === 'add to aturian')
-                      if (!tag) {
-                        const res = await fetch('/api/marketing/tags', {
-                          method: 'POST',
-                          headers: { 'Content-Type': 'application/json' },
-                          body: JSON.stringify({ name: 'Add to Aturian' }),
-                        })
-                        if (res.ok) {
-                          tag = await res.json()
-                          setAllCrmTags((prev) => [...(prev ?? []), tag!])
-                        }
-                      }
-                      if (tag && !createTagIds.includes(tag.id)) {
-                        setCreateTagIds((prev) => [...prev, tag!.id])
-                      }
-                    }}
-                    disabled={!!allCrmTags.find((t) => t.name.trim().toLowerCase() === 'add to aturian') && createTagIds.includes(allCrmTags.find((t) => t.name.trim().toLowerCase() === 'add to aturian')!.id)}
-                    className="mt-2.5 px-3 py-1.5 text-xs font-semibold bg-purple-700 hover:bg-purple-800 disabled:opacity-50 disabled:cursor-not-allowed text-white rounded-lg transition-colors"
-                  >
-                    {allCrmTags.find((t) => t.name.trim().toLowerCase() === 'add to aturian') && createTagIds.includes(allCrmTags.find((t) => t.name.trim().toLowerCase() === 'add to aturian')!.id)
-                      ? '✓ "Add to Aturian" tag added'
-                      : 'Add "Add to Aturian" Tag'}
-                  </button>
-                </div>
-              </div>
               <TagPicker value={createTagIds} onChange={setCreateTagIds} placeholder="Add tags…" />
             </div>
           </div>
