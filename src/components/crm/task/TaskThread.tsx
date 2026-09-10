@@ -739,10 +739,8 @@ export function TaskThread({
   const [text, setText] = useState('')
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [submitting, setSubmitting] = useState(false)
+  const [reassignTo, setReassignTo] = useState('')
   const fileInputRef = useRef<HTMLInputElement>(null)
-
-  const canReassignToCreator = !!createdBy && assignedTo === currentUserId && createdBy !== currentUserId
-  const assignerName = createdByName || 'the person who assigned it'
 
   // Everyone who has posted in this thread, plus whoever opened it — the
   // reassignment target list for in-thread replies.
@@ -762,6 +760,8 @@ export function TaskThread({
     }
   }
   const participants = [...participantsById.values()]
+  const reassignTargets = participants.filter((p) => p.id !== currentUserId)
+  const canReassign = assignedTo === currentUserId && reassignTargets.length > 0
 
   // Replies can target any message, but the thread only renders one level of
   // nesting — a reply to a reply is grouped under its top-level ancestor so
@@ -797,14 +797,14 @@ export function TaskThread({
     ...history.map((h): ThreadEntry => ({ kind: 'history', at: h.changed_at, entry: h })),
   ].sort((a, b) => new Date(a.at).getTime() - new Date(b.at).getTime())
 
-  async function submitReply(reassignToCreator = false) {
+  async function submitReply(reassignToId?: string) {
     if (!text.trim() && pendingFiles.length === 0) return
     setSubmitting(true)
     try {
       const res = await fetch(`/api/marketing/tasks/${taskId}/comments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ comment: text.trim(), reassign_to: reassignToCreator ? createdBy : undefined }),
+        body: JSON.stringify({ comment: text.trim(), reassign_to: reassignToId || undefined }),
       })
       if (!res.ok) return
       const created = await res.json()
@@ -824,6 +824,7 @@ export function TaskThread({
       }
       setText('')
       setPendingFiles([])
+      setReassignTo('')
       await onRefresh()
     } finally {
       setSubmitting(false)
@@ -896,28 +897,51 @@ export function TaskThread({
         )}
 
         <div className="flex items-center gap-2 flex-wrap">
-          {canReassignToCreator ? (
+          {canReassign && reassignTargets.length === 1 && (
             <button
               type="button"
-              onClick={() => submitReply(true)}
+              onClick={() => submitReply(reassignTargets[0].id)}
               disabled={submitting || (!text.trim() && pendingFiles.length === 0)}
-              title={`Send and reassign to ${assignerName}`}
+              title={`Send and reassign to ${reassignTargets[0].display_name}`}
               className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-lg disabled:opacity-60 transition-colors"
             >
               <ReassignGlyph />
-              {submitting ? 'Sending…' : `Send & Reassign to ${assignerName}`}
-            </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => submitReply(false)}
-              disabled={submitting || (!text.trim() && pendingFiles.length === 0)}
-              className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-lg disabled:opacity-60 transition-colors"
-            >
-              <SendGlyph className="h-3.5 w-3.5" />
-              {submitting ? 'Sending…' : 'Send'}
+              {submitting ? 'Sending…' : `Send & Reassign to ${reassignTargets[0].display_name}`}
             </button>
           )}
+          {canReassign && reassignTargets.length > 1 && (
+            <select
+              value={reassignTo}
+              onChange={(e) => setReassignTo(e.target.value)}
+              className="text-sm border border-purple-300 bg-purple-50 text-purple-800 rounded-lg px-2 py-1.5 focus:outline-none"
+            >
+              <option value="">Reassign to…</option>
+              {reassignTargets.map((p) => (
+                <option key={p.id} value={p.id}>{p.display_name}</option>
+              ))}
+            </select>
+          )}
+          {canReassign && reassignTargets.length > 1 && reassignTo && (
+            <button
+              type="button"
+              onClick={() => submitReply(reassignTo)}
+              disabled={submitting || (!text.trim() && pendingFiles.length === 0)}
+              title={`Send and reassign to ${reassignTargets.find((p) => p.id === reassignTo)?.display_name ?? ''}`}
+              className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-lg disabled:opacity-60 transition-colors"
+            >
+              <ReassignGlyph />
+              {submitting ? 'Sending…' : 'Send & Reassign'}
+            </button>
+          )}
+          <button
+            type="button"
+            onClick={() => submitReply()}
+            disabled={submitting || (!text.trim() && pendingFiles.length === 0)}
+            className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-lg disabled:opacity-60 transition-colors"
+          >
+            <SendGlyph className="h-3.5 w-3.5" />
+            {submitting ? 'Sending…' : 'Send'}
+          </button>
 
           <input
             ref={fileInputRef}
