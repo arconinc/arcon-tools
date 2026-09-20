@@ -11,6 +11,7 @@ import { useApiResource, type CrmUserLite } from '@/hooks'
 import type { PlacesAddress } from '@/lib/google-places'
 import type { AturianCommissionedClient } from '@/types'
 import { uploadAttachment } from '@/lib/crm/upload-attachment'
+import { useAppUser } from '@/components/layout/AppShell'
 
 const COMMISSIONED_CLIENT_OPTIONS: AturianCommissionedClient[] = [
   'Standard', 'Standard with Split', 'Credit Card Store', 'Non-Credit card store',
@@ -48,6 +49,7 @@ const EMPTY_FORM: CreateForm = {
 
 export default function AturianAddCustomerPage() {
   const router = useRouter()
+  const { user: appUser } = useAppUser()
 const { data: crmUsersData } = useApiResource<CrmUserLite[]>('/api/marketing/access-groups/customer_supplier_creator/users')
   const crmUsers = crmUsersData ?? []
 
@@ -61,11 +63,14 @@ const { data: crmUsersData } = useApiResource<CrmUserLite[]>('/api/marketing/acc
 
   useEffect(() => {
     if (crmUsers.length > 0 && !form.assigned_to) {
-      const amy = crmUsers.find((u) => u.display_name?.toLowerCase().includes('wheatcraft'))
-      if (amy) setForm((p) => ({ ...p, assigned_to: amy.id }))
+      // Default to the logged-in user when they're in the list, else Aaron.
+      const self = appUser ? crmUsers.find((u) => u.id === appUser.id) : undefined
+      const fallback = crmUsers.find((u) => u.display_name?.toLowerCase().includes('aaron'))
+      const target = self ?? fallback
+      if (target) setForm((p) => ({ ...p, assigned_to: target.id }))
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [crmUsers])
+  }, [crmUsers, appUser])
 
   function applyAddress(address: PlacesAddress) {
     setForm((p) => ({

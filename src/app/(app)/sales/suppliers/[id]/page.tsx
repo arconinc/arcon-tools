@@ -19,7 +19,7 @@ import { buildSupplierAturianPayload, sendAturianTransferPayload } from '@/lib/a
 import { taskStatusBadge } from '@/lib/badges'
 import { formatDate } from '@/lib/format'
 import type { PlacesAddress, PlacesDetails } from '@/lib/google-places'
-import { uploadAttachment } from '@/lib/crm/upload-attachment'
+import { AttachFileModal } from '@/components/crm/AttachFileModal'
 
 type TagOption = { id: string; name: string; color: string }
 
@@ -306,10 +306,6 @@ export default function VendorDetailPage() {
   const [taxLogging, setTaxLogging] = useState<string | null>(null)
 
   const [attachOpen, setAttachOpen] = useState(false)
-  const [attachLabel, setAttachLabel] = useState('')
-  const [attachFile, setAttachFile] = useState<File | null>(null)
-  const [attachUploading, setAttachUploading] = useState(false)
-  const [attachError, setAttachError] = useState<string | null>(null)
   const [deletingFileId, setDeletingFileId] = useState<string | null>(null)
 
   useEffect(() => {
@@ -464,30 +460,6 @@ export default function VendorDetailPage() {
 
   function startEdit() { if (!vendor) return; setEditForm({ ...vendor }); setEditing(true) }
   function cancelEdit() { setEditing(false); setEditForm({}) }
-  async function handleAttachFile(e: React.FormEvent) {
-    e.preventDefault()
-    if (!vendor || !attachFile || !attachLabel.trim()) return
-    setAttachUploading(true)
-    setAttachError(null)
-    try {
-      const uploaded = await uploadAttachment(attachFile).catch((e: Error) => { setAttachError(e.message ?? 'Upload failed'); return null })
-      if (!uploaded) return
-
-      const saveRes = await fetch(`/api/marketing/vendors/${vendor.id}/files`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ label: attachLabel.trim(), url: uploaded.url }),
-      })
-      const saveData = await saveRes.json()
-      if (!saveRes.ok) { setAttachError(saveData.error ?? 'Save failed'); return }
-
-      setVendor((prev) => prev ? { ...prev, files: [saveData, ...prev.files] } : prev)
-      setAttachOpen(false)
-      setAttachLabel('')
-      setAttachFile(null)
-    } finally { setAttachUploading(false) }
-  }
-
   async function handleDeleteFile(fileId: string) {
     if (!vendor || !confirm('Remove this file?')) return
     setDeletingFileId(fileId)
@@ -1363,7 +1335,7 @@ export default function VendorDetailPage() {
             <div className="px-5 py-3 border-b border-slate-100 bg-slate-50 flex items-center justify-between">
               <h2 className="text-sm font-semibold text-slate-700">Files ({vendor.files.length})</h2>
               <button
-                onClick={() => { setAttachOpen(true); setAttachLabel(''); setAttachFile(null); setAttachError(null) }}
+                onClick={() => setAttachOpen(true)}
                 className="flex items-center gap-1 text-xs text-purple-700 hover:text-purple-900 font-medium"
               >
                 <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1473,63 +1445,14 @@ export default function VendorDetailPage() {
         onClose={() => setTaskCreatedToastOpen(false)}
       />
 
-      {/* Attach File Modal */}
-      {attachOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40">
-          <div className="bg-white rounded-2xl shadow-xl w-full max-w-md mx-4 overflow-hidden">
-            <div className="px-6 py-4 border-b border-slate-100 flex items-center justify-between">
-              <h2 className="text-base font-semibold text-slate-800">Attach File</h2>
-              <button onClick={() => setAttachOpen(false)} className="text-slate-400 hover:text-slate-600">
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12"/>
-                </svg>
-              </button>
-            </div>
-            <form onSubmit={handleAttachFile} className="px-6 py-5 space-y-4">
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">Label</label>
-                <input
-                  type="text"
-                  value={attachLabel}
-                  onChange={(e) => setAttachLabel(e.target.value)}
-                  placeholder="e.g. W9, Price Sheet, Contract"
-                  required
-                  className="w-full border border-slate-200 rounded-lg px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-purple-500"
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-medium text-slate-700 mb-1">File</label>
-                <input
-                  type="file"
-                  required
-                  onChange={(e) => {
-                    const f = e.target.files?.[0] ?? null
-                    setAttachFile(f)
-                    if (f && !attachLabel.trim()) {
-                      setAttachLabel(f.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim())
-                    }
-                  }}
-                  className="w-full text-sm text-slate-600 file:mr-3 file:py-1.5 file:px-3 file:rounded-lg file:border-0 file:text-sm file:font-medium file:bg-purple-50 file:text-purple-700 hover:file:bg-purple-100"
-                />
-                <p className="mt-1 text-xs text-slate-400">Max 10MB</p>
-              </div>
-              {attachError && <p className="text-sm text-red-600">{attachError}</p>}
-              <div className="flex justify-end gap-2 pt-1">
-                <button type="button" onClick={() => setAttachOpen(false)} className="px-4 py-2 text-sm text-slate-600 hover:text-slate-800">
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={attachUploading || !attachFile || !attachLabel.trim()}
-                  className="px-4 py-2 text-sm font-medium bg-purple-700 text-white rounded-lg hover:bg-purple-800 disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {attachUploading ? 'Uploading…' : 'Attach'}
-                </button>
-              </div>
-            </form>
-          </div>
-        </div>
-      )}
+      <AttachFileModal
+        open={attachOpen}
+        onClose={() => setAttachOpen(false)}
+        uploadUrl={`/api/marketing/vendors/${vendor?.id ?? ''}/files`}
+        onAttached={(file) => {
+          setVendor((prev) => prev ? { ...prev, files: [file, ...prev.files] } : prev)
+        }}
+      />
     </div>
   )
 }

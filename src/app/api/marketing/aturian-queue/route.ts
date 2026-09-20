@@ -79,7 +79,8 @@ export async function POST(req: NextRequest) {
     .from('aturian_customer_queue')
     .insert({
       company_name: company_name.trim(),
-      assigned_to: primaryAssignee?.id || null,
+      // Sales Consultant picked by the requestor — not the queue worker (that's the task assignee below)
+      assigned_to: assigned_to || null,
       is_online_client: !!is_online_client,
       online_uses_cc: is_online_client ? !!online_uses_cc : null,
       commissioned_client,

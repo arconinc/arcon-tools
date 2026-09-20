@@ -27,6 +27,7 @@ import { taskStatusBadge } from '@/lib/badges'
 import { formatDate } from '@/lib/format'
 import type { PlacesAddress, PlacesDetails } from '@/lib/google-places'
 import { uploadAttachment } from '@/lib/crm/upload-attachment'
+import { AttachFileModal } from '@/components/crm/AttachFileModal'
 
 type DropdownUser = { id: string; display_name: string; email: string }
 
@@ -52,6 +53,19 @@ export default function CustomerDetailPage() {
   const [activeTab, setActiveTab] = useState<'details' | 'related' | 'activity' | 'artwork' | 'specs'>('details')
   const [createTaskOpen, setCreateTaskOpen] = useState(false)
   const [taskCreatedToastOpen, setTaskCreatedToastOpen] = useState(false)
+
+  const [attachOpen, setAttachOpen] = useState(false)
+  const [deletingFileId, setDeletingFileId] = useState<string | null>(null)
+
+  async function handleDeleteFile(fileId: string) {
+    if (!customer || !confirm('Remove this file?')) return
+    setDeletingFileId(fileId)
+    try {
+      const res = await fetch(`/api/marketing/customers/${customer.id}/files/${fileId}`, { method: 'DELETE' })
+      if (!res.ok) { alert('Delete failed'); return }
+      setCustomer((prev) => prev ? { ...prev, files: prev.files.filter((f) => f.id !== fileId) } : prev)
+    } finally { setDeletingFileId(null) }
+  }
 
   const [tagIds, setTagIds] = useState<string[]>([])
   const [tagSaving, setTagSaving] = useState(false)
@@ -1112,7 +1126,12 @@ export default function CustomerDetailPage() {
             onOpportunityClick={(id) => router.push(`/sales/opportunities/${id}`)}
           />
 
-          <CustomerFilesList files={customer.files} />
+          <CustomerFilesList
+            files={customer.files}
+            onAddClick={() => setAttachOpen(true)}
+            onDelete={handleDeleteFile}
+            deletingFileId={deletingFileId}
+          />
 
           {/* Tasks */}
           <div className="bg-white border border-slate-200 rounded-2xl overflow-hidden">
@@ -1193,6 +1212,15 @@ export default function CustomerDetailPage() {
           onDelete={artworkHook.remove}
         />
       )}
+
+      <AttachFileModal
+        open={attachOpen}
+        onClose={() => setAttachOpen(false)}
+        uploadUrl={`/api/marketing/customers/${customer?.id ?? ''}/files`}
+        onAttached={(file) => {
+          setCustomer((prev) => prev ? { ...prev, files: [file, ...prev.files] } : prev)
+        }}
+      />
 
       <ArtworkUploadModal
         open={showArtworkModal}
