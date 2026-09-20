@@ -455,6 +455,7 @@ export interface NewsArticleSummary {
   reading_time_minutes: number | null
   publish_date: string | null
   author_name: string
+  comment_count?: number
 }
 
 export interface NewsArticlePayload {

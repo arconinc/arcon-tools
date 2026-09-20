@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getPollData } from '@/lib/poll-utils'
+import { getCommentCounts } from '@/lib/news-comments'
 
 // GET /api/news — published articles for all authenticated users
 export async function GET(request: Request) {
@@ -50,10 +51,13 @@ export async function GET(request: Request) {
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
+  const commentCounts = await getCommentCounts((data ?? []).map((a) => a.id))
+
   // Flatten author join
   const articles = await Promise.all((data ?? []).map(async (a) => ({
     ...a,
     poll: a.content_kind === 'poll' ? await getPollData(a.id, appUser.id, false) : undefined,
+    comment_count: commentCounts[a.id] ?? 0,
     author_name: (a.author as unknown as { display_name: string } | null)?.display_name ?? 'Unknown',
     author: undefined,
   })))

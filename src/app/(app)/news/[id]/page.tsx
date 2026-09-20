@@ -7,6 +7,7 @@ import { ArticleTypeBadge } from '@/components/news/ArticleTypeBadge'
 import { formatPublishDate } from '@/lib/news-utils'
 import { getPollData } from '@/lib/poll-utils'
 import { PollBlock } from '@/components/news/PollBlock'
+import { CommentSection } from '@/components/news/CommentSection'
 import type { NewsArticle, ArticleType } from '@/types'
 
 interface PageProps {
@@ -100,6 +101,8 @@ export default async function ArticleReaderPage({ params }: PageProps) {
             <PollBlock articleId={a.id} poll={poll} showVoters={poll.can_view_voters ?? false} variant="detail" />
           </div>
         )}
+
+        <CommentSection articleId={a.id} currentUserId={appUser.id} isAdmin={appUser.is_admin} />
 
         {/* Footer */}
         <div className="mt-12 pt-8 border-t border-slate-100">

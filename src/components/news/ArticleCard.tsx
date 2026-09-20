@@ -12,6 +12,7 @@ interface Props {
 
 export function ArticleCard({ article }: Props) {
   const isPoll = article.content_kind === 'poll' && article.poll
+  const commentCount = article.comment_count ?? 0
 
   return (
     <article
@@ -58,8 +59,22 @@ export function ArticleCard({ article }: Props) {
         ) : article.excerpt && (
           <p className="text-xs text-slate-500 line-clamp-2 mb-3">{article.excerpt}</p>
         )}
-        <div className="text-xs text-slate-400 mt-3">
-          {article.author_name} · {formatPublishDate(article.publish_date)}
+        <div className="flex items-center gap-2 text-xs text-slate-400 mt-3">
+          <span>
+            {article.author_name} · {formatPublishDate(article.publish_date)}
+          </span>
+          {commentCount > 0 && (
+            <Link
+              href={`/news/${article.id}#comments`}
+              className="ml-auto inline-flex items-center gap-1 font-semibold text-purple-700 hover:text-purple-900 rounded focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-purple-400"
+              aria-label={`${commentCount} comment${commentCount === 1 ? '' : 's'} — jump to comments`}
+            >
+              <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+                <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+              </svg>
+              {commentCount}
+            </Link>
+          )}
         </div>
         {isPoll && (
           <Link href={`/news/${article.id}`} className="mt-3 inline-flex text-xs font-semibold text-purple-700 hover:text-purple-900">

@@ -3,6 +3,7 @@ import { createClient } from '@/lib/supabase/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { ArticleCard } from '@/components/news/ArticleCard'
 import { getPollData } from '@/lib/poll-utils'
+import { getCommentCounts } from '@/lib/news-comments'
 import { PageHeader } from '@/components/layout/PageHeader'
 import type { NewsArticleSummary } from '@/types'
 
@@ -33,6 +34,8 @@ export default async function NewsListingPage() {
     .order('publish_date', { ascending: false })
     .limit(50)
 
+  const commentCounts = await getCommentCounts((articles ?? []).map((a) => a.id))
+
   const summaries: NewsArticleSummary[] = await Promise.all((articles ?? []).map(async (a) => ({
     id: a.id,
     title: a.title,
@@ -47,6 +50,7 @@ export default async function NewsListingPage() {
     reading_time_minutes: a.reading_time_minutes,
     publish_date: a.publish_date,
     author_name: (a.author as unknown as { display_name: string } | null)?.display_name ?? 'Unknown',
+    comment_count: commentCounts[a.id] ?? 0,
   })))
 
   return (
