@@ -1,13 +1,6 @@
 import type { CrmTaskStatus } from '@/types'
 import { getTaskNextActions } from '@/lib/task-workflow'
 
-function firstLastInitial(name?: string | null): string {
-  if (!name) return 'Unassigned'
-  const parts = name.trim().split(/\s+/)
-  if (parts.length === 1) return parts[0]
-  return `${parts[0]} ${parts[parts.length - 1][0]}.`
-}
-
 export const FLOW_STEP_IDX: Record<CrmTaskStatus, number> = {
   not_started: 0,
   in_progress: 1,
@@ -71,7 +64,6 @@ function Step({
   clickable,
   onClick,
   label,
-  subLabel,
   circle,
   badge,
 }: {
@@ -80,7 +72,6 @@ function Step({
   clickable: boolean
   onClick?: () => void
   label: string
-  subLabel: string
   circle: React.ReactNode
   badge?: string
 }) {
@@ -95,7 +86,6 @@ function Step({
     <>
       {circle}
       <div className="text-[10.5px] font-semibold text-slate-900 mt-1.5 text-center whitespace-nowrap">{label}</div>
-      <div className="text-[9px] font-medium text-slate-400 mt-0.5 text-center whitespace-nowrap">{subLabel}</div>
       {badge && (
         <div className="mt-1 text-[9.5px] font-semibold text-red-700 bg-red-100 px-1.5 py-0.5 rounded whitespace-nowrap">
           {badge}
@@ -118,15 +108,9 @@ function Step({
 
 interface TaskFlowStepperProps {
   status: CrmTaskStatus
-  ownerName?: string | null
-  requestorName?: string | null
   // Fires with the target status when a clickable step is pressed.
   onAction?: (toStatus: CrmTaskStatus) => void
   disabled?: boolean
-  // Same "who it goes to" preview used by the footer action buttons — needed
-  // so the Completed step's subLabel matches them (completing from
-  // "Not Started"/"In Progress" assigns the actor, not always the requestor).
-  describeNext?: (toStatus: CrmTaskStatus) => string | null
 }
 
 // "Flow of Work" stepper: Not Started → In Progress → Waiting on Approval →
@@ -137,14 +121,10 @@ interface TaskFlowStepperProps {
 // represents a legal next status (per src/lib/task-workflow.ts) is clickable
 // and fires that transition — there's never more than one legal action per
 // step slot, since no two transitions from a given status land on the same index.
-export function TaskFlowStepper({ status, ownerName, requestorName, onAction, disabled = false, describeNext }: TaskFlowStepperProps) {
+export function TaskFlowStepper({ status, onAction, disabled = false }: TaskFlowStepperProps) {
   const idx = STEP_IDX[status] ?? 0
   const isNeedChanges = status === 'need_changes'
   const isCompleted = status === 'completed'
-  const owner = firstLastInitial(ownerName)
-  const requestor = firstLastInitial(requestorName)
-  const completedOwner = describeNext?.('completed') ?? requestorName ?? undefined
-  const completedTo = firstLastInitial(completedOwner)
 
   const nextActions = onAction ? getTaskNextActions(status) : []
   const actionForStep = (stepIdx: number) => nextActions.find((a) => STEP_IDX[a.toStatus] === stepIdx)
@@ -159,7 +139,6 @@ export function TaskFlowStepper({ status, ownerName, requestorName, onAction, di
           clickable={!!actionForStep(0) && !disabled}
           onClick={() => onAction?.(actionForStep(0)!.toStatus)}
           label="Not Started"
-          subLabel={`→ ${owner}`}
           circle={<StepCircle state={idx === 0 ? 'active' : idx > 0 ? 'done' : 'upcoming'} stepIdx={0} />}
         />
 
@@ -171,7 +150,6 @@ export function TaskFlowStepper({ status, ownerName, requestorName, onAction, di
           clickable={!!actionForStep(1) && !disabled}
           onClick={() => onAction?.(actionForStep(1)!.toStatus)}
           label="In Progress"
-          subLabel="→ assign to me"
           circle={<StepCircle state={idx === 1 ? 'active' : idx > 1 ? 'done' : 'upcoming'} stepIdx={1} />}
           badge={isNeedChanges ? '↩ sent back' : undefined}
         />
@@ -184,7 +162,6 @@ export function TaskFlowStepper({ status, ownerName, requestorName, onAction, di
           clickable={!!actionForStep(2) && !disabled}
           onClick={() => onAction?.(actionForStep(2)!.toStatus)}
           label="Waiting on Approval"
-          subLabel={`→ ${requestor}`}
           circle={<StepCircle state={idx === 2 ? 'active' : idx > 2 ? 'done' : 'upcoming'} stepIdx={2} />}
         />
 
@@ -196,7 +173,6 @@ export function TaskFlowStepper({ status, ownerName, requestorName, onAction, di
           clickable={!!actionForStep(3) && !disabled}
           onClick={() => onAction?.(actionForStep(3)!.toStatus)}
           label="Completed"
-          subLabel={`→ ${completedTo}`}
           circle={
             isCompleted ? (
               <div className="w-5 h-5 rounded-full bg-green-600 flex items-center justify-center flex-shrink-0">

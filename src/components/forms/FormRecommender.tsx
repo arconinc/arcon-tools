@@ -24,10 +24,6 @@ export function FormRecommender({
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    fetchForms()
-  }, [])
-
   const fetchForms = async () => {
     try {
       setLoading(true)
@@ -41,6 +37,10 @@ export function FormRecommender({
       setLoading(false)
     }
   }
+
+  useEffect(() => {
+    fetchForms()
+  }, [])
 
   const handleSendForm = async (formId: string) => {
     try {

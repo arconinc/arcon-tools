@@ -1,0 +1,319 @@
+{
+  "scannedAt": "2026-09-29T16:53:48Z",
+  "sessionGapMinutes": 30,
+  "projects": [
+    {
+      "name": "arcon-tools-app",
+      "path": "/Users/mchristianson/local_projects/arcon-tools-app",
+      "repo": "git@github.com:arconinc/arcon-tools.git",
+      "firstModified": "2026-08-03T08:31:36-05:00",
+      "lastModified": "2026-09-28T16:43:53-05:00",
+      "totalHours": 10.86,
+      "sessionCount": 14,
+      "sessions": [
+        {
+          "start": "2026-08-03T08:31:36-05:00",
+          "end": "2026-08-03T08:31:48-05:00",
+          "durationHours": 0.5,
+          "label": "route.ts"
+        },
+        {
+          "start": "2026-08-04T19:25:01-05:00",
+          "end": "2026-08-04T20:25:35-05:00",
+          "durationHours": 1.51,
+          "label": "CrmDetailActions.tsx, page.tsx, useTask.ts, task-participants.ts, +3 more"
+        },
+        {
+          "start": "2026-08-04T21:01:10-05:00",
+          "end": "2026-08-04T21:29:42-05:00",
+          "durationHours": 0.98,
+          "label": "page.tsx, task-enrich.ts, route.ts, useCustomer.ts"
+        },
+        {
+          "start": "2026-08-05T11:03:40-05:00",
+          "end": "2026-08-05T11:03:40-05:00",
+          "durationHours": 0.5,
+          "label": "route.ts"
+        },
+        {
+          "start": "2026-08-05T11:36:11-05:00",
+          "end": "2026-08-05T11:53:53-05:00",
+          "durationHours": 0.79,
+          "label": "UniversalSearch.tsx, section-slugs.ts, page.tsx, sources.ts, +1 more"
+        },
+        {
+          "start": "2026-08-05T12:58:19-05:00",
+          "end": "2026-08-05T13:01:48-05:00",
+          "durationHours": 0.56,
+          "label": "page.tsx, NotificationBell.tsx"
+        },
+        {
+          "start": "2026-08-07T11:04:51-05:00",
+          "end": "2026-08-07T11:18:50-05:00",
+          "durationHours": 0.73,
+          "label": "route.ts, page.tsx"
+        },
+        {
+          "start": "2026-08-11T14:37:23-05:00",
+          "end": "2026-08-11T14:37:23-05:00",
+          "durationHours": 0.5,
+          "label": "registry.ts"
+        },
+        {
+          "start": "2026-08-18T17:36:46-05:00",
+          "end": "2026-08-18T17:38:05-05:00",
+          "durationHours": 0.52,
+          "label": "route.ts, TaskCreatedToast.tsx, page.tsx"
+        },
+        {
+          "start": "2026-08-19T17:06:53-05:00",
+          "end": "2026-08-19T17:06:53-05:00",
+          "durationHours": 0.5,
+          "label": "page.tsx"
+        },
+        {
+          "start": "2026-08-24T14:36:13-05:00",
+          "end": "2026-08-24T15:24:25-05:00",
+          "durationHours": 1.3,
+          "label": "Toast.tsx, upload-attachment.ts, index.ts, task-workflow.ts, +1 more"
+        },
+        {
+          "start": "2026-08-31T19:17:04-05:00",
+          "end": "2026-08-31T19:17:04-05:00",
+          "durationHours": 0.5,
+          "label": "AppShell.tsx"
+        },
+        {
+          "start": "2026-09-20T12:07:12-05:00",
+          "end": "2026-09-20T12:33:18-05:00",
+          "durationHours": 0.94,
+          "label": "route.ts, page.tsx, AttachFileModal.tsx, CustomerFilesList.tsx, +5 more"
+        },
+        {
+          "start": "2026-09-28T16:12:07-05:00",
+          "end": "2026-09-28T16:43:53-05:00",
+          "durationHours": 1.03,
+          "label": "route.ts, TaskFlowStepper.tsx, page.tsx, TaskDetailModal.tsx, +6 more"
+        }
+      ]
+    },
+    {
+      "name": "xrossworld-apps",
+      "path": "/Users/mchristianson/local_projects/xrossworld/github/xrossworld-apps",
+      "repo": "https://github.com/Xrossworld-Org/xrossworld-apps",
+      "firstModified": "2026-08-12T14:49:35-05:00",
+      "lastModified": "2026-09-28T15:51:26-05:00",
+      "totalHours": 20.56,
+      "sessionCount": 32,
+      "sessions": [
+        {
+          "start": "2026-08-12T14:49:35-05:00",
+          "end": "2026-08-12T14:51:12-05:00",
+          "durationHours": 0.53,
+          "label": "Initial Commit; Add ci check"
+        },
+        {
+          "start": "2026-08-13T07:45:57-05:00",
+          "end": "2026-08-13T07:45:57-05:00",
+          "durationHours": 0.5,
+          "label": "Adding API Client"
+        },
+        {
+          "start": "2026-08-13T13:29:17-05:00",
+          "end": "2026-08-13T13:29:17-05:00",
+          "durationHours": 0.5,
+          "label": "Updates to the look to match Figma"
+        },
+        {
+          "start": "2026-08-13T14:22:05-05:00",
+          "end": "2026-08-13T14:22:05-05:00",
+          "durationHours": 0.5,
+          "label": "Updates to the look to match Figma"
+        },
+        {
+          "start": "2026-08-14T14:35:05-05:00",
+          "end": "2026-08-14T15:07:00-05:00",
+          "durationHours": 1.03,
+          "label": "New flow using back end for Oauth and email/password; Forgot Password Flow; Fix tests for new toggle button"
+        },
+        {
+          "start": "2026-08-14T15:56:33-05:00",
+          "end": "2026-08-14T15:59:25-05:00",
+          "durationHours": 0.55,
+          "label": "Code review updates"
+        },
+        {
+          "start": "2026-08-14T16:37:57-05:00",
+          "end": "2026-08-14T16:40:47-05:00",
+          "durationHours": 0.55,
+          "label": "Fix playwright tests; Merge pull request #1 from Xrossworld-Org/add-api-client"
+        },
+        {
+          "start": "2026-08-16T10:51:32-05:00",
+          "end": "2026-08-16T10:54:13-05:00",
+          "durationHours": 0.54,
+          "label": "Add logout button; Merge pull request #2 from Xrossworld-Org/add-api-client"
+        },
+        {
+          "start": "2026-08-18T20:14:51-05:00",
+          "end": "2026-08-18T20:14:51-05:00",
+          "durationHours": 0.5,
+          "label": "Add phone number input and shared app shell"
+        },
+        {
+          "start": "2026-08-19T09:14:28-05:00",
+          "end": "2026-08-19T09:14:28-05:00",
+          "durationHours": 0.5,
+          "label": "Fix build and e2e tests"
+        },
+        {
+          "start": "2026-08-19T13:31:57-05:00",
+          "end": "2026-08-19T13:31:57-05:00",
+          "durationHours": 0.5,
+          "label": "Accept different error routes"
+        },
+        {
+          "start": "2026-08-23T13:39:55-05:00",
+          "end": "2026-08-23T13:39:55-05:00",
+          "durationHours": 0.5,
+          "label": "Mock flow for different types"
+        },
+        {
+          "start": "2026-08-23T15:36:22-05:00",
+          "end": "2026-08-23T15:36:22-05:00",
+          "durationHours": 0.5,
+          "label": "More flows"
+        },
+        {
+          "start": "2026-08-24T17:41:26-05:00",
+          "end": "2026-08-24T17:41:26-05:00",
+          "durationHours": 0.5,
+          "label": "Add sentry"
+        },
+        {
+          "start": "2026-08-24T18:35:19-05:00",
+          "end": "2026-08-24T18:35:19-05:00",
+          "durationHours": 0.5,
+          "label": "Phase 1 of hardening"
+        },
+        {
+          "start": "2026-08-24T19:49:38-05:00",
+          "end": "2026-08-24T19:49:38-05:00",
+          "durationHours": 0.5,
+          "label": "Phase 2 of hardening"
+        },
+        {
+          "start": "2026-08-24T20:38:01-05:00",
+          "end": "2026-08-24T21:22:39-05:00",
+          "durationHours": 1.24,
+          "label": "Rest of the phases of hardening; Design review"
+        },
+        {
+          "start": "2026-08-26T22:11:10-05:00",
+          "end": "2026-08-26T22:11:10-05:00",
+          "durationHours": 0.5,
+          "label": "Resumable flow implementation and onboarding updates"
+        },
+        {
+          "start": "2026-08-27T16:38:59-05:00",
+          "end": "2026-08-27T16:38:59-05:00",
+          "durationHours": 0.5,
+          "label": "Animations"
+        },
+        {
+          "start": "2026-08-27T17:28:28-05:00",
+          "end": "2026-08-27T17:28:28-05:00",
+          "durationHours": 0.5,
+          "label": "Further refine look and field"
+        },
+        {
+          "start": "2026-08-29T11:18:42-05:00",
+          "end": "2026-08-29T11:18:42-05:00",
+          "durationHours": 0.5,
+          "label": "Fix compile error with test"
+        },
+        {
+          "start": "2026-09-09T15:55:20-05:00",
+          "end": "2026-09-09T15:55:20-05:00",
+          "durationHours": 0.5,
+          "label": "Update social accounts handling and enhance development-only safeguards"
+        },
+        {
+          "start": "2026-09-09T16:30:59-05:00",
+          "end": "2026-09-09T16:30:59-05:00",
+          "durationHours": 0.5,
+          "label": "Add assets and tests for welcome modal; extend openAPI admin endpoints"
+        },
+        {
+          "start": "2026-09-12T10:32:09-05:00",
+          "end": "2026-09-12T11:05:34-05:00",
+          "durationHours": 1.06,
+          "label": "Replace onboarding menu with app menu; redesign campaign list to include filters and cards; Redesign campaign detail screen with new layout, status chips, and modals; implement campaign detail view logic; Add ThemeToggle component to AppShell for decorated screens"
+        },
+        {
+          "start": "2026-09-16T12:29:24-05:00",
+          "end": "2026-09-16T12:53:14-05:00",
+          "durationHours": 0.9,
+          "label": "recommendation.test.ts, timing.test.ts, recommendation.ts, rights-response.test.ts, +9 more"
+        },
+        {
+          "start": "2026-09-17T11:59:01-05:00",
+          "end": "2026-09-17T11:59:01-05:00",
+          "durationHours": 0.5,
+          "label": "review-progress.tsx"
+        },
+        {
+          "start": "2026-09-17T12:55:22-05:00",
+          "end": "2026-09-17T13:17:44-05:00",
+          "durationHours": 0.87,
+          "label": "Add draft plan for Creator Portal bid flow detailing API integrations, UI mappings, traps, and implementation steps"
+        },
+        {
+          "start": "2026-09-17T13:50:23-05:00",
+          "end": "2026-09-17T14:07:11-05:00",
+          "durationHours": 0.78,
+          "label": "Add motion system for improved transitions and animations across UI elements; Refactor bid flow: remove DeclineNoteSheet, update paid ads term handling, and add related tests"
+        },
+        {
+          "start": "2026-09-17T22:36:20-05:00",
+          "end": "2026-09-17T22:49:28-05:00",
+          "durationHours": 0.72,
+          "label": "Lock theme switching beyond onboarding steps; redesign app menu and logout button; extract Wave component"
+        },
+        {
+          "start": "2026-09-22T22:18:41-05:00",
+          "end": "2026-09-22T22:32:45-05:00",
+          "durationHours": 0.73,
+          "label": "Refactor theme behavior: lock theme switching per route, remove unnecessary state in ThemeToggle, and centralize configuration in ThemeLock; Redesign bid-launched screen: replace SVG with image asset, update layout for better spacing and mobile responsiveness, and adjust button styling.; Add bid withdrawal functionality to campaign detail: integrate withdrawBid API, update UI states, and enhance tests"
+        },
+        {
+          "start": "2026-09-28T14:06:16-05:00",
+          "end": "2026-09-28T15:10:06-05:00",
+          "durationHours": 1.56,
+          "label": "Integrate Smartsupp chat: implement SmartsuppIdentity component, add user context and error tracking, and preload chat script in layout.; Add internal issue reporting system: connect Smartsupp API, implement `ReportIssueProvider`, redact sensitive URL data, and include tests"
+        },
+        {
+          "start": "2026-09-28T15:51:26-05:00",
+          "end": "2026-09-28T15:51:26-05:00",
+          "durationHours": 0.5,
+          "label": "Refactor issue reporting to replace Smartsupp integration with GitHub API: implement `submitReport`, remove `sendReport`, adjust relevant components, and update tests"
+        }
+      ]
+    }
+  ],
+  "notScanned": [
+    {
+      "name": "moose-knuckle-golf",
+      "path": "/Users/mchristianson/local_projects/moose-knuckle-golf",
+      "reason": "Directory is outside the folders connected to this session (connected folders: arcon-tools-app, xrossworld/github). Skipped, not reported as zero hours."
+    },
+    {
+      "name": "personal",
+      "path": "/Users/mchristianson/local_projects/personal",
+      "reason": "Directory is outside the folders connected to this session (connected folders: arcon-tools-app, xrossworld/github). Skipped, not reported as zero hours."
+    }
+  ],
+  "notes": [
+    "xrossworld-apps has no top-level 'src' directory (it's a pnpm monorepo with apps/*/src, packages/*/src); scanned the whole repo tree instead, excluding node_modules/.git/.next/dist/build/coverage/.turbo, per the pattern **/*.{ts,tsx,js,jsx,css,md}."
+  ]
+}

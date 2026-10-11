@@ -16,7 +16,9 @@ export async function GET() {
   const overrides = new Map<string, boolean>()
   for (const row of data ?? []) overrides.set(row.type, !!row.email)
 
-  const definitions = Object.values(NOTIFICATION_REGISTRY).map(def => ({
+  const definitions = Object.values(NOTIFICATION_REGISTRY)
+    .filter(def => def.type.startsWith('task_'))
+    .map(def => ({
     type: def.type,
     label: def.label,
     description: def.description,

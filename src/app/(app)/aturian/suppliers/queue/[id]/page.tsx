@@ -130,6 +130,7 @@ export default function AturianSupplierQueueDetailPage() {
           </div>
           <div className="px-5 py-4 grid grid-cols-3 gap-4 text-sm">
             <Field label="Requestor" value={entry.requestor_user?.display_name} />
+            <Field label="ASI #" value={entry.asi_number} />
           </div>
         </div>
 

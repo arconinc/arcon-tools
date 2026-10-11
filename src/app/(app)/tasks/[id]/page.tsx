@@ -16,7 +16,7 @@ import { TaskParticipants } from '@/components/crm/task/TaskParticipants'
 import { computeTaskParticipants } from '@/lib/task-participants'
 import { ConfirmButton } from '@/components/ui/ConfirmButton'
 import { CalendarGlyph, TrashGlyph } from '@/components/crm/task/TaskIcons'
-import { TASK_STATUS_LABELS, TASK_STATUS_COLORS, computeTransitionPatch } from '@/lib/task-workflow'
+import { TASK_STATUS_LABELS, TASK_STATUS_COLORS } from '@/lib/task-workflow'
 import type { CrmTaskStatus } from '@/types'
 import { uploadAttachmentWithToast } from '@/lib/crm/upload-attachment'
 
@@ -169,24 +169,6 @@ export default function TaskDetailPage() {
     } catch {
       setTask((t) => t ? { ...t, status: prev } : t)
     }
-  }
-
-  // Preview text for the guided status buttons — who the task will go to next.
-  function describeNextOwner(toStatus: CrmTaskStatus): string | null {
-    if (!task || !appUser) return null
-    const patch = computeTransitionPatch(
-      { assigned_to: task.assigned_to, created_by: task.created_by, last_worked_by: task.last_worked_by },
-      task.status as CrmTaskStatus,
-      toStatus,
-      appUser.id
-    )
-    const targetId = patch.assigned_to
-    if (targetId === undefined) return null
-    if (targetId === appUser.id) return 'you'
-    if (targetId === task.created_user?.id) return task.created_user.display_name
-    if (targetId === task.assigned_user?.id) return task.assigned_user.display_name
-    if (targetId === task.last_worked_user?.id) return task.last_worked_user.display_name
-    return null
   }
 
   async function uploadTaskAttachment(file: File) {
@@ -352,10 +334,7 @@ export default function TaskDetailPage() {
 
         <TaskFlowStepper
           status={task.status as CrmTaskStatus}
-          ownerName={task.assigned_user?.display_name}
-          requestorName={task.created_user?.display_name}
           onAction={quickUpdateStatus}
-          describeNext={describeNextOwner}
         />
       </div>
 

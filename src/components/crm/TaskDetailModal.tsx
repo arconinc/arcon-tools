@@ -8,9 +8,12 @@ export function TaskDetailModal({
   onClose,
   onTaskUpdated,
   onTaskDeleted,
+  onOpened,
 }: {
   taskId: string | null
   onClose: () => void
+  // Fires once the task is open — opening is what marks its comments read.
+  onOpened?: (taskId: string) => void
   onTaskUpdated?: (task: TaskFormTask) => void
   onTaskDeleted?: () => void
 }) {
@@ -33,6 +36,9 @@ export function TaskDetailModal({
           return
         }
         setTask(data)
+        fetch(`/api/marketing/tasks/${taskId}/read`, { method: 'POST' })
+          .then(() => { if (active) onOpened?.(taskId) })
+          .catch(() => {})
       })
       .catch(() => {
         if (active) setError('Failed to load task')

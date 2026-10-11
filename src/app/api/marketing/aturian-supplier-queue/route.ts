@@ -52,7 +52,7 @@ export async function POST(req: NextRequest) {
 
   const body = await req.json()
   const {
-    requestor_id, company_name, phone, website,
+    requestor_id, company_name, asi_number, phone, website,
     mailing_address1, mailing_address2, mailing_city, mailing_state, mailing_zip,
     address1, address2, city, state, zip,
     orders_email, ap_email, art_email, sales_rep, paperwork_notes,
@@ -61,6 +61,7 @@ export async function POST(req: NextRequest) {
 
   if (!requestor_id?.trim()) return badRequest('Requestor is required')
   if (!company_name?.trim()) return badRequest('Full Supplier Company Name is required')
+  if (asi_number?.trim() && !/^\d{6,7}$/.test(asi_number.trim())) return badRequest('ASI # must be 6-7 digits')
   if (!mailing_address1?.trim()) return badRequest('Supplier Mailing Address is required')
   if (!mailing_city?.trim()) return badRequest('Supplier Mailing City is required')
   if (!mailing_state?.trim()) return badRequest('Supplier Mailing State is required')
@@ -89,6 +90,7 @@ export async function POST(req: NextRequest) {
     .insert({
       requestor_id: requestor_id.trim(),
       company_name: company_name.trim(),
+      asi_number: asi_number?.trim() || null,
       phone: phone.trim(),
       website: website.trim(),
       mailing_address1: mailing_address1.trim(),
@@ -116,11 +118,23 @@ export async function POST(req: NextRequest) {
 
   if (error) return serverError(error.message)
 
-  const descLines = [
-    `Company: ${company_name.trim()}`,
-    `Phone: ${phone.trim()}`,
-    `Address: ${[address1, city, state, zip].filter(Boolean).join(', ')}`,
-  ].join('\n')
+  const join = (...parts: (string | null | undefined)[]) => parts.map((s) => s?.trim()).filter(Boolean).join(', ')
+  const rows: [string, string | null | undefined][] = [
+    ['Company', company_name],
+    ['ASI #', asi_number],
+    ['Phone', phone],
+    ['Website', website],
+    ['Mailing Address', join(mailing_address1, mailing_address2, mailing_city, mailing_state, mailing_zip)],
+    ['Billing Address', join(address1, address2, city, state, zip)],
+    ['Orders Email', orders_email],
+    ['AP Email', ap_email],
+    ['Art Email', art_email],
+    ['Sales Rep', sales_rep],
+    ['Paperwork Needed', paperwork_notes],
+    ['Paperwork File', paperwork_file_name],
+  ]
+  const details = rows.flatMap(([label, value]) => (value?.trim() ? [{ label, value: value.trim() }] : []))
+  const descLines = details.map((d) => `${d.label}: ${d.value}`).join('\n')
 
   const teamId = await getTeamIdByKey(adminClient, 'accounting')
 
@@ -155,9 +169,7 @@ export async function POST(req: NextRequest) {
           queue_id: data.id,
           company_name: company_name.trim(),
           requestor_name: actor.display_name,
-          phone: data.phone ?? null,
-          city: data.city ?? null,
-          state: data.state ?? null,
+          details,
         },
         recipientSpec: { userIds: assignees.map((a) => a.id) },
         suppressUserIds: [appUser.id],

@@ -1,0 +1,18 @@
+Date,Client,Project,Task,Notes,Hours,First name,Last name
+2026-09-02,Arcon,Arcon,Programming,Fix typo in eCommerce labels; update supplier form instructions,0.5,Matt,Christianson
+2026-09-03,Furball Farm Cat Sanctuary,Shopify Migration,Meetings,FFCS website Zoom meeting,1,Matt,Christianson
+2026-09-08,Furball Farm Cat Sanctuary,Shopify Migration,Development,Explore size-based navigation for in-stock items,2,Matt,Christianson
+2026-09-09,Xrossworld,Client and Creator Portal,Development,Update social accounts handling; add welcome modal assets and tests,1.5,Matt,Christianson
+2026-09-10,Arcon,Arcon,Programming,Enable reassignment of task comments to participants,0.75,Matt,Christianson
+2026-09-10,Furball Farm Cat Sanctuary,Shopify Migration,Meetings,FFCS website Zoom meeting,1,Matt,Christianson
+2026-09-12,Xrossworld,Client and Creator Portal,Development,Redesign campaign list and detail screens; add ThemeToggle to app shell,1.5,Matt,Christianson
+2026-09-17,Furball Farm Cat Sanctuary,Shopify Migration,Meetings,FFCS website Zoom meeting,1,Matt,Christianson
+2026-09-17,Xrossworld,Client and Creator Portal,Development,Add motion system; refactor bid flow and paid ads term handling,1,Matt,Christianson
+2026-09-17,Xrossworld,Client and Creator Portal,Development,Draft Creator Portal bid flow plan,0.5,Matt,Christianson
+2026-09-17,Xrossworld,Client and Creator Portal,Development,Lock theme switching; redesign app menu/logout button; extract Wave component,1.5,Matt,Christianson
+2026-09-20,Arcon,Arcon,Programming,"Add customer/vendor file attachments, self-promo tabs, news comments",2,Matt,Christianson
+2026-09-21,Arcon,Arcon,Programming,Fix sales rep defaulting to Amy for new customers,0.5,Matt,Christianson
+2026-09-22,Xrossworld,Client and Creator Portal,Development,Refactor theme lock; redesign bid-launched screen; add bid withdrawal,1.25,Matt,Christianson
+2026-09-28,Arcon,Arcon,Programming,Add task comment read-tracking and unread counts (CRM tasks),1.5,Matt,Christianson
+2026-09-28,Arcon,Arcon,Programming,Compile Arc notification-type inventory for review,0.5,Matt,Christianson
+2026-09-28,Xrossworld,Client and Creator Portal,Development,Integrate Smartsupp chat; add issue reporting; refactor to GitHub API,2,Matt,Christianson

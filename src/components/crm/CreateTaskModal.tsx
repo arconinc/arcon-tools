@@ -10,7 +10,7 @@ import { TaskParticipants } from '@/components/crm/task/TaskParticipants'
 import { computeTaskParticipants } from '@/lib/task-participants'
 import { TaskFlowStepper } from '@/components/crm/task/TaskFlowStepper'
 import { TASK_STATUS_LABELS, TASK_STATUS_COLORS } from '@/lib/task-workflow'
-import { CalendarGlyph, TrashGlyph, ExternalLinkGlyph, PlusGlyph } from '@/components/crm/task/TaskIcons'
+import { CalendarGlyph, TrashGlyph, ExternalLinkGlyph, PlusGlyph, ChatBubbleGlyph } from '@/components/crm/task/TaskIcons'
 import type { Comment, HistoryEntry, TaskAttachment } from '@/hooks/useTask'
 import type { CrmTask, CrmTaskStatus } from '@/types'
 import { uploadAttachmentWithToast } from '@/lib/crm/upload-attachment'
@@ -344,23 +344,6 @@ export function TaskFormModal({
     }
   }
 
-  // Preview text for the guided status buttons — who the task will go to next.
-  function describeNextOwner(toStatus: CrmTaskStatus): string | null {
-    if (!task || !appUser) return null
-    const targetId =
-      toStatus === 'in_progress' && task.status === 'waiting_on_approval' ? (task.last_worked_by ?? task.assigned_to ?? null)
-      : toStatus === 'in_progress' ? appUser.id
-      : toStatus === 'waiting_on_approval' ? task.created_by
-      : toStatus === 'completed' && task.status === 'not_started' ? appUser.id
-      : null
-    if (!targetId) return null
-    if (targetId === appUser.id) return 'you'
-    if (targetId === task.created_user?.id) return task.created_user.display_name
-    if (targetId === task.assigned_user?.id) return task.assigned_user.display_name
-    if (targetId === task.last_worked_user?.id) return task.last_worked_user.display_name
-    return null
-  }
-
   async function handleDeleteTask() {
     if (!task?.id) return
     setDeleting(true)
@@ -404,8 +387,15 @@ export function TaskFormModal({
     return detail.error ? fallback : detail
   }
 
-  async function handleSubmit(e: FormEvent) {
+  function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    return saveTask()
+  }
+
+  // Thread "Send" already posted the comment — persist the rest of the form and close.
+  const handleSent = () => saveTask()
+
+  async function saveTask() {
     if (!form.title.trim()) {
       setError('Title is required')
       return
@@ -595,6 +585,16 @@ export function TaskFormModal({
               aria-hidden="true"
             />
 
+              {mode === 'edit' && (task?.comments?.length ?? 0) > 0 && (
+                <span
+                  title={`${task?.comments?.length} comment${task?.comments?.length === 1 ? '' : 's'}`}
+                  className="inline-flex items-center gap-1 text-xs font-medium text-slate-500"
+                >
+                  <ChatBubbleGlyph />
+                  {task?.comments?.length}
+                </span>
+              )}
+
               {mode === 'edit' && task?.id && (
                 <Link
                   href={`/tasks/${task.id}`}
@@ -647,11 +647,8 @@ export function TaskFormModal({
         {mode === 'edit' && task && (
           <TaskFlowStepper
             status={task.status as CrmTaskStatus}
-            ownerName={task.assigned_user?.display_name}
-            requestorName={task.created_user?.display_name}
             onAction={handleStatusAction}
             disabled={saving}
-            describeNext={describeNextOwner}
           />
         )}
 
@@ -758,6 +755,7 @@ export function TaskFormModal({
                   canEditDescription
                   uploadingDescriptionFile={uploadingDescriptionFile}
                   onRefresh={refreshTask}
+                  onSent={handleSent}
                   onCompleteTask={task.status !== 'completed' ? () => handleStatusAction('completed') : undefined}
                   onSaveDescription={saveDescription}
                   onUploadDescriptionFile={uploadDescriptionAttachment}

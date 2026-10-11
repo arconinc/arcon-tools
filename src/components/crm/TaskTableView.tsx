@@ -472,7 +472,17 @@ export function TaskTableView({ tasks, loading, total, page, search, onPageChang
         const task = row.original
         return (
           <>
-            <div className="font-medium text-slate-900 truncate">{task.title}</div>
+            <div className="flex items-center gap-2 min-w-0">
+              <div className="font-medium text-slate-900 truncate">{task.title}</div>
+              {(task.unread_comment_count ?? 0) > 0 && (
+                <span
+                  title={`${task.unread_comment_count} new comment${task.unread_comment_count === 1 ? '' : 's'}`}
+                  className="inline-flex h-[18px] min-w-[20px] flex-shrink-0 items-center justify-center rounded-[10px_10px_10px_2px] bg-red-500 px-1.5 text-[10px] font-bold leading-none text-white shadow-sm"
+                >
+                  {task.unread_comment_count}
+                </span>
+              )}
+            </div>
             {task.progress > 0 && task.progress < 100 && (
               <div className="mt-1 w-24 h-1.5 bg-slate-100 rounded-full overflow-hidden">
                 <div className="h-full bg-purple-500 rounded-full" style={{ width: `${task.progress}%` }} />

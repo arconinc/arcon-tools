@@ -1,5 +1,129 @@
 [
   {
+    "version": "1.2.0",
+    "date": "2026-10-11",
+    "title": "v1.2.0 Release",
+    "summary": "Refactor statuses within tasks and other misc updates.",
+    "changes": [
+      {
+        "category": "feature",
+        "description": "Add news comments feature with admin controls and UI integration"
+      },
+      {
+        "category": "feature",
+        "description": "Add tab navigation to Self-promo page with dynamic iframe content"
+      },
+      {
+        "category": "feature",
+        "description": "Add AttachFileModal and API endpoints for managing customer and vendor files"
+      },
+      {
+        "category": "feature",
+        "description": "Enable reassignment of task comments to participants"
+      },
+      {
+        "category": "feature",
+        "description": "Fix typo in eCommerce labels and update supplier form instructions"
+      },
+      {
+        "category": "feature",
+        "description": "Assign to Amy and Jill"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Hide needs changes"
+      },
+      {
+        "category": "feature",
+        "description": "Do not reassign when assigning a comment"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Fix new Customer sales consultant field."
+      },
+      {
+        "category": "bug_fix",
+        "description": "Fix issue with tags dropdown being cut off"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Allow for larger file uploads"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Allow for larger file uploads"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Fix issue with tags dropdown being cut off"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Fix issue with approving PTO requests"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Fix build"
+      },
+      {
+        "category": "feature",
+        "description": "Freely Move Tasks in Progress"
+      },
+      {
+        "category": "feature",
+        "description": "Add name to PTO Confirmation"
+      },
+      {
+        "category": "feature",
+        "description": "Default to on for all emails."
+      },
+      {
+        "category": "feature",
+        "description": "Add logo/artwork when creating a spec sample."
+      },
+      {
+        "category": "feature",
+        "description": "Add Chime"
+      },
+      {
+        "category": "feature",
+        "description": "Allow anyone to view forms"
+      },
+      {
+        "category": "feature",
+        "description": "Universal Search to include Tasks"
+      },
+      {
+        "category": "feature",
+        "description": "Reply to and reassign"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Related tasks"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Make tasks conversational"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Fix double notification when completing"
+      },
+      {
+        "category": "bug_fix",
+        "description": "Vendor relation email link"
+      },
+      {
+        "category": "feature",
+        "description": "Access Group for creating aturian"
+      },
+      {
+        "category": "feature",
+        "description": "Release 1.1"
+      }
+    ]
+  },
+  {
     "version": "1.1.0",
     "date": "2026-08-02",
     "title": "After launch updates 1",

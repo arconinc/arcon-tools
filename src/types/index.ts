@@ -1007,6 +1007,7 @@ export interface AturianCustomerQueueDetail extends AturianCustomerQueueEntry {
 export interface AturianSupplierQueueEntry {
   id: string
   company_name: string
+  asi_number: string | null
   phone: string | null
   website: string | null
   mailing_address1: string | null

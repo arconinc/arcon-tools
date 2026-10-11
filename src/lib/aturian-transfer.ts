@@ -159,6 +159,7 @@ export function buildSupplierAturianPayload(supplier: SupplierTransferSource): A
 type SupplierQueueTransferSource = {
   id: string
   company_name: string
+  asi_number?: string | null
   phone: string | null
   website: string | null
   mailing_address1: string | null
@@ -188,6 +189,7 @@ export function buildSupplierQueuePayload(entry: SupplierQueueTransferSource): A
     exportedAt: new Date().toISOString(),
     fields: {
       name: { label: 'Supplier Name', value: entry.company_name },
+      asi_number: { label: 'ASI #', value: entry.asi_number ?? null },
       phone: { label: 'Phone', value: entry.phone },
       website: { label: 'Website', value: entry.website },
       mailing_address1: { label: 'Mailing Address 1', value: entry.mailing_address1 },

@@ -8,6 +8,9 @@ import { taskAssigned } from '@/lib/notifications/registry'
 import { unauthorized, badRequest, serverError, created, ok } from '@/lib/api/respond'
 import { stripReadOnly } from '@/lib/api/sanitize'
 
+// Comments older than this count as already seen for a task the user never opened.
+const UNREAD_BASELINE = '2026-09-28T00:00:00Z'
+
 function quotePostgrestValue(value: string) {
   return `"${value.replace(/"/g, '\\"')}"`
 }
@@ -258,8 +261,20 @@ export async function GET(req: NextRequest) {
     attCountMap[a.task_id] = (attCountMap[a.task_id] ?? 0) + 1
   }
 
+  // Comments by others since the caller last opened the task, for every task in
+  // the list. Tasks never opened only count comments after UNREAD_BASELINE, so
+  // pre-existing history doesn't show up as unread.
+  const unreadMap: Record<string, number> = {}
+  if (taskIds.length > 0) {
+    const { data: unreadRows } = await adminClient.rpc('unread_comment_counts', {
+      p_task_ids: taskIds, p_user_id: appUser.id, p_baseline: UNREAD_BASELINE,
+    })
+    for (const r of (unreadRows ?? []) as { task_id: string; unread: number }[]) unreadMap[r.task_id] = Number(r.unread)
+  }
+
   const enriched = rows.map((t: any) => ({
     ...t,
+    unread_comment_count: unreadMap[t.id] ?? 0,
     assigned_user_name: t.assigned_to ? (usersMap[t.assigned_to] ?? null) : null,
     created_by_name: t.created_by ? (usersMap[t.created_by] ?? null) : null,
     team_name: t.team_id ? (teamsMap[t.team_id]?.name ?? null) : null,

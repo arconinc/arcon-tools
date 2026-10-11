@@ -42,6 +42,7 @@ export type KanbanTask = {
   created_by_name: string | null
   delegators: string[]
   attachment_count: number
+  unread_comment_count?: number
 }
 
 type DragOverCard = { id: string; half: 'top' | 'bottom' }
@@ -356,6 +357,22 @@ function KanbanCard({
       aria-label={`Open task ${task.title}`}
       className={`kanban-card priority-${task.priority}${isDragging ? ' dragging' : ''}${isUpdating ? ' updating' : ''}${insertClass}`}
     >
+      {(task.unread_comment_count ?? 0) > 0 && (
+        <span
+          title={`${task.unread_comment_count} new comment${task.unread_comment_count === 1 ? '' : 's'}`}
+          style={{
+            position: 'absolute', top: -9, right: -7, zIndex: 2,
+            minWidth: 20, height: 18, padding: '0 6px', boxSizing: 'border-box',
+            display: 'flex', alignItems: 'center', justifyContent: 'center',
+            background: '#ef4444', color: '#fff', fontSize: 10, fontWeight: 700,
+            borderRadius: '10px 10px 10px 2px', boxShadow: '0 1px 3px rgba(0,0,0,0.25)',
+            pointerEvents: 'none',
+          }}
+        >
+          {task.unread_comment_count}
+        </span>
+      )}
+
       {/* Title row */}
       <div style={{ display: 'flex', alignItems: 'flex-start', gap: 7, marginBottom: 8 }}>
         <span style={{ fontSize: 13, fontWeight: 600, color: '#111', lineHeight: 1.4, flex: 1 }}>

@@ -15,6 +15,7 @@ import type { PlacesAddress } from '@/lib/google-places'
 type CreateForm = {
   requestor_id: string
   company_name: string
+  asi_number: string
   phone: string
   website: string
   mailing_address1: string
@@ -35,7 +36,7 @@ type CreateForm = {
 }
 
 const EMPTY_FORM: CreateForm = {
-  requestor_id: '', company_name: '', phone: '', website: '',
+  requestor_id: '', company_name: '', asi_number: '', phone: '', website: '',
   mailing_address1: '', mailing_address2: '', mailing_city: '', mailing_state: '', mailing_zip: '',
   address1: '', address2: '', city: '', state: '', zip: '',
   orders_email: '', ap_email: '', art_email: '', sales_rep: '', paperwork_notes: '',
@@ -118,6 +119,7 @@ export default function AturianAddSupplierPage() {
     const rules = {
       requestor_id: [req('Requestor is required')],
       company_name: [req('Full Supplier Company Name is required')],
+      asi_number: [{ test: (v: string) => !v.trim() || /^\d{6,7}$/.test(v.trim()), message: 'ASI # must be 6-7 digits' }],
       mailing_address1: [req('Supplier Mailing Address is required')],
       mailing_city: [req('Supplier Mailing City is required')],
       mailing_state: [req('Supplier Mailing State is required')],
@@ -145,6 +147,7 @@ export default function AturianAddSupplierPage() {
         body: JSON.stringify({
           requestor_id: form.requestor_id,
           company_name: form.company_name.trim(),
+          asi_number: form.asi_number.trim() || null,
           phone: form.phone,
           website: form.website,
           mailing_address1: form.mailing_address1,
@@ -208,6 +211,13 @@ export default function AturianAddSupplierPage() {
                 onChange={(e) => { setForm((p) => ({ ...p, company_name: e.target.value })); clearError('company_name') }}
                 className={inputCls(errors.company_name)} />
               <FieldError error={errors.company_name} />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">ASI #</label>
+              <input type="text" inputMode="numeric" maxLength={8} value={form.asi_number}
+                onChange={(e) => { setForm((p) => ({ ...p, asi_number: e.target.value.replace(/\D/g, '') })); clearError('asi_number') }}
+                className={inputCls(errors.asi_number)} />
+              <FieldError error={errors.asi_number} />
             </div>
           </div>
         </div>

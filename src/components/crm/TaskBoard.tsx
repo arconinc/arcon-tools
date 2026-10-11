@@ -950,6 +950,7 @@ function TaskBoardInner({ defaultTeamKey, defaultAssignee = 'all' }: TaskBoardPr
       <TaskDetailModal
         taskId={selectedTaskId}
         onClose={() => setSelectedTaskId(null)}
+        onOpened={(id) => setTasks((prev) => prev.map((task) => task.id === id ? { ...task, unread_comment_count: 0 } : task))}
         onTaskUpdated={(updated) => {
           setTasks((prev) => prev.map((task) => task.id === updated.id ? {
             ...task,

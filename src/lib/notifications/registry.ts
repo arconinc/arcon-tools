@@ -954,9 +954,7 @@ export interface AturianSupplierQueueNewEntryPayload {
   queue_id: string
   company_name: string
   requestor_name: string
-  phone: string | null
-  city: string | null
-  state: string | null
+  details: { label: string; value: string }[]
 }
 
 export const aturianSupplierQueueNewEntry: NotificationDefinition<AturianSupplierQueueNewEntryPayload> = {
@@ -971,7 +969,6 @@ export const aturianSupplierQueueNewEntry: NotificationDefinition<AturianSupplie
   }),
   email: (p, recipient) => {
     const firstName = (recipient.display_name ?? '').split(' ')[0] || 'there'
-    const addr = [p.city, p.state].filter(Boolean).join(', ')
     return {
       subject: `New Aturian supplier request: ${p.company_name}`,
       html: renderGenericEmail({
@@ -981,8 +978,7 @@ export const aturianSupplierQueueNewEntry: NotificationDefinition<AturianSupplie
         bodyLines: [
           `<strong>${p.requestor_name}</strong> submitted a new supplier request for the Aturian queue.`,
           `<strong style="font-size:16px;color:#1e293b">${p.company_name}</strong>`,
-          ...(p.phone ? [`<strong>Phone:</strong> ${p.phone}`] : []),
-          ...(addr ? [`<strong>Location:</strong> ${addr}`] : []),
+          ...p.details.filter((d) => d.label !== 'Company').map((d) => `<strong>${d.label}:</strong> ${escapeHtml(d.value)}`),
           `Mark it complete once it's been added, so the other person knows not to duplicate it.`,
         ],
         ctaText: 'View in Supplier Queue',
