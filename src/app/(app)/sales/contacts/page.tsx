@@ -198,6 +198,16 @@ export default function ContactsPage() {
                 label="Filter by tag"
               />
             )}
+            <a
+              href={tagFilter.length === 1 ? `/api/marketing/contacts/export?tag_id=${tagFilter[0]}` : undefined}
+              aria-disabled={tagFilter.length !== 1}
+              title={tagFilter.length === 1 ? 'Download CSV of all contacts with this tag' : 'Select exactly one tag to export'}
+              className={`px-4 py-2 text-sm font-semibold rounded-xl border border-slate-200 bg-white transition-colors ${
+                tagFilter.length === 1 ? 'text-purple-700 hover:bg-purple-50' : 'text-slate-300 pointer-events-none'
+              }`}
+            >
+              Export CSV
+            </a>
           </div>
           <FilterPillGroup
             options={TYPE_OPTIONS}
