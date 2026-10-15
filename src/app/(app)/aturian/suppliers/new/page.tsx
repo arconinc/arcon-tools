@@ -119,7 +119,7 @@ export default function AturianAddSupplierPage() {
     const rules = {
       requestor_id: [req('Requestor is required')],
       company_name: [req('Full Supplier Company Name is required')],
-      asi_number: [{ test: (v: string) => !v.trim() || /^\d{6,7}$/.test(v.trim()), message: 'ASI # must be 6-7 digits' }],
+      asi_number: [req('ASI # is required'), { test: (v: string) => /^\d{6,8}$/.test(v.trim()), message: 'ASI # must be 6-8 digits' }],
       mailing_address1: [req('Supplier Mailing Address is required')],
       mailing_city: [req('Supplier Mailing City is required')],
       mailing_state: [req('Supplier Mailing State is required')],

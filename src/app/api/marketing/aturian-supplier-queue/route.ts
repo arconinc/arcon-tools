@@ -61,7 +61,8 @@ export async function POST(req: NextRequest) {
 
   if (!requestor_id?.trim()) return badRequest('Requestor is required')
   if (!company_name?.trim()) return badRequest('Full Supplier Company Name is required')
-  if (asi_number?.trim() && !/^\d{6,7}$/.test(asi_number.trim())) return badRequest('ASI # must be 6-7 digits')
+  if (!asi_number?.trim()) return badRequest('ASI # is required')
+  if (!/^\d{6,8}$/.test(asi_number.trim())) return badRequest('ASI # must be 6-8 digits')
   if (!mailing_address1?.trim()) return badRequest('Supplier Mailing Address is required')
   if (!mailing_city?.trim()) return badRequest('Supplier Mailing City is required')
   if (!mailing_state?.trim()) return badRequest('Supplier Mailing State is required')
