@@ -119,7 +119,7 @@ export default function AturianAddSupplierPage() {
     const rules = {
       requestor_id: [req('Requestor is required')],
       company_name: [req('Full Supplier Company Name is required')],
-      asi_number: [req('ASI # is required'), { test: (v: string) => /^\d{6,8}$/.test(v.trim()), message: 'ASI # must be 6-8 digits' }],
+      asi_number: [req('ASI # is required'), { test: (v: string) => /^\d{2,}$/.test(v.trim()), message: 'ASI # must be at least 2 digits' }],
       mailing_address1: [req('Supplier Mailing Address is required')],
       mailing_city: [req('Supplier Mailing City is required')],
       mailing_state: [req('Supplier Mailing State is required')],
@@ -214,7 +214,7 @@ export default function AturianAddSupplierPage() {
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-500 uppercase tracking-wide">ASI #</label>
-              <input type="text" inputMode="numeric" maxLength={8} value={form.asi_number}
+              <input type="text" inputMode="numeric" value={form.asi_number}
                 onChange={(e) => { setForm((p) => ({ ...p, asi_number: e.target.value.replace(/\D/g, '') })); clearError('asi_number') }}
                 className={inputCls(errors.asi_number)} />
               <FieldError error={errors.asi_number} />
