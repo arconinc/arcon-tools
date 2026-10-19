@@ -1,8 +1,9 @@
 import { NextRequest, NextResponse } from 'next/server'
+import * as Sentry from '@sentry/nextjs'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
 import { dispatchNotification, fetchActor } from '@/lib/notifications/dispatch'
-import { taskCommentAdded, taskAssigned } from '@/lib/notifications/registry'
+import { taskCommentAdded } from '@/lib/notifications/registry'
 import { stripHtml } from '@/lib/news-utils'
 
 // GET /api/marketing/tasks/[id]/comments
@@ -48,7 +49,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   const { id: taskId } = await params
   const body = await req.json()
-  const { comment, reassignToCreator, reassign_to, parent_comment_id } = body
+  const { comment, parent_comment_id } = body
 
   // Text is optional here — the conversation thread also posts "attach only"
   // replies (files with no message), which upload to this comment row right
@@ -58,27 +59,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   const adminClient = createAdminClient()
   const { data: task, error: taskError } = await adminClient
     .from('crm_tasks')
-    .select('id, title, assigned_to, created_by, department, delegators, team_id, due_date, priority, status, description')
+    .select('id, title, assigned_to, created_by, department')
     .eq('id', taskId)
     .single()
 
   if (taskError || !task) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
-
-  // reassign_to targets any conversation participant; reassignToCreator is the
-  // older "hand it back to whoever assigned it" shortcut — both resolve to the
-  // same reassignment path below.
-  const reassignTarget: string | null = reassignToCreator === true ? task.created_by : (typeof reassign_to === 'string' && reassign_to ? reassign_to : null)
-  const shouldReassign = reassignTarget !== null
-  if (shouldReassign) {
-    if (task.assigned_to !== appUser.id) {
-      return NextResponse.json({ error: 'Only the current assignee can reassign this task.' }, { status: 400 })
-    }
-    if (reassignTarget === appUser.id) {
-      return NextResponse.json({ error: 'Task is already assigned to you.' }, { status: 400 })
-    }
-    const { data: targetUser } = await adminClient.from('users').select('id').eq('id', reassignTarget).single()
-    if (!targetUser) return NextResponse.json({ error: 'Invalid reassignment target.' }, { status: 400 })
-  }
 
   // A reply can target any existing message, but the thread only renders one
   // level of nesting — so a reply-to-a-reply is folded onto its top-level
@@ -109,63 +94,12 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
 
-  if (shouldReassign && reassignTarget) {
-    const changedAt = new Date().toISOString()
-    const { error: reassignError } = await adminClient
-      .from('crm_tasks')
-      .update({
-        assigned_to: reassignTarget,
-        delegators: task.assigned_to
-          ? [...new Set([...(task.delegators ?? []), task.assigned_to])]
-          : task.delegators,
-        updated_at: changedAt,
-      })
-      .eq('id', taskId)
-
-    if (reassignError) {
-      return NextResponse.json({ error: reassignError.message }, { status: 500 })
-    }
-
-    await adminClient.from('crm_task_history').insert({
-      task_id: taskId,
-      user_id: appUser.id,
-      field_changed: 'assigned_to',
-      old_value: task.assigned_to,
-      new_value: reassignTarget,
-      changed_at: changedAt,
-    })
-
-    try {
-      const actor = await fetchActor(appUser.id)
-      await dispatchNotification({
-        definition: taskAssigned,
-        payload: {
-          task_id: taskId,
-          task_title: task.title,
-          actor_id: appUser.id,
-          actor_name: actor.display_name,
-          department: task.department ?? null,
-          team_id: task.team_id ?? null,
-          team_name: null,
-          due_date: task.due_date ?? null,
-          priority: task.priority ?? null,
-          status: task.status ?? null,
-          description: task.description ?? null,
-          fanout_kind: 'user',
-        },
-        recipientSpec: { userId: reassignTarget },
-        suppressUserIds: [appUser.id],
-      })
-    } catch (err) {
-      console.error('[notifications] task reassign dispatch failed:', err)
-    }
-  }
-
-  // Notify the person who assigned the task when someone else adds a comment —
-  // skipped when they're also the reassignment target, since the reassign
-  // notification above already tells them.
+  // Comments never reassign the task — notify both the requestor and the
+  // assignee (minus the commenter) on every message.
   try {
-    if (task.created_by && task.created_by !== appUser.id && reassignTarget !== task.created_by) {
+    const recipientIds = [...new Set([task.created_by, task.assigned_to])]
+      .filter((uid): uid is string => !!uid && uid !== appUser.id)
+    if (recipientIds.length > 0) {
       const actor = await fetchActor(appUser.id)
       const { data: commentRows } = await adminClient
         .from('crm_task_comments')
@@ -198,12 +132,13 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
           })),
           department: task.department ?? null,
         },
-        recipientSpec: { userId: task.created_by },
+        recipientSpec: { userIds: recipientIds },
         suppressUserIds: [appUser.id],
       })
     }
   } catch (err) {
     console.error('[notifications] task comment dispatch failed:', err)
+    Sentry.captureException(err)
   }
 
   return NextResponse.json(data, { status: 201 })

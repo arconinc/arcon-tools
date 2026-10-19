@@ -499,8 +499,8 @@ function TaskBoardInner({ defaultTeamKey, defaultAssignee = 'all' }: TaskBoardPr
     }
 
     // Route the status change through the single-task PATCH endpoint so a
-    // cross-column drag gets the exact same guided-workflow reassignment,
-    // transition validation, and notifications as the status action buttons —
+    // cross-column drag gets the exact same transition validation and
+    // notifications as the status action buttons —
     // the reorder endpoint itself just moves sort_order, no business logic.
     const [, statusRes] = await Promise.all([
       reorderPromise,
@@ -545,9 +545,7 @@ function TaskBoardInner({ defaultTeamKey, defaultAssignee = 'all' }: TaskBoardPr
 
   // ── Row actions (table view) ───────────────────────────────────────────────
 
-  // The action is the target status; reassignment (who it goes to next) is
-  // computed server-side by the guided workflow state machine — see
-  // src/lib/task-workflow.ts and the PATCH handler.
+  // The action is the target status; status changes never reassign the task.
   async function handleRowAction(taskId: string, action: TableRowAction) {
     const task = tasks.find((t) => t.id === taskId)
     if (!task) return

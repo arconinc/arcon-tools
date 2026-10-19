@@ -6,7 +6,7 @@ import { ALL_CATEGORIES } from '@/lib/task-constants'
 import { validateTeamId } from '@/lib/team-assignment'
 import { dispatchNotification, fetchActor } from '@/lib/notifications/dispatch'
 import { taskAssigned, taskCompleted, taskUpdated, taskWaitingOnApproval, taskNeedsChanges } from '@/lib/notifications/registry'
-import { computeTransitionPatch } from '@/lib/task-workflow'
+import { TASK_STATUS_LABELS } from '@/lib/task-workflow'
 import type { CrmTaskStatus } from '@/types'
 
 const TRACKED_FIELDS = ['status', 'assigned_to', 'last_worked_by', 'team_id', 'department', 'priority', 'category', 'due_date', 'progress'] as const
@@ -256,22 +256,6 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     return NextResponse.json({ error: 'Invalid team' }, { status: 400 })
   }
 
-  // Status moves are unrestricted (any stage to any stage) — compute the
-  // reassignment a transition triggers (see src/lib/task-workflow.ts). Clients
-  // only ever send the target status, never assigned_to alongside it; the
-  // server decides who the task goes to next.
-  if ('status' in safeUpdates && safeUpdates.status !== current.status) {
-    const fromStatus = current.status as CrmTaskStatus
-    const toStatus = safeUpdates.status as CrmTaskStatus
-    const reassignment = computeTransitionPatch(
-      { assigned_to: current.assigned_to, created_by: current.created_by, last_worked_by: current.last_worked_by },
-      fromStatus,
-      toStatus,
-      appUser.id
-    )
-    Object.assign(safeUpdates, reassignment)
-  }
-
   // Insert history rows for each tracked field that changed
   const historyInserts = TRACKED_FIELDS
     .filter((field) => field in safeUpdates && String(safeUpdates[field]) !== String(current[field]))
@@ -319,11 +303,9 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       'team_id' in safeUpdates && data.team_id !== current.team_id
     const statusChanged = 'status' in safeUpdates && data.status !== current.status
 
-    // When a status transition (waiting_on_approval / need_changes / completed) is what
-    // moved assigned_to, that transition has its own dedicated notification below — don't
-    // also fire the generic "assigned you a task" one for the same action, or the recipient
-    // gets two emails for one click. Direct reassignment (no status change) is unaffected.
-    if (newAssigneeChanged && !statusChanged && data.assigned_to && data.assigned_to !== appUser.id) {
+    // assigned_to only ever changes via the manual assignee dropdown — status
+    // changes never move the task.
+    if (newAssigneeChanged && data.assigned_to && data.assigned_to !== appUser.id) {
       const actor = await fetchActor(appUser.id)
       await dispatchNotification({
         definition: taskAssigned,
@@ -391,83 +373,37 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
       })
     }
 
-    // Notify the requestor when a task is sent to them for review
-    const statusChangedToWaitingOnApproval = statusChanged && data.status === 'waiting_on_approval'
-    if (statusChangedToWaitingOnApproval && current.created_by && current.created_by !== appUser.id) {
-      const actor = await fetchActor(appUser.id)
-      await dispatchNotification({
-        definition: taskWaitingOnApproval,
-        payload: {
-          task_id: data.id,
-          task_title: data.title,
-          actor_id: appUser.id,
-          actor_name: actor.display_name,
-          department: data.department ?? null,
-        },
-        recipientSpec: { userId: current.created_by },
-        suppressUserIds: [appUser.id],
-      })
-    }
-
-    // Notify the reassigned worker when a task is sent back from approval
-    const statusChangedToNeedChanges = statusChanged && data.status === 'in_progress' && current.status === 'waiting_on_approval'
-    if (statusChangedToNeedChanges && data.assigned_to && data.assigned_to !== appUser.id) {
-      const actor = await fetchActor(appUser.id)
-      await dispatchNotification({
-        definition: taskNeedsChanges,
-        payload: {
-          task_id: data.id,
-          task_title: data.title,
-          actor_id: appUser.id,
-          actor_name: actor.display_name,
-          department: data.department ?? null,
-        },
-        recipientSpec: { userId: data.assigned_to },
-        suppressUserIds: [appUser.id],
-      })
-    }
-
-    // Notify the task creator when someone else marks the task complete directly
-    const statusChangedToCompleted = statusChanged && data.status === 'completed'
-    if (statusChangedToCompleted && current.created_by && current.created_by !== appUser.id) {
-      const actor = await fetchActor(appUser.id)
-      await dispatchNotification({
-        definition: taskCompleted,
-        payload: {
-          task_id: data.id,
-          task_title: data.title,
-          actor_id: appUser.id,
-          actor_name: actor.display_name,
-          department: data.department ?? null,
-        },
-        recipientSpec: { userId: current.created_by },
-        suppressUserIds: [appUser.id],
-      })
-    }
-
-    // Waiting on Approval -> Complete: the requestor completed it themselves, so
-    // notify everyone who worked the task (last_worked_by + any delegators).
-    const completedFromApproval = statusChangedToCompleted && current.status === 'waiting_on_approval'
-    if (completedFromApproval) {
-      const workerIds = [
-        current.last_worked_by,
-        ...((current.delegators as string[] | null) ?? []),
-      ].filter((id): id is string => !!id && id !== appUser.id)
-      const uniqueWorkerIds = [...new Set(workerIds)]
-      if (uniqueWorkerIds.length > 0) {
+    // Status changes never move the task — notify both the requestor and the
+    // assignee (minus whoever made the change) so neither loses track of it.
+    if (statusChanged) {
+      const recipientIds = [...new Set([current.created_by, data.assigned_to])]
+        .filter((uid): uid is string => !!uid && uid !== appUser.id)
+      if (recipientIds.length > 0) {
         const actor = await fetchActor(appUser.id)
-        await dispatchNotification({
-          definition: taskCompleted,
-          payload: {
-            task_id: data.id,
-            task_title: data.title,
-            actor_id: appUser.id,
-            actor_name: actor.display_name,
-            department: data.department ?? null,
-          },
-          recipientSpec: { userIds: uniqueWorkerIds },
-          suppressUserIds: [appUser.id],
-        })
+        const payload = {
+          task_id: data.id,
+          task_title: data.title,
+          actor_id: appUser.id,
+          actor_name: actor.display_name,
+          department: data.department ?? null,
+        }
+        const recipientSpec = { userIds: recipientIds }
+        const suppressUserIds = [appUser.id]
+        if (data.status === 'waiting_on_approval') {
+          await dispatchNotification({ definition: taskWaitingOnApproval, payload, recipientSpec, suppressUserIds })
+        } else if (data.status === 'in_progress' && current.status === 'waiting_on_approval') {
+          await dispatchNotification({ definition: taskNeedsChanges, payload, recipientSpec, suppressUserIds })
+        } else if (data.status === 'completed') {
+          await dispatchNotification({ definition: taskCompleted, payload, recipientSpec, suppressUserIds })
+        } else {
+          const statusLabel = TASK_STATUS_LABELS[data.status as CrmTaskStatus] ?? data.status
+          await dispatchNotification({
+            definition: taskUpdated,
+            payload: { ...payload, changed_fields: [`status → ${statusLabel}`] },
+            recipientSpec,
+            suppressUserIds,
+          })
+        }
       }
     }
   } catch (err) {

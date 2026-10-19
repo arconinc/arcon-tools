@@ -248,7 +248,7 @@ export function TaskFormModal({
     return () => { active = false }
   }, [open, mode, task?.id, appUser?.email, defaultTeamId])
 
-  // Sync form assignment when the task's assignment changes externally (e.g. thread reassign + refresh)
+  // Sync form assignment when the task's assignment changes externally (e.g. quick-edit panel + refresh)
   // so a subsequent Save Task doesn't overwrite the reassignment with stale form state.
   useEffect(() => {
     if (!open || mode !== 'edit') return
@@ -319,9 +319,7 @@ export function TaskFormModal({
     await refreshTask()
   }
 
-  // The action is just the target status — reassignment (who it goes to next)
-  // is computed server-side by the guided workflow state machine. See
-  // src/lib/task-workflow.ts and the PATCH handler.
+  // The action is just the target status; status changes never reassign the task.
   async function handleStatusAction(toStatus: CrmTaskStatus) {
     if (!task?.id) return
     setSaving(true)
@@ -750,8 +748,6 @@ export function TaskFormModal({
                   currentUserName={appUser?.display_name ?? ''}
                   currentUserAvatarUrl={appUser?.avatar_url}
                   isAdmin={appUser?.is_admin ?? false}
-                  assignedTo={task.assigned_to}
-                  createdBy={task.created_by}
                   canEditDescription
                   uploadingDescriptionFile={uploadingDescriptionFile}
                   onRefresh={refreshTask}
