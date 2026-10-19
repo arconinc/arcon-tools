@@ -164,7 +164,7 @@ Two-table: `spec_ideas` (catalog) + `spec_samples` (per-customer records). Stora
 
 ## Testing & Verification
 
-No unit test suite. Playwright available (`playwright.config.ts`). **Done when:** TS would compile cleanly, ESLint clean, and user has verified the feature manually at http://localhost:3000. For auth/RBAC changes: verify both admin and non-admin paths. For private files: verify signed URL path is used.
+Write unit tests for every feature/bugfix (no runner set up yet — ask before adding one). Playwright available (`playwright.config.ts`). **Done when:** TS would compile cleanly, ESLint clean, and user has verified the feature manually at http://localhost:3000. For auth/RBAC changes: verify both admin and non-admin paths. For private files: verify signed URL path is used.
 
 ## Agent Workflow
 
@@ -174,6 +174,13 @@ No unit test suite. Playwright available (`playwright.config.ts`). **Done when:*
 4. Touch only files directly related to the requirement.
 5. After changes: summarize what changed, which files, what user should test.
 6. New API routes → follow auth pattern exactly. New notification types → follow registry pattern.
+
+### Change → Commit Flow (required)
+1. Build the change + unit tests. Leave it **uncommitted on `main`**: no branches, PRs, or worktrees unless explicitly asked.
+2. User tests manually. Then ask: "Ready to commit?" and "How long did this take to build?"
+3. **No** → keep iterating until it works as expected. **Yes** → one commit on `main` with a detailed message that includes the build-time estimate.
+4. Automatically code-review that commit and list the findings. The user picks which to fix.
+5. After the fixes are approved, ask before committing and pushing to `main`.
 
 ## Safety, Security, and Do-Not Rules
 
