@@ -1,53 +1,9 @@
 import type { CrmTaskStatus } from '@/types'
 
-// Single source of truth for the task-status reassignment logic and the
-// UI labels/emphasis for the "next action" buttons. Shared by the PATCH route
-// and every task UI surface (detail page, modal, kanban/table row actions) so
-// there is exactly one place that knows the rules. Status moves themselves are
-// unrestricted — a task can go from any stage to any stage.
-
-export interface TaskAssignmentFields {
-  assigned_to: string | null
-  created_by: string
-  last_worked_by: string | null
-}
-
-// Computes the assigned_to/last_worked_by changes a status transition triggers.
-// Returns only the keys that should change — spread onto the update payload.
-export function computeTransitionPatch(
-  task: TaskAssignmentFields,
-  fromStatus: CrmTaskStatus,
-  toStatus: CrmTaskStatus,
-  actorId: string
-): { assigned_to?: string | null; last_worked_by?: string | null } {
-  const patch: { assigned_to?: string | null; last_worked_by?: string | null } = {}
-
-  if (toStatus === 'in_progress') {
-    if (fromStatus === 'waiting_on_approval') {
-      // Send back — return to whoever last worked it.
-      patch.assigned_to = task.last_worked_by ?? task.assigned_to ?? actorId
-    } else {
-      // Picking up the task — the actor becomes the current owner.
-      patch.assigned_to = actorId
-    }
-  } else if (toStatus === 'waiting_on_approval') {
-    // Whoever was working it is recorded as last_worked_by so a later
-    // "Needs Changes" knows who to send it back to; ownership shifts to the requestor.
-    patch.last_worked_by = task.assigned_to ?? actorId
-    patch.assigned_to = task.created_by
-  } else if (toStatus === 'completed') {
-    // When completing from the approval flow, keep the task with whoever did
-    // the work (last_worked_by) so it appears in their completed view.
-    // Otherwise hand back to the creator.
-    if (fromStatus === 'waiting_on_approval' && task.last_worked_by) {
-      patch.assigned_to = task.last_worked_by
-    } else {
-      patch.assigned_to = task.created_by
-    }
-  }
-
-  return patch
-}
+// Single source of truth for the UI labels/emphasis for the "next action"
+// buttons, shared by every task UI surface (detail page, modal, kanban/table
+// row actions). Status moves are unrestricted — a task can go from any stage
+// to any stage — and never change who the task is assigned to.
 
 export const TASK_STATUS_LABELS: Record<CrmTaskStatus, string> = {
   not_started: 'Not Started',

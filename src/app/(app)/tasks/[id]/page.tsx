@@ -627,8 +627,6 @@ export default function TaskDetailPage() {
           currentUserName={appUser.display_name}
           currentUserAvatarUrl={appUser.avatar_url}
           isAdmin={appUser.is_admin}
-          assignedTo={task.assigned_to}
-          createdBy={task.created_by}
           canEditDescription
           uploadingDescriptionFile={uploadingAttachment}
           onRefresh={refetch}
