@@ -4,9 +4,52 @@
 :root {
   --background: #f5f5f5;
   --foreground: #111111;
-  --arcon-purple: #6b1e98;
+  --arcon-purple: var(--color-brand-600);
   --arcon-purple-light: #f3e8ff;
   --arcon-sidebar: #111111;
+}
+
+/* ── Design tokens ── Brand scale is built around #6b1e98 (brand-600).
+   Exposed as Tailwind utilities (bg-brand-600, text-ink-500, …) and CSS vars.
+   Additive only: existing hex values migrate to these screen by screen. */
+@theme {
+  --color-brand-50: #f8f1fc;
+  --color-brand-100: #f3e8ff;
+  --color-brand-200: #e4c9f5;
+  --color-brand-300: #cb9ae9;
+  --color-brand-400: #a95fd6;
+  --color-brand-500: #8a33bd;
+  --color-brand-600: #6b1e98;
+  --color-brand-700: #5a1880;
+  --color-brand-800: #481466;
+  --color-brand-900: #36104d;
+
+  --color-ink-900: #0f172a;
+  --color-ink-700: #334155;
+  --color-ink-500: #64748b;
+  --color-ink-400: #94a3b8;
+  --color-ink-200: #e2e8f0;
+  --color-ink-100: #f1f5f9;
+
+  --color-danger-600: #dc2626;
+  --color-danger-50: #fef2f2;
+  --color-success-600: #16a34a;
+  --color-success-50: #f0fdf4;
+  --color-warn-600: #d97706;
+  --color-warn-50: #fffbeb;
+}
+
+/* Keyboard focus ring for interactive controls. Unlayered, so it wins over
+   Tailwind's focus:outline-none; inline style={{ outline: 'none' }} still overrides.
+   Text inputs are excluded since they already carry their own focus styles. */
+a:focus-visible,
+button:focus-visible,
+summary:focus-visible,
+[role="button"]:focus-visible,
+[role="tab"]:focus-visible,
+[tabindex]:not([tabindex="-1"]):focus-visible {
+  outline: 2px solid var(--color-brand-600);
+  outline-offset: 2px;
 }
 
 body {

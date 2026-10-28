@@ -170,14 +170,12 @@ Write unit tests for every feature/bugfix (no runner set up yet — ask before a
 
 1. Read target files before editing — never edit from memory.
 2. For multi-file changes, identify all affected files before touching any.
-3. Smallest diff that satisfies the requirement. No speculative abstractions.
-4. Touch only files directly related to the requirement.
-5. After changes: summarize what changed, which files, what user should test.
-6. New API routes → follow auth pattern exactly. New notification types → follow registry pattern.
+3. Smallest diff that satisfies the requirement; touch only directly related files. No speculative abstractions.
+4. New API routes → follow auth pattern exactly. New notification types → follow registry pattern.
 
 ### Change → Commit Flow (required)
 1. Build the change + unit tests. Leave it **uncommitted on `main`**: no branches, PRs, or worktrees unless explicitly asked.
-2. User tests manually. Then ask: "Ready to commit?" and "How long did this take to build?"
+2. Summarize what changed, which files, and what to test. User tests manually. Then ask: "Ready to commit?" and "How long did this take to build?"
 3. **No** → keep iterating until it works as expected. **Yes** → one commit on `main` with a detailed message that includes the build-time estimate.
 4. Automatically code-review that commit and list the findings. The user picks which to fix.
 5. After the fixes are approved, ask before committing and pushing to `main`.
