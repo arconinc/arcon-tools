@@ -1,6 +1,8 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { NextRequest, NextResponse, after } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
+import { analyzeArtwork } from '@/lib/artwork/analyze'
+import { canUseAsLogo } from '@/lib/artwork/logo'
 
 // GET /api/marketing/artwork?customer_id=
 export async function GET(req: NextRequest) {
@@ -75,6 +77,9 @@ export async function POST(req: NextRequest) {
     .single()
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
+
+  // Hat mockups: check new logos for background boxes and embroidery problems after responding.
+  if (canUseAsLogo(data)) after(() => analyzeArtwork(data.id))
 
   return NextResponse.json(data, { status: 201 })
 }

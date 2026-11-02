@@ -28,6 +28,7 @@ import { formatDate } from '@/lib/format'
 import type { PlacesAddress, PlacesDetails } from '@/lib/google-places'
 import { uploadAttachment } from '@/lib/crm/upload-attachment'
 import { AttachFileModal } from '@/components/crm/AttachFileModal'
+import { CustomerMockupsGrid } from '@/components/mockups/CustomerMockupsGrid'
 
 type DropdownUser = { id: string; display_name: string; email: string }
 
@@ -1202,15 +1203,18 @@ export default function CustomerDetailPage() {
 
       {/* ── Artwork Tab ── */}
       {activeTab === 'artwork' && (
-        <CustomerArtworkGrid
-          artwork={artworkHook.artwork}
-          loaded={artworkHook.loaded}
-          loading={artworkHook.loading}
-          vectorizingIds={artworkHook.vectorizingIds}
-          onAdd={() => setShowArtworkModal(true)}
-          onVectorize={artworkHook.vectorize}
-          onDelete={artworkHook.remove}
-        />
+        <>
+          <CustomerArtworkGrid
+            artwork={artworkHook.artwork}
+            loaded={artworkHook.loaded}
+            loading={artworkHook.loading}
+            vectorizingIds={artworkHook.vectorizingIds}
+            onAdd={() => setShowArtworkModal(true)}
+            onVectorize={artworkHook.vectorize}
+            onDelete={artworkHook.remove}
+          />
+          {customer?.id && <CustomerMockupsGrid customerId={customer.id} />}
+        </>
       )}
 
       <AttachFileModal

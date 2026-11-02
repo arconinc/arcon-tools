@@ -28,6 +28,8 @@ const FEATURE_VARS: Record<string, string[]> = {
   addon: ['ADDON_API_KEY'],
   promoBullit: ['PROMOBULLIT_AUTH'],
   expenseReports: ['EXPENSE_REPORT_REVIEWER_ID'],
+  hatMockups: ['ANTHROPIC_API_KEY'],
+  hatMockupsRealism: ['GEMINI_API_KEY'], // optional: realistic renders only show when set
 }
 
 // Optional vars with sensible defaults

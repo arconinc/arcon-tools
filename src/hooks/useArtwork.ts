@@ -1,6 +1,7 @@
 'use client'
 
 import { useState } from 'react'
+import type { ArtworkAnalysis } from '@/lib/artwork/warnings'
 
 export type ArtworkItem = {
   id: string
@@ -19,6 +20,7 @@ export type ArtworkItem = {
   is_drive_link: boolean
   dropbox_url: string | null
   is_dropbox_file: boolean
+  ai_analysis?: ArtworkAnalysis | null
   added_by: string
   created_at: string
   updated_at: string

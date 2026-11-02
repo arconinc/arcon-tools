@@ -2,6 +2,7 @@
 
 import { formatBytes } from '@/lib/format'
 import type { ArtworkItem } from '@/hooks/useArtwork'
+import { WARNING_LABELS } from '@/lib/artwork/warnings'
 
 type Props = {
   artwork: ArtworkItem[]
@@ -93,6 +94,14 @@ export function CustomerArtworkGrid({ artwork, loaded, loading, vectorizingIds, 
                   <div className="text-sm font-semibold text-slate-800 truncate" title={item.name}>{item.name}</div>
                   {item.description && (
                     <div className="text-xs text-slate-500 line-clamp-2">{item.description}</div>
+                  )}
+                  {!!item.ai_analysis?.warnings?.length && (
+                    <div
+                      className="text-xs font-medium text-amber-800 bg-amber-50 border border-amber-200 rounded px-1.5 py-0.5 w-fit"
+                      title={item.ai_analysis.notes || undefined}
+                    >
+                      Embroidery: {item.ai_analysis.warnings.map((w) => WARNING_LABELS[w]).join(', ')}
+                    </div>
                   )}
                   <div className="text-xs text-slate-400 mt-auto pt-1 space-y-0.5">
                     {item.is_drive_link
