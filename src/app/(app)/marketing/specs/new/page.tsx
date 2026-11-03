@@ -7,6 +7,7 @@ import { SpecIdea } from '@/types'
 import { IdeaCard } from '@/components/specs/IdeaCard'
 import { ArtworkUploadModal } from '@/components/crm/customer/ArtworkUploadModal'
 import type { ArtworkItem } from '@/hooks/useArtwork'
+import { findDefaultSpecCsrId } from '@/lib/crm/spec-defaults'
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -174,7 +175,10 @@ export default function NewSpecWizard() {
   // ── Fetch users ────────────────────────────────────────────────────────────
   useEffect(() => {
     fetch('/api/marketing/users').then(r => r.json()).then((d: UserOption[]) => {
-      if (Array.isArray(d)) setUsers(d)
+      if (!Array.isArray(d)) return
+      setUsers(d)
+      // Default CSR to Ella; user can still change it in step 3
+      setAssignedCsrId(prev => prev || findDefaultSpecCsrId(d))
     })
   }, [])
 
@@ -970,7 +974,7 @@ export default function NewSpecWizard() {
               <div>
                 <label className="wiz-label">Assigned CSR</label>
                 <select className="wiz-input" value={assignedCsrId} onChange={e => setAssignedCsrId(e.target.value)}>
-                  <option value="">— Me (default) —</option>
+                  <option value="">— Me —</option>
                   {users.map(u => <option key={u.id} value={u.id}>{u.display_name}</option>)}
                 </select>
               </div>
