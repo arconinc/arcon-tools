@@ -1,7 +1,10 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { TaskFormModal, type TaskFormTask } from '@/components/crm/CreateTaskModal'
+import { mergePolledThread } from '@/lib/crm/task-poll'
+
+const POLL_MS = 10_000
 
 export function TaskDetailModal({
   taskId,
@@ -20,10 +23,40 @@ export function TaskDetailModal({
   const [task, setTask] = useState<TaskFormTask | null>(null)
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
+  const [newCommentIds, setNewCommentIds] = useState<Set<string>>(new Set())
+  const taskRef = useRef<TaskFormTask | null>(null)
+  taskRef.current = task
+
+  // While open, pull in the thread (messages, history, attachments) from
+  // others. Only those fields are merged, so form edits and the composer
+  // draft are never touched. New messages get highlighted and marked read.
+  useEffect(() => {
+    if (!taskId) return
+    const id = setInterval(async () => {
+      const before = taskRef.current
+      if (document.hidden || !before || before.id !== taskId) return
+      try {
+        const res = await fetch(`/api/marketing/tasks/${taskId}`)
+        if (!res.ok) return
+        const fresh = await res.json()
+        // Skip if the task changed locally (reply/save) while this was in flight.
+        if (taskRef.current !== before) return
+        const { task: merged, newCommentIds: added } = mergePolledThread(before, fresh)
+        if (merged === before) return
+        setTask(merged)
+        if (added.length) {
+          setNewCommentIds((prev) => new Set([...prev, ...added]))
+          fetch(`/api/marketing/tasks/${taskId}/read`, { method: 'POST' }).catch(() => {})
+        }
+      } catch {}
+    }, POLL_MS)
+    return () => clearInterval(id)
+  }, [taskId])
 
   useEffect(() => {
     if (!taskId) return
     let active = true
+    setNewCommentIds(new Set())
     setTask(null)
     setLoading(true)
     setError(null)
@@ -91,6 +124,7 @@ export function TaskDetailModal({
       open={true}
       mode="edit"
       task={task}
+      newCommentIds={newCommentIds}
       onClose={onClose}
       onSaved={(savedTask) => {
         setTask(savedTask)

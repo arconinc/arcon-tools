@@ -378,12 +378,14 @@ function ThreadCommentItem({
   currentUserId,
   isAdmin,
   onRefresh,
+  isNew = false,
 }: {
   comment: Comment
   taskId: string
   currentUserId: string
   isAdmin: boolean
   onRefresh: () => void
+  isNew?: boolean
 }) {
   async function deleteComment() {
     await fetch(`/api/marketing/tasks/${taskId}/comments/${comment.id}`, { method: 'DELETE' })
@@ -396,7 +398,8 @@ function ThreadCommentItem({
   }
 
   return (
-    <div className="bg-white border border-slate-200 rounded-2xl p-5">
+    <div className={`bg-white border rounded-2xl p-5 transition-colors ${isNew ? 'border-purple-300 ring-2 ring-purple-100 bg-purple-50/40' : 'border-slate-200'}`}>
+      {isNew && <span className="mb-2 inline-block rounded-full bg-purple-600 px-2 py-0.5 text-[11px] font-semibold text-white">New</span>}
       <div className="flex items-start justify-between gap-3">
         <MessageMeta displayName={comment.user.display_name} email={comment.user.email} avatarUrl={comment.user.avatar_url} profileImageUrl={comment.user.profile_image_url} />
         {(comment.user_id === currentUserId || isAdmin) && (
@@ -438,7 +441,9 @@ function CommentGroup({
   currentUserName,
   currentUserAvatarUrl,
   currentUserProfileImageUrl,
+  newCommentIds,
 }: {
+  newCommentIds?: Set<string>
   comment: Comment
   replies: Comment[]
   taskId: string
@@ -451,11 +456,11 @@ function CommentGroup({
 }) {
   return (
     <div>
-      <ThreadCommentItem comment={comment} taskId={taskId} currentUserId={currentUserId} isAdmin={isAdmin} onRefresh={onRefresh} />
+      <ThreadCommentItem comment={comment} taskId={taskId} currentUserId={currentUserId} isAdmin={isAdmin} onRefresh={onRefresh} isNew={newCommentIds?.has(comment.id)} />
       {replies.length > 0 && (
         <div className="ml-10 mt-3 space-y-3 border-l-2 border-slate-100 pl-4">
           {replies.map((r) => (
-            <ThreadCommentItem key={r.id} comment={r} taskId={taskId} currentUserId={currentUserId} isAdmin={isAdmin} onRefresh={onRefresh} />
+            <ThreadCommentItem key={r.id} comment={r} taskId={taskId} currentUserId={currentUserId} isAdmin={isAdmin} onRefresh={onRefresh} isNew={newCommentIds?.has(r.id)} />
           ))}
         </div>
       )}
@@ -493,7 +498,10 @@ export function TaskThread({
   onUploadDescriptionFile,
   onDeleteDescriptionAttachment,
   stickyComposer = false,
+  newCommentIds,
 }: {
+  // Comments that arrived from someone else while the thread was open.
+  newCommentIds?: Set<string>
   stickyComposer?: boolean
   taskId: string
   createdAt: string
@@ -710,6 +718,7 @@ export function TaskThread({
             currentUserName={currentUserName}
             currentUserAvatarUrl={currentUserAvatarUrl}
             currentUserProfileImageUrl={currentUserProfileImageUrl}
+            newCommentIds={newCommentIds}
           />
         )
       })}

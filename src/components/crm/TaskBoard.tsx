@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect, useCallback, useMemo, Suspense } from 'react'
+import { useState, useEffect, useCallback, useMemo, useRef, Suspense } from 'react'
 import { useRouter, useSearchParams, usePathname } from 'next/navigation'
 import { useAppUser } from '@/components/layout/AppShell'
 import { MultiSelect, type MultiSelectOption } from '@/components/ui/MultiSelect'
@@ -11,6 +11,7 @@ import QuickAddTask from './QuickAddTask'
 import { CreateTaskModal } from './CreateTaskModal'
 import { TaskCreatedToast } from './TaskCreatedToast'
 import { TaskDetailModal } from './TaskDetailModal'
+import { mergePolledList } from '@/lib/crm/task-poll'
 import { ALL_CATEGORIES, getTaskCategoryLabel } from '@/lib/task-constants'
 import { SavedFiltersMenu } from '@/components/ui/SavedFiltersMenu'
 
@@ -68,6 +69,8 @@ interface TaskBoardProps {
   defaultAssignee?: 'me' | 'all'
 }
 
+const POLL_MS = 30_000
+
 function TaskBoardInner({ defaultTeamKey, defaultAssignee = 'all' }: TaskBoardProps) {
   const router = useRouter()
   const pathname = usePathname()
@@ -117,7 +120,13 @@ function TaskBoardInner({ defaultTeamKey, defaultAssignee = 'all' }: TaskBoardPr
   const [page, setPage] = useState(1)
 
   // State
-  const [tasks, setTasks] = useState<KanbanTask[]>([])
+  const [tasks, setTasksRaw] = useState<KanbanTask[]>([])
+  // Any local edit (drag, quick edit, delete…) stamps this so a slower
+  // in-flight poll can't overwrite it with older server data.
+  const lastLocalEditAt = useRef(0)
+  const setTasks: typeof setTasksRaw = (u) => { lastLocalEditAt.current = Date.now(); setTasksRaw(u) }
+  const pollQueryRef = useRef<string | null>(null)
+  const selectedTaskIdRef = useRef<string | null>(null)
   const [total, setTotal] = useState(0)
   const [loading, setLoading] = useState(true)
   const [allUsers, setAllUsers] = useState<UserOption[]>([])
@@ -260,17 +269,40 @@ function TaskBoardInner({ defaultTeamKey, defaultAssignee = 'all' }: TaskBoardPr
       params.set('limit', '200')
     }
 
+    pollQueryRef.current = params.toString()
     setLoading(true)
     fetch(`/api/marketing/tasks?${params}`)
       .then((r) => { if (!r.ok) throw new Error('Failed'); return r.json() })
       .then((data) => {
-        setTasks(Array.isArray(data.tasks) ? data.tasks : [])
+        setTasksRaw(Array.isArray(data.tasks) ? data.tasks : [])
         setTotal(typeof data.total === 'number' ? data.total : 0)
       })
-      .catch(() => setTasks([]))
+      .catch(() => setTasksRaw([]))
       .finally(() => setLoading(false))
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [usersKey, teamId, category, showDelegated, hideDelegated, hideCompleted, initialized, view, page, refreshKey, columnFiltersKey, isTeamLocked, teamIdInitialized, myTasksMode, currentUser?.id])
+
+  // Background refresh so changes from others (new messages, reassignments)
+  // show up without a page reload. Uses the last filter query; skipped when
+  // the tab is hidden or the user edited the list while the request was out.
+  selectedTaskIdRef.current = selectedTaskId
+  useEffect(() => {
+    const id = setInterval(async () => {
+      const query = pollQueryRef.current
+      if (!query || document.hidden) return
+      const startedAt = Date.now()
+      try {
+        const res = await fetch(`/api/marketing/tasks?${query}`)
+        if (!res.ok) return
+        const data = await res.json()
+        if (pollQueryRef.current !== query || lastLocalEditAt.current > startedAt) return
+        if (!Array.isArray(data.tasks)) return
+        setTasksRaw((prev) => mergePolledList(prev, data.tasks as KanbanTask[], selectedTaskIdRef.current))
+        if (typeof data.total === 'number') setTotal(data.total)
+      } catch {}
+    }, POLL_MS)
+    return () => clearInterval(id)
+  }, [])
 
   // ── Filter helpers ─────────────────────────────────────────────────────────
 

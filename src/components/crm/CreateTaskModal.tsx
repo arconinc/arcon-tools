@@ -190,6 +190,7 @@ export function TaskFormModal({
   defaultTeamId,
   linkedEntity,
   task,
+  newCommentIds,
 }: {
   open: boolean
   mode: 'create' | 'edit'
@@ -199,6 +200,7 @@ export function TaskFormModal({
   defaultTeamId?: string
   linkedEntity?: TaskLinkedEntity
   task?: TaskFormTask | null
+  newCommentIds?: Set<string>
 }) {
   const { user: appUser } = useAppUser()
   const [crmUsers, setCrmUsers] = useState<DropdownUser[]>([])
@@ -682,6 +684,7 @@ export function TaskFormModal({
                   isAdmin={appUser?.is_admin ?? false}
                   canEditDescription
                   uploadingDescriptionFile={uploadingDescriptionFile}
+                  newCommentIds={newCommentIds}
                   onRefresh={refreshTask}
                   onSent={handleSent}
                   onDraftChange={setHasDraft}
