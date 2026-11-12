@@ -90,8 +90,8 @@ export default function TaskDetailPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isNew, router])
 
-  async function saveFieldValues(fields: Record<string, unknown>) {
-    if (!task) return
+  async function saveFieldValues(fields: Record<string, unknown>): Promise<boolean> {
+    if (!task) return false
     setSaving(true)
     try {
       const res = await fetch(`/api/marketing/tasks/${task.id}`, {
@@ -102,16 +102,17 @@ export default function TaskDetailPage() {
       if (!res.ok) {
         const data = await res.json()
         alert(data.error ?? 'Save failed')
-        return
+        return false
       }
       await refetch()
+      return true
     } finally {
       setSaving(false)
     }
   }
 
   async function saveFieldValue(field: string, value: unknown) {
-    await saveFieldValues({ [field]: value })
+    return saveFieldValues({ [field]: value })
   }
 
   function startEditLinked() {
@@ -171,13 +172,13 @@ export default function TaskDetailPage() {
     }
   }
 
-  async function uploadTaskAttachment(file: File) {
-    if (!task) return
+  async function uploadTaskAttachment(file: File): Promise<boolean> {
+    if (!task) return false
     setUploadingAttachment(true)
     try {
       const uploaded = await uploadAttachmentWithToast(file)
-      if (!uploaded) return
-      await fetch(`/api/marketing/tasks/${task.id}/attachments`, {
+      if (!uploaded) return false
+      const res = await fetch(`/api/marketing/tasks/${task.id}/attachments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -187,16 +188,20 @@ export default function TaskDetailPage() {
           mime_type: uploaded.mime_type,
         }),
       })
+      if (!res.ok) return false
       await refetch()
+      return true
     } finally {
       setUploadingAttachment(false)
     }
   }
 
-  async function deleteTaskAttachment(attachmentId: string) {
+  async function deleteTaskAttachment(attachmentId: string): Promise<boolean | void> {
     if (!task || !confirm('Remove this attachment?')) return
-    await fetch(`/api/marketing/tasks/${task.id}/attachments?attachment_id=${attachmentId}`, { method: 'DELETE' })
+    const res = await fetch(`/api/marketing/tasks/${task.id}/attachments?attachment_id=${attachmentId}`, { method: 'DELETE' })
+    if (!res.ok) return false
     await refetch()
+    return true
   }
 
   async function deleteTask() {

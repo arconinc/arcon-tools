@@ -8,9 +8,7 @@ import { TaskThread } from '@/components/crm/task/TaskThread'
 import { AssignToControl } from '@/components/crm/task/AssignToControl'
 import { TaskParticipants } from '@/components/crm/task/TaskParticipants'
 import { computeTaskParticipants } from '@/lib/task-participants'
-import { TaskFlowStepper } from '@/components/crm/task/TaskFlowStepper'
-import { TASK_STATUS_LABELS, TASK_STATUS_COLORS } from '@/lib/task-workflow'
-import { CalendarGlyph, TrashGlyph, ExternalLinkGlyph, PlusGlyph, ChatBubbleGlyph } from '@/components/crm/task/TaskIcons'
+import { TrashGlyph, ExternalLinkGlyph, PlusGlyph } from '@/components/crm/task/TaskIcons'
 import type { Comment, HistoryEntry, TaskAttachment } from '@/hooks/useTask'
 import type { CrmTask, CrmTaskStatus } from '@/types'
 import { uploadAttachmentWithToast } from '@/lib/crm/upload-attachment'
@@ -67,6 +65,7 @@ export type TaskFormTask = CrmTask & {
 const STATUSES = [
   { value: 'not_started', label: 'Not Started', pill: 'text-slate-600 bg-slate-100 border-slate-200 hover:bg-slate-200' },
   { value: 'in_progress', label: 'In Progress', pill: 'text-blue-700 bg-blue-50 border-blue-200 hover:bg-blue-100' },
+  { value: 'need_changes', label: 'Needs Changes', pill: 'text-red-700 bg-red-50 border-red-200 hover:bg-red-100' },
   { value: 'completed', label: 'Completed', pill: 'text-green-700 bg-green-50 border-green-200 hover:bg-green-100' },
   { value: 'waiting_on_approval', label: 'Waiting on Approval', pill: 'text-purple-700 bg-purple-50 border-purple-200 hover:bg-purple-100' },
   { value: 'waiting_on_client_approval', label: 'Waiting on Client', pill: 'text-orange-700 bg-orange-50 border-orange-200 hover:bg-orange-100' },
@@ -214,11 +213,9 @@ export function TaskFormModal({
   const [hasDraft, setHasDraft] = useState(false)
   const [showUnsentConfirm, setShowUnsentConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
-  const [openDropdown, setOpenDropdown] = useState<'priority' | 'status' | null>(null)
-  const dropdownRef = useRef<HTMLDivElement>(null)
+  const [openDropdown, setOpenDropdown] = useState<'priority' | 'status' | 'menu' | null>(null)
   const initialFormRef = useRef<TaskForm>(task ? formFromTask(task) : emptyForm(defaultTeamId))
   const [editingField, setEditingField] = useState<'title' | 'assigned_to' | 'description' | null>(null)
-  const dueDateRef = useRef<HTMLInputElement>(null)
 
   useEffect(() => {
     if (!open) return
@@ -266,9 +263,8 @@ export function TaskFormModal({
   useEffect(() => {
     if (!openDropdown) return
     function handleClickOutside(e: MouseEvent) {
-      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
-        setOpenDropdown(null)
-      }
+      // Each open dropdown/menu wraps itself in a [data-dd] container.
+      if (!(e.target as Element).closest('[data-dd]')) setOpenDropdown(null)
     }
     document.addEventListener('mousedown', handleClickOutside)
     return () => document.removeEventListener('mousedown', handleClickOutside)
@@ -286,39 +282,47 @@ export function TaskFormModal({
     onSaved(saved as TaskFormTask)
   }
 
-  async function saveDescription(html: string) {
-    if (!task?.id) return
-    await fetch(`/api/marketing/tasks/${task.id}`, {
+  // Description and attachment actions save on their own; they report success or
+  // failure to the thread, which shows it next to the description.
+  async function saveDescription(html: string): Promise<boolean> {
+    if (!task?.id) return false
+    const res = await fetch(`/api/marketing/tasks/${task.id}`, {
       method: 'PATCH',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ description: html || null }),
     })
+    if (!res.ok) return false
     await refreshTask()
+    return true
   }
 
-  async function uploadDescriptionAttachment(file: File) {
-    if (!task?.id) return
+  async function uploadDescriptionAttachment(file: File): Promise<boolean> {
+    if (!task?.id) return false
     setUploadingDescriptionFile(true)
     try {
       const uploaded = await uploadAttachmentWithToast(file)
-      if (!uploaded) { alert('Upload failed'); return }
-      await fetch(`/api/marketing/tasks/${task.id}/attachments`, {
+      if (!uploaded) return false
+      const res = await fetch(`/api/marketing/tasks/${task.id}/attachments`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           url: uploaded.url, file_name: uploaded.file_name, file_size: uploaded.file_size, mime_type: uploaded.mime_type,
         }),
       })
+      if (!res.ok) return false
       await refreshTask()
+      return true
     } finally {
       setUploadingDescriptionFile(false)
     }
   }
 
-  async function deleteDescriptionAttachment(attachmentId: string) {
-    if (!task?.id) return
-    await fetch(`/api/marketing/tasks/${task.id}/attachments?attachment_id=${attachmentId}`, { method: 'DELETE' })
+  async function deleteDescriptionAttachment(attachmentId: string): Promise<boolean> {
+    if (!task?.id) return false
+    const res = await fetch(`/api/marketing/tasks/${task.id}/attachments?attachment_id=${attachmentId}`, { method: 'DELETE' })
+    if (!res.ok) return false
     await refreshTask()
+    return true
   }
 
   // The action is just the target status; status changes never reassign the task.
@@ -448,7 +452,9 @@ export function TaskFormModal({
     }
   }
 
-  const isDirty = hasDraft || pendingFiles.length > 0 || JSON.stringify(form) !== JSON.stringify(initialFormRef.current)
+  const formDirty = pendingFiles.length > 0 || JSON.stringify(form) !== JSON.stringify(initialFormRef.current)
+  const isDirty = hasDraft || formDirty
+  const canDelete = mode === 'edit' && !!task?.id && !!(appUser?.is_admin || task.created_by === appUser?.id || task.task_owner === appUser?.id)
 
   function handleClose() {
     if (showDeleteConfirm) { setShowDeleteConfirm(false); return }
@@ -468,8 +474,14 @@ export function TaskFormModal({
 
         {/* Header */}
         <div className="flex-shrink-0 border-b border-slate-100 bg-white px-8 py-4">
-          <div className="flex items-center justify-between gap-5 flex-wrap">
-            <div className="min-w-0">
+          <div className="flex items-center justify-between gap-3">
+            <div className="flex-shrink-0 w-8 h-8 rounded-[10px] bg-purple-100 text-purple-700 grid place-items-center" aria-hidden="true">
+              <svg className="h-[18px] w-[18px]" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" viewBox="0 0 24 24">
+                <rect x="3" y="3" width="18" height="18" rx="4" />
+                <path d="M8 12l3 3 5-6" />
+              </svg>
+            </div>
+            <div className="min-w-0 flex-1">
               {editingField === 'title' ? (
                 <input
                   type="text"
@@ -501,100 +513,9 @@ export function TaskFormModal({
               )}
             </div>
 
-            {/* Status + priority badges, due date, external link, close */}
-            <div ref={dropdownRef} className="flex items-center gap-2 flex-shrink-0 flex-wrap justify-end">
-            {mode === 'create' ? (
-              <div className="relative">
-                <button
-                  type="button"
-                  onClick={() => setOpenDropdown(openDropdown === 'status' ? null : 'status')}
-                  className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold transition-colors ${currentStatus.pill}`}
-                >
-                  <StatusIcon value={form.status} />
-                  {currentStatus.label}
-                  <svg className="h-3 w-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                  </svg>
-                </button>
-                {openDropdown === 'status' && (
-                  <div className="absolute left-0 top-full mt-1 w-52 rounded-xl border border-slate-200 bg-white shadow-lg z-20 py-1 overflow-hidden">
-                    {STATUSES.map((s) => (
-                      <button
-                        key={s.value}
-                        type="button"
-                        onClick={() => { setForm((prev) => ({ ...prev, status: s.value })); setOpenDropdown(null) }}
-                        className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold transition-colors ${s.value === form.status ? s.pill : 'text-slate-600 hover:bg-slate-50'}`}
-                      >
-                        <StatusIcon value={s.value} />
-                        {s.label}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ) : (
-              <span className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-semibold ${TASK_STATUS_COLORS[(task?.status ?? 'not_started') as CrmTaskStatus]}`}>
-                {TASK_STATUS_LABELS[(task?.status ?? 'not_started') as CrmTaskStatus]}
-              </span>
-            )}
-
-            <div className="relative">
-              <button
-                type="button"
-                onClick={() => setOpenDropdown(openDropdown === 'priority' ? null : 'priority')}
-                className={`inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full border text-xs font-semibold transition-colors ${currentPriority.pill}`}
-              >
-                <PriorityIcon />
-                {currentPriority.label}
-                <svg className="h-3 w-3 opacity-60" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
-                </svg>
-              </button>
-              {openDropdown === 'priority' && (
-                <div className="absolute left-0 top-full mt-1 w-36 rounded-xl border border-slate-200 bg-white shadow-lg z-20 py-1 overflow-hidden">
-                  {PRIORITIES.map((p) => (
-                    <button
-                      key={p.value}
-                      type="button"
-                      onClick={() => { setForm((prev) => ({ ...prev, priority: p.value })); setOpenDropdown(null) }}
-                      className={`w-full flex items-center gap-2 px-3 py-2 text-xs font-semibold transition-colors ${p.value === form.priority ? p.pill : 'text-slate-600 hover:bg-slate-50'}`}
-                    >
-                      <PriorityIcon />
-                      {p.label}
-                    </button>
-                  ))}
-                </div>
-              )}
-            </div>
-
-            <button
-              type="button"
-              onClick={() => (dueDateRef.current as HTMLInputElement & { showPicker?: () => void })?.showPicker?.() ?? dueDateRef.current?.click()}
-              className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-500 hover:text-purple-700 transition-colors"
-            >
-              <CalendarGlyph />
-              {form.due_date
-                ? new Date(form.due_date + 'T00:00:00').toLocaleDateString('en-US', { month: 'short', day: 'numeric' })
-                : 'No date'}
-            </button>
-            <input
-              ref={dueDateRef}
-              type="date"
-              value={form.due_date}
-              onChange={(e) => setForm((p) => ({ ...p, due_date: e.target.value }))}
-              className="sr-only"
-              tabIndex={-1}
-              aria-hidden="true"
-            />
-
-              {mode === 'edit' && (task?.comments?.length ?? 0) > 0 && (
-                <span
-                  title={`${task?.comments?.length} comment${task?.comments?.length === 1 ? '' : 's'}`}
-                  className="inline-flex items-center gap-1 text-xs font-medium text-slate-500"
-                >
-                  <ChatBubbleGlyph />
-                  {task?.comments?.length}
-                </span>
+            <div data-dd className="flex items-center gap-1 flex-shrink-0">
+              {mode === 'edit' && formDirty && (
+                <span className="mr-2 text-xs font-medium text-slate-500" aria-live="polite">Unsaved changes</span>
               )}
 
               {mode === 'edit' && task?.id && (
@@ -606,6 +527,47 @@ export function TaskFormModal({
                   <ExternalLinkGlyph />
                 </Link>
               )}
+
+              {mode === 'edit' && task?.id && (
+                <div className="relative">
+                  <button
+                    type="button"
+                    onClick={() => setOpenDropdown(openDropdown === 'menu' ? null : 'menu')}
+                    className="rounded-lg p-2 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
+                    aria-label="More actions"
+                    aria-haspopup="menu"
+                    aria-expanded={openDropdown === 'menu'}
+                  >
+                    <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                      <circle cx="5" cy="12" r="1.8" /><circle cx="12" cy="12" r="1.8" /><circle cx="19" cy="12" r="1.8" />
+                    </svg>
+                  </button>
+                  {openDropdown === 'menu' && (
+                    <div role="menu" className="absolute right-0 top-full mt-1 w-48 rounded-xl border border-slate-200 bg-white shadow-lg z-20 py-1 overflow-hidden">
+                      <button
+                        type="button"
+                        role="menuitem"
+                        onClick={() => { void navigator.clipboard?.writeText(`${window.location.origin}/tasks/${task?.id}`); setOpenDropdown(null) }}
+                        className="w-full flex items-center gap-2 px-3 py-2 text-sm text-slate-700 hover:bg-slate-50 transition-colors"
+                      >
+                        Copy link
+                      </button>
+                      {canDelete && (
+                        <button
+                          type="button"
+                          role="menuitem"
+                          onClick={() => { setOpenDropdown(null); setShowDeleteConfirm(true) }}
+                          className="w-full flex items-center gap-2 px-3 py-2 text-sm text-red-600 hover:bg-red-50 transition-colors"
+                        >
+                          <TrashGlyph />
+                          Delete task…
+                        </button>
+                      )}
+                    </div>
+                  )}
+                </div>
+              )}
+
               <button
                 type="button"
                 onClick={handleClose}
@@ -618,49 +580,14 @@ export function TaskFormModal({
               </button>
             </div>
           </div>
-
-          {/* Prominent assign control + (edit mode) everyone involved */}
-          <div className="flex items-center justify-between gap-3 mt-3 flex-wrap">
-            <AssignToControl
-              teamId={form.team_id || null}
-              assignedTo={form.assigned_to || null}
-              displayLabel={
-                mode === 'edit'
-                  ? (task?.assigned_user?.display_name ?? task?.team?.name ?? 'Unassigned')
-                  : (form.assigned_to
-                      ? (crmUsers.find((u) => u.id === form.assigned_to)?.display_name ?? 'Unknown')
-                      : form.team_id
-                      ? (teams.find((t) => t.id === form.team_id)?.name ?? 'Unknown team')
-                      : 'Unassigned')
-              }
-              teams={teams}
-              users={crmUsers}
-              editing={editingField === 'assigned_to'}
-              onStartEdit={() => setEditingField('assigned_to')}
-              onChange={(assignment) => {
-                setForm((p) => ({ ...p, team_id: assignment.teamId ?? '', assigned_to: assignment.assignedTo ?? '' }))
-                setEditingField(null)
-              }}
-            />
-            {mode === 'edit' && task && <TaskParticipants participants={computeTaskParticipants(task)} />}
-          </div>
         </div>
 
-        {mode === 'edit' && task && (
-          <TaskFlowStepper
-            status={task.status as CrmTaskStatus}
-            onAction={handleStatusAction}
-            disabled={saving}
-          />
-        )}
-
-        {/* Form — flex column so description can grow */}
-        <form onSubmit={handleSubmit} className="flex-1 flex flex-col min-h-0 relative">
-
+        {/* Form: main column + Details sidebar */}
+        <form onSubmit={handleSubmit} className="flex-1 min-h-0 relative flex flex-col lg:flex-row overflow-y-auto lg:overflow-hidden">
+          <div className="flex-1 min-w-0 min-h-0 flex flex-col">
           {error && (
             <div className="flex-shrink-0 mx-6 mt-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700">{error}</div>
           )}
-
           {mode === 'create' ? (
             <div className="flex-1 flex flex-col min-h-0 px-6 pt-3 pb-3">
               <div className="flex-shrink-0 mb-1">
@@ -736,8 +663,9 @@ export function TaskFormModal({
             </div>
           ) : (
             task?.id && (
-              <div className="flex-1 min-h-0 overflow-y-auto px-6 py-4">
+              <div className="flex-1 min-h-0 px-6 py-4">
                 <TaskThread
+                  stickyComposer
                   taskId={task.id}
                   createdAt={task.created_at}
                   createdByName={task.created_user?.display_name ?? 'Unknown'}
@@ -757,7 +685,6 @@ export function TaskFormModal({
                   onRefresh={refreshTask}
                   onSent={handleSent}
                   onDraftChange={setHasDraft}
-                  onCompleteTask={task.status !== 'completed' ? () => handleStatusAction('completed') : undefined}
                   onSaveDescription={saveDescription}
                   onUploadDescriptionFile={uploadDescriptionAttachment}
                   onDeleteDescriptionAttachment={deleteDescriptionAttachment}
@@ -765,42 +692,158 @@ export function TaskFormModal({
               </div>
             )
           )}
+          </div>
 
-          {/* Footer */}
-          <div className="mt-auto flex-shrink-0 flex items-center justify-between gap-3 px-6 py-3 border-t border-slate-100">
-            <div>
-              {mode === 'edit' && task?.id && (appUser?.is_admin || task.created_by === appUser?.id || task.task_owner === appUser?.id) && (
+          <aside className="flex-shrink-0 lg:w-80 flex flex-col border-t lg:border-t-0 lg:border-l border-slate-200 bg-slate-50">
+            <div className="flex-1 min-h-0 overflow-y-auto px-6 py-5 space-y-5">
+              <h3 className="text-base font-semibold text-slate-900">Details</h3>
+
+              <div data-dd className="relative">
+                <span className="block text-xs font-semibold text-slate-600 mb-1.5">Status</span>
                 <button
                   type="button"
-                  onClick={() => setShowDeleteConfirm(true)}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 text-sm font-semibold text-red-600 border border-red-200 rounded-xl hover:bg-red-50 transition-colors"
+                  onClick={() => setOpenDropdown(openDropdown === 'status' ? null : 'status')}
+                  aria-haspopup="listbox"
+                  aria-expanded={openDropdown === 'status'}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:border-slate-300 text-sm text-slate-900 transition-colors"
                 >
-                  <TrashGlyph />
-                  Delete Task
+                  <span className={currentStatus.pill.split(' ')[0]}><StatusIcon value={form.status} /></span>
+                  {currentStatus.label}
+                  <svg className="ml-auto h-3.5 w-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {openDropdown === 'status' && (
+                  <div role="listbox" className="absolute left-0 right-0 top-full mt-1 rounded-xl border border-slate-200 bg-white shadow-lg z-20 py-1 overflow-hidden">
+                    {STATUSES.filter((s) => mode === 'edit' || s.value !== 'need_changes').map((s) => (
+                      <button
+                        key={s.value}
+                        type="button"
+                        role="option"
+                        aria-selected={s.value === form.status}
+                        onClick={() => { setForm((prev) => ({ ...prev, status: s.value })); setOpenDropdown(null) }}
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors ${s.value === form.status ? s.pill : 'text-slate-600 hover:bg-slate-50'}`}
+                      >
+                        <StatusIcon value={s.value} />
+                        {s.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <span className="block text-xs font-semibold text-slate-600 mb-1.5">Assignee</span>
+                <AssignToControl
+                  variant="field"
+                  teamId={form.team_id || null}
+                  assignedTo={form.assigned_to || null}
+                  displayLabel={
+                    mode === 'edit'
+                      ? (task?.assigned_user?.display_name ?? task?.team?.name ?? 'Unassigned')
+                      : (form.assigned_to
+                          ? (crmUsers.find((u) => u.id === form.assigned_to)?.display_name ?? 'Unknown')
+                          : form.team_id
+                          ? (teams.find((t) => t.id === form.team_id)?.name ?? 'Unknown team')
+                          : 'Unassigned')
+                  }
+                  teams={teams}
+                  users={crmUsers}
+                  editing={editingField === 'assigned_to'}
+                  onStartEdit={() => setEditingField('assigned_to')}
+                  onChange={(assignment) => {
+                    setForm((p) => ({ ...p, team_id: assignment.teamId ?? '', assigned_to: assignment.assignedTo ?? '' }))
+                    setEditingField(null)
+                  }}
+                />
+              </div>
+
+              <div data-dd className="relative">
+                <span className="block text-xs font-semibold text-slate-600 mb-1.5">Priority</span>
+                <button
+                  type="button"
+                  onClick={() => setOpenDropdown(openDropdown === 'priority' ? null : 'priority')}
+                  aria-haspopup="listbox"
+                  aria-expanded={openDropdown === 'priority'}
+                  className="w-full flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:border-slate-300 text-sm text-slate-900 transition-colors"
+                >
+                  <span className={currentPriority.pill.split(' ')[0]}><PriorityIcon /></span>
+                  {currentPriority.label}
+                  <svg className="ml-auto h-3.5 w-3.5 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                  </svg>
+                </button>
+                {openDropdown === 'priority' && (
+                  <div role="listbox" className="absolute left-0 right-0 top-full mt-1 rounded-xl border border-slate-200 bg-white shadow-lg z-20 py-1 overflow-hidden">
+                    {PRIORITIES.map((p) => (
+                      <button
+                        key={p.value}
+                        type="button"
+                        role="option"
+                        aria-selected={p.value === form.priority}
+                        onClick={() => { setForm((prev) => ({ ...prev, priority: p.value })); setOpenDropdown(null) }}
+                        className={`w-full flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors ${p.value === form.priority ? p.pill : 'text-slate-600 hover:bg-slate-50'}`}
+                      >
+                        <PriorityIcon />
+                        {p.label}
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
+
+              <div>
+                <label htmlFor="task-due-date" className="block text-xs font-semibold text-slate-600 mb-1.5">Due date</label>
+                <input
+                  id="task-due-date"
+                  type="date"
+                  value={form.due_date}
+                  onChange={(e) => setForm((p) => ({ ...p, due_date: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-xl border border-slate-200 bg-white text-sm text-slate-900 focus:outline-none focus:ring-2 focus:ring-purple-400"
+                />
+              </div>
+
+              {mode === 'edit' && task && (
+                <div>
+                  <span className="block text-xs font-semibold text-slate-600 mb-1.5">People involved</span>
+                  <TaskParticipants participants={computeTaskParticipants(task)} />
+                </div>
+              )}
+
+              {mode === 'edit' && task && task.status !== 'completed' && (
+                <button
+                  type="button"
+                  onClick={() => handleStatusAction('completed')}
+                  disabled={saving}
+                  className="w-full px-4 py-2 border border-slate-300 bg-white text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 disabled:opacity-50 transition-colors"
+                >
+                  Mark complete
                 </button>
               )}
+
+              <div className="border-t border-slate-200 pt-5">
+              {mode === 'edit' && hasDraft && (
+                <p className="mb-2 text-xs text-amber-700">You have an unsent message. Save won&apos;t send it.</p>
+              )}
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  onClick={handleClose}
+                  className="flex-1 px-4 py-2 border border-slate-300 bg-white text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  disabled={saving || (mode === 'edit' && !isDirty)}
+                  className="flex-1 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl disabled:opacity-40 disabled:hover:bg-purple-700 transition-colors"
+                >
+                  {saving ? savingLabel : actionLabel}
+                </button>
+              </div>
+              </div>
             </div>
-            <div className="flex gap-3">
-              <button
-                type="button"
-                onClick={handleClose}
-                className="px-5 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors"
-              >
-                Cancel
-              </button>
-              <button
-                type="submit"
-                disabled={saving || (mode === 'edit' && !isDirty)}
-                className={
-                  mode === 'edit'
-                    ? 'px-5 py-2 border border-purple-300 text-purple-800 hover:bg-purple-50 text-sm font-semibold rounded-xl disabled:opacity-40 disabled:hover:bg-transparent transition-colors'
-                    : 'px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl disabled:opacity-60 transition-colors'
-                }
-              >
-                {saving ? savingLabel : actionLabel}
-              </button>
-            </div>
-          </div>
+          </aside>
 
           {showUnsentConfirm && (
             <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-white/95 backdrop-blur-sm p-6">

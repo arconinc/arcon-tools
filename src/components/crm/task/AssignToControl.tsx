@@ -19,6 +19,7 @@ export function AssignToControl({
   editing,
   onStartEdit,
   onChange,
+  variant = 'pill',
 }: {
   teamId: string | null
   assignedTo: string | null
@@ -28,7 +29,37 @@ export function AssignToControl({
   editing: boolean
   onStartEdit: () => void
   onChange: (assignment: { teamId: string | null; assignedTo: string | null }) => void
+  // 'field' is a plain full-width form field for the task Details sidebar.
+  variant?: 'pill' | 'field'
 }) {
+  if (variant === 'field') {
+    if (editing) {
+      return (
+        <TeamAssigneeSelect
+          teamId={teamId}
+          assignedTo={assignedTo}
+          teams={teams}
+          users={users}
+          onChange={onChange}
+          className="w-full text-sm border border-purple-400 rounded-xl px-3 py-2 focus:outline-none focus:ring-2 focus:ring-purple-300 bg-white"
+        />
+      )
+    }
+    return (
+      <button
+        type="button"
+        onClick={onStartEdit}
+        className="w-full flex items-center gap-2 px-3 py-2 rounded-xl border border-slate-200 bg-white hover:border-slate-300 text-sm text-slate-900 transition-colors"
+      >
+        <ReassignGlyph className="h-4 w-4 text-slate-400" />
+        <span className="truncate">{displayLabel}</span>
+        <svg className="ml-auto h-3.5 w-3.5 flex-shrink-0 text-slate-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
+      </button>
+    )
+  }
+
   if (editing) {
     return (
       <TeamAssigneeSelect
