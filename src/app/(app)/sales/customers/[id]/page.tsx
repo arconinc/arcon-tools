@@ -11,6 +11,7 @@ import { TaskCreatedToast } from '@/components/crm/TaskCreatedToast'
 import { CallLogCard } from '@/components/crm/CallLogCard'
 import { Modal, Field, FieldInput, SocialIcon } from '@/components/ui'
 import { CustomerHeader } from '@/components/crm/customer/CustomerHeader'
+import { useAppUser } from '@/components/layout/AppShell'
 import { CustomerContactsList } from '@/components/crm/customer/CustomerContactsList'
 import { CustomerOpportunitiesList } from '@/components/crm/customer/CustomerOpportunitiesList'
 import { CustomerFilesList } from '@/components/crm/customer/CustomerFilesList'
@@ -28,6 +29,7 @@ import { formatDate } from '@/lib/format'
 import type { PlacesAddress, PlacesDetails } from '@/lib/google-places'
 import { uploadAttachment } from '@/lib/crm/upload-attachment'
 import { AttachFileModal } from '@/components/crm/AttachFileModal'
+import { CustomerMockupsGrid } from '@/components/mockups/CustomerMockupsGrid'
 
 type DropdownUser = { id: string; display_name: string; email: string }
 
@@ -42,6 +44,7 @@ type CreateForm = {
 
 export default function CustomerDetailPage() {
   const router = useRouter()
+  const { user: viewer } = useAppUser()
   const params = useParams<{ id: string }>()
   const id = params.id
   const isNew = id === 'new'
@@ -56,6 +59,15 @@ export default function CustomerDetailPage() {
 
   const [attachOpen, setAttachOpen] = useState(false)
   const [deletingFileId, setDeletingFileId] = useState<string | null>(null)
+
+  // Soft delete: the server sets deleted_at on this customer, its contacts, and its opportunities.
+  async function handleDeleteCustomer() {
+    if (!customer) return
+    if (!window.confirm(`Delete ${customer.name}? Its contacts and opportunities will be hidden too. Nothing is erased.`)) return
+    const res = await fetch(`/api/marketing/customers/${customer.id}`, { method: 'DELETE' })
+    if (!res.ok) { alert('Delete failed'); return }
+    router.push('/sales/customers')
+  }
 
   async function handleDeleteFile(fileId: string) {
     if (!customer || !confirm('Remove this file?')) return
@@ -615,6 +627,7 @@ export default function CustomerDetailPage() {
           )
         }
         onCreateTask={() => setCreateTaskOpen(true)}
+        onDelete={viewer?.is_admin ? handleDeleteCustomer : undefined}
       />
 
       {/* Tabs */}
@@ -1202,15 +1215,18 @@ export default function CustomerDetailPage() {
 
       {/* ── Artwork Tab ── */}
       {activeTab === 'artwork' && (
-        <CustomerArtworkGrid
-          artwork={artworkHook.artwork}
-          loaded={artworkHook.loaded}
-          loading={artworkHook.loading}
-          vectorizingIds={artworkHook.vectorizingIds}
-          onAdd={() => setShowArtworkModal(true)}
-          onVectorize={artworkHook.vectorize}
-          onDelete={artworkHook.remove}
-        />
+        <>
+          <CustomerArtworkGrid
+            artwork={artworkHook.artwork}
+            loaded={artworkHook.loaded}
+            loading={artworkHook.loading}
+            vectorizingIds={artworkHook.vectorizingIds}
+            onAdd={() => setShowArtworkModal(true)}
+            onVectorize={artworkHook.vectorize}
+            onDelete={artworkHook.remove}
+          />
+          {customer?.id && <CustomerMockupsGrid customerId={customer.id} />}
+        </>
       )}
 
       <AttachFileModal

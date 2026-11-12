@@ -211,6 +211,8 @@ export function TaskFormModal({
   const [error, setError] = useState<string | null>(null)
   const [showDeleteConfirm, setShowDeleteConfirm] = useState(false)
   const [showDiscardConfirm, setShowDiscardConfirm] = useState(false)
+  const [hasDraft, setHasDraft] = useState(false)
+  const [showUnsentConfirm, setShowUnsentConfirm] = useState(false)
   const [deleting, setDeleting] = useState(false)
   const [openDropdown, setOpenDropdown] = useState<'priority' | 'status' | null>(null)
   const dropdownRef = useRef<HTMLDivElement>(null)
@@ -387,6 +389,8 @@ export function TaskFormModal({
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault()
+    // Save doesn't send the message box. If it has text, ask before it's lost.
+    if (mode === 'edit' && hasDraft) { setShowUnsentConfirm(true); return }
     return saveTask()
   }
 
@@ -444,7 +448,7 @@ export function TaskFormModal({
     }
   }
 
-  const isDirty = pendingFiles.length > 0 || JSON.stringify(form) !== JSON.stringify(initialFormRef.current)
+  const isDirty = hasDraft || pendingFiles.length > 0 || JSON.stringify(form) !== JSON.stringify(initialFormRef.current)
 
   function handleClose() {
     if (showDeleteConfirm) { setShowDeleteConfirm(false); return }
@@ -452,7 +456,7 @@ export function TaskFormModal({
   }
 
   const displayLinkedEntity = linkedEntity ?? (task ? linkedEntityFromTask(task) : undefined)
-  const actionLabel = mode === 'edit' ? 'Save Task' : 'Create Task'
+  const actionLabel = mode === 'edit' ? 'Save changes' : 'Create Task'
   const savingLabel = mode === 'edit' ? 'Saving...' : 'Creating...'
 
   const currentPriority = PRIORITIES.find((p) => p.value === form.priority) ?? PRIORITIES[1]
@@ -752,6 +756,7 @@ export function TaskFormModal({
                   uploadingDescriptionFile={uploadingDescriptionFile}
                   onRefresh={refreshTask}
                   onSent={handleSent}
+                  onDraftChange={setHasDraft}
                   onCompleteTask={task.status !== 'completed' ? () => handleStatusAction('completed') : undefined}
                   onSaveDescription={saveDescription}
                   onUploadDescriptionFile={uploadDescriptionAttachment}
@@ -785,13 +790,42 @@ export function TaskFormModal({
               </button>
               <button
                 type="submit"
-                disabled={saving}
-                className="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl disabled:opacity-60 transition-colors"
+                disabled={saving || (mode === 'edit' && !isDirty)}
+                className={
+                  mode === 'edit'
+                    ? 'px-5 py-2 border border-purple-300 text-purple-800 hover:bg-purple-50 text-sm font-semibold rounded-xl disabled:opacity-40 disabled:hover:bg-transparent transition-colors'
+                    : 'px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl disabled:opacity-60 transition-colors'
+                }
               >
                 {saving ? savingLabel : actionLabel}
               </button>
             </div>
           </div>
+
+          {showUnsentConfirm && (
+            <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-white/95 backdrop-blur-sm p-6">
+              <div className="w-full max-w-sm text-center">
+                <h3 className="text-lg font-bold text-slate-900 mb-2">You have an unsent message</h3>
+                <p className="text-sm text-slate-600 mb-6">Saving changes won&apos;t send it. Go back and press Send message, or save without it.</p>
+                <div className="flex gap-3 justify-center">
+                  <button
+                    type="button"
+                    onClick={() => setShowUnsentConfirm(false)}
+                    className="px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-xl transition-colors"
+                  >
+                    Go back to message
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => { setShowUnsentConfirm(false); setHasDraft(false); void saveTask() }}
+                    className="px-5 py-2 border border-slate-300 text-slate-700 text-sm font-medium rounded-xl hover:bg-slate-50 transition-colors"
+                  >
+                    Save without it
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
 
           {showDiscardConfirm && (
             <div className="absolute inset-0 z-20 flex items-center justify-center rounded-2xl bg-white/95 backdrop-blur-sm p-6">

@@ -11,6 +11,7 @@ npm run dev      # dev server on port 3000
 npm run build    # production build
 npm run lint     # ESLint
 npm run release  # interactive release (creates tag, updates releases.json)
+npm test         # Vitest unit tests (src/**/*.test.ts)
 ```
 
 > **User tests everything.** Do NOT run `npm run build`, `npm run dev`, or lint/typecheck unless explicitly asked. State what changed and what the user should verify.
@@ -66,6 +67,7 @@ src/
     task-constants.ts # CrmTaskDepartment, enums, DEPARTMENT_ROUTES, ROUTE_TO_DEPARTMENT
     crm/require-user.ts  # requireUser() — auth + admin lookup + impersonation, for CRM route handlers
     api/respond.ts    # ok/created/unauthorized/forbidden/notFound/badRequest/serverError response helpers
+    hat-catalog/, hat-mockup/  # Hat Mockup Assistant: vendor crawl + compositor + agent (docs/plans/hat-mockup-assistant-plan-v1.md)
   types/index.ts      # All shared TypeScript types
 ```
 
@@ -105,11 +107,7 @@ const flags = useFeatureFlags()      // Record<string, boolean>
 ```
 
 ### Feature Flags
-```tsx
-<FeatureFlag name="my-feature">...</FeatureFlag>
-// or: if (flags['my-feature']) { ... }
-```
-Flags are rows in `feature_flags` table. A missing row = disabled.
+Vercel Flags SDK in `src/lib/flags.ts`: define the flag, add it to `getEvaluatedFlags()` and `/api/flags`. Server: `await myFlag()`. Client: `useFeatureFlags()['key']` (AppShell). Default off.
 
 ### Notifications System
 Add new type: define `<Type>Payload` + `NotificationDefinition` in `registry.ts`, add to `NOTIFICATION_REGISTRY`. Dispatch via `dispatchNotification({ definition, payload, recipientSpec, suppressUserIds? })` (`src/lib/notifications/dispatch.ts`). `recipientSpec` (`src/lib/notifications/recipients.ts`) targets `userId` / `userIds` / `teamId` / `department` / `admins: true`. `suppressUserIds` excludes the actor from their own notification. `fetchActor(userId)` resolves `{ id, display_name }` for use in payloads. No DB seed needed — registry key is source of truth. Wrap dispatch calls in try/catch + `Sentry.captureException(err)` so a notification failure never blocks the main mutation.
@@ -164,7 +162,7 @@ Two-table: `spec_ideas` (catalog) + `spec_samples` (per-customer records). Stora
 
 ## Testing & Verification
 
-Write unit tests for every feature/bugfix (no runner set up yet — ask before adding one). Playwright available (`playwright.config.ts`). **Done when:** TS would compile cleanly, ESLint clean, and user has verified the feature manually at http://localhost:3000. For auth/RBAC changes: verify both admin and non-admin paths. For private files: verify signed URL path is used.
+Write unit tests for every feature/bugfix (Vitest, `npm test`). Playwright available (`playwright.config.ts`). **Done when:** TS would compile cleanly, ESLint clean, and user has verified the feature manually at http://localhost:3000. For auth/RBAC changes: verify both admin and non-admin paths. For private files: verify signed URL path is used.
 
 ## Agent Workflow
 
@@ -184,6 +182,7 @@ Write unit tests for every feature/bugfix (no runner set up yet — ask before a
 
 - **Never skip auth checks** — not even on "obviously admin-only" routes.
 - **Never call `createAdminClient()` without first verifying the user.**
+- **Cron routes:** `CRON_SECRET` bearer only; never trust the `x-vercel-cron` header (anyone can send it).
 - **Never link directly to private storage buckets** — use `/api/files/signed-url`.
 - **Never use browser Supabase client in server components or route handlers.**
 - **Never run `npm run build` or `npm run dev`** — user tests all changes.

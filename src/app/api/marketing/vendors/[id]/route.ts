@@ -23,7 +23,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
   if (error || !vendor) return notFound('Vendor not found')
 
   const [contactsRes, filesRes, tasksRes, createdByUserRes, entityTagsRes] = await Promise.all([
-    adminClient.from('crm_contacts').select('id, first_name, last_name, title, email, phone, type_of_contact, created_at').eq('vendor_id', id).order('last_name'),
+    adminClient.from('crm_contacts').select('id, first_name, last_name, title, email, phone, type_of_contact, created_at').eq('vendor_id', id).is('deleted_at', null).order('last_name'),
     adminClient.from('crm_files').select('id, label, url, created_at').eq('vendor_id', id).order('created_at', { ascending: false }),
     adminClient
       .from('crm_tasks')

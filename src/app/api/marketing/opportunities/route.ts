@@ -70,11 +70,12 @@ export async function GET(req: NextRequest) {
   }
 
   const [countRes, dataRes] = await Promise.all([
-    applyFilters(adminClient.from('crm_opportunities').select('*', { count: 'exact', head: true })),
+    applyFilters(adminClient.from('crm_opportunities').select('*', { count: 'exact', head: true }).is('deleted_at', null)),
     applyFilters(
       adminClient
         .from('crm_opportunities')
         .select('id, name, customer_id, assigned_to, pipeline_stage, value, probability, status, category, forecast_close_date, closed_at, created_at, updated_at')
+        .is('deleted_at', null)
         .order('created_at', { ascending: false })
     ).range(from, to),
   ])

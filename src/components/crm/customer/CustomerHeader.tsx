@@ -11,6 +11,7 @@ type CustomerHeaderProps = {
   id: string
   onCreateOpportunity: () => void
   onCreateTask: () => void
+  onDelete?: () => void
 }
 
 export function CustomerHeader({
@@ -23,6 +24,7 @@ export function CustomerHeader({
   id,
   onCreateOpportunity,
   onCreateTask,
+  onDelete,
 }: CustomerHeaderProps) {
   return (
     <div className="bg-white border border-slate-200 rounded-2xl p-4 mb-3">
@@ -77,7 +79,10 @@ export function CustomerHeader({
           >
             + Opportunity
           </button>
-          <CrmDetailActions onCreateTask={onCreateTask} />
+          <CrmDetailActions
+            onCreateTask={onCreateTask}
+            extraAction={onDelete ? { label: 'Delete customer', onClick: onDelete } : undefined}
+          />
         </div>
       </div>
     </div>

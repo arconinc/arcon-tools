@@ -11,11 +11,11 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
   const adminClient = createAdminClient()
   const { data, error } = await adminClient
     .from('store_contact_links')
-    .select('contact:crm_contacts(id, first_name, last_name, email)')
+    .select('contact:crm_contacts(id, first_name, last_name, email, deleted_at)')
     .eq('store_id', id)
 
   if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-  return NextResponse.json((data ?? []).map((r: { contact: unknown }) => r.contact))
+  return NextResponse.json((data ?? []).map((r: { contact: any }) => r.contact).filter((c: any) => c && !c.deleted_at))
 }
 
 export async function POST(request: Request, { params }: { params: Promise<{ id: string }> }) {

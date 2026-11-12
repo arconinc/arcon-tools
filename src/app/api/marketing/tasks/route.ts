@@ -89,10 +89,10 @@ export async function GET(req: NextRequest) {
   if (linkedSearch) {
     const like = `%${linkedSearch}%`
     const [oppsRes, custsRes, vendsRes, contsRes] = await Promise.all([
-      adminClient.from('crm_opportunities').select('id').ilike('name', like).limit(100),
-      adminClient.from('crm_customers').select('id').ilike('name', like).limit(100),
+      adminClient.from('crm_opportunities').select('id').is('deleted_at', null).ilike('name', like).limit(100),
+      adminClient.from('crm_customers').select('id').is('deleted_at', null).ilike('name', like).limit(100),
       adminClient.from('crm_vendors').select('id').ilike('name', like).limit(100),
-      adminClient.from('crm_contacts').select('id').or(`first_name.ilike.${quotePostgrestValue(like)},last_name.ilike.${quotePostgrestValue(like)}`).limit(100),
+      adminClient.from('crm_contacts').select('id').is('deleted_at', null).or(`first_name.ilike.${quotePostgrestValue(like)},last_name.ilike.${quotePostgrestValue(like)}`).limit(100),
     ])
     linkedSearchFilters = [
       ...((oppsRes.data ?? []).map((row: { id: string }) => `opportunity_id.eq.${row.id}`)),

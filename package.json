@@ -8,9 +8,11 @@
     "start": "next start",
     "lint": "eslint",
     "release": "node scripts/release.mjs",
-    "setup-hooks": "node scripts/setup-hooks.mjs"
+    "setup-hooks": "node scripts/setup-hooks.mjs",
+    "test": "vitest run"
   },
   "dependencies": {
+    "@anthropic-ai/sdk": "^1.3.0",
     "@flags-sdk/vercel": "^1.4.2",
     "@fullcalendar/core": "^6.1.20",
     "@fullcalendar/daygrid": "^6.1.20",
@@ -33,6 +35,7 @@
     "@tiptap/pm": "^3.20.1",
     "@tiptap/react": "^3.20.1",
     "@tiptap/starter-kit": "^3.20.1",
+    "cheerio": "^1.2.0",
     "cloudinary": "^2.9.0",
     "flags": "^4.2.0",
     "next": "16.1.6",
@@ -43,6 +46,7 @@
     "react-dom": "19.2.3",
     "recharts": "^3.8.0",
     "resend": "^6.12.2",
+    "sharp": "^0.34.5",
     "xlsx": "^0.18.5"
   },
   "devDependencies": {
@@ -55,6 +59,7 @@
     "eslint": "^9",
     "eslint-config-next": "16.1.6",
     "tailwindcss": "^4",
-    "typescript": "^5"
+    "typescript": "^5",
+    "vitest": "^3.2.7"
   }
 }

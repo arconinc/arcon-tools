@@ -1,1 +1,6 @@
-{}
+{
+  "crons": [
+    { "path": "/api/cron/hat-catalog-sync", "schedule": "*/20 6-11 * * *" },
+    { "path": "/api/cron/hat-mockup-starters", "schedule": "30 11 * * *" }
+  ]
+}

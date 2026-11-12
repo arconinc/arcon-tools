@@ -45,11 +45,12 @@ export async function GET(req: NextRequest) {
   }
 
   const [countRes, dataRes] = await Promise.all([
-    applyFilters(adminClient.from('crm_customers').select('*', { count: 'exact', head: true })),
+    applyFilters(adminClient.from('crm_customers').select('*', { count: 'exact', head: true }).is('deleted_at', null)),
     applyFilters(
       adminClient
         .from('crm_customers')
         .select('id, name, client_status, phone, website, assigned_to, logo_url, created_at, updated_at')
+        .is('deleted_at', null)
         .order('name')
     ).range(from, to),
   ])

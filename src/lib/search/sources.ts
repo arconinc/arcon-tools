@@ -56,6 +56,7 @@ export const SEARCH_SOURCES: SearchSource[] = [
       const { data } = await admin
         .from('crm_customers')
         .select('id, name, industry, billing_city')
+        .is('deleted_at', null)
         .ilike('name', ilikePattern(term))
         .limit(LIMIT)
       return (data ?? []).map(c => ({
@@ -80,6 +81,7 @@ export const SEARCH_SOURCES: SearchSource[] = [
       const { data } = await admin
         .from('crm_contacts')
         .select('id, first_name, last_name, email, title, customer_id, vendor_id')
+        .is('deleted_at', null)
         .or(nameFilter)
         .limit(LIMIT)
 

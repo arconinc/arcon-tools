@@ -33,6 +33,7 @@ export async function GET() {
     adminClient
       .from('crm_opportunities')
       .select('value, forecast_close_date, assigned_to')
+      .is('deleted_at', null)
       .eq('status', 'open')
       .not('forecast_close_date', 'is', null)
       .not('assigned_to', 'is', null),

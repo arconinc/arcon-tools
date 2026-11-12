@@ -91,6 +91,12 @@ export function useAppUser() {
   return useContext(UserContext)
 }
 
+export const FeatureFlagsContext = createContext<Record<string, boolean>>({})
+
+export function useFeatureFlags() {
+  return useContext(FeatureFlagsContext)
+}
+
 
 // ── Nav structure ─────────────────────────────────────────────────────────────
 
@@ -191,6 +197,7 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
         { href: '/marketing', label: 'Dashboard', icon: CrmDashIcon, adminMatch: true },
         { href: '/marketing/calendar', label: 'Calendar', icon: CalendarIcon, adminMatch: true },
         { href: '/marketing/specs', label: 'Spec Samples', icon: SpecSampleIcon, adminMatch: true },
+        { href: '/marketing/mockups', label: 'Hat Mockups', icon: SpecSampleIcon, adminMatch: true },
         { href: '/admin/specs/ideas', label: 'Spec Ideas', icon: SpecSampleIcon, adminOnly: true, adminMatch: true },
         { href: '/marketing/vendor-relations', label: 'Vendor Relations', icon: BuildingIcon, adminMatch: true },
         { href: '/marketing/self-promo', label: 'Self-promo', icon: MegaphoneIcon, adminMatch: true },
@@ -260,6 +267,7 @@ function buildNavSections(isAdmin: boolean, roles: string[], featureFlags: Recor
         { href: '/admin/marketing-goals', label: 'Sales Goals', icon: GoalIcon, adminMatch: true, groupLabel: 'Sales & Marketing' },
         { href: '/admin/marketing-tags', label: 'Marketing Tags', icon: TagIcon, adminMatch: true },
         { href: '/admin/marketing-import', label: 'Marketing Import', icon: UploadIcon, adminMatch: true },
+        { href: '/admin/hat-catalog', label: 'Hat Catalog', icon: StoreIcon, adminMatch: true },
 
         { href: '/admin/users', label: 'Manage Users', icon: UserAdminIcon, adminMatch: true, groupLabel: 'People & Access' },
         { href: '/admin/groups', label: 'Access Control', icon: UsersIcon, adminMatch: true },
@@ -475,6 +483,7 @@ export default function AppShell({ children, user, isImpersonating, impersonated
 
   return (
     <UserContext.Provider value={{ user }}>
+      <FeatureFlagsContext.Provider value={evaluatedFlags}>
       <StoreContext.Provider value={{ selectedStore, setSelectedStore }}>
         <div style={{ display: 'flex', height: '100vh', overflow: 'hidden', background: '#f5f5f5' }}>
 
@@ -856,6 +865,7 @@ export default function AppShell({ children, user, isImpersonating, impersonated
 
         </div>
       </StoreContext.Provider>
+      </FeatureFlagsContext.Provider>
       <Toaster />
     </UserContext.Provider>
   )

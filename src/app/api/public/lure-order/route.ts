@@ -97,6 +97,7 @@ async function upsertCustomerAndContact(
     .from('crm_contacts')
     .select('id, customer_id')
     .eq('email', email.toLowerCase())
+    .is('deleted_at', null)
     .single()
 
   if (existingContact?.customer_id) {

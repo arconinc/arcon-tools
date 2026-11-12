@@ -35,7 +35,7 @@ export async function GET(_: Request, { params }: { params: Promise<{ id: string
       .maybeSingle(),
     adminClient
       .from('store_contact_links')
-      .select('contact:crm_contacts(id, first_name, last_name, email)')
+      .select('contact:crm_contacts(id, first_name, last_name, email, deleted_at)')
       .eq('store_id', id),
     adminClient
       .from('crm_tasks')

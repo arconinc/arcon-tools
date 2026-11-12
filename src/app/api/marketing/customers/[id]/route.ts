@@ -5,6 +5,7 @@ import { unauthorized, forbidden, notFound, serverError, ok } from '@/lib/api/re
 import { stripReadOnly } from '@/lib/api/sanitize'
 import { setEntityTags } from '@/lib/crm/tags'
 import { withAssigneeNames } from '@/lib/crm/task-enrich'
+import { softDeleteCustomer } from '@/lib/crm/soft-delete'
 
 // GET /api/marketing/customers/[id]
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -18,14 +19,15 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .from('crm_customers')
     .select('*')
     .eq('id', id)
+    .is('deleted_at', null)
     .single()
 
   if (error || !customer) return notFound('Customer not found')
 
   // Fetch related data in parallel
   const [contactsRes, oppsRes, filesRes, storesRes, tasksRes, assignedUserRes, createdByUserRes, entityTagsRes] = await Promise.all([
-    adminClient.from('crm_contacts').select('id, first_name, last_name, title, email, phone, type_of_contact, department').eq('customer_id', id).order('last_name'),
-    adminClient.from('crm_opportunities').select('id, name, value, status, pipeline_stage, forecast_close_date, assigned_to').eq('customer_id', id).order('created_at', { ascending: false }),
+    adminClient.from('crm_contacts').select('id, first_name, last_name, title, email, phone, type_of_contact, department').eq('customer_id', id).is('deleted_at', null).order('last_name'),
+    adminClient.from('crm_opportunities').select('id, name, value, status, pipeline_stage, forecast_close_date, assigned_to').eq('customer_id', id).is('deleted_at', null).order('created_at', { ascending: false }),
     adminClient.from('crm_files').select('id, label, url, created_at').eq('customer_id', id).order('created_at', { ascending: false }),
     adminClient.from('store_customer_links').select('stores(id, store_id, store_name, status, is_active)').eq('customer_id', id),
     adminClient
@@ -92,6 +94,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .from('crm_customers')
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id)
+    .is('deleted_at', null)
     .select()
     .single()
 
@@ -99,7 +102,8 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   return ok(data)
 }
 
-// DELETE /api/marketing/customers/[id] — admin only
+// DELETE /api/marketing/customers/[id] — admin only. Soft delete: sets deleted_at on the customer,
+// its contacts, and its opportunities. Nothing is removed from the table.
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const appUser = await requireUser()
   if (!appUser) return unauthorized()
@@ -107,8 +111,11 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
 
   const { id } = await params
   const adminClient = createAdminClient()
-  const { error } = await adminClient.from('crm_customers').delete().eq('id', id)
-
-  if (error) return serverError(error.message)
-  return ok({ ok: true })
+  try {
+    const counts = await softDeleteCustomer(adminClient, id)
+    if (!counts) return notFound('Customer not found')
+    return ok({ ok: true, deleted: counts })
+  } catch (err) {
+    return serverError(err instanceof Error ? err.message : 'Delete failed')
+  }
 }
