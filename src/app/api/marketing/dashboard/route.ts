@@ -35,6 +35,7 @@ export async function GET() {
     adminClient
       .from('crm_opportunities')
       .select('id, name, customer_id, value, probability, pipeline_stage, forecast_close_date, status')
+      .is('deleted_at', null)
       .eq('assigned_to', appUser.id)
       .eq('status', 'open')
       .order('value', { ascending: false }),
@@ -43,6 +44,7 @@ export async function GET() {
     adminClient
       .from('crm_opportunities')
       .select('id, name, customer_id, assigned_to, value, pipeline_stage, forecast_close_date, status')
+      .is('deleted_at', null)
       .eq('status', 'open')
       .lte('forecast_close_date', closingSoonStr)
       .gte('forecast_close_date', todayStr)
@@ -53,6 +55,7 @@ export async function GET() {
     adminClient
       .from('crm_opportunities')
       .select('*', { count: 'exact', head: true })
+      .is('deleted_at', null)
       .eq('status', 'open')
       .lte('forecast_close_date', closingSoonStr)
       .gte('forecast_close_date', todayStr),
@@ -61,6 +64,7 @@ export async function GET() {
     adminClient
       .from('crm_opportunities')
       .select('id, assigned_to, value, status')
+      .is('deleted_at', null)
       .eq('status', 'open')
       .not('assigned_to', 'is', null),
 
@@ -100,6 +104,7 @@ export async function GET() {
   const { data: wonThisMonth } = await adminClient
     .from('crm_opportunities')
     .select('assigned_to, value')
+    .is('deleted_at', null)
     .eq('status', 'won')
     .not('assigned_to', 'is', null)
     .gte('closed_at', monthStart)
@@ -187,7 +192,7 @@ export async function GET() {
   const tOppIds = [...new Set(myTaskRows.map((t: any) => t.opportunity_id).filter(Boolean))]
   const tOpps: Record<string, string> = {}
   if (tOppIds.length > 0) {
-    const { data } = await adminClient.from('crm_opportunities').select('id, name').in('id', tOppIds)
+    const { data } = await adminClient.from('crm_opportunities').select('id, name').in('id', tOppIds).is('deleted_at', null)
     for (const o of data ?? []) tOpps[o.id] = o.name
   }
   const myTasks = myTaskRows.map((t: any) => ({

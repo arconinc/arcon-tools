@@ -5,6 +5,7 @@ import { unauthorized, forbidden, notFound, serverError, ok } from '@/lib/api/re
 import { stripReadOnly } from '@/lib/api/sanitize'
 import { setEntityTags } from '@/lib/crm/tags'
 import { withAssigneeNames } from '@/lib/crm/task-enrich'
+import { softDeleteContact } from '@/lib/crm/soft-delete'
 
 // GET /api/marketing/contacts/[id]
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -18,6 +19,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .from('crm_contacts')
     .select('*')
     .eq('id', id)
+    .is('deleted_at', null)
     .single()
 
   if (error || !contact) return notFound('Contact not found')
@@ -77,6 +79,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .from('crm_contacts')
     .update({ ...updates, updated_at: new Date().toISOString() })
     .eq('id', id)
+    .is('deleted_at', null)
     .select()
     .single()
 
@@ -84,7 +87,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   return ok(data)
 }
 
-// DELETE /api/marketing/contacts/[id] — admin only
+// DELETE /api/marketing/contacts/[id] — admin only. Soft delete: sets deleted_at. Nothing is removed from the table.
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const appUser = await requireUser()
   if (!appUser) return unauthorized()
@@ -92,8 +95,11 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
 
   const { id } = await params
   const adminClient = createAdminClient()
-  const { error } = await adminClient.from('crm_contacts').delete().eq('id', id)
-
-  if (error) return serverError(error.message)
-  return ok({ ok: true })
+  try {
+    const deleted = await softDeleteContact(adminClient, id)
+    if (!deleted) return notFound('Contact not found')
+    return ok({ ok: true })
+  } catch (err) {
+    return serverError(err instanceof Error ? err.message : 'Delete failed')
+  }
 }

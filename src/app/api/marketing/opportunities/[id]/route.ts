@@ -40,6 +40,7 @@ export async function GET(_req: NextRequest, { params }: { params: Promise<{ id:
     .from('crm_opportunities')
     .select('*')
     .eq('id', id)
+    .is('deleted_at', null)
     .single()
 
   if (error || !opp) return notFound('Opportunity not found')
@@ -123,6 +124,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .from('crm_opportunities')
     .select('*')
     .eq('id', id)
+    .is('deleted_at', null)
     .single()
 
   if (fetchErr || !current) return notFound('Opportunity not found')
@@ -178,6 +180,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
     .from('crm_opportunities')
     .update(finalUpdates)
     .eq('id', id)
+    .is('deleted_at', null)
     .select()
     .single()
 
@@ -185,7 +188,7 @@ export async function PATCH(req: NextRequest, { params }: { params: Promise<{ id
   return ok(data)
 }
 
-// DELETE /api/marketing/opportunities/[id] — admin only
+// DELETE /api/marketing/opportunities/[id] — admin only. Soft delete: sets deleted_at. Nothing is removed from the table.
 export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
   const appUser = await requireUser()
   if (!appUser) return unauthorized()
@@ -193,8 +196,14 @@ export async function DELETE(_req: NextRequest, { params }: { params: Promise<{ 
 
   const { id } = await params
   const adminClient = createAdminClient()
-  const { error } = await adminClient.from('crm_opportunities').delete().eq('id', id)
+  const { data, error } = await adminClient
+    .from('crm_opportunities')
+    .update({ deleted_at: new Date().toISOString() })
+    .eq('id', id)
+    .is('deleted_at', null)
+    .select('id')
 
   if (error) return serverError(error.message)
+  if (!data?.length) return notFound('Opportunity not found')
   return ok({ ok: true })
 }

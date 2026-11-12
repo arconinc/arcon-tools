@@ -1,6 +1,7 @@
 'use client'
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
+import { hasUnsentDraft } from '@/lib/crm/task-draft'
 import { formatDateTime } from '@/lib/format'
 import { TASK_STATUS_LABELS } from '@/lib/task-workflow'
 import { TaskDescriptionEditor } from '@/components/crm/TaskDescriptionEditor'
@@ -453,6 +454,7 @@ export function TaskThread({
   uploadingDescriptionFile,
   onRefresh,
   onSent,
+  onDraftChange,
   onCompleteTask,
   onSaveDescription,
   onUploadDescriptionFile,
@@ -478,6 +480,8 @@ export function TaskThread({
   onRefresh: () => void | Promise<void>
   // Fires after a message is sent (instead of onRefresh) so the host can save and close.
   onSent?: () => void | Promise<void>
+  // Reports whether the composer holds an unsent message, so the host can warn before it's lost.
+  onDraftChange?: (hasDraft: boolean) => void
   onCompleteTask?: () => void
   onSaveDescription: (html: string) => void
   onUploadDescriptionFile: (file: File) => void
@@ -487,6 +491,9 @@ export function TaskThread({
   const [pendingFiles, setPendingFiles] = useState<File[]>([])
   const [submitting, setSubmitting] = useState(false)
   const fileInputRef = useRef<HTMLInputElement>(null)
+
+  const draft = hasUnsentDraft(text, pendingFiles.length)
+  useEffect(() => { onDraftChange?.(draft) }, [draft, onDraftChange])
 
   // Replies can target any message, but the thread only renders one level of
   // nesting — a reply to a reply is grouped under its top-level ancestor so
@@ -603,6 +610,9 @@ export function TaskThread({
           rows={3}
           value={text}
           onChange={(e) => setText(e.target.value)}
+          onKeyDown={(e) => {
+            if (e.key === 'Enter' && (e.metaKey || e.ctrlKey) && !submitting) { e.preventDefault(); submitReply() }
+          }}
           placeholder="Write a message…"
           className="w-full px-3 py-2 text-sm border border-slate-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-purple-400 resize-none mb-2"
         />
@@ -623,11 +633,12 @@ export function TaskThread({
             type="button"
             onClick={() => submitReply()}
             disabled={submitting || (!text.trim() && pendingFiles.length === 0)}
-            className="inline-flex items-center gap-1.5 px-4 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-lg disabled:opacity-60 transition-colors"
+            className="inline-flex items-center gap-1.5 px-5 py-2 bg-purple-700 hover:bg-purple-800 text-white text-sm font-semibold rounded-lg shadow-sm disabled:opacity-60 transition-colors"
           >
             <SendGlyph className="h-3.5 w-3.5" />
-            {submitting ? 'Sending…' : 'Send'}
+            {submitting ? 'Sending…' : 'Send message'}
           </button>
+          <span className="text-xs text-slate-400 hidden sm:inline">or press Ctrl/⌘ + Enter</span>
 
           <input
             ref={fileInputRef}

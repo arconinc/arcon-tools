@@ -47,6 +47,7 @@ export async function GET(req: NextRequest) {
     const { data, error } = await adminClient
       .from('crm_contacts')
       .select('id, first_name, last_name, email, phone, customer_id')
+      .is('deleted_at', null)
       .in('id', registeredIds)
       .order('last_name')
       .order('first_name')
@@ -58,6 +59,7 @@ export async function GET(req: NextRequest) {
     const { data: matchingCustomers } = await adminClient
       .from('crm_customers')
       .select('id')
+      .is('deleted_at', null)
       .ilike('name', `%${search}%`)
       .limit(50)
 
@@ -66,6 +68,7 @@ export async function GET(req: NextRequest) {
     let query = adminClient
       .from('crm_contacts')
       .select('id, first_name, last_name, email, phone, customer_id')
+      .is('deleted_at', null)
       .order('last_name')
       .order('first_name')
       .limit(50)
@@ -142,6 +145,7 @@ export async function POST(request: Request) {
     .from('crm_contacts')
     .select('id')
     .eq('id', contactId)
+    .is('deleted_at', null)
     .maybeSingle()
   if (contactErr || !contact) {
     return NextResponse.json({ error: 'Contact not found' }, { status: 404 })
@@ -194,6 +198,7 @@ export async function PUT(request: Request) {
   const { data: existingCustomer } = await adminClient
     .from('crm_customers')
     .select('id')
+    .is('deleted_at', null)
     .ilike('name', company)
     .limit(1)
     .maybeSingle()
@@ -217,6 +222,7 @@ export async function PUT(request: Request) {
     .from('crm_contacts')
     .select('id')
     .eq('email', normalizedEmail)
+    .is('deleted_at', null)
     .maybeSingle()
 
   let contactId: string

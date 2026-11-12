@@ -1,6 +1,6 @@
 'use client'
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type CSSProperties } from 'react'
 import Link from 'next/link'
 import { ArtworkUploadModal } from '@/components/crm/customer/ArtworkUploadModal'
 import type { ArtworkItem } from '@/hooks/useArtwork'
@@ -91,6 +91,19 @@ export function HatMockupAssistant({
 
   const logRef = useRef<HTMLDivElement>(null)
   const renderSeq = useRef(0)
+  const gridRef = useRef<HTMLDivElement>(null)
+  const [panelH, setPanelH] = useState<number | null>(null)
+
+  // Size the two panels to whatever space is left under the header, so the chat input stays on screen.
+  useLayoutEffect(() => {
+    const measure = () => {
+      const top = gridRef.current?.getBoundingClientRect().top ?? 0
+      setPanelH(Math.max(560, window.innerHeight - top - 16))
+    }
+    measure()
+    window.addEventListener('resize', measure)
+    return () => window.removeEventListener('resize', measure)
+  }, [])
 
   useEffect(() => {
     getJson<{ styles: Style[]; syncedAt: string | null }>('/api/marketing/mockups/catalog')
@@ -286,9 +299,13 @@ export function HatMockupAssistant({
         </button>
       </div>
 
-      <div className="grid gap-4 lg:grid-cols-2">
+      <div
+        ref={gridRef}
+        className="grid gap-4 lg:grid-cols-2"
+        style={panelH ? ({ '--panel-h': `${panelH}px` } as CSSProperties) : undefined}
+      >
         {/* Conversation */}
-        <section className="bg-white border border-slate-200 rounded-2xl flex flex-col min-h-[560px] lg:h-[calc(100vh-240px)]">
+        <section className="bg-white border border-slate-200 rounded-2xl flex flex-col min-h-[560px] lg:h-[var(--panel-h)]">
           <h2 className="px-4 py-3 border-b border-slate-200 text-xs font-semibold tracking-wider uppercase text-slate-500 flex justify-between">
             <span>Conversation</span>
             {sel.customerName && <span className="normal-case tracking-normal font-medium">Customer: {sel.customerName}</span>}
@@ -370,7 +387,7 @@ export function HatMockupAssistant({
         </section>
 
         {/* Mockup + pickers */}
-        <section className="bg-white border border-slate-200 rounded-2xl flex flex-col lg:h-[calc(100vh-240px)]">
+        <section className="bg-white border border-slate-200 rounded-2xl flex flex-col lg:h-[var(--panel-h)]">
           <h2 className="px-4 py-3 border-b border-slate-200 text-xs font-semibold tracking-wider uppercase text-slate-500 flex justify-between">
             <span>Mockup</span>
             <span className="normal-case tracking-normal font-medium">{rendering ? 'Rendering…' : current?.title ?? 'Waiting for a hat'}</span>

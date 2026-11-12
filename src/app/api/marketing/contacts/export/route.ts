@@ -67,13 +67,13 @@ export async function GET(req: NextRequest) {
       if ((data ?? []).length < 1000) break
     }
 
-    const contacts = await fetchByIds(adminClient, 'crm_contacts', contactIds)
+    const contacts = (await fetchByIds(adminClient, 'crm_contacts', contactIds)).filter((c) => !c.deleted_at)
     contacts.sort((a, b) => (a.last_name + a.first_name).localeCompare(b.last_name + b.first_name))
 
     const customerIds = [...new Set(contacts.map((c) => c.customer_id).filter(Boolean))] as string[]
     const vendorIds = [...new Set(contacts.map((c) => c.vendor_id).filter(Boolean))] as string[]
     const [customers, vendors] = await Promise.all([
-      fetchByIds(adminClient, 'crm_customers', customerIds),
+      fetchByIds(adminClient, 'crm_customers', customerIds).then((rows) => rows.filter((c) => !c.deleted_at)),
       fetchByIds(adminClient, 'crm_vendors', vendorIds),
     ])
     const customerMap = new Map(customers.map((c) => [c.id, c]))

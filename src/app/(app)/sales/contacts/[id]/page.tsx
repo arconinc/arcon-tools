@@ -8,6 +8,7 @@ import EntitySearchPicker from '@/components/crm/EntitySearchPicker'
 import { PlacesAddressAutocomplete } from '@/components/crm/PlacesAddressAutocomplete'
 import { CreateTaskModal } from '@/components/crm/CreateTaskModal'
 import { CrmDetailActions } from '@/components/crm/CrmDetailActions'
+import { useAppUser } from '@/components/layout/AppShell'
 import { TaskCreatedToast } from '@/components/crm/TaskCreatedToast'
 import { formatPhoneInput } from '@/lib/phone'
 import { taskStatusBadge } from '@/lib/badges'
@@ -74,6 +75,7 @@ function FI({ label, name, value, onChange, type = 'text' }: {
 
 export default function ContactDetailPage() {
   const router = useRouter()
+  const { user: viewer } = useAppUser()
   const params = useParams<{ id: string }>()
   const searchParams = useSearchParams()
   const id = params.id
@@ -138,6 +140,15 @@ export default function ContactDetailPage() {
       .catch(() => setError('Failed to load contact'))
       .finally(() => setLoading(false))
   }, [id, isNew])
+
+  // Soft delete: sets deleted_at. Nothing is erased.
+  async function handleDeleteContact() {
+    if (!contact) return
+    if (!window.confirm(`Delete ${contact.first_name} ${contact.last_name}? Nothing is erased.`)) return
+    const res = await fetch(`/api/marketing/contacts/${contact.id}`, { method: 'DELETE' })
+    if (!res.ok) { alert('Delete failed'); return }
+    router.push('/sales/contacts')
+  }
 
   function startEdit() {
     if (!contact) return
@@ -378,7 +389,12 @@ export default function ContactDetailPage() {
               <div className="flex items-center justify-between px-5 py-3 border-b border-slate-100 bg-slate-50 rounded-t-2xl">
                 <h2 className="text-sm font-semibold text-slate-700">Name &amp; Contact Details</h2>
                 {!editing ? (
-                  <button onClick={startEdit} className="px-3 py-1 text-xs font-semibold border border-slate-300 text-slate-600 rounded-lg hover:bg-white transition-colors">Edit</button>
+                  <div className="flex gap-2">
+                    {viewer?.is_admin && (
+                      <button onClick={handleDeleteContact} className="px-3 py-1 text-xs font-semibold border border-red-200 text-red-600 rounded-lg hover:bg-red-50 transition-colors">Delete</button>
+                    )}
+                    <button onClick={startEdit} className="px-3 py-1 text-xs font-semibold border border-slate-300 text-slate-600 rounded-lg hover:bg-white transition-colors">Edit</button>
+                  </div>
                 ) : (
                   <div className="flex gap-2">
                     <button onClick={saveEdit} disabled={saving} className="px-3 py-1 text-xs font-semibold bg-purple-700 text-white rounded-lg hover:bg-purple-800 disabled:opacity-60 transition-colors">{saving ? 'Saving…' : 'Save'}</button>

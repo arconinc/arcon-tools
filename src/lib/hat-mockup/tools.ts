@@ -193,7 +193,7 @@ export async function executeTool(ctx: ToolContext, name: string, input: Input):
     case 'find_customer': {
       const q = s(input, 'query') ?? ''
       ctx.activity.push(`Searched customers for “${q}”`)
-      const { data } = await db.from('crm_customers').select('id, name').ilike('name', `%${q}%`).order('name').limit(5)
+      const { data } = await db.from('crm_customers').select('id, name').is('deleted_at', null).ilike('name', `%${q}%`).order('name').limit(5)
       return { customers: data ?? [] }
     }
     case 'list_customer_logos': {

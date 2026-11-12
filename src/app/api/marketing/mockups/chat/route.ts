@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
     return ok({ session_id: session.id, reply: turn.reply, ask: turn.ask, previews: turn.previews, activity: turn.activity, state })
   } catch (err) {
     Sentry.captureException(err)
+    console.error('[mockup chat] turn failed:', err) // ponytail: temporary, remove once the 500 cause is fixed
     if (err instanceof Anthropic.RateLimitError) return fail(429, 'The assistant is busy. Try again in a moment.')
     return serverError('The assistant ran into a problem. Your selections are kept; try again or use the pickers.')
   }

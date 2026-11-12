@@ -1,0 +1,4 @@
+# >>> mcp-switcher supabase (managed; do not edit inside this block) >>>
+[mcp_servers.supabase]
+url = "https://mcp.supabase.com/mcp?project_ref=hrjlnxoyindmmacdjbsn&read_only=true"
+# <<< mcp-switcher supabase <<<
