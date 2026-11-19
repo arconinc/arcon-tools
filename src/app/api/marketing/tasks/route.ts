@@ -1,12 +1,8 @@
 import { NextRequest } from 'next/server'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
-import { ALL_CATEGORIES } from '@/lib/task-constants'
-import { validateTeamId } from '@/lib/team-assignment'
-import { dispatchNotification, fetchActor } from '@/lib/notifications/dispatch'
-import { taskAssigned } from '@/lib/notifications/registry'
-import { unauthorized, badRequest, serverError, created, ok } from '@/lib/api/respond'
-import { stripReadOnly } from '@/lib/api/sanitize'
+import { unauthorized, serverError, ok } from '@/lib/api/respond'
+import { createTask } from '@/lib/crm/tasks-service'
 
 // Comments older than this count as already seen for a task the user never opened.
 const UNREAD_BASELINE = '2026-09-28T00:00:00Z'
@@ -15,19 +11,6 @@ function quotePostgrestValue(value: string) {
   return `"${value.replace(/"/g, '\\"')}"`
 }
 
-function normalizeTaskAssignment(task: Record<string, unknown>) {
-  const normalized = { ...task }
-
-  if (
-    typeof normalized.category === 'string' &&
-    normalized.category &&
-    !(ALL_CATEGORIES as string[]).includes(normalized.category)
-  ) {
-    normalized.category = null
-  }
-
-  return { task: normalized }
-}
 
 // GET /api/marketing/tasks
 // ?assigned_to=me|all|<uuid>|<uuid1>,<uuid2>  ?status=  ?category=  ?team_id=  ?delegated_by_me=true  ?my_teams=true  ?due_before=  ?opportunity_id=  ?customer_id=  ?vendor_id=  ?order_by=created|due_date|sort_order  ?page=1&limit=50
@@ -307,78 +290,5 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   const appUser = await requireUser()
   if (!appUser) return unauthorized()
-
-  const body = await req.json()
-  const { title, ...rest } = body
-  if (!title?.trim()) return badRequest('Title is required')
-
-  const safeRest = stripReadOnly(rest, ['assigned_user_name', 'linked_to_name', 'linked_to_type'])
-
-  const normalized = normalizeTaskAssignment(safeRest)
-
-  const adminClient = createAdminClient()
-
-  if (normalized.task.team_id && !(await validateTeamId(adminClient, normalized.task.team_id as string))) {
-    return badRequest('Invalid team')
-  }
-
-  const { data, error } = await adminClient
-    .from('crm_tasks')
-    .insert({
-      title: title.trim(),
-      ...normalized.task,
-      created_by: appUser.id,
-      task_owner: normalized.task.task_owner ?? appUser.id,
-      // Only default to the creator when the field is omitted entirely —
-      // an explicit `null` (e.g. assigning to a team with no individual
-      // picked yet) must stay unassigned, not silently become "me".
-      assigned_to: 'assigned_to' in normalized.task ? normalized.task.assigned_to : appUser.id,
-      status: normalized.task.status ?? 'not_started',
-      priority: normalized.task.priority ?? 'medium',
-      progress: normalized.task.progress ?? 0,
-    })
-    .select()
-    .single()
-
-  if (error) return serverError(error.message)
-
-  // Fire task_assigned notification. Wrapped in try/catch so a notification
-  // failure (or missing migration) never blocks the task creation response.
-  try {
-    const isUserAssigned = !!data.assigned_to && data.assigned_to !== appUser.id
-    const isTeamOnly = !data.assigned_to && !!data.team_id
-    if (isUserAssigned || isTeamOnly) {
-      const actor = await fetchActor(appUser.id)
-      let teamName: string | null = null
-      if (isTeamOnly) {
-        const { data: team } = await adminClient.from('groups').select('name').eq('id', data.team_id).single()
-        teamName = team?.name ?? null
-      }
-      await dispatchNotification({
-        definition: taskAssigned,
-        payload: {
-          task_id: data.id,
-          task_title: data.title,
-          actor_id: appUser.id,
-          actor_name: actor.display_name,
-          department: data.department ?? null,
-          team_id: data.team_id ?? null,
-          team_name: teamName,
-          due_date: data.due_date ?? null,
-          priority: data.priority ?? null,
-          status: data.status ?? null,
-          description: data.description ?? null,
-          fanout_kind: isTeamOnly ? 'team' : 'user',
-        },
-        recipientSpec: isTeamOnly
-          ? { teamId: data.team_id }
-          : { userId: data.assigned_to },
-        suppressUserIds: [appUser.id],
-      })
-    }
-  } catch (err) {
-    console.error('[notifications] task POST dispatch failed:', err)
-  }
-
-  return created(data)
+  return createTask(appUser, await req.json())
 }

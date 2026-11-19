@@ -1,10 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
-import * as Sentry from '@sentry/nextjs'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { requireUser } from '@/lib/crm/require-user'
-import { dispatchNotification, fetchActor } from '@/lib/notifications/dispatch'
-import { taskCommentAdded } from '@/lib/notifications/registry'
-import { stripHtml } from '@/lib/news-utils'
+import { addTaskComment } from '@/lib/crm/tasks-service'
 
 // GET /api/marketing/tasks/[id]/comments
 export async function GET(_req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
@@ -48,100 +45,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
   if (!appUser) return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
 
   const { id: taskId } = await params
-  const body = await req.json()
-  const { comment, parent_comment_id } = body
-
-  // Text is optional here — the conversation thread also posts "attach only"
-  // replies (files with no message), which upload to this comment row right
-  // after creation. Empty string is a valid comment body.
-  if (typeof comment !== 'string') return NextResponse.json({ error: 'Comment text is required' }, { status: 400 })
-
-  const adminClient = createAdminClient()
-  const { data: task, error: taskError } = await adminClient
-    .from('crm_tasks')
-    .select('id, title, assigned_to, created_by, department')
-    .eq('id', taskId)
-    .single()
-
-  if (taskError || !task) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
-
-  // A reply can target any existing message, but the thread only renders one
-  // level of nesting — so a reply-to-a-reply is folded onto its top-level
-  // ancestor here, keeping the stored tree shallow and the UI simple.
-  let resolvedParentId: string | null = null
-  if (typeof parent_comment_id === 'string' && parent_comment_id) {
-    const { data: parent } = await adminClient
-      .from('crm_task_comments')
-      .select('id, task_id, parent_comment_id')
-      .eq('id', parent_comment_id)
-      .single()
-    if (!parent || parent.task_id !== taskId) {
-      return NextResponse.json({ error: 'Invalid parent comment' }, { status: 400 })
-    }
-    resolvedParentId = parent.parent_comment_id ?? parent.id
-  }
-
-  const { data, error } = await adminClient
-    .from('crm_task_comments')
-    .insert({
-      task_id: taskId,
-      user_id: appUser.id,
-      comment: comment.trim(),
-      parent_comment_id: resolvedParentId,
-    })
-    .select()
-    .single()
-
-  if (error) return NextResponse.json({ error: error.message }, { status: 500 })
-
-  // Comments never reassign the task — notify both the requestor and the
-  // assignee (minus the commenter) on every message.
-  try {
-    const recipientIds = [...new Set([task.created_by, task.assigned_to])]
-      .filter((uid): uid is string => !!uid && uid !== appUser.id)
-    if (recipientIds.length > 0) {
-      const actor = await fetchActor(appUser.id)
-      const { data: commentRows } = await adminClient
-        .from('crm_task_comments')
-        .select('comment, created_at, user_id')
-        .eq('task_id', taskId)
-        .order('created_at', { ascending: true })
-
-      const commentUserIds = [...new Set((commentRows ?? []).map((c: any) => c.user_id).filter(Boolean))]
-      const commentUsersMap: Record<string, string> = {}
-      if (commentUserIds.length > 0) {
-        const { data: commentUsers } = await adminClient
-          .from('users')
-          .select('id, display_name')
-          .in('id', commentUserIds)
-        for (const u of commentUsers ?? []) commentUsersMap[u.id] = u.display_name
-      }
-
-      await dispatchNotification({
-        definition: taskCommentAdded,
-        payload: {
-          task_id: taskId,
-          task_title: task.title,
-          actor_id: appUser.id,
-          actor_name: actor.display_name,
-          comment_preview: stripHtml(comment).trim() ? stripHtml(comment).trim().slice(0, 120) : 'Added an attachment',
-          comments: (commentRows ?? []).map((c: any) => ({
-            author_name: commentUsersMap[c.user_id] ?? 'Unknown',
-            comment: c.comment,
-            created_at: c.created_at,
-          })),
-          department: task.department ?? null,
-        },
-        recipientSpec: { userIds: recipientIds },
-        suppressUserIds: [appUser.id],
-      })
-    }
-  } catch (err) {
-    console.error('[notifications] task comment dispatch failed:', err)
-    Sentry.captureException(err)
-  }
-
-  return NextResponse.json(data, { status: 201 })
+  return addTaskComment(appUser, taskId, await req.json())
 }
 
 // DELETE /api/marketing/tasks/[id]/comments/[cid]  ← handled in sub-route
