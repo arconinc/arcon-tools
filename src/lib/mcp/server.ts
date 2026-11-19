@@ -3,11 +3,15 @@ import { WebStandardStreamableHTTPServerTransport } from '@modelcontextprotocol/
 import type { McpUser } from './auth'
 import { registerPeopleTools } from './tools/people'
 import { registerTaskTools } from './tools/tasks'
+import { registerCustomerTools } from './tools/customers'
+import { registerVendorTools } from './tools/vendors'
 
 function createMcpServer(user: McpUser) {
   const server = new McpServer({ name: 'arcon-tools', version: '1.0.0' })
   registerPeopleTools(server, user)
   registerTaskTools(server, user)
+  registerCustomerTools(server, user)
+  registerVendorTools(server, user)
   return server
 }
 
