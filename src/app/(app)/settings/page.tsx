@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import McpTokensCard from '@/components/settings/McpTokensCard'
 
 export default function SettingsPage() {
   const [username, setUsername] = useState('')
@@ -111,6 +112,10 @@ export default function SettingsPage() {
             {loading ? 'Validating & Saving…' : 'Update Credentials'}
           </button>
         </form>
+      </div>
+
+      <div className="mt-6">
+        <McpTokensCard />
       </div>
     </div>
   )
